@@ -1,0 +1,192 @@
+<Window x:Class="VoiceLite.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="VoiceLite Settings" Height="520" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Settings" FontSize="24" FontWeight="Bold" Grid.Row="0" Margin="0,0,0,20"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
+            <StackPanel>
+                <!-- Hotkey Settings -->
+                <GroupBox Header="Hotkey Settings" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Record Hotkey:" Margin="0,0,0,5"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Name="HotkeyTextBox"
+                                     Grid.Column="0"
+                                     IsReadOnly="True"
+                                     Text="F1"
+                                     Padding="5"
+                                     Background="#F0F0F0"
+                                     PreviewKeyDown="HotkeyTextBox_PreviewKeyDown"
+                                     GotFocus="HotkeyTextBox_GotFocus"
+                                     LostFocus="HotkeyTextBox_LostFocus"/>
+
+                            <Button Name="ClearHotkeyButton"
+                                    Grid.Column="1"
+                                    Content="Clear"
+                                    Width="60"
+                                    Margin="5,0,0,0"
+                                    Click="ClearHotkeyButton_Click"/>
+                        </Grid>
+                        <TextBlock Name="HotkeyInstructionText"
+                                   Text="Click the box and press your desired key combination"
+                                   FontSize="11"
+                                   Foreground="Gray"
+                                   Margin="0,5,0,0"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Recording Mode -->
+                <GroupBox Header="Recording Mode" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <RadioButton Name="PushToTalkRadio"
+                                     Content="Push-to-Talk (Hold key to record)"
+                                     IsChecked="True"
+                                     Margin="0,0,0,5"/>
+                        <RadioButton Name="ToggleRadio"
+                                     Content="Toggle (Press once to start, again to stop)"
+                                     IsEnabled="False"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Audio Settings -->
+                <GroupBox Header="Audio Settings" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Microphone:" Margin="0,0,0,5"/>
+                        <ComboBox Name="MicrophoneComboBox"
+                                  Margin="0,0,0,10"
+                                  DisplayMemberPath="Name"/>
+                        <Button Name="RefreshMicrophonesButton"
+                                Content="Refresh Microphones"
+                                Width="150"
+                                HorizontalAlignment="Left"
+                                Click="RefreshMicrophonesButton_Click"/>
+
+                        <CheckBox Name="PlaySoundFeedbackCheckBox"
+                                  Content="Play sound feedback (beep on record start/stop)"
+                                  Margin="0,10,0,5"/>
+
+                        <CheckBox Name="AutoPasteCheckBox"
+                                  Content="Auto-paste transcribed text (Ctrl+V)"
+                                  IsChecked="True"
+                                  Margin="0,0,0,10"
+                                  ToolTip="When enabled, transcribed text will automatically paste into the active application. When disabled, text is only copied to clipboard."/>
+
+                        <TextBlock Text="Text Injection Mode:" Margin="0,0,0,5"/>
+                        <ComboBox Name="TextInjectionModeComboBox"
+                                  Margin="0,0,0,5"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="Smart Auto"
+                                          ToolTip="Automatically choose between typing and pasting based on text length and context"/>
+                            <ComboBoxItem Content="Always Type"
+                                          ToolTip="Always use keyboard typing (most compatible, works in password fields)"/>
+                            <ComboBoxItem Content="Always Paste"
+                                          ToolTip="Always use clipboard paste (fastest, but doesn't work in secure fields)"/>
+                            <ComboBoxItem Content="Prefer Type"
+                                          ToolTip="Use typing for short text, paste for long text"/>
+                            <ComboBoxItem Content="Prefer Paste"
+                                          ToolTip="Use paste when possible, type when necessary"/>
+                        </ComboBox>
+                        <TextBlock Text="Smart mode types short text and pastes long text"
+                                   FontSize="11"
+                                   Foreground="Gray"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Whisper Settings -->
+                <GroupBox Header="Whisper Settings" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Model:" Margin="0,0,0,5"/>
+                        <ComboBox Name="WhisperModelComboBox"
+                                  Margin="0,0,0,10"
+                                  IsEditable="True"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                            <TextBlock Text="Beam size:" VerticalAlignment="Center"/>
+                            <TextBox Name="BeamSizeTextBox" Width="60" Margin="5,0,15,0"/>
+                            <TextBlock Text="Best of:" VerticalAlignment="Center"/>
+                            <TextBox Name="BestOfTextBox" Width="60" Margin="5,0,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Timeout multiplier (seconds per audio second):" Margin="0,5,0,5"/>
+                        <TextBox Name="TimeoutMultiplierTextBox" Width="80"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Audio Enhancements -->
+                <GroupBox Header="Audio Enhancements" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <CheckBox Name="NoiseSuppressionCheckBox"
+                                  Content="Enable noise suppression"
+                                  Margin="0,0,0,5"/>
+                        <CheckBox Name="AutoGainCheckBox"
+                                  Content="Enable automatic gain control"
+                                  Margin="0,0,0,10"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                            <TextBlock Text="Target RMS:" VerticalAlignment="Center"/>
+                            <TextBox Name="TargetRmsTextBox" Width="60" Margin="5,0,15,0"/>
+                            <TextBlock Text="Noise gate threshold:" VerticalAlignment="Center"/>
+                            <TextBox Name="NoiseThresholdTextBox" Width="60" Margin="5,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Other Settings -->
+                <GroupBox Header="Other Settings" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <CheckBox Name="StartWithWindowsCheckBox"
+                                  Content="Start with Windows"
+                                  Margin="0,0,0,5"
+                                  IsEnabled="False"/>
+                        <CheckBox Name="MinimizeToTrayCheckBox"
+                                  Content="Minimize to system tray on close"
+                                  IsChecked="True"
+                                  Margin="0,0,0,5"/>
+                        <CheckBox Name="ShowTrayIconCheckBox"
+                                  Content="Show system tray icon"
+                                  IsChecked="True"
+                                  IsEnabled="False"
+                                  Margin="0,0,0,5"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Name="SaveButton"
+                    Content="Save"
+                    Width="80"
+                    Margin="0,0,10,0"
+                    Click="SaveButton_Click"
+                    IsDefault="True"/>
+            <Button Name="CancelButton"
+                    Content="Cancel"
+                    Width="80"
+                    Click="CancelButton_Click"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
