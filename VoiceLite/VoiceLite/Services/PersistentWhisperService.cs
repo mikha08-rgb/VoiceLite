@@ -1,0 +1,373 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using NAudio.Wave;
+using VoiceLite.Interfaces;
+using VoiceLite.Models;
+
+namespace VoiceLite.Services
+{
+    public class PersistentWhisperService : ITranscriber, IDisposable
+    {
+        private readonly Settings settings;
+        private readonly string baseDir;
+        private string? cachedWhisperExePath;
+        private string? cachedModelPath;
+        private string? dummyAudioPath;
+        private volatile bool isWarmedUp = false;
+        private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
+
+        public PersistentWhisperService(Settings settings)
+        {
+            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // Cache paths at initialization
+            cachedWhisperExePath = ResolveWhisperExePath();
+            cachedModelPath = ResolveModelPath();
+
+            // Create dummy audio file and start warmup process
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    CreateDummyAudioFile();
+                    await WarmUpWhisperAsync();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
+                }
+            });
+        }
+
+        private string ResolveWhisperExePath()
+        {
+            var whisperExePath = Path.Combine(baseDir, "whisper", "whisper.exe");
+            if (File.Exists(whisperExePath))
+                return whisperExePath;
+
+            whisperExePath = Path.Combine(baseDir, "whisper.exe");
+            if (File.Exists(whisperExePath))
+                return whisperExePath;
+
+            throw new FileNotFoundException("Whisper.exe not found");
+        }
+
+        private string ResolveModelPath()
+        {
+            var modelFile = settings.WhisperModel switch
+            {
+                "small" => "ggml-small.bin",
+                "medium" => "ggml-medium.bin",
+                "large" => "ggml-large-v3.bin",
+                _ => "ggml-small.bin"
+            };
+
+            var modelPath = Path.Combine(baseDir, "whisper", modelFile);
+            if (File.Exists(modelPath))
+                return modelPath;
+
+            modelPath = Path.Combine(baseDir, modelFile);
+            if (File.Exists(modelPath))
+                return modelPath;
+
+            throw new FileNotFoundException($"Model {modelFile} not found");
+        }
+
+        private void CreateDummyAudioFile()
+        {
+            try
+            {
+                var tempDir = Path.Combine(baseDir, "temp");
+                Directory.CreateDirectory(tempDir);
+                dummyAudioPath = Path.Combine(tempDir, "dummy_warmup.wav");
+
+                // Create 1 second of silence at 16kHz (whisper's preferred format)
+                var sampleRate = 16000;
+                var duration = TimeSpan.FromSeconds(1);
+                var sampleCount = (int)(sampleRate * duration.TotalSeconds);
+
+                using var writer = new WaveFileWriter(dummyAudioPath, new WaveFormat(sampleRate, 1));
+                var silenceBuffer = new float[sampleCount];
+                // silenceBuffer is already initialized to zeros (silence)
+                writer.WriteSamples(silenceBuffer, 0, silenceBuffer.Length);
+
+                ErrorLogger.LogMessage($"Created dummy audio file: {dummyAudioPath}");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("CreateDummyAudioFile", ex);
+                throw;
+            }
+        }
+
+        private async Task WarmUpWhisperAsync()
+        {
+            if (string.IsNullOrEmpty(dummyAudioPath) || !File.Exists(dummyAudioPath))
+            {
+                ErrorLogger.LogMessage("Dummy audio file not available for warmup");
+                return;
+            }
+
+            try
+            {
+                ErrorLogger.LogMessage("Starting Whisper warmup process...");
+                var startTime = DateTime.Now;
+
+                // Use the fastest possible settings for warmup
+                var modelPath = cachedModelPath ?? ResolveModelPath();
+                var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+
+                var arguments = $"-m \"{modelPath}\" " +
+                              $"-f \"{dummyAudioPath}\" " +
+                              $"--threads {Environment.ProcessorCount} " +
+                              "--no-timestamps --language en " +
+                              "--beam-size 1 " +          // Fastest possible
+                              "--best-of 1 " +            // Single candidate
+                              "--entropy-thold 3.0";
+
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = whisperExePath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                using var process = new Process { StartInfo = processStartInfo };
+                process.Start();
+
+                // Set high priority for warmup
+                try
+                {
+                    process.PriorityClass = ProcessPriorityClass.AboveNormal;
+                }
+                catch { }
+
+                await process.WaitForExitAsync();
+
+                var warmupTime = DateTime.Now - startTime;
+                ErrorLogger.LogMessage($"Whisper warmup completed in {warmupTime.TotalMilliseconds:F0}ms");
+
+                isWarmedUp = true;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("WarmUpWhisperAsync", ex);
+            }
+        }
+
+
+        public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
+        {
+            ErrorLogger.LogMessage($"PersistentWhisperService.TranscribeFromMemoryAsync called with {audioData.Length} bytes");
+
+            // Save to temporary file for whisper.cpp
+            var tempPath = Path.Combine(Path.GetTempPath(), $"whisper_temp_{Guid.NewGuid():N}.wav");
+            try
+            {
+                await File.WriteAllBytesAsync(tempPath, audioData);
+                return await TranscribeAsync(tempPath);
+            }
+            finally
+            {
+                // Clean up temp file immediately
+                try
+                {
+                    if (File.Exists(tempPath))
+                        File.Delete(tempPath);
+                }
+                catch { /* Ignore cleanup errors */ }
+            }
+        }
+
+        public async Task<string> TranscribeAsync(string audioFilePath)
+        {
+            if (!File.Exists(audioFilePath))
+                throw new FileNotFoundException($"Audio file not found: {audioFilePath}");
+
+            // Check if file has actual audio data (not just headers)
+            var fileInfo = new FileInfo(audioFilePath);
+            if (fileInfo.Length < 100)
+            {
+                ErrorLogger.LogMessage($"TranscribeAsync: Skipping empty audio file - {audioFilePath} ({fileInfo.Length} bytes)");
+                return string.Empty;
+            }
+
+            // Use semaphore to ensure only one transcription at a time
+            await transcriptionSemaphore.WaitAsync();
+
+            try
+            {
+                // Preprocess audio if needed
+                AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
+
+                var startTime = DateTime.Now;
+
+                // If not warmed up yet, do a quick warmup
+                if (!isWarmedUp)
+                {
+                    await WarmUpWhisperAsync();
+                }
+
+                var modelPath = cachedModelPath ?? ResolveModelPath();
+                var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+
+                // Build arguments optimized for speed - we're pre-warmed so can be more aggressive
+                var arguments = $"-m \"{modelPath}\" " +
+                              $"-f \"{audioFilePath}\" " +
+                              $"--threads {Environment.ProcessorCount} " +
+                              "--no-timestamps --language en " +
+                              "--beam-size 1 " +          // Fastest possible
+                              "--best-of 1 " +            // Single candidate for speed
+                              "--entropy-thold 2.8";      // Slightly higher for speed
+
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = whisperExePath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                using var process = new Process { StartInfo = processStartInfo };
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+
+                process.OutputDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        outputBuilder.AppendLine(e.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        errorBuilder.AppendLine(e.Data);
+                    }
+                };
+
+                process.Start();
+
+                // Set highest priority for fastest processing (warmed system)
+                try
+                {
+                    process.PriorityClass = ProcessPriorityClass.High;
+                }
+                catch { }
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                // Aggressive timeout since we're pre-warmed
+                var audioInfo = new FileInfo(audioFilePath);
+                var timeoutSeconds = Math.Max(5, (int)(audioInfo.Length / 200000)); // More aggressive timeout
+
+                bool exited = await Task.Run(() => process.WaitForExit(timeoutSeconds * 1000));
+
+                if (!exited)
+                {
+                    process.Kill();
+                    throw new TimeoutException("Transcription timed out");
+                }
+
+                if (process.ExitCode != 0)
+                {
+                    var error = errorBuilder.ToString();
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        ErrorLogger.LogMessage($"Whisper error: {error}");
+                    }
+                    throw new Exception($"Whisper process failed with exit code {process.ExitCode}");
+                }
+
+                var result = outputBuilder.ToString();
+
+                // Clean up the output - remove system messages and empty lines
+                var lines = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                var cleanedResult = new StringBuilder();
+                foreach (var line in lines)
+                {
+                    // Skip system messages from whisper
+                    if (!line.StartsWith("[") && !line.Contains("whisper_") && !line.Contains("ggml_"))
+                    {
+                        cleanedResult.AppendLine(line.Trim());
+                    }
+                }
+
+                result = cleanedResult.ToString().Trim();
+
+                // Post-process the transcription
+                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary);
+
+                var totalTime = DateTime.Now - startTime;
+                ErrorLogger.LogMessage($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms");
+
+                // Background warmup for next request
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(100); // Small delay
+                        await WarmUpWhisperAsync(); // Keep system warm
+                    }
+                    catch { /* Ignore warmup errors */ }
+                });
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("PersistentWhisperService.TranscribeAsync", ex);
+                throw;
+            }
+            finally
+            {
+                transcriptionSemaphore.Release();
+            }
+        }
+
+        private void CleanupProcess()
+        {
+            try
+            {
+                // Clean up dummy audio file
+                if (!string.IsNullOrEmpty(dummyAudioPath) && File.Exists(dummyAudioPath))
+                {
+                    try
+                    {
+                        File.Delete(dummyAudioPath);
+                    }
+                    catch { /* Ignore cleanup errors */ }
+                }
+
+                isWarmedUp = false;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("PersistentWhisperService.CleanupProcess", ex);
+            }
+        }
+
+        public void Dispose()
+        {
+            CleanupProcess();
+            transcriptionSemaphore?.Dispose();
+        }
+    }
+}

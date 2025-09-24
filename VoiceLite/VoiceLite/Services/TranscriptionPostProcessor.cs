@@ -1,0 +1,331 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+namespace VoiceLite.Services
+{
+    public class TranscriptionPostProcessor
+    {
+        // Pre-compiled regex patterns for performance
+        private static readonly Dictionary<Regex, string> TechnicalCorrections;
+
+        // Pre-compiled regex patterns used in FixPunctuation and FixSpacing
+        private static readonly Regex MultipleSpacesRegex = new Regex(@"\s+", RegexOptions.Compiled);
+        private static readonly Regex CapitalizeAfterPeriodRegex = new Regex(@"(\. )([a-z])", RegexOptions.Compiled);
+        private static readonly Regex SpaceBeforePunctuationRegex = new Regex(@"\s+([.,!?;:])", RegexOptions.Compiled);
+        private static readonly Regex SpaceAfterPunctuationRegex = new Regex(@"([.,!?;:])([A-Za-z])", RegexOptions.Compiled);
+        private static readonly Regex SpaceAroundParenOpenRegex = new Regex(@"\s*\(\s*", RegexOptions.Compiled);
+        private static readonly Regex SpaceAroundParenCloseRegex = new Regex(@"\s*\)\s*", RegexOptions.Compiled);
+        private static readonly Regex SpaceAroundBracketOpenRegex = new Regex(@"\s*\[\s*", RegexOptions.Compiled);
+        private static readonly Regex SpaceAroundBracketCloseRegex = new Regex(@"\s*\]\s*", RegexOptions.Compiled);
+
+        // CRITICAL PERFORMANCE FIX: Pre-compile ALL context-aware regex patterns to eliminate runtime compilation
+        private static readonly Regex GetHubRegex = new Regex(@"\bget\s*hub\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex GetLabRegex = new Regex(@"\bget\s*lab\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex GitIgnoreRegex = new Regex(@"\bgit\s*ignore\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouStateRegex = new Regex(@"\byou\s*state\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouEffectRegex = new Regex(@"\byou\s*effect\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouContextRegex = new Regex(@"\byou\s*context\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouReducerRegex = new Regex(@"\byou\s*reducer\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouMemoRegex = new Regex(@"\byou\s*memo\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YouCallbackRegex = new Regex(@"\byou\s*callback\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex PackageJasonRegex = new Regex(@"\bpackage\s*jason\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex PackageLockRegex = new Regex(@"\bpackage\s*lock\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex YarnLockRegex = new Regex(@"\byarn\s*lock\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex JaySonRegex = new Regex(@"\bjay\s*son\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ConsoleDotLogRegex = new Regex(@"\bconsole\s*dot\s*log\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DotThenRegex = new Regex(@"\bdot\s*then\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DotCatchRegex = new Regex(@"\bdot\s*catch\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DotMapRegex = new Regex(@"\bdot\s*map\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DotFilterRegex = new Regex(@"\bdot\s*filter\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DotReduceRegex = new Regex(@"\bdot\s*reduce\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Pre-compiled common misrecognition patterns
+        private static readonly Regex EndPointRegex = new Regex(@"\bend\s*point\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DataBaseRegex = new Regex(@"\bdata\s*base\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FrameWorkRegex = new Regex(@"\bframe\s*work\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FrontEndRegex = new Regex(@"\bfront\s*end\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex BackEndRegex = new Regex(@"\bback\s*end\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex FullStackRegex = new Regex(@"\bfull\s*stack\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DevOpsRegex = new Regex(@"\bdev\s*ops\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex CiCdRegex = new Regex(@"\bci\s*cd\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex HttpsRegex = new Regex(@"\bhttp\s*s\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SqlLightRegex = new Regex(@"\bsql\s*light\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex NoSqlRegex = new Regex(@"\bno\s*sql\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex RestFullRegex = new Regex(@"\brest\s*full\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex WebSocketRegex = new Regex(@"\bweb\s*socket\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LocalHostRegex = new Regex(@"\blocal\s*host\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex IdeRegex = new Regex(@"\bI\s*D\s*E\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex UrlRegex = new Regex(@"\bU\s*R\s*L\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex UiRegex = new Regex(@"\bU\s*I\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex UxRegex = new Regex(@"\bU\s*X\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex SqlRegex = new Regex(@"\bS\s*Q\s*L\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex XmlRegex = new Regex(@"\bX\s*M\s*L\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex HtmlRegex = new Regex(@"\bH\s*T\s*M\s*L\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex CssRegex = new Regex(@"\bC\s*S\s*S\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        static TranscriptionPostProcessor()
+        {
+            // Pre-compile all technical correction patterns once at startup
+            TechnicalCorrections = new Dictionary<Regex, string>
+            {
+                // Programming terms
+                { new Regex(@"\bgit\s*hub\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "GitHub" },
+                { new Regex(@"\bgit\s*lab\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "GitLab" },
+                { new Regex(@"\bget\s*hub\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "GitHub" },
+                { new Regex(@"\bnpm\s*install\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "npm install" },
+                { new Regex(@"\bnode\s*js\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Node.js" },
+                { new Regex(@"\breact\s*js\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "React.js" },
+                { new Regex(@"\bview\s*js\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Vue.js" },
+                { new Regex(@"\bnext\s*js\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Next.js" },
+                { new Regex(@"\btype\s*script\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "TypeScript" },
+                { new Regex(@"\bjava\s*script\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "JavaScript" },
+                { new Regex(@"\bc\s*sharp\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "C#" },
+                { new Regex(@"\bc\s*plus\s*plus\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "C++" },
+                { new Regex(@"\bmy\s*sql\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "MySQL" },
+                { new Regex(@"\bpost\s*gres\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "PostgreSQL" },
+                { new Regex(@"\bmongo\s*db\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "MongoDB" },
+                { new Regex(@"\bred\s*is\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Redis" },
+                { new Regex(@"\bdocker\s*file\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Dockerfile" },
+                { new Regex(@"\byaml\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "YAML" },
+                { new Regex(@"\bjson\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "JSON" },
+                { new Regex(@"\bapi\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "API" },
+                { new Regex(@"\brest\s*api\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "REST API" },
+                { new Regex(@"\bgraph\s*ql\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "GraphQL" },
+                { new Regex(@"\baws\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "AWS" },
+                { new Regex(@"\blazure\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Azure" },
+                { new Regex(@"\bgcp\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "GCP" },
+
+                // Additional commonly misheard terms
+                { new Regex(@"\bkubernetes\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Kubernetes" },
+                { new Regex(@"\bk8s\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "k8s" },
+                { new Regex(@"\belastic\s*search\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Elasticsearch" },
+                { new Regex(@"\bjenkins\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Jenkins" },
+                { new Regex(@"\bterraform\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Terraform" },
+                { new Regex(@"\bansible\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Ansible" },
+                { new Regex(@"\bnginx\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "nginx" },
+                { new Regex(@"\bapache\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Apache" },
+                { new Regex(@"\blinux\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Linux" },
+                { new Regex(@"\bubuntu\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Ubuntu" },
+                { new Regex(@"\bcentos\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "CentOS" },
+                { new Regex(@"\bdebian\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Debian" },
+                { new Regex(@"\bwsl\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "WSL" },
+                { new Regex(@"\bpython\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Python" },
+                { new Regex(@"\bdjango\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Django" },
+                { new Regex(@"\bflask\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Flask" },
+                { new Regex(@"\bfast\s*api\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "FastAPI" },
+                { new Regex(@"\bruntime\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "runtime" },
+                { new Regex(@"\bcompile\s*time\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "compile time" },
+                { new Regex(@"\bdebugger\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "debugger" },
+                { new Regex(@"\bbreak\s*point\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "breakpoint" },
+                { new Regex(@"\bstack\s*overflow\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Stack Overflow" },
+
+                // Common programming keywords
+                { new Regex(@"\bfor\s*each\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "forEach" },
+                { new Regex(@"\buse\s*state\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useState" },
+                { new Regex(@"\buse\s*effect\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useEffect" },
+                { new Regex(@"\buse\s*context\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useContext" },
+                { new Regex(@"\buse\s*reducer\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useReducer" },
+                { new Regex(@"\buse\s*memo\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useMemo" },
+                { new Regex(@"\buse\s*callback\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "useCallback" },
+                { new Regex(@"\basync\s*await\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "async/await" },
+                { new Regex(@"\btry\s*catch\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "try/catch" },
+                { new Regex(@"\bif\s*else\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "if/else" },
+
+                // Common commands
+                { new Regex(@"\bgit\s*add\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git add" },
+                { new Regex(@"\bgit\s*commit\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git commit" },
+                { new Regex(@"\bgit\s*push\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git push" },
+                { new Regex(@"\bgit\s*pull\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git pull" },
+                { new Regex(@"\bgit\s*clone\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git clone" },
+                { new Regex(@"\bgit\s*checkout\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git checkout" },
+                { new Regex(@"\bgit\s*merge\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git merge" },
+                { new Regex(@"\bgit\s*rebase\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git rebase" },
+                { new Regex(@"\bgit\s*status\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git status" },
+                { new Regex(@"\bgit\s*log\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "git log" },
+                { new Regex(@"\bnpm\s*run\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "npm run" },
+                { new Regex(@"\bnpm\s*start\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "npm start" },
+                { new Regex(@"\bnpm\s*test\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "npm test" },
+                { new Regex(@"\bnpm\s*build\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "npm build" },
+                { new Regex(@"\byarn\s*install\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "yarn install" },
+                { new Regex(@"\byarn\s*add\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "yarn add" },
+                { new Regex(@"\byarn\s*start\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "yarn start" },
+
+                // File extensions
+                { new Regex(@"\bdot\s*js\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".js" },
+                { new Regex(@"\bdot\s*ts\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".ts" },
+                { new Regex(@"\bdot\s*jsx\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".jsx" },
+                { new Regex(@"\bdot\s*tsx\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".tsx" },
+                { new Regex(@"\bdot\s*json\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".json" },
+                { new Regex(@"\bdot\s*md\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".md" },
+                { new Regex(@"\bdot\s*css\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".css" },
+                { new Regex(@"\bdot\s*html\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".html" },
+                { new Regex(@"\bdot\s*xml\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".xml" },
+                { new Regex(@"\bdot\s*yaml\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".yaml" },
+                { new Regex(@"\bdot\s*yml\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".yml" },
+                { new Regex(@"\bdot\s*env\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".env" },
+                { new Regex(@"\bdot\s*git\s*ignore\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".gitignore" },
+                { new Regex(@"\bdot\s*docker\s*ignore\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), ".dockerignore" },
+
+                // Common misspellings
+                { new Regex(@"\bconsole\s*dot\s*log\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "console.log" },
+                { new Regex(@"\bvs\s*code\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "VS Code" },
+                { new Regex(@"\bvisual\s*studio\s*code\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Visual Studio Code" },
+                { new Regex(@"\bintelli\s*j\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "IntelliJ" },
+                { new Regex(@"\bweb\s*pack\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "webpack" },
+                { new Regex(@"\bbabel\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Babel" },
+                { new Regex(@"\bes\s*lint\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "ESLint" },
+                { new Regex(@"\bprettier\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Prettier" }
+            };
+        }
+
+        public static string ProcessTranscription(string transcription, bool useEnhancedDictionary = true)
+        {
+            if (string.IsNullOrWhiteSpace(transcription))
+                return transcription;
+
+            var processed = transcription;
+
+            // Apply technical corrections using pre-compiled regex
+            foreach (var correction in TechnicalCorrections)
+            {
+                processed = correction.Key.Replace(processed, correction.Value);
+            }
+
+            // Apply enhanced corrections if enabled (default is true now)
+            if (useEnhancedDictionary)
+            {
+                processed = ApplyEnhancedCorrections(processed);
+            }
+
+            // Fix common punctuation issues
+            processed = FixPunctuation(processed);
+
+            // Fix spacing issues
+            processed = FixSpacing(processed);
+
+            return processed;
+        }
+
+        private static string FixPunctuation(string text)
+        {
+            // Add period at the end if missing
+            if (!string.IsNullOrWhiteSpace(text) && !text.TrimEnd().EndsWith(".") && !text.TrimEnd().EndsWith("!") && !text.TrimEnd().EndsWith("?"))
+            {
+                text = text.TrimEnd() + ".";
+            }
+
+            // Fix multiple spaces using pre-compiled regex
+            text = MultipleSpacesRegex.Replace(text, " ");
+
+            // Capitalize first letter
+            if (text.Length > 0 && char.IsLower(text[0]))
+            {
+                text = char.ToUpper(text[0]) + text.Substring(1);
+            }
+
+            // Capitalize after periods using pre-compiled regex
+            text = CapitalizeAfterPeriodRegex.Replace(text, m => m.Groups[1].Value + m.Groups[2].Value.ToUpper());
+
+            return text;
+        }
+
+        private static string FixSpacing(string text)
+        {
+            // Remove space before punctuation using pre-compiled regex
+            text = SpaceBeforePunctuationRegex.Replace(text, "$1");
+
+            // Add space after punctuation if missing using pre-compiled regex
+            text = SpaceAfterPunctuationRegex.Replace(text, "$1 $2");
+
+            // Fix spacing around parentheses and brackets using pre-compiled regex
+            text = SpaceAroundParenOpenRegex.Replace(text, " (");
+            text = SpaceAroundParenCloseRegex.Replace(text, ") ");
+            text = SpaceAroundBracketOpenRegex.Replace(text, " [");
+            text = SpaceAroundBracketCloseRegex.Replace(text, "] ");
+
+            // Clean up multiple spaces again using pre-compiled regex
+            text = MultipleSpacesRegex.Replace(text, " ");
+
+            return text.Trim();
+        }
+
+        private static string ApplyEnhancedCorrections(string text)
+        {
+            // Context-aware corrections for better accuracy
+            var hasGitContext = HasContext(text, "repository", "commit", "branch", "merge", "push", "pull", "clone");
+            var hasReactContext = HasContext(text, "component", "render", "props", "state", "hook", "React");
+            var hasNodeContext = HasContext(text, "package", "install", "dependency", "module", "require", "import");
+            var hasCodeContext = HasContext(text, "function", "variable", "class", "method", "return", "debug");
+
+            // CRITICAL PERFORMANCE FIX: Use pre-compiled regex patterns instead of creating new ones
+            // Apply context-aware corrections using pre-compiled patterns
+            if (hasGitContext)
+            {
+                text = GetHubRegex.Replace(text, "GitHub");
+                text = GetLabRegex.Replace(text, "GitLab");
+                text = GitIgnoreRegex.Replace(text, ".gitignore");
+            }
+
+            if (hasReactContext)
+            {
+                text = YouStateRegex.Replace(text, "useState");
+                text = YouEffectRegex.Replace(text, "useEffect");
+                text = YouContextRegex.Replace(text, "useContext");
+                text = YouReducerRegex.Replace(text, "useReducer");
+                text = YouMemoRegex.Replace(text, "useMemo");
+                text = YouCallbackRegex.Replace(text, "useCallback");
+            }
+
+            if (hasNodeContext)
+            {
+                text = PackageJasonRegex.Replace(text, "package.json");
+                text = PackageLockRegex.Replace(text, "package-lock.json");
+                text = YarnLockRegex.Replace(text, "yarn.lock");
+            }
+
+            if (hasCodeContext)
+            {
+                text = JaySonRegex.Replace(text, "JSON");
+                text = ConsoleDotLogRegex.Replace(text, "console.log");
+                text = DotThenRegex.Replace(text, ".then");
+                text = DotCatchRegex.Replace(text, ".catch");
+                text = DotMapRegex.Replace(text, ".map");
+                text = DotFilterRegex.Replace(text, ".filter");
+                text = DotReduceRegex.Replace(text, ".reduce");
+            }
+
+            // Additional common misrecognitions using pre-compiled patterns
+            text = EndPointRegex.Replace(text, "endpoint");
+            text = DataBaseRegex.Replace(text, "database");
+            text = FrameWorkRegex.Replace(text, "framework");
+            text = FrontEndRegex.Replace(text, "frontend");
+            text = BackEndRegex.Replace(text, "backend");
+            text = FullStackRegex.Replace(text, "fullstack");
+            text = DevOpsRegex.Replace(text, "DevOps");
+            text = CiCdRegex.Replace(text, "CI/CD");
+            text = HttpsRegex.Replace(text, "HTTPS");
+            text = SqlLightRegex.Replace(text, "SQLite");
+            text = NoSqlRegex.Replace(text, "NoSQL");
+            text = RestFullRegex.Replace(text, "RESTful");
+            text = WebSocketRegex.Replace(text, "WebSocket");
+            text = LocalHostRegex.Replace(text, "localhost");
+            text = IdeRegex.Replace(text, "IDE");
+            text = UrlRegex.Replace(text, "URL");
+            text = UiRegex.Replace(text, "UI");
+            text = UxRegex.Replace(text, "UX");
+            text = SqlRegex.Replace(text, "SQL");
+            text = XmlRegex.Replace(text, "XML");
+            text = HtmlRegex.Replace(text, "HTML");
+            text = CssRegex.Replace(text, "CSS");
+
+            return text;
+        }
+
+        private static bool HasContext(string text, params string[] keywords)
+        {
+            return keywords.Any(keyword => text.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+}

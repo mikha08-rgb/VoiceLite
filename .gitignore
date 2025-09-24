@@ -1,0 +1,26 @@
+# Large model files
+*.bin
+
+# Build outputs
+bin/
+obj/
+
+# Release packages
+*.zip
+
+# Backup folders
+backup*/
+
+# Temporary files
+temp/
+*.wav
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Whisper executables and models
+whisper/*.bin
+whisper/*.exe
+whisper/*.dll

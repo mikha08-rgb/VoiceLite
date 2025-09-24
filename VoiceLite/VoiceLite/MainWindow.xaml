@@ -1,0 +1,114 @@
+<Window x:Class="VoiceLite.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VoiceLite" Height="380" Width="500"
+        Icon="VoiceLite.ico"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        StateChanged="Window_StateChanged"
+        Background="#FAFAFA">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title bar with status on the right -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="VoiceLite"
+                       FontSize="22" FontWeight="SemiBold"
+                       Foreground="#2C3E50"
+                       HorizontalAlignment="Left"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="#27AE60" Margin="0,0,6,0"/>
+                <TextBlock x:Name="StatusText" Text="Ready"
+                          Foreground="#27AE60" FontWeight="SemiBold" FontSize="14"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Configuration information -->
+        <StackPanel Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="Hotkey: " Foreground="#7F8C8D"/>
+                    <TextBlock x:Name="HotkeyText" Text="F1" Foreground="#2C3E50" FontWeight="SemiBold"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock Text="Microphone: " Foreground="#7F8C8D"/>
+                    <TextBlock x:Name="MicrophoneText" Text="Default" Foreground="#2C3E50" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+
+        <!-- Cleaner transcription area -->
+        <Border Grid.Row="2" BorderBrush="#D5DBDB" BorderThickness="1"
+                Background="White"
+                CornerRadius="4"
+                Margin="0,0,0,16" Padding="12">
+            <TextBox x:Name="TranscriptionText"
+                     Text="Ready to transcribe"
+                     TextWrapping="Wrap"
+                     Foreground="#95A5A6"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     IsReadOnly="True"
+                     FontSize="14"
+                     VerticalScrollBarVisibility="Auto"
+                     AcceptsReturn="True"/>
+        </Border>
+
+        <!-- Clean button layout -->
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Buttons with better spacing -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal">
+                <Button x:Name="TestButton"
+                        Content="Test Recording"
+                        MinWidth="120"
+                        Height="32"
+                        Background="#3498DB"
+                        Foreground="White"
+                        BorderThickness="0"
+                        FontWeight="SemiBold"
+                        Cursor="Hand"
+                        Click="TestButton_Click"
+                        Margin="0,0,8,0"
+                        Padding="16,0"/>
+
+                <Button x:Name="SettingsButton"
+                        Content="Settings"
+                        MinWidth="100"
+                        Height="32"
+                        Background="White"
+                        Foreground="#7F8C8D"
+                        BorderBrush="#D5DBDB"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        Click="SettingsButton_Click"
+                        Padding="16,0"/>
+            </StackPanel>
+
+            <CheckBox Grid.Row="1"
+                     x:Name="MinimizeCheckBox"
+                     Content="Minimize to system tray on close"
+                     Foreground="#7F8C8D"
+                     FontSize="12"
+                     IsChecked="True"
+                     HorizontalAlignment="Left"
+                     Margin="0,12,0,0"/>
+        </Grid>
+    </Grid>
+</Window>
+
+

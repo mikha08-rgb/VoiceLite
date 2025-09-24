@@ -1,0 +1,5 @@
+VoiceLite Cleanup (internal)
+
+- Fix: HotkeyManager.UnregisterCurrentHotkey no longer contains stray parentheses; restores build after parallel branch merge. Rollback: revert VoiceLite/VoiceLite/Services/HotkeyManager.cs if new async polling logic misbehaves.
+- Cleanup: Removed empty VoiceLite/VoiceLitebinDebugnet8.0-windowswhisper directory (legacy publish artifact). Rollback: recover from backup if tooling expects it (no references found).
+- Refactor: Added Utilities/HotkeyDisplayHelper and routed MainWindow and SettingsWindow through it to keep modifier formatting in sync. Rollback: revert helper and reintroduce per-view formatting if UI issues appear.

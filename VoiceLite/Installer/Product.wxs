@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:netfx="http://schemas.microsoft.com/wix/NetFxExtension">
+
+  <Product Id="*"
+           Name="VoiceLite"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="Your Company"
+           UpgradeCode="PUT-GUID-HERE">
+
+    <Package InstallerVersion="200"
+             Compressed="yes"
+             InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Check for .NET 8.0 Runtime -->
+    <PropertyRef Id="NETFRAMEWORK45" />
+    <Condition Message="This application requires .NET Desktop Runtime 8.0. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0">
+      <![CDATA[Installed OR NETFRAMEWORK45]]>
+    </Condition>
+
+    <!-- Define Installation Directory -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="VoiceLite">
+
+          <!-- Main Application Files -->
+          <Component Id="MainExecutable" Guid="PUT-GUID-HERE">
+            <File Id="VoiceLiteExe"
+                  Source="$(var.ProjectDir)\bin\Release\net8.0-windows\VoiceLite.exe"
+                  KeyPath="yes">
+              <Shortcut Id="StartMenuShortcut"
+                        Directory="ProgramMenuFolder"
+                        Name="VoiceLite"
+                        Description="Speech to Text Application"
+                        WorkingDirectory="INSTALLFOLDER"
+                        Icon="VoiceLiteIcon"
+                        Advertise="yes" />
+            </File>
+          </Component>
+
+          <!-- DLL Files -->
+          <Component Id="NAudioDll" Guid="PUT-GUID-HERE">
+            <File Source="$(var.ProjectDir)\bin\Release\net8.0-windows\NAudio.dll" />
+          </Component>
+
+          <!-- Whisper Directory -->
+          <Directory Id="WhisperDir" Name="whisper">
+            <Component Id="WhisperExe" Guid="PUT-GUID-HERE">
+              <File Source="$(var.ProjectDir)\whisper\whisper.exe" />
+            </Component>
+            <Component Id="WhisperModel" Guid="PUT-GUID-HERE">
+              <File Source="$(var.ProjectDir)\whisper\ggml-small.bin" />
+            </Component>
+            <Component Id="ClblastDll" Guid="PUT-GUID-HERE">
+              <File Source="$(var.ProjectDir)\whisper\clblast.dll" />
+            </Component>
+            <Component Id="OpenBlasDll" Guid="PUT-GUID-HERE">
+              <File Source="$(var.ProjectDir)\whisper\libopenblas.dll" />
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu Folder -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="VoiceLite" />
+      </Directory>
+    </Directory>
+
+    <!-- Icon -->
+    <Icon Id="VoiceLiteIcon" SourceFile="$(var.ProjectDir)\VoiceLite.ico" />
+
+    <!-- Features to Install -->
+    <Feature Id="ProductFeature" Title="VoiceLite" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="NAudioDll" />
+      <ComponentRef Id="WhisperExe" />
+      <ComponentRef Id="WhisperModel" />
+      <ComponentRef Id="ClblastDll" />
+      <ComponentRef Id="OpenBlasDll" />
+    </Feature>
+
+    <!-- Add Registry Entry for Uninstall -->
+    <Property Id="ARPPRODUCTICON" Value="VoiceLiteIcon" />
+
+  </Product>
+</Wix>

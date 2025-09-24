@@ -1,0 +1,147 @@
+﻿using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+using VoiceLite.Interfaces;
+
+namespace VoiceLite.Services
+{
+    public class TextInjector : ITextInjector
+    {
+        public bool AutoPaste { get; set; } = true;
+
+        public void InjectText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ErrorLogger.LogMessage("InjectText called with empty text");
+                return;
+            }
+
+            ErrorLogger.LogMessage($"InjectText called with {text.Length} characters, AutoPaste: {AutoPaste}");
+
+            try
+            {
+                PasteViaClipboard(text);
+                ErrorLogger.LogMessage("Text injection completed");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("TextInjector.InjectText", ex);
+                throw new Exception($"Failed to inject text: {ex.Message}", ex);
+            }
+        }
+
+        private void PasteViaClipboard(string text)
+        {
+            Exception? workerException = null;
+
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    SetClipboardText(text);
+
+                    if (AutoPaste)
+                    {
+                        // CRITICAL PERFORMANCE FIX: Reduce delay from 50ms to 5ms
+                        // Modern systems need much less time for clipboard operations
+                        Thread.Sleep(5); // Minimal delay to ensure clipboard is ready
+                        SimulateCtrlV();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    workerException = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+
+            if (!thread.Join(TimeSpan.FromSeconds(3)))
+            {
+                ErrorLogger.LogMessage("Clipboard operation thread timed out");
+                throw new InvalidOperationException("Clipboard operation timed out.");
+            }
+
+            if (workerException != null)
+            {
+                throw new InvalidOperationException("Clipboard operation failed.", workerException);
+            }
+        }
+
+        private static void SetClipboardText(string text)
+        {
+            const int maxAttempts = 5;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                try
+                {
+                    Clipboard.SetText(text, TextDataFormat.UnicodeText);
+                    ErrorLogger.LogMessage("Text copied to clipboard successfully");
+                    return;
+                }
+                catch (ExternalException)
+                {
+                    // CRITICAL PERFORMANCE FIX: Reduce exponential backoff delays
+                    // Old: 50ms, 100ms, 150ms, 200ms, 250ms (total: 750ms worst case)
+                    // New: 5ms, 10ms, 15ms, 20ms, 25ms (total: 75ms worst case)
+                    // 90% reduction in retry delay time!
+                    if (attempt < maxAttempts - 1) // Don't sleep on the last attempt
+                    {
+                        Thread.Sleep(5 * (attempt + 1));
+                    }
+                }
+            }
+
+            throw new InvalidOperationException("Unable to access clipboard.");
+        }
+
+        private static void SimulateCtrlV()
+        {
+            try
+            {
+                ErrorLogger.LogMessage("Simulating Ctrl+V");
+
+                // CRITICAL PERFORMANCE FIX: Optimize key simulation timing
+                // Old: 10ms delay between each key event (30ms total)
+                // New: 1ms delay only where necessary (2ms total)
+                // Modern systems can handle much faster key simulation
+
+                // Press Ctrl
+                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
+
+                // Press V (minimal delay to ensure Ctrl is registered)
+                Thread.Sleep(1);
+                keybd_event(VK_V, 0, KEYEVENTF_KEYDOWN, 0);
+
+                // Release V (no delay needed)
+                keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0);
+
+                // Release Ctrl (minimal delay to ensure proper key sequence)
+                Thread.Sleep(1);
+                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+
+                ErrorLogger.LogMessage("Ctrl+V simulation completed");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("SimulateCtrlV failed", ex);
+                throw;
+            }
+        }
+
+        // Virtual key codes
+        private const byte VK_CONTROL = 0x11;
+        private const byte VK_V = 0x56;
+
+        // Key event flags
+        private const uint KEYEVENTF_KEYDOWN = 0x0000;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+
+        [DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+    }
+}
