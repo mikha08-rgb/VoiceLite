@@ -12,7 +12,26 @@
 
 ---
 
-A lightweight, native Windows application that provides instant speech-to-text functionality anywhere in Windows. Press F1 to start dictating - it's that simple!
+**Press F1 to speak, release to type.** Works in ANY Windows application - browsers, VS Code, Discord, Terminal, everywhere!
+
+## 🎯 Quick Install (2 minutes)
+
+### Step 1: Install .NET (if needed)
+Most Windows PCs already have this. If VoiceLite doesn't start:
+- Download: [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime)
+- Choose: **Windows x64** → **Desktop Runtime**
+- Install it
+
+### Step 2: Download VoiceLite
+1. Go to [Releases](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
+2. Download **VoiceLite-Base-v3.0.zip** (Recommended - 441MB)
+3. Extract ALL files to a folder (e.g., `C:\VoiceLite`)
+4. Run **VoiceLite.exe**
+5. That's it! Press F1 anywhere to start talking
+
+### Alternative Downloads
+- **VoiceLite-Lite** (81MB) - Faster but less accurate
+- **VoiceLite-Pro** (318MB) - More accurate but slower
 
 ## ✨ Key Features
 
@@ -25,75 +44,48 @@ A lightweight, native Windows application that provides instant speech-to-text f
 - 🎨 **Modern UI**: Clean, intuitive interface with real-time feedback
 - 📊 **Multiple Models**: Choose between different Whisper models for speed vs accuracy
 
+## 💡 How It Works
+1. **Hold F1** - Start recording
+2. **Speak** - Say anything
+3. **Release F1** - Your words appear as text
+
 ## Requirements
 
-- Windows 10/11
-- .NET 8.0 Runtime
-- Microphone
-- ~500MB disk space (for Whisper model)
+- ✅ Windows 10 or 11
+- ✅ [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) (free, 50MB)
+- ✅ Microphone
+- ✅ 500MB disk space
 
-## 🚀 Quick Start
+## 🎙️ Usage Examples
 
-### Option 1: Download Release (Recommended)
-1. Download the [latest release](../../releases)
-2. Extract the ZIP file to your preferred location
-3. Run `VoiceLite.exe`
-4. The app will download the Whisper model on first run (~466MB)
-5. VoiceLite minimizes to system tray - you're ready to dictate!
+### Works Everywhere
+- **VS Code**: Code comments, variable names
+- **Discord/Teams**: Chat messages
+- **Terminal**: Commands and scripts
+- **Browser**: Search, emails, forms
+- **Word/Excel**: Documents and spreadsheets
+- **Any text field**: If you can type there, VoiceLite works!
 
-### Option 2: Build from Source
-See [Build Instructions](#build-from-source) below
+### Tips
+- Speak naturally - it adds punctuation automatically
+- Great with technical terms: "useState", "npm install", "git commit"
+- Window minimizes to system tray (near clock)
+- Right-click tray icon for settings
 
-## 📖 How to Use
+## ❓ Troubleshooting
 
-### Basic Voice Dictation
-1. **Position your cursor** where you want to type (any application)
-2. **Hold F1** to start recording
-3. **Speak naturally** - no need to pause between words
-4. **Release F1** to stop recording
-5. Watch your speech appear as text instantly!
+**App won't start?**
+- Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime)
+- Windows Defender warning? Click "More info" → "Run anyway" (it's safe)
 
-### System Tray Controls
-- **Double-click tray icon**: Show/hide main window
-- **Right-click tray icon**: Access menu (Settings, About, Exit)
-- **Minimize window**: App continues running in background
+**F1 not working?**
+- Make sure VoiceLite is running (check system tray)
+- Some games may block F1 - try in Notepad first
 
-### Pro Tips
-- 💡 Speak naturally - Whisper handles punctuation contextually
-- 💡 Say technical terms clearly - it recognizes programming keywords
-- 💡 For best results, use in a quiet environment
-- 💡 The app shows visual feedback when recording
-
-## 🔨 Build from Source
-
-### Prerequisites
-- Visual Studio 2022 or VS Code with C# extension
-- .NET 8.0 SDK
-- Git
-
-### Build Steps
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/VoiceLite.git
-cd VoiceLite
-
-# Download Whisper model (first time only)
-powershell -ExecutionPolicy Bypass -File download-whisper.ps1
-
-# Build the project
-dotnet build
-
-# Run the application
-dotnet run --project VoiceLite
-```
-
-### Creating a Release Build
-```bash
-# Create optimized release build
-dotnet publish VoiceLite -c Release -r win-x64 --self-contained false
-
-# Output will be in: VoiceLite\bin\Release\net8.0-windows\win-x64\publish\
-```
+**Poor accuracy?**
+- Speak clearly, not too fast
+- Check microphone is working
+- Try the Pro version for better accuracy
 
 ## 🔧 Technical Architecture
 
