@@ -217,7 +217,7 @@ namespace VoiceLite.Controls
             UpdateRecommendation();
         }
 
-        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
         {
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
             {

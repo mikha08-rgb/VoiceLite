@@ -356,36 +356,28 @@ namespace VoiceLite.Services
                     {
                         ErrorLogger.LogMessage($"OnDataAvailable: Writing {e.BytesRecorded} bytes to THIS session at {DateTime.Now:HH:mm:ss.fff}");
 
-                        // Apply volume scaling if needed
-                        if (InputVolumeScale != 1f)
+                        // Apply volume scaling (InputVolumeScale is const 0.8f)
+                        // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
+                        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
+                        try
                         {
-                            // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
-                            var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
-                            try
-                            {
-                                Array.Copy(e.Buffer, buffer, e.BytesRecorded);
+                            Array.Copy(e.Buffer, buffer, e.BytesRecorded);
 
-                                for (int i = 0; i < e.BytesRecorded; i += 2)
-                                {
-                                    short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
-                                    int scaled = (int)Math.Round(sample * InputVolumeScale);
-                                    scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
-                                    short clamped = (short)scaled;
-                                    buffer[i] = (byte)(clamped & 0xFF);
-                                    buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
-                                }
-                                waveFile.Write(buffer, 0, e.BytesRecorded);
-                            }
-                            finally
+                            for (int i = 0; i < e.BytesRecorded; i += 2)
                             {
-                                // CRITICAL: Return buffer to pool to prevent memory leak
-                                System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
+                                short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                                int scaled = (int)Math.Round(sample * InputVolumeScale);
+                                scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
+                                short clamped = (short)scaled;
+                                buffer[i] = (byte)(clamped & 0xFF);
+                                buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
                             }
+                            waveFile.Write(buffer, 0, e.BytesRecorded);
                         }
-                        else
+                        finally
                         {
-                            waveFile.Write(e.Buffer, 0, e.BytesRecorded);
-                            // Note: Flush happens automatically when file is disposed
+                            // CRITICAL: Return buffer to pool to prevent memory leak
+                            System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
                         }
                     }
                     else if (e.BytesRecorded > 0)

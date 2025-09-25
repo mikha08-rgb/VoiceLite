@@ -679,7 +679,7 @@ namespace VoiceLite
 
                 // Clean up the audio file
                 // Retry file deletion with delay to handle file locks
-                Task.Run(async () =>
+                _ = Task.Run(async () =>
                 {
                     for (int i = 0; i < 3; i++)
                     {
@@ -899,7 +899,7 @@ namespace VoiceLite
                 if (createdCopy && workingAudioPath != audioFilePath)
                 {
                     // Retry file deletion with delay to handle file locks
-                    Task.Run(async () =>
+                    _ = Task.Run(async () =>
                     {
                         for (int i = 0; i < 3; i++)
                         {

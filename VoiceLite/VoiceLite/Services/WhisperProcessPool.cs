@@ -197,7 +197,7 @@ namespace VoiceLite.Services
             return new WhisperProcess(newProcess);
         }
 
-        private async Task<Process?> CreateWhisperProcess()
+        private Task<Process?> CreateWhisperProcess()
         {
             try
             {
@@ -228,12 +228,12 @@ namespace VoiceLite.Services
                 TrackProcessMemory(process);
 
                 ErrorLogger.LogMessage($"Created new whisper process {process.Id}");
-                return process;
+                return Task.FromResult<Process?>(process);
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("WhisperProcessPool.CreateWhisperProcess", ex);
-                return null;
+                return Task.FromResult<Process?>(null);
             }
         }
 
