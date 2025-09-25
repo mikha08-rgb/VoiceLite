@@ -1,0 +1,16 @@
+VoiceLite - Base Package (No Model Included)
+============================================
+
+This package does NOT include any Whisper model.
+You must download a model separately and place it in the 'whisper' folder.
+
+Available Models:
+- ggml-tiny.bin (75MB) - Fastest, basic accuracy
+- ggml-small.bin (466MB) - Balanced (Recommended)
+- ggml-medium.bin (1.5GB) - High accuracy
+- ggml-large-v3.bin (2.9GB) - Best accuracy
+
+Download models from:
+https://github.com/ggerganov/whisper.cpp/tree/master/models
+
+After downloading, place the .bin file in the 'whisper' subfolder.

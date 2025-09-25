@@ -16,15 +16,7 @@
 
 ## 🎯 Quick Install (2 minutes)
 
-### Step 1: Install Required Components
-
-#### IMPORTANT: Visual C++ Runtime (REQUIRED)
-**You MUST install this or you'll get "VCRUNTIME140_1.dll not found" error:**
-- Download: [Visual C++ Redistributable x64](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-- Run the installer
-- Click "Install" and wait for completion
-
-#### .NET Runtime (if needed)
+### Step 1: Install .NET (if needed)
 Most Windows PCs already have this. If VoiceLite doesn't start:
 - Download: [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime)
 - Choose: **Windows x64** → **Desktop Runtime**
@@ -81,9 +73,6 @@ Most Windows PCs already have this. If VoiceLite doesn't start:
 - Right-click tray icon for settings
 
 ## ❓ Troubleshooting
-
-**"VCRUNTIME140_1.dll not found" error?**
-- Install [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) - This is REQUIRED!
 
 **App won't start?**
 - Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime)
