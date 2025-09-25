@@ -35,9 +35,11 @@ Most PCs already have this. If VoiceLite won't start:
 
 | Version | Size | Description | Download |
 |---------|------|-------------|----------|
-| **Standard** ⭐ | 442MB | Best for most users | [Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.1/VoiceLite-Base-v3.1.zip) |
-| **Lite** | 81MB | Faster, less accurate | [Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Lite-v3.0.zip) |
-| **Pro** | 318MB | Higher accuracy | [Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Pro-v3.0.zip) |
+| **Standard** ⭐ | 442MB | Best for most users - Good balance | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.1/VoiceLite-Base-v3.1.zip) |
+| **Lite** | 81MB | Faster but less accurate | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Lite-v3.0.zip) |
+| **Pro** | 318MB | Higher accuracy, slower | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Pro-v3.0.zip) |
+
+📌 **All versions include Left Alt as default hotkey (customizable)**
 
 </div>
 
