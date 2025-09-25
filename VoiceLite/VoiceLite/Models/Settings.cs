@@ -23,7 +23,7 @@ namespace VoiceLite.Models
     {
         private RecordMode _mode = RecordMode.PushToTalk;
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
-        private Key _recordHotkey = Key.F1;
+        private Key _recordHotkey = Key.LeftAlt;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
         private string _whisperModel = "ggml-small.bin";
         private int _beamSize = 5;
@@ -45,7 +45,7 @@ namespace VoiceLite.Models
         public Key RecordHotkey
         {
             get => _recordHotkey;
-            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.F1;
+            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.LeftAlt;
         }
 
         public ModifierKeys HotkeyModifiers
