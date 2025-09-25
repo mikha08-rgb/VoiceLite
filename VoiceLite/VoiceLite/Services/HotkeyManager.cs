@@ -32,9 +32,9 @@ namespace VoiceLite.Services
         private bool isRegistered = false;
         private CancellationTokenSource? keyMonitorCts;
 
-        private Key currentKey = Key.F1;
+        private Key currentKey = Key.LeftAlt;
         private ModifierKeys currentModifiers = ModifierKeys.None;
-        private uint currentVirtualKey = 0x70; // VK_F1
+        private uint currentVirtualKey = 0xA4; // VK_LMENU (Left Alt)
         private bool isKeyDown = false;
 
         private readonly object stateLock = new();
