@@ -26,7 +26,15 @@
 
 ## 📥 Download & Install (2 minutes)
 
-### Step 1: Get .NET Runtime (if needed)
+### Step 1: Install Required Components
+
+#### A. Visual C++ Runtime (REQUIRED)
+**You must install this first or VoiceLite won't work:**
+- [Download Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) (13MB)
+- Run the installer and click "Install"
+- Restart your PC if prompted
+
+#### B. .NET Runtime (if needed)
 Most PCs already have this. If VoiceLite won't start:
 - [Download .NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) → Choose **Windows x64**
 
@@ -38,6 +46,8 @@ Most PCs already have this. If VoiceLite won't start:
 | **Standard** ⭐ | 442MB | Best for most users - Good balance | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.1/VoiceLite-Base-v3.1.zip) |
 | **Lite** | 81MB | Faster but less accurate | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Lite-v3.0.zip) |
 | **Pro** | 318MB | Higher accuracy, slower | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Pro-v3.0.zip) |
+
+⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
 📌 **All versions include Left Alt as default hotkey (customizable)**
 
@@ -114,6 +124,7 @@ function fibonacci(n) {
 - **OS**: Windows 10/11
 - **RAM**: 4GB minimum (8GB recommended)
 - **Storage**: 500MB - 3GB (depending on model)
+- **Visual C++ Runtime**: 2015-2022 x64 ([Download here](https://aka.ms/vs/17/release/vc_redist.x64.exe)) **REQUIRED**
 - **.NET**: Version 8.0 Desktop Runtime
 - **Microphone**: Any (better mic = better accuracy)
 
@@ -152,6 +163,7 @@ Currently English optimized. More languages coming soon!
 
 | Problem | Solution |
 |---------|----------|
+| **"VCRUNTIME140_1.dll not found" error** | Install [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) (Required!) |
 | **Won't start** | Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) |
 | **Windows Defender warning** | Click "More info" → "Run anyway" (false positive) |
 | **No text appears** | Check mic is working, VoiceLite in system tray |
