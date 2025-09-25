@@ -97,7 +97,7 @@ namespace VoiceLite.Models
         public bool StartWithWindows { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
-        public bool PlaySoundFeedback { get; set; } = true;
+        public bool PlaySoundFeedback { get; set; } = false;
         public bool ShowVisualIndicator { get; set; } = true;
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device

@@ -165,7 +165,7 @@ namespace VoiceLite
 
         private void ClearHotkeyButton_Click(object sender, RoutedEventArgs e)
         {
-            capturedKey = Key.F1;
+            capturedKey = Key.LeftAlt;
             capturedModifiers = ModifierKeys.None;
             UpdateHotkeyDisplay(capturedKey, capturedModifiers);
             settings.RecordHotkey = capturedKey;
