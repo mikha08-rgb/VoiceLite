@@ -1,155 +1,177 @@
-# VoiceLite - Native Windows Speech-to-Text
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-I'm building a Windows native speech-to-text application that uses Whisper AI for highly accurate transcription. The app runs in the background and allows voice dictation in ANY Windows application via global hotkey.
+VoiceLite is a production-ready Windows native speech-to-text application using OpenAI Whisper AI. It provides instant voice typing anywhere in Windows via global hotkey. The app is fully functional with comprehensive error handling, multiple Whisper models, and performance optimizations.
 
-## Core Requirements
-- Platform: Windows-only native application
-- Technology: C# with WPF (.NET 6.0 or later)
-- Speech Recognition: whisper.cpp with ggml-small.bin model (466MB)
-- Global Hotkey: F1 (customizable later)
-- Text Injection: Works everywhere - terminals, browsers, IDEs, any text field
-- System Tray: Background operation with status indicator
-- Performance: <200ms latency, 95%+ accuracy on technical terms
+## Common Development Commands
 
-## Technical Stack Decided
-- Language: C# (NOT Electron, NOT Python)
-- UI Framework: WPF
-- Audio Recording: NAudio NuGet package
-- Whisper Integration: whisper.cpp subprocess (NOT Web Speech API)
-- Text Injection: InputSimulator NuGet package
-- Global Hotkeys: Win32 API RegisterHotKey
+### Build & Run
+```bash
+# Build the solution
+dotnet build VoiceLite/VoiceLite.sln
 
-## Project Structure
-VoiceLite/
-├── VoiceLite.sln
-├── VoiceLite/
-│   ├── MainWindow.xaml
-│   ├── MainWindow.xaml.cs
-│   ├── App.xaml
-│   ├── App.xaml.cs
-│   ├── Services/
-│   │   ├── AudioRecorder.cs       # NAudio recording implementation
-│   │   ├── WhisperService.cs      # Manages whisper.cpp subprocess
-│   │   ├── TextInjector.cs        # InputSimulator wrapper
-│   │   ├── HotkeyManager.cs       # Global hotkey registration
-│   │   └── SystemTrayManager.cs   # System tray icon and menu
-│   ├── Models/
-│   │   ├── Settings.cs            # User settings (hotkey, mode, etc)
-│   │   └── TranscriptionResult.cs # Result from Whisper
-│   └── Interfaces/
-│       ├── IRecorder.cs
-│       ├── ITranscriber.cs
-│       └── ITextInjector.cs
-├── whisper/
-│   ├── whisper.exe               # whisper.cpp Windows binary
-│   └── ggml-small.bin           # Whisper AI model (466MB)
-├── temp/
-│   └── audio.wav                # Temporary recording file
-└── settings.json                # User preferences
-## Implementation Plan
+# Run in Debug mode
+dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj
 
-### Phase 1: Core Functionality (MVP)
-1. [ ] Create WPF project with basic window
-2. [ ] Add NAudio and implement AudioRecorder service
-3. [ ] Test recording to WAV file
-4. [ ] Integrate whisper.cpp as subprocess
-5. [ ] Parse transcription output
-6. [ ] Add InputSimulator for text injection
-7. [ ] Implement global F1 hotkey
-8. [ ] Add system tray icon
+# Build Release version
+dotnet build VoiceLite/VoiceLite.sln -c Release
 
-### Phase 2: Essential Features
-9. [ ] Add settings window
-10. [ ] Implement push-to-talk vs toggle mode
-11. [ ] Add customizable hotkey selection
-12. [ ] Error handling (no mic, whisper missing)
-13. [ ] Visual/audio recording indicator
+# Publish self-contained executable
+dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
+```
 
-### Phase 3: Future Enhancements
-- [ ] Voice commands ("new line", "period")
-- [ ] App-specific behavior
-- [ ] Custom vocabulary
-- [ ] Multiple language support
+### Testing
+```bash
+# Run all tests
+dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
-## Key Architecture Decisions
+# Run specific test
+dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --filter "FullyQualifiedName~TestName"
 
-### Use Dependency Injection Pattern
-```csharp
-public interface IRecorder {
-    void StartRecording();
-    void StopRecording();
-    event EventHandler<AudioDataArgs> AudioReady;
-}
+# Run tests with coverage
+dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect:"XPlat Code Coverage" --settings VoiceLite/VoiceLite.Tests/coverlet.runsettings
+```
 
-public interface ITranscriber {
-    Task<string> TranscribeAsync(byte[] audio);
-}
+### Code Quality
+```bash
+# Format code
+dotnet format VoiceLite/VoiceLite.sln
 
-public interface ITextInjector {
-    void InjectText(string text);
-}
+# Analyze code (if analyzers are installed)
+dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
+```
 
-Service-Based Architecture
-Keep services modular and swappable. Each service has single responsibility.
-Settings Management
+## Architecture Overview
 
-public class Settings {
-    public RecordMode Mode { get; set; } = RecordMode.Toggle;
-    public Keys RecordHotkey { get; set; } = Keys.F1;
-    public string WhisperModel { get; set; } = "ggml-small.bin";
-    public bool StartWithWindows { get; set; } = false;
-    public bool ShowTrayIcon { get; set; } = true;
-}
+### Core Components
 
-Whisper Integration Details
-Whisper.cpp Command
-whisper.exe -m ggml-small.bin -f audio.wav --no-timestamps --language en
+1. **MainWindow** (`MainWindow.xaml.cs`): Entry point, coordinates all services
+   - Manages recording state and hotkey handling
+   - Implements push-to-talk and toggle modes
+   - Handles system tray integration
+   - Visual state management for recording indicators
 
-Procces management 
-var process = new Process {
-    StartInfo = new ProcessStartInfo {
-        FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe"),
-        Arguments = $"-m ggml-small.bin -f \"{audioPath}\" --no-timestamps",
-        UseShellExecute = false,
-        RedirectStandardOutput = true,
-        CreateNoWindow = true
-    }
-};
-NuGet Packages Required
-    •    NAudio - Audio recording
-    •    InputSimulator - Text injection
-    •    System.Text.Json - Settings serialization
-    •    Hardcodet.NotifyIcon.Wpf - System tray (optional, or use Windows.Forms)
-Current Development Status
-Starting fresh - no code written yet. Need to:
-    1.    Create Visual Studio WPF project
-    2.    Set up folder structure
-    3.    Install NuGet packages
-    4.    Build MVP
-Important Notes for Claude Code
-    •    I have Visual Studio 2022 installed (NOT just VS Code)
-    •    I want production-quality code, not prototypes
-    •    Include error handling from the start
-    •    Make services modular for easy future changes
-    •    Performance is critical - optimize for <200ms latency
-    •    The app should feel native and professional
-Common Issues to Avoid
-    1.    Whisper.exe path - use relative to exe location
-    2.    Audio format - must be 16kHz WAV for Whisper
-    3.    Admin rights - may need for some text injection scenarios
-    4.    Antivirus - may flag InputSimulator or global hotkeys
-Testing Checklist
-    •    Works in Notepad
-    •    Works in Terminal/CMD
-    •    Works in browsers
-    •    Works in VS Code
-    •    Works with admin applications
-    •    Handles no microphone gracefully
-    •    Handles missing whisper.exe gracefully
-Success Metrics
-    •    Transcription latency: <200ms after speech stops
-    •    Accuracy on code terms: 95%+ (git, npm, useState, forEach, etc)
-    •    App size: <20MB (excluding Whisper model)
-    •    RAM usage: <100MB when idle, <300MB when transcribing
-    •    CPU usage: <5% when idle
+2. **Service Layer** (`Services/`): Modular, single-responsibility services
+   - `AudioRecorder`: NAudio-based recording with noise suppression
+   - `WhisperService`/`PersistentWhisperService`: Whisper.cpp subprocess management
+   - `TextInjector`: Text injection using InputSimulator (supports multiple modes)
+   - `HotkeyManager`: Global hotkey registration via Win32 API
+   - `SystemTrayManager`: System tray icon and context menu
+   - `AudioPreprocessor`: Audio enhancement (noise gate, gain control)
+   - `TranscriptionPostProcessor`: Text corrections and formatting
+   - `WhisperProcessPool`: Process pooling for performance
+   - `ModelBenchmarkService`: Model performance testing
+   - `MemoryMonitor`: Memory usage tracking
+   - `ErrorLogger`: Centralized error logging
+
+3. **Models** (`Models/`): Data structures and configuration
+   - `Settings`: User preferences with validation
+   - `TranscriptionResult`: Whisper output parsing
+   - `WhisperModelInfo`: Model metadata and benchmarking
+
+4. **Interfaces** (`Interfaces/`): Contract definitions for dependency injection
+   - `IRecorder`, `ITranscriber`, `ITextInjector`
+
+5. **UI Components**
+   - `SettingsWindow`: Settings UI with model selection
+   - `Controls/SimpleModelSelector`: Model selection control
+   - `Resources/ModernStyles.xaml`: WPF styling resources
+
+## Whisper Integration
+
+### Available Models (in `whisper/` directory)
+- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy
+- `ggml-base.bin` (148MB): Fast, good for basic use
+- `ggml-small.bin` (488MB): **Default** - balanced performance
+- `ggml-medium.bin` (1.5GB): Higher accuracy, slower
+- `ggml-large-v3.bin` (3.1GB): Best accuracy, slowest
+
+### Whisper Process Management
+- Uses process pooling for performance (`WhisperProcessPool`)
+- Persistent mode available for reduced latency
+- Automatic timeout handling with configurable multiplier
+- Temperature optimization (0.2) for better accuracy
+- Context prompting using recent transcriptions
+- Beam search parameters (beam_size=5, best_of=5)
+
+### Whisper Command Format
+```bash
+whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperature 0.2 --beam-size 5 --best-of 5
+```
+
+## Key Technical Details
+
+### Dependencies (NuGet Packages)
+- `NAudio` (2.2.1): Audio recording and processing
+- `H.InputSimulator` (1.2.1): Keyboard/mouse simulation for text injection
+- `Hardcodet.NotifyIcon.Wpf` (2.0.1): System tray integration
+- `System.Text.Json` (9.0.9): Settings persistence
+- `System.Management` (8.0.0): System information
+
+### Test Dependencies (xUnit)
+- `xunit` (2.9.2): Test framework
+- `Moq` (4.20.70): Mocking framework
+- `FluentAssertions` (6.12.0): Assertion library
+
+### Performance Optimizations
+- Audio preprocessing with noise gate and AGC
+- Whisper process pooling for reduced latency
+- Smart text injection (clipboard for long text, typing for short)
+- Memory monitoring and cleanup
+- Cached model benchmarking
+- VAD (Voice Activity Detection) for silence trimming
+
+### Settings & Configuration
+- Settings stored in `%APPDATA%/VoiceLite/settings.json`
+- Default hotkey: Left Alt (customizable)
+- Default mode: Push-to-talk (not toggle)
+- Auto-paste enabled by default
+- Multiple text injection modes (SmartAuto, AlwaysType, AlwaysPaste, PreferType, PreferPaste)
+- Sound feedback disabled by default
+
+### Error Handling & Logging
+- Comprehensive error logging via `ErrorLogger` service
+- Logs stored in `%APPDATA%/VoiceLite/logs/`
+- Graceful fallbacks for missing models or whisper.exe
+- Microphone device detection and switching
+- Process crash recovery
+- Timeout handling for hung processes
+
+## Important Development Notes
+
+### Platform Requirements
+- Target Framework: .NET 8.0 Windows
+- Requires Visual C++ Runtime 2015-2022 x64
+- Windows 10/11 (uses Windows Forms for some features)
+
+### Build Configuration
+- Application manifest for DPI awareness (`app.manifest`)
+- Icon resources embedded in project (`VoiceLite.ico`)
+- Whisper binaries copied to output on build
+- Self-contained deployment supported
+
+### Critical Implementation Details
+1. **Audio Format**: Must be 16kHz, 16-bit mono WAV for Whisper
+2. **Hotkey Registration**: Uses Win32 API, may require admin for some keys
+3. **Text Injection**: May trigger antivirus warnings (false positives)
+4. **Process Management**: Whisper.exe path relative to executable location
+5. **Memory Management**: Automatic cleanup after transcription
+6. **Thread Safety**: Recording state protected by lock
+
+### Testing Compatibility
+Works across all Windows applications:
+- Text editors (Notepad, VS Code, Visual Studio)
+- Terminals (CMD, PowerShell, Windows Terminal)
+- Browsers (Chrome, Firefox, Edge)
+- Communication apps (Discord, Teams, Slack)
+- Games (windowed mode)
+- Admin-elevated applications
+
+### Performance Targets
+- Transcription latency: <200ms after speech stops
+- Accuracy on technical terms: 95%+ (git, npm, useState, forEach)
+- Idle RAM usage: <100MB
+- Active RAM usage: <300MB
+- Idle CPU usage: <5%

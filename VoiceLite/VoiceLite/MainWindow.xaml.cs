@@ -46,10 +46,125 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
+
+            // Check dependencies before initializing services
+            _ = CheckDependenciesAsync();
+
             InitializeServices();
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+        }
+
+        private async Task CheckDependenciesAsync()
+        {
+            try
+            {
+                // First run comprehensive diagnostics
+                var diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
+
+                if (diagnostics.HasAnyIssues)
+                {
+                    ErrorLogger.LogMessage($"Startup issues detected: {diagnostics.GetSummary()}");
+
+                    // Try to auto-fix issues
+                    var issuesFixed = await StartupDiagnostics.TryAutoFixIssuesAsync(diagnostics);
+
+                    if (issuesFixed)
+                    {
+                        ErrorLogger.LogMessage("Some issues were automatically fixed");
+                        // Re-run diagnostics after fixes
+                        diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
+                    }
+
+                    // Show remaining issues to user
+                    if (diagnostics.HasAnyIssues)
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            var message = "VoiceLite detected some issues:\n\n" + diagnostics.GetSummary();
+
+                            if (diagnostics.AntivirusIssues)
+                            {
+                                message += "\n\nSolution: Add VoiceLite to your antivirus exclusions.";
+                            }
+
+                            if (diagnostics.BlockedFilesIssue)
+                            {
+                                message += "\n\nSolution: Right-click VoiceLite.exe → Properties → Unblock";
+                            }
+
+                            if (diagnostics.ProtectedFolderIssue)
+                            {
+                                message += "\n\nSolution: Move VoiceLite to a different folder (e.g., Desktop or Documents)";
+                            }
+
+                            MessageBox.Show(message, "Setup Issues Detected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        });
+                    }
+                }
+
+                // Now check dependencies
+                var result = await DependencyChecker.CheckAndInstallDependenciesAsync();
+
+                if (!result.AllDependenciesMet)
+                {
+                    ErrorLogger.LogError($"Dependency check failed: {result.GetErrorMessage()}", null);
+
+                    // Show user-friendly error
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        StatusText.Text = "Setup Required";
+                        TestButton.IsEnabled = false;
+
+                        var message = result.GetErrorMessage() + "\n\n";
+
+                        if (!result.VCRuntimeInstalled || !result.WhisperCanRun)
+                        {
+                            message += "Click OK to install required components automatically.";
+
+                            var response = MessageBox.Show(
+                                message,
+                                "Setup Required",
+                                MessageBoxButton.OKCancel,
+                                MessageBoxImage.Information);
+
+                            if (response == MessageBoxResult.OK)
+                            {
+                                // Re-run dependency installer
+                                _ = Task.Run(async () =>
+                                {
+                                    var retry = await DependencyChecker.CheckAndInstallDependenciesAsync();
+                                    if (retry.AllDependenciesMet)
+                                    {
+                                        await Dispatcher.InvokeAsync(() =>
+                                        {
+                                            StatusText.Text = "Ready";
+                                            TestButton.IsEnabled = true;
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show(
+                                message + "Please check the troubleshooting guide or reinstall.",
+                                "Setup Required",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
+                    });
+                }
+                else
+                {
+                    ErrorLogger.LogMessage("All dependencies verified successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Dependency check failed", ex);
+            }
         }
 
         private void LoadSettings()
