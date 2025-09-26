@@ -274,16 +274,61 @@ namespace VoiceLite.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                // Aggressive timeout since we're pre-warmed
+                // Smart timeout calculation
                 var audioInfo = new FileInfo(audioFilePath);
-                var timeoutSeconds = Math.Max(5, (int)(audioInfo.Length / 200000)); // More aggressive timeout
+
+                // Calculate timeout based on multiple factors
+                int timeoutSeconds;
+                if (!isWarmedUp)
+                {
+                    // First run needs more time (model loading)
+                    timeoutSeconds = 60; // 60 seconds for first run
+                    ErrorLogger.LogMessage("Using extended timeout for first run (60s)");
+                }
+                else
+                {
+                    // Calculate based on file size and typical processing speed
+                    // Whisper typically processes at 10-50x realtime speed depending on model
+                    var estimatedAudioSeconds = audioInfo.Length / 32000.0; // Rough estimate (16kHz, 16-bit)
+
+                    // Use model-specific multiplier
+                    var processingMultiplier = settings.WhisperModel switch
+                    {
+                        "ggml-tiny.bin" => 2.0,    // Very fast
+                        "ggml-base.bin" => 3.0,    // Fast
+                        "ggml-small.bin" => 5.0,   // Default
+                        "ggml-medium.bin" => 10.0, // Slower
+                        "ggml-large-v3.bin" => 20.0, // Slowest
+                        _ => 5.0
+                    };
+
+                    timeoutSeconds = Math.Max(10, (int)(estimatedAudioSeconds * processingMultiplier) + 5);
+                    timeoutSeconds = Math.Min(timeoutSeconds, 120); // Cap at 2 minutes
+                }
+
+                ErrorLogger.LogMessage($"Timeout set to {timeoutSeconds}s for {audioInfo.Length} byte file");
 
                 bool exited = await Task.Run(() => process.WaitForExit(timeoutSeconds * 1000));
 
                 if (!exited)
                 {
                     process.Kill();
-                    throw new TimeoutException("Transcription timed out");
+                    ErrorLogger.LogError($"Transcription timed out after {timeoutSeconds}s", null);
+
+                    // Check if this is a first-run issue
+                    if (!isWarmedUp)
+                    {
+                        throw new TimeoutException(
+                            "First transcription timed out. This often happens when:\n" +
+                            "• Antivirus is scanning the files\n" +
+                            "• Windows Defender is blocking execution\n" +
+                            "• The model file is being loaded for the first time\n\n" +
+                            "Please try again or add VoiceLite to your antivirus exclusions.");
+                    }
+                    else
+                    {
+                        throw new TimeoutException($"Transcription timed out after {timeoutSeconds} seconds. Please try speaking less or using a smaller model.");
+                    }
                 }
 
                 if (process.ExitCode != 0)

@@ -39,4 +39,16 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="FirstRunWizard.xaml.cs">
+      <DependentUpon>FirstRunWizard.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="FirstRunWizard.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
 </Project>
