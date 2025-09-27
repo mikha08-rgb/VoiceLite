@@ -51,4 +51,10 @@
     </Page>
   </ItemGroup>
 
+  <!-- Post-build obfuscation for Release builds -->
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
+    <Message Text="Running post-build obfuscation..." Importance="high" />
+    <Exec Command="ObfuscateRelease.bat $(Configuration)" WorkingDirectory="$(ProjectDir)" ContinueOnError="true" />
+  </Target>
+
 </Project>

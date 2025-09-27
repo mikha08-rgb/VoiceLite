@@ -30,7 +30,7 @@ namespace VoiceLite.Controls
         {
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
 
-            // Check which models are installed and disable radio buttons for missing ones
+            // Check which models are installed (both encrypted and unencrypted)
             CheckAndUpdateRadio(TinyRadio, Path.Combine(whisperPath, "ggml-tiny.bin"));
             CheckAndUpdateRadio(BaseRadio, Path.Combine(whisperPath, "ggml-base.bin"));
             CheckAndUpdateRadio(SmallRadio, Path.Combine(whisperPath, "ggml-small.bin"));
@@ -40,7 +40,11 @@ namespace VoiceLite.Controls
 
         private void CheckAndUpdateRadio(RadioButton radio, string modelPath)
         {
-            if (!File.Exists(modelPath))
+            // Check for both encrypted (.enc) and unencrypted (.bin) versions
+            var encryptedPath = modelPath + ".enc";
+            var modelExists = File.Exists(modelPath) || File.Exists(encryptedPath);
+
+            if (!modelExists)
             {
                 radio.IsEnabled = false;
                 radio.Opacity = 0.5;
