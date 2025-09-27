@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceLite - Professional Speech-to-Text for Windows</title>
+    <meta name="description" content="Instant voice typing anywhere in Windows. Powered by OpenAI Whisper AI. One hotkey, no internet required.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 0;
+            text-align: center;
+        }
+        h1 { font-size: 3em; margin-bottom: 20px; }
+        .subtitle { font-size: 1.3em; opacity: 0.95; margin-bottom: 30px; }
+        .cta-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: transform 0.3s;
+        }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .features {
+            padding: 60px 0;
+            background: #f8f9fa;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        .feature {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .feature h3 { color: #667eea; margin-bottom: 15px; }
+        .pricing {
+            padding: 60px 0;
+            text-align: center;
+        }
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        .price-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 40px 30px;
+            position: relative;
+        }
+        .price-card.featured {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+        .price-card.featured::before {
+            content: 'MOST POPULAR';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #667eea;
+            color: white;
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 0.8em;
+        }
+        .price { font-size: 3em; color: #667eea; margin: 20px 0; }
+        .price-features { list-style: none; margin: 30px 0; }
+        .price-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .buy-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .buy-button:hover { background: #5a67d8; }
+        .faq { padding: 60px 0; background: #f8f9fa; }
+        .faq-item { margin-bottom: 30px; }
+        .faq-item h3 { color: #667eea; margin-bottom: 10px; }
+        footer {
+            background: #2d3748;
+            color: white;
+            padding: 30px 0;
+            text-align: center;
+        }
+        footer a { color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>VoiceLite</h1>
+            <p class="subtitle">Professional Speech-to-Text for Windows</p>
+            <p style="font-size: 1.1em; margin-bottom: 30px;">Instant voice typing anywhere. Powered by OpenAI Whisper AI.</p>
+            <a href="#download" class="cta-button">Download Free Trial</a>
+        </div>
+    </header>
+
+    <section id="download" style="padding: 60px 0; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+        <div class="container" style="text-align: center;">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px; color: #2d3748;">Try VoiceLite Free for 14 Days</h2>
+            <p style="font-size: 1.2em; margin-bottom: 30px; color: #4a5568;">
+                No credit card required. Full features. Works offline.
+            </p>
+
+            <div style="max-width: 600px; margin: 0 auto 40px;">
+                <a href="/downloads/VoiceLite-1.0.0-Windows.zip"
+                   class="cta-button" style="display: inline-block; padding: 20px 50px; font-size: 1.2em;">
+                    📥 Download VoiceLite (Windows)
+                </a>
+                <p style="margin-top: 15px; color: #718096; font-size: 0.95em;">
+                    Version 1.0 • 16 MB download • Windows 10/11 • Includes all AI models
+                </p>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 30px; margin-top: 40px;">
+                <div style="text-align: left;">
+                    <h4 style="color: #667eea; margin-bottom: 10px;">✓ What's Included:</h4>
+                    <ul style="list-style: none; padding: 0; color: #4a5568;">
+                        <li>• 14-day free trial</li>
+                        <li>• All 5 AI models</li>
+                        <li>• Unlimited transcriptions</li>
+                        <li>• No internet required</li>
+                    </ul>
+                </div>
+                <div style="text-align: left;">
+                    <h4 style="color: #667eea; margin-bottom: 10px;">📋 Requirements:</h4>
+                    <ul style="list-style: none; padding: 0; color: #4a5568;">
+                        <li>• Windows 10 or 11</li>
+                        <li>• 4GB RAM minimum</li>
+                        <li>• Microphone</li>
+                        <li>• 5GB disk space</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 20px;">Why VoiceLite?</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <h3>⚡ Lightning Fast</h3>
+                    <p>Press Alt, speak, release. Text appears instantly. No waiting, no cloud processing.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 99% Accurate</h3>
+                    <p>Powered by OpenAI Whisper AI. Handles technical terms, code, and multiple accents perfectly.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔒 100% Private</h3>
+                    <p>Everything runs locally on your PC. No internet required. Your voice never leaves your computer.</p>
+                </div>
+                <div class="feature">
+                    <h3>🖥️ Works Everywhere</h3>
+                    <p>Any Windows app: Discord, Teams, VS Code, browsers, games. If you can type, VoiceLite works.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎨 5 AI Models</h3>
+                    <p>Choose your balance: Ultra-fast Tiny model or maximum accuracy Large model.</p>
+                </div>
+                <div class="feature">
+                    <h3>⚙️ Zero Config</h3>
+                    <p>Download, run, done. No accounts, no API keys, no complex setup. Just works.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px;">Simple, Fair Pricing</h2>
+            <p style="font-size: 1.2em; color: #666;">One-time purchase. Lifetime updates. No subscriptions.</p>
+
+            <div class="pricing-cards">
+                <div class="price-card">
+                    <h3>Personal</h3>
+                    <div class="price">$29</div>
+                    <p>Perfect for individual use</p>
+                    <ul class="price-features">
+                        <li>✓ 1 device activation</li>
+                        <li>✓ All 5 AI models</li>
+                        <li>✓ Lifetime updates</li>
+                        <li>✓ Email support</li>
+                        <li>✓ Personal use only</li>
+                    </ul>
+                    <a href="#" class="buy-button" data-tier="personal">Buy Personal</a>
+                </div>
+
+                <div class="price-card featured">
+                    <h3>Professional</h3>
+                    <div class="price">$59</div>
+                    <p>For power users & freelancers</p>
+                    <ul class="price-features">
+                        <li>✓ 3 device activations</li>
+                        <li>✓ All 5 AI models</li>
+                        <li>✓ Lifetime updates</li>
+                        <li>✓ Priority support</li>
+                        <li>✓ Commercial use allowed</li>
+                    </ul>
+                    <a href="#" class="buy-button" data-tier="professional">Buy Professional</a>
+                </div>
+
+                <div class="price-card">
+                    <h3>Business</h3>
+                    <div class="price">$199</div>
+                    <p>For teams & companies</p>
+                    <ul class="price-features">
+                        <li>✓ 5 user licenses</li>
+                        <li>✓ Unlimited devices</li>
+                        <li>✓ All 5 AI models</li>
+                        <li>✓ Priority updates</li>
+                        <li>✓ Dedicated support</li>
+                    </ul>
+                    <a href="#" class="buy-button" data-tier="business">Buy Business</a>
+                </div>
+            </div>
+
+            <p style="margin-top: 40px; color: #666;">
+                🔒 Secure payment via Stripe. 30-day money-back guarantee.
+            </p>
+        </div>
+    </section>
+
+    <section class="faq">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 40px;">Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <h3>How does it work?</h3>
+                <p>Hold Alt key, speak naturally, release to transcribe. Text appears wherever your cursor is. It's that simple.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Does it need internet?</h3>
+                <p>No! VoiceLite runs 100% offline. The AI models are included. Your voice data never leaves your computer.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What's the difference between models?</h3>
+                <p>Tiny (77MB): Instant, good accuracy. Small (488MB): Fast, great accuracy. Large (3GB): Best accuracy, slower. You get all models with any license.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I try it first?</h3>
+                <p>Yes! Download includes a 14-day free trial with all features. No credit card required.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>System requirements?</h3>
+                <p>Windows 10/11, 4GB RAM minimum (8GB recommended for Large model), 5GB disk space for all models.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 VoiceLite. All rights reserved.</p>
+            <p style="margin-top: 10px;">
+                <a href="mailto:support@voicelite.app">support@voicelite.app</a> |
+                <a href="/privacy">Privacy Policy</a> |
+                <a href="/terms">Terms of Service</a>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Stripe payment links
+        const stripeLinks = {
+            personal: 'https://buy.stripe.com/test_bJe9AT2900gmceb6sDgbm00',
+            professional: 'https://buy.stripe.com/test_bJe9AT2900gmceb6sDgbm00', // Using same link for now - update when you create professional product
+            business: 'https://buy.stripe.com/test_bJe9AT2900gmceb6sDgbm00' // Using same link for now - update when you create business product
+        };
+
+        document.querySelectorAll('.buy-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tier = button.dataset.tier;
+                window.location.href = stripeLinks[tier];
+            });
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
