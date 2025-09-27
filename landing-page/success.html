@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You - VoiceLite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .success-container {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #10b981;
+            margin-bottom: 30px;
+            animation: scaleIn 0.3s ease-out 0.2s both;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .checkmark svg {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            stroke-width: 3;
+            fill: none;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: checkmarkDraw 0.5s ease-out 0.5s forwards;
+        }
+
+        @keyframes checkmarkDraw {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        h1 {
+            color: #1f2937;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-out 0.3s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .subtitle {
+            color: #6b7280;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            animation: fadeIn 0.5s ease-out 0.4s both;
+        }
+
+        .email-info {
+            background: #f3f4f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+            animation: fadeIn 0.5s ease-out 0.5s both;
+        }
+
+        .email-info strong {
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .next-steps {
+            text-align: left;
+            margin: 40px 0;
+            animation: fadeIn 0.5s ease-out 0.6s both;
+        }
+
+        .next-steps h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .next-steps ol {
+            color: #6b7280;
+            padding-left: 20px;
+            line-height: 1.8;
+        }
+
+        .support-info {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #f3f4f6;
+            color: #6b7280;
+            animation: fadeIn 0.5s ease-out 0.7s both;
+        }
+
+        .support-info a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .support-info a:hover {
+            text-decoration: underline;
+        }
+
+        .download-button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-top: 30px;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease-out 0.8s both;
+        }
+
+        .download-button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .processing-note {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #92400e;
+            font-size: 0.95em;
+            animation: fadeIn 0.5s ease-out 0.6s both;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="checkmark">
+            <svg viewBox="0 0 52 52">
+                <path d="M14 27l10 10 20-20" />
+            </svg>
+        </div>
+
+        <h1>Payment Successful!</h1>
+        <p class="subtitle">Thank you for purchasing VoiceLite</p>
+
+        <div class="email-info">
+            <p>Your license key will be sent to:</p>
+            <p><strong id="customer-email">your email address</strong></p>
+        </div>
+
+        <div class="processing-note">
+            ⏱️ License keys are typically delivered within 5-10 minutes. During high demand, it may take up to 1 hour.
+        </div>
+
+        <div class="next-steps">
+            <h3>What happens next?</h3>
+            <ol>
+                <li>Check your email for your license key</li>
+                <li>Download VoiceLite if you haven't already</li>
+                <li>Open VoiceLite and click on "License" in the system tray</li>
+                <li>Enter your license key to activate</li>
+                <li>Start using voice-to-text with the Alt key!</li>
+            </ol>
+        </div>
+
+        <a href="/" class="download-button">Download VoiceLite</a>
+
+        <div class="support-info">
+            <p><strong>Need help?</strong></p>
+            <p>Contact us at <a href="mailto:support@voicelite.app">support@voicelite.app</a></p>
+            <p style="margin-top: 10px;">Please include your order email in any support requests.</p>
+        </div>
+    </div>
+
+    <script>
+        // Get email from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const email = urlParams.get('customer_email') || urlParams.get('email');
+
+        if (email) {
+            document.getElementById('customer-email').textContent = email;
+        }
+
+        // Optional: Store purchase info in localStorage for the download page
+        if (email) {
+            localStorage.setItem('voicelite_purchase', JSON.stringify({
+                email: email,
+                date: new Date().toISOString()
+            }));
+        }
+    </script>
+</body>
+</html>
