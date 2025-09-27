@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ],
+  "env": {
+    "API_KEY": "CE7038B50A2FC2F91C52D042EAADAA77",
+    "ADMIN_KEY": "F50BB8D40F0262CFFE40D254B789C317",
+    "NODE_ENV": "production"
+  }
+}

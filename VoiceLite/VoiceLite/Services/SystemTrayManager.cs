@@ -29,7 +29,7 @@ namespace VoiceLite.Services
             trayIcon = new TaskbarIcon
             {
                 Icon = customIcon ?? System.Drawing.SystemIcons.Application,
-                ToolTipText = "VoiceLite - Press F1 to dictate"
+                ToolTipText = "VoiceLite - Hold Alt to dictate"
             };
 
             trayIcon.TrayMouseDoubleClick += (s, e) =>
@@ -51,6 +51,22 @@ namespace VoiceLite.Services
                 IsEnabled = false
             };
 
+            var licenseItem = new System.Windows.Controls.MenuItem
+            {
+                Header = "License..."
+            };
+            licenseItem.Click += (s, e) =>
+            {
+                var licenseWindow = new SimpleLicenseWindow();
+                licenseWindow.ShowDialog();
+
+                // Refresh main window after license dialog closes
+                if (mainWindow is MainWindow mw)
+                {
+                    mw.UpdateTrialStatus();
+                }
+            };
+
             var separator = new System.Windows.Controls.Separator();
 
             var exitItem = new System.Windows.Controls.MenuItem
@@ -64,6 +80,7 @@ namespace VoiceLite.Services
 
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(settingsItem);
+            contextMenu.Items.Add(licenseItem);
             contextMenu.Items.Add(separator);
             contextMenu.Items.Add(exitItem);
 
@@ -85,7 +102,7 @@ namespace VoiceLite.Services
         public void MinimizeToTray()
         {
             mainWindow.Hide();
-            ShowBalloonTip("VoiceLite", "Running in background. Press F1 to dictate.");
+            ShowBalloonTip("VoiceLite", "Running in background. Hold Alt to dictate.");
         }
 
         public void Dispose()

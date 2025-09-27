@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Database
+*.db
+*.sqlite
+data/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+temp/
+
+# Backup files
+*.backup
+*.bak
+.vercel

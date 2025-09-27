@@ -21,6 +21,10 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private MemoryMonitor? memoryMonitor;
+        private LicenseManager? licenseManager;
+        private LicenseInfo? currentLicense;
+        private ModelEncryptionService? modelEncryption;
+        private SimpleLicenseManager? simpleLicenseManager;
         private Settings settings = new();
         private bool _isRecording = false;
         private bool isRecording
@@ -195,6 +199,44 @@ namespace VoiceLite
             UpdateConfigDisplay();
         }
 
+        public void UpdateTrialStatus()
+        {
+            if (simpleLicenseManager == null) return;
+
+            var daysRemaining = simpleLicenseManager.GetTrialDaysRemaining();
+
+            if (daysRemaining == -1) // Activated license - HIDE the trial bar completely
+            {
+                TrialStatusBar.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                // Show trial bar for trial users
+                TrialStatusBar.Visibility = Visibility.Visible;
+
+                if (daysRemaining > 0)
+                {
+                    TrialStatusText.Text = $"{daysRemaining} days left on trial";
+                    if (daysRemaining <= 3)
+                    {
+                        TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkRed);
+                        TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 215, 218));
+                    }
+                    else
+                    {
+                        TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(133, 100, 4));
+                        TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 243, 205));
+                    }
+                }
+                else
+                {
+                    TrialStatusText.Text = "Trial expired - Please activate";
+                    TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkRed);
+                    TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 215, 218));
+                }
+            }
+        }
+
         private void SaveSettings()
         {
             try
@@ -214,6 +256,30 @@ namespace VoiceLite
         {
             try
             {
+                // Simple license check
+                simpleLicenseManager = new SimpleLicenseManager();
+
+                // Update trial status display
+                UpdateTrialStatus();
+
+                if (!simpleLicenseManager.IsValid())
+                {
+                    var licenseWindow = new SimpleLicenseWindow();
+                    licenseWindow.ShowDialog();
+
+                    // Re-check after dialog
+                    if (!simpleLicenseManager.IsValid())
+                    {
+                        MessageBox.Show("VoiceLite requires a valid license to continue.",
+                            "License Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        Application.Current.Shutdown();
+                        return;
+                    }
+
+                    // Update status after activation
+                    UpdateTrialStatus();
+                }
+
                 // Initialize core services
                 textInjector = new TextInjector(settings);
                 audioRecorder = new AudioRecorder();
@@ -260,6 +326,10 @@ namespace VoiceLite
         {
             try
             {
+                // Update license status in UI
+                UpdateLicenseStatus();
+                RestrictModelSelection();
+
                 var helper = new WindowInteropHelper(this);
                 hotkeyManager?.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
@@ -1257,6 +1327,12 @@ namespace VoiceLite
                 audioRecorder?.Dispose();
                 audioRecorder = null;
 
+                // Clean up temp model files
+                ModelEncryptionService.CleanupTempFiles();
+
+                // Stop security protection
+                SecurityService.StopProtection();
+
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
             catch (Exception ex)
@@ -1265,6 +1341,82 @@ namespace VoiceLite
             }
 
             base.OnClosed(e);
+        }
+
+        private void ShowLicenseWarning()
+        {
+            if (currentLicense == null)
+            {
+                currentLicense = new LicenseInfo { Status = LicenseStatus.NoLicense };
+            }
+
+            string message = currentLicense.Status switch
+            {
+                LicenseStatus.TrialExpired => "Your trial period has expired.\n\nPlease purchase a license to continue using VoiceLite.",
+                LicenseStatus.Expired => "Your license has expired.\n\nPlease renew your license to continue using VoiceLite.",
+                LicenseStatus.Invalid => "Invalid license detected.\n\nPlease contact support if you believe this is an error.",
+                LicenseStatus.NoLicense => "No license found.\n\nStarting 14-day trial period.",
+                _ => ""
+            };
+
+            if (!string.IsNullOrEmpty(message))
+            {
+                MessageBox.Show(message, "License Status", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void UpdateLicenseStatus()
+        {
+            if (currentLicense == null)
+                return;
+
+            // Update window title with license status
+            string licenseText = currentLicense.Type == LicenseType.Trial
+                ? $"Trial ({currentLicense.TrialDaysRemaining} days left)"
+                : currentLicense.Type.ToString();
+
+            this.Title = $"VoiceLite - {licenseText}";
+
+            // Update status text color based on license
+            if (currentLicense.Type == LicenseType.Trial && currentLicense.TrialDaysRemaining <= 3)
+            {
+                StatusText.Foreground = Brushes.Orange;
+            }
+        }
+
+        private bool CheckFeatureAccess(string feature)
+        {
+            if (currentLicense == null || !currentLicense.IsValid())
+                return false;
+
+            switch (feature)
+            {
+                case "large-models":
+                    return currentLicense.CanUseAllModels;
+                case "advanced-features":
+                    return currentLicense.CanUseAdvancedFeatures;
+                case "unlimited-usage":
+                    return currentLicense.IsUnlimited;
+                default:
+                    return true;
+            }
+        }
+
+        private void RestrictModelSelection()
+        {
+            if (currentLicense == null || licenseManager == null)
+                return;
+
+            // Check if current model is allowed
+            if (!licenseManager.CheckModelAccess(settings.WhisperModel))
+            {
+                // Fallback to tiny model for trial users
+                settings.WhisperModel = "ggml-tiny.bin";
+                SaveSettings();
+
+                MessageBox.Show($"Your {currentLicense.Type} license only allows access to limited models.\n\nSwitching to Tiny model.",
+                    "Model Restriction", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
     }
 }

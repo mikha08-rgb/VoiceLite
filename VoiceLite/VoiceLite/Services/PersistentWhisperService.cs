@@ -19,11 +19,25 @@ namespace VoiceLite.Services
         private string? dummyAudioPath;
         private volatile bool isWarmedUp = false;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
+        private ModelEncryptionService? modelEncryption;
 
         public PersistentWhisperService(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // Initialize model encryption service
+            try
+            {
+                var licenseManager = new LicenseManager();
+                modelEncryption = new ModelEncryptionService(licenseManager);
+                modelEncryption.EncryptModelsIfNeeded();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to initialize model encryption", ex);
+                // Continue without encryption for backward compatibility
+            }
 
             // Cache paths at initialization
             cachedWhisperExePath = ResolveWhisperExePath();
@@ -67,6 +81,18 @@ namespace VoiceLite.Services
                 _ => "ggml-small.bin"
             };
 
+            // Try to get decrypted model path from encryption service first
+            if (modelEncryption != null)
+            {
+                var decryptedPath = modelEncryption.GetDecryptedModelPath(modelFile);
+                if (!string.IsNullOrEmpty(decryptedPath) && File.Exists(decryptedPath))
+                {
+                    ErrorLogger.LogMessage($"Using decrypted model at: {decryptedPath}");
+                    return decryptedPath;
+                }
+            }
+
+            // Fall back to unencrypted models for backward compatibility
             var modelPath = Path.Combine(baseDir, "whisper", modelFile);
             if (File.Exists(modelPath))
                 return modelPath;
@@ -413,6 +439,7 @@ namespace VoiceLite.Services
         {
             CleanupProcess();
             transcriptionSemaphore?.Dispose();
+            // Note: ModelEncryptionService doesn't implement IDisposable
         }
     }
 }

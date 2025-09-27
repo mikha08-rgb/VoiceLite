@@ -7,26 +7,42 @@
         ShowInTaskbar="True"
         StateChanged="Window_StateChanged"
         Background="#FAFAFA">
-    <Grid Margin="24">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Title bar with status on the right -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="VoiceLite"
-                       FontSize="22" FontWeight="SemiBold"
-                       Foreground="#2C3E50"
-                       HorizontalAlignment="Left"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="#27AE60" Margin="0,0,6,0"/>
-                <TextBlock x:Name="StatusText" Text="Ready"
-                          Foreground="#27AE60" FontWeight="SemiBold" FontSize="14"/>
-            </StackPanel>
-        </Grid>
+        <!-- Trial Status Bar -->
+        <Border Grid.Row="0" x:Name="TrialStatusBar" Background="#FFF3CD" BorderBrush="#FFC107" BorderThickness="0,0,0,1" Visibility="Visible">
+            <TextBlock x:Name="TrialStatusText"
+                       Text="14 days left on trial"
+                       Padding="10,5"
+                       FontWeight="SemiBold"
+                       Foreground="#856404"
+                       TextAlignment="Center"/>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar with status on the right -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="VoiceLite"
+                           FontSize="22" FontWeight="SemiBold"
+                           Foreground="#2C3E50"
+                           HorizontalAlignment="Left"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="#27AE60" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="StatusText" Text="Ready"
+                              Foreground="#27AE60" FontWeight="SemiBold" FontSize="14"/>
+                </StackPanel>
+            </Grid>
 
         <!-- Configuration information -->
         <StackPanel Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Margin="0,0,0,16">
@@ -107,6 +123,7 @@
                      IsChecked="True"
                      HorizontalAlignment="Left"
                      Margin="0,12,0,0"/>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
