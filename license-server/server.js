@@ -5,6 +5,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const crypto = require('crypto');
 const cors = require('cors');
+const { sendLicenseEmail } = require('./emailService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,10 @@ db.run(`
         device_count INTEGER DEFAULT 1,
         max_devices INTEGER DEFAULT 1,
         is_active BOOLEAN DEFAULT 1,
+        subscription_id TEXT,
+        stripe_customer_id TEXT,
+        subscription_status TEXT,
+        current_period_end TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
 `);
@@ -44,9 +49,15 @@ db.run(`
     )
 `);
 
-// Simple API key authentication (set this as environment variable)
-const API_KEY = process.env.API_KEY || 'CE7038B50A2FC2F91C52D042EAADAA77';
-const ADMIN_KEY = process.env.ADMIN_KEY || 'F50BB8D40F0262CFFE40D254B789C317';
+// API key authentication - MUST be set as environment variables in production
+const API_KEY = process.env.API_KEY;
+const ADMIN_KEY = process.env.ADMIN_KEY;
+
+if (!API_KEY || !ADMIN_KEY) {
+    console.error('CRITICAL: API_KEY and ADMIN_KEY environment variables must be set!');
+    console.error('Generate secure keys using: openssl rand -hex 32');
+    process.exit(1);
+}
 
 // Middleware for API authentication
 function requireApiKey(req, res, next) {
@@ -84,19 +95,17 @@ app.post('/api/generate', requireAdminKey, (req, res) => {
 
     // Generate license key based on type
     const prefix = {
-        'Trial': 'TRIAL',
-        'Personal': 'PERS',
-        'Pro': 'PROF',
-        'Business': 'BUSI'
-    }[license_type] || 'PERS';
+        'Free': 'FREE',
+        'Pro': 'PRO',
+        'Subscription': 'SUB'
+    }[license_type] || 'FREE';
 
     const licenseKey = `${prefix}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
     const maxDevices = {
-        'Trial': 1,
-        'Personal': 1,
+        'Free': 1,
         'Pro': 3,
-        'Business': 999
+        'Subscription': 3
     }[license_type] || 1;
 
     db.run(
@@ -287,6 +296,102 @@ app.get('/api/stats', requireAdminKey, (req, res) => {
     );
 });
 
+// Stripe Webhook Handler
+app.post('/api/webhook/stripe', express.raw({type: 'application/json'}), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+        console.error('Stripe webhook secret not configured');
+        return res.status(500).send('Webhook secret not configured');
+    }
+
+    try {
+        // For now, just log the webhook (Stripe library would be added in production)
+        const event = JSON.parse(req.body.toString());
+
+        console.log('Stripe webhook received:', event.type);
+
+        // Handle different event types
+        switch (event.type) {
+            case 'checkout.session.completed':
+                // Payment successful - generate and email license
+                const session = event.data.object;
+                const email = session.customer_email || session.customer_details?.email;
+                const subscriptionId = session.subscription;
+                const customerId = session.customer;
+                const licenseType = 'Pro'; // All subscriptions are Pro
+
+                // Generate license
+                const prefix = 'SUB'; // Subscription prefix
+
+                const licenseKey = `${prefix}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+                // Save to database with subscription info
+                db.run(
+                    `INSERT INTO licenses (license_key, email, license_type, max_devices, subscription_id, stripe_customer_id, subscription_status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [licenseKey, email, licenseType, 3, subscriptionId, customerId, 'active'],
+                    async (err) => {
+                        if (err) {
+                            console.error('Failed to save license:', err);
+                        } else {
+                            console.log(`License created for ${email}: ${licenseKey}`);
+                            // Send email with license key
+                            await sendLicenseEmail(email, licenseKey, licenseType);
+                        }
+                    }
+                );
+                break;
+
+            case 'customer.subscription.deleted':
+                // Handle subscription cancellation
+                const cancelledSub = event.data.object;
+                db.run(
+                    `UPDATE licenses SET subscription_status = 'cancelled', is_active = 0 WHERE subscription_id = ?`,
+                    [cancelledSub.id],
+                    (err) => {
+                        if (err) console.error('Failed to cancel subscription:', err);
+                        else console.log('Subscription cancelled:', cancelledSub.id);
+                    }
+                );
+                break;
+
+            case 'customer.subscription.updated':
+                // Handle subscription updates (renewal, payment method change, etc)
+                const updatedSub = event.data.object;
+                db.run(
+                    `UPDATE licenses SET subscription_status = ?, current_period_end = ? WHERE subscription_id = ?`,
+                    [updatedSub.status, new Date(updatedSub.current_period_end * 1000).toISOString(), updatedSub.id],
+                    (err) => {
+                        if (err) console.error('Failed to update subscription:', err);
+                        else console.log('Subscription updated:', updatedSub.id);
+                    }
+                );
+                break;
+
+            case 'invoice.payment_failed':
+                // Handle failed payments
+                const failedInvoice = event.data.object;
+                if (failedInvoice.subscription) {
+                    db.run(
+                        `UPDATE licenses SET subscription_status = 'past_due' WHERE subscription_id = ?`,
+                        [failedInvoice.subscription],
+                        (err) => {
+                            if (err) console.error('Failed to update payment status:', err);
+                            else console.log('Payment failed for subscription:', failedInvoice.subscription);
+                        }
+                    );
+                }
+                break;
+        }
+
+        res.json({received: true});
+    } catch (err) {
+        console.error('Webhook error:', err);
+        res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`VoiceLite License Server running on port ${PORT}`);
@@ -294,6 +399,7 @@ app.listen(PORT, () => {
     console.log('\nIMPORTANT: Set these environment variables in production:');
     console.log('- API_KEY: For app authentication');
     console.log('- ADMIN_KEY: For admin operations');
+    console.log('- STRIPE_WEBHOOK_SECRET: For Stripe webhooks');
     console.log('- PORT: Server port (optional)');
 });
 

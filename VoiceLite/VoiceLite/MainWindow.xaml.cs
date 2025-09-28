@@ -25,6 +25,8 @@ namespace VoiceLite
         private LicenseInfo? currentLicense;
         private ModelEncryptionService? modelEncryption;
         private SimpleLicenseManager? simpleLicenseManager;
+        private UsageTracker? usageTracker;
+        private DateTime recordingStartTime;
         private Settings settings = new();
         private bool _isRecording = false;
         private bool isRecording
@@ -258,6 +260,9 @@ namespace VoiceLite
             {
                 // Simple license check
                 simpleLicenseManager = new SimpleLicenseManager();
+
+                // Initialize usage tracking
+                usageTracker = new UsageTracker(simpleLicenseManager);
 
                 // Update trial status display
                 UpdateTrialStatus();
@@ -855,6 +860,16 @@ namespace VoiceLite
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
             ErrorLogger.LogMessage($"OnAudioFileReady: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}, isCancelled={isCancelled}, file={audioFilePath}");
+
+            // Track usage for free users
+            if (usageTracker != null && recordingStartTime != DateTime.MinValue)
+            {
+                var duration = (DateTime.Now - recordingStartTime).TotalSeconds;
+                usageTracker.RecordUsage(duration);
+
+                // Update status to show remaining time
+                UpdateTrialStatus();
+            }
 
             // If recording was cancelled, just clean up and return
             if (isCancelled)

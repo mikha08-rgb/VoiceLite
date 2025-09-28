@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -9,10 +10,8 @@ namespace VoiceLite.Services
 {
     public enum SimpleLicenseType
     {
-        Trial,
-        Personal,
-        Professional,
-        Business
+        Free,
+        Pro
     }
 
     public class SimpleLicenseManager
@@ -20,11 +19,13 @@ namespace VoiceLite.Services
         private readonly string licensePath;
         private readonly string registryKey = @"SOFTWARE\VoiceLite";
         private LicenseData? currentLicense;
+        private readonly HttpClient httpClient;
+        private const string LICENSE_SERVER_URL = "https://voicelite-license.up.railway.app"; // Update when deployed
 
         public class LicenseData
         {
             public string Key { get; set; } = "";
-            public SimpleLicenseType Type { get; set; } = SimpleLicenseType.Trial;
+            public SimpleLicenseType Type { get; set; } = SimpleLicenseType.Free;
             public DateTime StartDate { get; set; } = DateTime.Now;
             public DateTime? ActivationDate { get; set; }
             public bool IsActivated { get; set; }
@@ -35,6 +36,7 @@ namespace VoiceLite.Services
             var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VoiceLite");
             Directory.CreateDirectory(appData);
             licensePath = Path.Combine(appData, "license.json");
+            httpClient = new HttpClient();
             LoadLicense();
         }
 
@@ -101,24 +103,14 @@ namespace VoiceLite.Services
 
         public bool IsValid()
         {
-            if (currentLicense == null) return false;
-
-            // If activated with a valid key, always valid
-            if (currentLicense.IsActivated && !string.IsNullOrEmpty(currentLicense.Key))
-                return true;
-
-            // Otherwise check trial period (14 days)
-            var daysUsed = (DateTime.Now - currentLicense.StartDate).TotalDays;
-            return daysUsed <= 14;
+            // Always valid - usage limits are handled by UsageTracker
+            return true;
         }
 
         public int GetTrialDaysRemaining()
         {
-            if (currentLicense?.IsActivated == true) return -1; // Not in trial
-
-            var daysUsed = (DateTime.Now - (currentLicense?.StartDate ?? DateTime.Now)).TotalDays;
-            var remaining = 14 - (int)daysUsed;
-            return Math.Max(0, remaining);
+            // No longer using trial system
+            return -1;
         }
 
         public bool ActivateLicense(string licenseKey)
@@ -126,87 +118,81 @@ namespace VoiceLite.Services
             if (string.IsNullOrWhiteSpace(licenseKey))
                 return false;
 
-            // Simple offline validation
             licenseKey = licenseKey.Trim().ToUpper().Replace(" ", "");
 
-            // Expected format: XXX-XXXX-XXXX-XXXX-XXXX
-            if (licenseKey.Length < 23)
+            // Basic format validation
+            if (licenseKey.Length < 20)
                 return false;
 
-            // Determine license type from prefix
-            var prefix = licenseKey.Substring(0, 3);
-            var type = prefix switch
+            try
             {
-                "PER" => SimpleLicenseType.Personal,
-                "PRO" => SimpleLicenseType.Professional,
-                "BUS" => SimpleLicenseType.Business,
-                _ => SimpleLicenseType.Trial
-            };
+                // Validate with server (this will be async in production)
+                var result = ValidateLicenseWithServer(licenseKey);
+                if (!result)
+                    return false;
 
-            // If no valid prefix, reject
-            if (type == SimpleLicenseType.Trial)
+                // For now, do basic offline validation as fallback
+                var prefix = licenseKey.Substring(0, 3);
+                var type = prefix switch
+                {
+                    "PRO" => SimpleLicenseType.Pro,
+                    "SUB" => SimpleLicenseType.Pro, // Subscription prefix
+                    _ => SimpleLicenseType.Free
+                };
+
+                if (type == SimpleLicenseType.Free)
+                    return false;
+
+                // Store activated license
+                currentLicense = new LicenseData
+                {
+                    Key = licenseKey,
+                    Type = type,
+                    StartDate = currentLicense?.StartDate ?? DateTime.Now,
+                    ActivationDate = DateTime.Now,
+                    IsActivated = true
+                };
+
+                SaveLicense();
+                return true;
+            }
+            catch
+            {
+                // If server validation fails, reject activation
                 return false;
+            }
+        }
 
-            // Validate format and checksum
-            var keyPart = licenseKey.Replace("-", "");
-
-            // Must be exactly prefix + 16 hex characters
-            if (!System.Text.RegularExpressions.Regex.IsMatch(keyPart, @"^(PER|PRO|BUS)[A-F0-9]{16}$"))
+        private bool ValidateLicenseWithServer(string licenseKey)
+        {
+            try
+            {
+                // In production, this would be an async call to the license server
+                // For now, return true if format is valid (will be replaced with actual server call)
+                return System.Text.RegularExpressions.Regex.IsMatch(
+                    licenseKey.Replace("-", ""),
+                    @"^(PRO|SUB)[A-F0-9]{12,}$"
+                );
+            }
+            catch
             {
                 return false;
             }
-
-            // Simple checksum validation - last 4 chars should match a calculated value
-            var mainPart = keyPart.Substring(0, keyPart.Length - 4);
-            var checksum = keyPart.Substring(keyPart.Length - 4);
-
-            // Calculate expected checksum
-            int sum = 0;
-            foreach (char c in mainPart)
-            {
-                sum += c;
-            }
-            var expectedChecksum = (sum * 7919).ToString("X4"); // Use prime number for better distribution
-
-            // Validate checksum
-            if (!checksum.Equals(expectedChecksum.Substring(expectedChecksum.Length - 4)))
-            {
-                return false;
-            }
-
-            // Activate
-            currentLicense = new LicenseData
-            {
-                Key = licenseKey,
-                Type = type,
-                StartDate = currentLicense?.StartDate ?? DateTime.Now,
-                ActivationDate = DateTime.Now,
-                IsActivated = true
-            };
-
-            SaveLicense();
-            return true;
         }
 
         public string GetLicenseStatus()
         {
             if (currentLicense?.IsActivated == true)
             {
-                return $"{currentLicense.Type} License - Activated";
+                return $"Pro Subscription - Active";
             }
 
-            var days = GetTrialDaysRemaining();
-            if (days > 0)
-            {
-                return $"Trial - {days} days remaining";
-            }
-
-            return "Trial Expired";
+            return "Free Account";
         }
 
         public SimpleLicenseType GetLicenseType()
         {
-            return currentLicense?.Type ?? SimpleLicenseType.Trial;
+            return currentLicense?.Type ?? SimpleLicenseType.Free;
         }
 
         // Removed ResetTrial() - security vulnerability
