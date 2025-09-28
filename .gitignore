@@ -23,4 +23,4 @@ temp/
 # Whisper executables and models
 whisper/*.bin
 whisper/*.exe
-whisper/*.dll
+whisper/*.dllVoiceLite/.claude/
