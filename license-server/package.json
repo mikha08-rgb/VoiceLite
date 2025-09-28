@@ -10,7 +10,8 @@
   "dependencies": {
     "express": "^4.18.2",
     "sqlite3": "^5.1.6",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
