@@ -43,6 +43,30 @@ dotnet format VoiceLite/VoiceLite.sln
 dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 ```
 
+### Installer (Inno Setup)
+```bash
+# Build installer (requires Inno Setup installed)
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
+```
+
+### Web Application (Next.js)
+```bash
+# Navigate to web directory
+cd voicelite-web
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
 ## Architecture Overview
 
 ### Core Components
@@ -65,11 +89,15 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
    - `ModelBenchmarkService`: Model performance testing
    - `MemoryMonitor`: Memory usage tracking
    - `ErrorLogger`: Centralized error logging
+   - `StartupDiagnostics`: Comprehensive startup checks and auto-fixes
+   - `LicenseManager`/`SimpleLicenseManager`: License validation and Pro features
+   - `UsageTracker`: Track usage minutes for freemium model
 
 3. **Models** (`Models/`): Data structures and configuration
    - `Settings`: User preferences with validation
    - `TranscriptionResult`: Whisper output parsing
    - `WhisperModelInfo`: Model metadata and benchmarking
+   - `LicenseInfo`: License information and Pro status
 
 4. **Interfaces** (`Interfaces/`): Contract definitions for dependency injection
    - `IRecorder`, `ITranscriber`, `ITextInjector`
@@ -82,11 +110,11 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 ## Whisper Integration
 
 ### Available Models (in `whisper/` directory)
-- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy
-- `ggml-base.bin` (148MB): Fast, good for basic use
-- `ggml-small.bin` (488MB): **Default** - balanced performance
-- `ggml-medium.bin` (1.5GB): Higher accuracy, slower
-- `ggml-large-v3.bin` (3.1GB): Best accuracy, slowest
+- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy - **Free tier default**
+- `ggml-base.bin` (148MB): Fast, good for basic use - **Requires Pro**
+- `ggml-small.bin` (488MB): Balanced performance - **Requires Pro**
+- `ggml-medium.bin` (1.5GB): Higher accuracy, slower - **Requires Pro**
+- `ggml-large-v3.bin` (3.1GB): Best accuracy, slowest - **Requires Pro**
 
 ### Whisper Process Management
 - Uses process pooling for performance (`WhisperProcessPool`)
@@ -100,6 +128,26 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 ```bash
 whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperature 0.2 --beam-size 5 --best-of 5
 ```
+
+## Licensing & Freemium Model
+
+### Free Tier
+- 10 minutes of usage per week
+- Resets every Monday at midnight
+- Tiny model only
+- Usage tracked in `%APPDATA%/VoiceLite/usage.json`
+
+### Pro Tier ($7/month)
+- Unlimited usage
+- All models available (base, small, medium, large)
+- Stripe subscription via web app
+- License validation via SimpleLicenseManager
+
+### Implementation Details
+- `UsageTracker` monitors recording time
+- `SimpleLicenseManager` validates Pro status
+- Upgrade prompts shown when free tier exhausted
+- Model restrictions enforced in Settings UI
 
 ## Key Technical Details
 
@@ -124,7 +172,11 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 - VAD (Voice Activity Detection) for silence trimming
 
 ### Settings & Configuration
-- Settings stored in `%APPDATA%/VoiceLite/settings.json`
+- **Settings stored in `%APPDATA%\VoiceLite\settings.json`** (NOT in Program Files)
+- Usage tracked in `%APPDATA%\VoiceLite\usage.json`
+- License stored in `%APPDATA%\VoiceLite\license.json`
+- AppData directory created automatically on first run
+- Settings migration from old Program Files location (if exists)
 - Default hotkey: Left Alt (customizable)
 - Default mode: Push-to-talk (not toggle)
 - Auto-paste enabled by default
@@ -133,11 +185,14 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ### Error Handling & Logging
 - Comprehensive error logging via `ErrorLogger` service
-- Logs stored in `%APPDATA%/VoiceLite/logs/`
+- **Logs stored in `%APPDATA%\VoiceLite\logs\voicelite.log`** (NOT in Program Files)
+- Log directory created automatically on first write
+- Log rotation at 10MB max size
 - Graceful fallbacks for missing models or whisper.exe
 - Microphone device detection and switching
 - Process crash recovery
 - Timeout handling for hung processes
+- Special handling for UnauthorizedAccessException with user-friendly messages
 
 ## Important Development Notes
 
@@ -151,6 +206,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 - Icon resources embedded in project (`VoiceLite.ico`)
 - Whisper binaries copied to output on build
 - Self-contained deployment supported
+- Post-build obfuscation in Release mode (ObfuscateRelease.bat)
 
 ### Critical Implementation Details
 1. **Audio Format**: Must be 16kHz, 16-bit mono WAV for Whisper
@@ -159,6 +215,8 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 4. **Process Management**: Whisper.exe path relative to executable location
 5. **Memory Management**: Automatic cleanup after transcription
 6. **Thread Safety**: Recording state protected by lock
+7. **License Validation**: Pro features locked behind SimpleLicenseManager checks
+8. **Usage Tracking**: Freemium limits enforced by UsageTracker
 
 ### Testing Compatibility
 Works across all Windows applications:
@@ -175,3 +233,54 @@ Works across all Windows applications:
 - Idle RAM usage: <100MB
 - Active RAM usage: <300MB
 - Idle CPU usage: <5%
+
+## Web Application Architecture
+
+The `voicelite-web` directory contains a Next.js 15 application for:
+- Marketing landing page (`app/page.tsx`)
+- Stripe checkout integration (`app/api/checkout/route.ts`)
+- Webhook handling for subscriptions (`app/api/webhook/route.ts`)
+- Pro subscription management
+
+### Tech Stack
+- Next.js 15.5.4 (React 19)
+- TypeScript
+- Tailwind CSS v4
+- Stripe for payments
+- Resend for email notifications
+
+## Deployment & Distribution
+
+### Installer Creation
+1. Build Release version with `dotnet publish`
+2. Copy to installer source directory
+3. Run Inno Setup compiler on `VoiceLiteSetup_Simple.iss`
+4. Output: `VoiceLite-Setup-1.0.5.exe` in root directory (current version)
+
+### Installer Features
+- Includes only tiny model by default (minimal size)
+- Auto-installs to Program Files
+- Creates desktop shortcut
+- Uninstaller removes AppData settings
+- Version tracking via AppId GUID
+
+### Distribution Channels
+- GitHub Releases (primary)
+- Google Drive for large downloads (442MB with models)
+- Direct download from voicelite.app
+
+## Known Issues & Limitations
+
+1. **VCRUNTIME140_1.dll Error**: Requires Visual C++ Redistributable 2015-2022 x64
+2. **Antivirus False Positives**: Global hotkeys and text injection may trigger warnings
+3. **Windows Defender**: Files may need to be unblocked (right-click → Properties → Unblock)
+4. **First Run Diagnostics**: StartupDiagnostics checks and auto-fixes common issues
+5. **License Server**: Requires online connection for Pro validation
+6. **English Only**: Multi-language support planned but not yet implemented
+
+## Fixed in v1.0.5
+
+- **Settings Location**: Fixed critical bug where settings were saved to Program Files (protected directory) instead of AppData. This caused permission errors on first run for non-admin users.
+- **Error Logs Location**: Fixed error logs being written to Program Files. Now correctly uses `%APPDATA%\VoiceLite\logs\`
+- **First-Run Experience**: Added automatic AppData directory creation and settings migration
+- **Installer**: Now pre-creates AppData directories during installation to prevent first-run issues

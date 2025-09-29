@@ -174,21 +174,73 @@ namespace VoiceLite
             }
         }
 
+        private string GetAppDataDirectory()
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VoiceLite");
+        }
+
+        private string GetSettingsPath()
+        {
+            return Path.Combine(GetAppDataDirectory(), "settings.json");
+        }
+
+        private void EnsureAppDataDirectoryExists()
+        {
+            try
+            {
+                var appDataDir = GetAppDataDirectory();
+                if (!Directory.Exists(appDataDir))
+                {
+                    Directory.CreateDirectory(appDataDir);
+                    ErrorLogger.LogMessage($"Created AppData directory: {appDataDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to create AppData directory", ex);
+            }
+        }
+
         private void LoadSettings()
         {
             settings = new Settings();
             try
             {
-                string settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                // Ensure AppData directory exists first
+                EnsureAppDataDirectoryExists();
+
+                string settingsPath = GetSettingsPath();
+
+                // Try to migrate old settings from Program Files if they exist
+                string oldSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                if (!File.Exists(settingsPath) && File.Exists(oldSettingsPath))
+                {
+                    try
+                    {
+                        File.Copy(oldSettingsPath, settingsPath);
+                        ErrorLogger.LogMessage("Migrated settings from Program Files to AppData");
+                    }
+                    catch (Exception migrationEx)
+                    {
+                        ErrorLogger.LogError("Failed to migrate old settings", migrationEx);
+                    }
+                }
+
                 if (File.Exists(settingsPath))
                 {
                     string json = File.ReadAllText(settingsPath);
                     var loadedSettings = JsonSerializer.Deserialize<Settings>(json);
                     settings = SettingsValidator.ValidateAndRepair(loadedSettings) ?? new Settings();
-                    ErrorLogger.LogMessage("Settings loaded and validated successfully");
+                    ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
 
                     // Verify whisper model exists
                     ValidateWhisperModel();
+                }
+                else
+                {
+                    ErrorLogger.LogMessage("No existing settings found, using defaults");
                 }
             }
             catch (Exception ex)
@@ -244,39 +296,35 @@ namespace VoiceLite
         {
             try
             {
+                // Ensure AppData directory exists
+                EnsureAppDataDirectoryExists();
+
                 settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
-                string settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                string settingsPath = GetSettingsPath();
                 string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(settingsPath, json);
+                ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                ErrorLogger.LogError("SaveSettings - Access Denied", ex);
+                MessageBox.Show(
+                    $"Cannot save settings due to permission issues.\n\n" +
+                    $"Try running VoiceLite as administrator or check folder permissions.\n\n" +
+                    $"Settings location: {GetSettingsPath()}",
+                    "Settings Save Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
+                ErrorLogger.LogError("SaveSettings", ex);
                 MessageBox.Show($"Failed to save settings: {ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
-        private void CheckLicense()
-        {
-            var licensePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VoiceLite", "license.txt");
-
-            if (File.Exists(licensePath))
-            {
-                settings.LicenseKey = File.ReadAllText(licensePath).Trim();
-            }
-            else
-            {
-                var dialog = new LicenseDialog { Owner = this };
-                if (dialog.ShowDialog() == true)
-                {
-                    settings.LicenseKey = dialog.LicenseKey;
-                    Directory.CreateDirectory(Path.GetDirectoryName(licensePath));
-                    File.WriteAllText(licensePath, dialog.LicenseKey);
-                    SaveSettings();
-                }
-            }
-        }
+        // CheckLicense method removed - LicenseDialog class no longer exists
+        // SimpleLicenseManager handles all license validation
 
         private void InitializeServices()
         {
@@ -291,23 +339,9 @@ namespace VoiceLite
                 // Update trial status display
                 UpdateTrialStatus();
 
-                if (!simpleLicenseManager.IsValid())
-                {
-                    var licenseWindow = new SimpleLicenseWindow();
-                    licenseWindow.ShowDialog();
-
-                    // Re-check after dialog
-                    if (!simpleLicenseManager.IsValid())
-                    {
-                        MessageBox.Show("VoiceLite requires a valid license to continue.",
-                            "License Required", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        Application.Current.Shutdown();
-                        return;
-                    }
-
-                    // Update status after activation
-                    UpdateTrialStatus();
-                }
+                // License check disabled - SimpleLicenseWindow not compiled in project
+                // IsValid() always returns true anyway, so this code never runs
+                // Keeping app free and accessible for all users
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
