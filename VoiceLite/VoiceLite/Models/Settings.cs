@@ -125,6 +125,10 @@ namespace VoiceLite.Models
         public Dictionary<string, ModelBenchmarkCache> BenchmarkCache { get; set; } = new Dictionary<string, ModelBenchmarkCache>();
         public bool ShowModelComparison { get; set; } = true; // Show visual comparison by default
         public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
+
+        // License properties
+        public string? LicenseKey { get; set; }
+        public bool IsProVersion => !string.IsNullOrEmpty(LicenseKey) && LicenseKey.StartsWith("PRO-2024-");
     }
 
     public class ModelBenchmarkCache

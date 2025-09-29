@@ -52,6 +52,7 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
+            CheckLicense(); // Check for license on startup
 
             // Check dependencies before initializing services
             _ = CheckDependenciesAsync();
@@ -254,6 +255,29 @@ namespace VoiceLite
             }
         }
 
+        private void CheckLicense()
+        {
+            var licensePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite", "license.txt");
+
+            if (File.Exists(licensePath))
+            {
+                settings.LicenseKey = File.ReadAllText(licensePath).Trim();
+            }
+            else
+            {
+                var dialog = new LicenseDialog { Owner = this };
+                if (dialog.ShowDialog() == true)
+                {
+                    settings.LicenseKey = dialog.LicenseKey;
+                    Directory.CreateDirectory(Path.GetDirectoryName(licensePath));
+                    File.WriteAllText(licensePath, dialog.LicenseKey);
+                    SaveSettings();
+                }
+            }
+        }
+
         private void InitializeServices()
         {
             try
@@ -307,6 +331,13 @@ namespace VoiceLite
                 }
 
                 audioRecorder.AudioFileReady += OnAudioFileReady;
+
+                // For free users, force tiny model
+                if (!settings.IsProVersion && settings.WhisperModel != "ggml-tiny.bin")
+                {
+                    settings.WhisperModel = "ggml-tiny.bin";
+                    SaveSettings();
+                }
 
                 // Use persistent Whisper service for better performance
                 whisperService = new PersistentWhisperService(settings);

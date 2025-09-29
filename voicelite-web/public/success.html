@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You - VoiceLite Pro</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(to bottom, #f3f4f6, #ffffff);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 48px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            text-align: center;
+        }
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .success-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            stroke-width: 3;
+        }
+        h1 {
+            color: #111827;
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+        .subtitle {
+            color: #6b7280;
+            font-size: 18px;
+            margin-bottom: 32px;
+        }
+        .info-box {
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+        .info-box h3 {
+            color: #374151;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        .info-box ol {
+            color: #6b7280;
+            margin-left: 20px;
+        }
+        .info-box li {
+            margin-bottom: 8px;
+        }
+        .button {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 12px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .secondary-link {
+            color: #6b7280;
+            text-decoration: none;
+            margin-top: 16px;
+            display: inline-block;
+        }
+        .secondary-link:hover {
+            color: #374151;
+            text-decoration: underline;
+        }
+        .email-notice {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            margin: 24px 0;
+            text-align: left;
+            border-radius: 4px;
+        }
+        .email-notice strong {
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+            </svg>
+        </div>
+
+        <h1>Payment Successful!</h1>
+        <p class="subtitle">Welcome to VoiceLite Pro</p>
+
+        <div class="email-notice">
+            <strong>📧 Check your email!</strong><br>
+            We've sent your license key and download link to your email address.
+        </div>
+
+        <div class="info-box">
+            <h3>What happens next:</h3>
+            <ol>
+                <li>Check your email for your unique license key</li>
+                <li>Download VoiceLite Pro from the link in the email</li>
+                <li>Enter your license key when prompted</li>
+                <li>Enjoy all Pro features with a 7-day free trial!</li>
+            </ol>
+        </div>
+
+        <a href="/" class="button">Return to Homepage</a>
+
+        <p style="margin-top: 32px; color: #6b7280; font-size: 14px;">
+            Didn't receive the email? Check your spam folder or<br>
+            <a href="mailto:support@voicelite.app" style="color: #3b82f6;">contact support</a>
+        </p>
+
+        <p style="margin-top: 16px; color: #9ca3af; font-size: 13px;">
+            You can manage your subscription anytime through the<br>
+            Stripe customer portal link in your email.
+        </p>
+    </div>
+</body>
+</html>

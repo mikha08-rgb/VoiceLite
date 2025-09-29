@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -24,6 +25,13 @@ namespace VoiceLite
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
+
+            // Show download button if user has Pro license
+            if (settings.IsProVersion)
+            {
+                DownloadProModelsButton.Visibility = Visibility.Visible;
+            }
+
             LoadSettings();
             SetupModelComparison();
         }
@@ -65,6 +73,15 @@ namespace VoiceLite
 
         private void SetupModelComparison()
         {
+            // Pass Pro status to the selector
+            SimpleModelSelector.IsProVersion = settings.IsProVersion;
+
+            // For free users, force tiny model
+            if (!settings.IsProVersion)
+            {
+                settings.WhisperModel = "ggml-tiny.bin";
+            }
+
             // Set the current model in the simple selector
             SimpleModelSelector.SelectedModel = settings.WhisperModel;
         }
@@ -259,6 +276,57 @@ namespace VoiceLite
                 settings.NoiseGateThreshold = Math.Max(0.0, Math.Min(0.5, noiseThreshold));
 
             // Hotkey (already saved on change)
+        }
+
+        private async void DownloadProModels_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            button.IsEnabled = false;
+            button.Content = "Downloading... (this may take several minutes)";
+
+            try
+            {
+                var models = new[]
+                {
+                    ("ggml-medium.bin", "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin")
+                    // Large model (2.9GB) exceeds GitHub's 2GB limit - will be added in future update
+                };
+
+                var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromMinutes(30);
+
+                    foreach (var (name, url) in models)
+                    {
+                        var targetPath = Path.Combine(whisperPath, name);
+
+                        if (File.Exists(targetPath))
+                        {
+                            button.Content = $"{name} already exists, skipping...";
+                            await Task.Delay(500);
+                            continue;
+                        }
+
+                        button.Content = $"Downloading {name}...";
+                        var bytes = await client.GetByteArrayAsync(url);
+                        await File.WriteAllBytesAsync(targetPath, bytes);
+                    }
+                }
+
+                button.Content = "Download Complete!";
+                // Models will be available after restart
+
+                MessageBox.Show("Pro model downloaded successfully! Restart the application to see it in the model list.",
+                               "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                button.Content = "Download Pro Model (Medium - 1.5GB)";
+                button.IsEnabled = true;
+            }
         }
     }
 }

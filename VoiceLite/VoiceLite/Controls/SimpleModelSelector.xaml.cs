@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using VoiceLite.Models;
 
 namespace VoiceLite.Controls
 {
@@ -19,6 +20,8 @@ namespace VoiceLite.Controls
                 UpdateSelection();
             }
         }
+
+        public bool IsProVersion { get; set; }
 
         public SimpleModelSelector()
         {
@@ -40,11 +43,32 @@ namespace VoiceLite.Controls
 
         private void CheckAndUpdateRadio(RadioButton radio, string modelPath)
         {
+            var modelName = Path.GetFileName(modelPath);
+
             // Check for both encrypted (.enc) and unencrypted (.bin) versions
             var encryptedPath = modelPath + ".enc";
             var modelExists = File.Exists(modelPath) || File.Exists(encryptedPath);
 
-            if (!modelExists)
+            // For free users, only allow tiny model
+            if (!IsProVersion && modelName != "ggml-tiny.bin")
+            {
+                radio.IsEnabled = false;
+                radio.Opacity = 0.5;
+
+                // Add "(Pro Only)" to the label
+                var panel = radio.Content as StackPanel;
+                if (panel?.Children[0] is Grid grid)
+                {
+                    if (grid.Children[0] is StackPanel labelPanel && labelPanel.Children[0] is TextBlock nameBlock)
+                    {
+                        if (!nameBlock.Text.Contains("(Pro Only)") && !nameBlock.Text.Contains("(Not installed)"))
+                        {
+                            nameBlock.Text += " (Pro Only)";
+                        }
+                    }
+                }
+            }
+            else if (!modelExists)
             {
                 radio.IsEnabled = false;
                 radio.Opacity = 0.5;
@@ -68,6 +92,16 @@ namespace VoiceLite.Controls
         {
             if (sender is RadioButton radio && radio.Tag is string modelFile)
             {
+                // For free users, only allow tiny model
+                if (!IsProVersion && modelFile != "ggml-tiny.bin")
+                {
+                    // Reset to tiny model
+                    TinyRadio.IsChecked = true;
+                    MessageBox.Show("Pro license required for this model. Using Tiny model instead.",
+                                    "Pro Feature", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
                 selectedModel = modelFile;
                 UpdateTip(modelFile);
                 ModelSelected?.Invoke(this, modelFile);
