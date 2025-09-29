@@ -39,7 +39,8 @@ namespace VoiceLite.Services
 
         public AudioRecorder()
         {
-            tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
+            // Use Windows temp folder instead of Program Files (fixes permissions issue)
+            tempDirectory = Path.Combine(Path.GetTempPath(), "VoiceLite", "audio");
             if (!Directory.Exists(tempDirectory))
             {
                 Directory.CreateDirectory(tempDirectory);
