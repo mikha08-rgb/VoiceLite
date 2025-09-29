@@ -52,7 +52,7 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
-            CheckLicense(); // Check for license on startup
+            // CheckLicense(); // Disabled: LicenseDialog not included in project. SimpleLicenseManager handles licensing.
 
             // Check dependencies before initializing services
             _ = CheckDependenciesAsync();
