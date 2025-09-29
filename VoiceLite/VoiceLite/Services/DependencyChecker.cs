@@ -30,7 +30,7 @@ namespace VoiceLite.Services
             result.WhisperExeFound = CheckWhisperExecutable();
             result.ModelFound = CheckWhisperModel();
 
-            // Check 2: Visual C++ Runtime
+            // Check 2: Visual C++ Runtime (required for whisper.exe)
             result.VCRuntimeInstalled = CheckVCRuntime();
 
             // Check 3: Test whisper.exe can actually run
@@ -127,7 +127,8 @@ namespace VoiceLite.Services
             try
             {
                 // Method 1: Try to load a VC Runtime DLL directly
-                var requiredDlls = new[] { "VCRUNTIME140.dll", "VCRUNTIME140_1.dll", "MSVCP140.dll" };
+                // Note: VCRUNTIME140_1.dll is optional and not always present
+                var requiredDlls = new[] { "VCRUNTIME140.dll", "MSVCP140.dll" };
 
                 foreach (var dll in requiredDlls)
                 {

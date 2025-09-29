@@ -141,8 +141,17 @@
             <!-- Whisper Model Tab -->
             <TabItem Header="AI Model" Name="ModelTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
-                    <controls:SimpleModelSelector x:Name="SimpleModelSelector"
-                                                  ModelSelected="SimpleModelSelector_ModelSelected"/>
+                    <StackPanel>
+                        <controls:SimpleModelSelector x:Name="SimpleModelSelector"
+                                                      ModelSelected="SimpleModelSelector_ModelSelected"/>
+
+                        <Button Name="DownloadProModelsButton"
+                                Content="Download Pro Model (Medium - 1.5GB)"
+                                Height="35"
+                                Margin="0,15,0,0"
+                                Click="DownloadProModels_Click"
+                                Visibility="Collapsed"/>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
