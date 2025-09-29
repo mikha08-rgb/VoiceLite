@@ -6,12 +6,32 @@ namespace VoiceLite.Services
 {
     public static class ErrorLogger
     {
-        private static readonly string LogPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory,
-            "voicelite_error.log");
+        private static readonly string LogDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VoiceLite",
+            "logs");
+
+        private static readonly string LogPath = Path.Combine(LogDirectory, "voicelite.log");
 
         private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB max
         private static readonly object LogLock = new object();
+
+        static ErrorLogger()
+        {
+            // Ensure log directory exists
+            try
+            {
+                if (!Directory.Exists(LogDirectory))
+                {
+                    Directory.CreateDirectory(LogDirectory);
+                }
+            }
+            catch
+            {
+                // If we can't create the log directory, logging will fail silently
+                // This is better than crashing the application
+            }
+        }
 
         public static void LogError(string context, Exception ex)
         {

@@ -3,7 +3,7 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.2
+AppVersion=1.0.5
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -11,7 +11,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.2
+OutputBaseFilename=VoiceLite-Setup-1.0.5
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -32,7 +32,7 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (only tiny, base, and small models)
+; Whisper files (ONLY tiny model for minimal size)
 Source: "..\whisper_installer\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file
@@ -53,19 +53,30 @@ Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 function InitializeSetup: Boolean;
 begin
   Result := True;
+  // Prerequisites check removed for seamless installation
+  // The app will check and prompt for missing dependencies on first run
+end;
 
-  // Simple reminder about prerequisites
-  if MsgBox('VoiceLite requires:' + #13#10 +
-            '• .NET Desktop Runtime 8.0' + #13#10 +
-            '• Visual C++ Runtime 2015-2022' + #13#10#13#10 +
-            'Do you have these installed?',
-            mbConfirmation, MB_YESNO) = IDNO then
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  AppDataDir: String;
+  LogsDir: String;
+begin
+  if CurStep = ssPostInstall then
   begin
-    MsgBox('Please install the prerequisites first:' + #13#10#13#10 +
-           '.NET 8: https://dotnet.microsoft.com/download/dotnet/8.0/runtime' + #13#10 +
-           'VC++ Runtime: https://aka.ms/vs/17/release/vc_redist.x64.exe',
-           mbInformation, MB_OK);
-    Result := False;
+    // Create AppData directories for settings and logs
+    AppDataDir := ExpandConstant('{userappdata}\VoiceLite');
+    LogsDir := AppDataDir + '\logs';
+
+    try
+      if not DirExists(AppDataDir) then
+        CreateDir(AppDataDir);
+
+      if not DirExists(LogsDir) then
+        CreateDir(LogsDir);
+    except
+      // Silently fail - the app will create directories on first run if needed
+    end;
   end;
 end;
 
@@ -76,7 +87,7 @@ begin
     if MsgBox('Do you want to remove VoiceLite settings and temporary files?',
               mbConfirmation, MB_YESNO) = IDYES then
     begin
-      DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
+      DelTree(ExpandConstant('{userappdata}\VoiceLite'), True, True, True);
     end;
   end;
 end;

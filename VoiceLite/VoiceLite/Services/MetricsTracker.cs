@@ -13,12 +13,30 @@ namespace VoiceLite.Services
         private readonly Settings settings;
         private readonly List<TranscriptionMetric> metrics = new List<TranscriptionMetric>();
         private readonly string metricsPath;
+        private readonly string metricsDirectory;
         private readonly object lockObject = new object();
 
         public MetricsTracker(Settings settings)
         {
             this.settings = settings;
-            metricsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "metrics.json");
+            metricsDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "VoiceLite");
+            metricsPath = Path.Combine(metricsDirectory, "metrics.json");
+
+            // Ensure directory exists
+            try
+            {
+                if (!Directory.Exists(metricsDirectory))
+                {
+                    Directory.CreateDirectory(metricsDirectory);
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to create metrics directory", ex);
+            }
+
             LoadMetrics();
         }
 
@@ -200,7 +218,7 @@ namespace VoiceLite.Services
             try
             {
                 var summary = GetSummary();
-                var reportPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                var reportPath = Path.Combine(metricsDirectory,
                     $"metrics_report_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
 
                 var report = $@"VoiceLite Metrics Report
