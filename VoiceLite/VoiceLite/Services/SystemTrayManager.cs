@@ -57,14 +57,9 @@ namespace VoiceLite.Services
             };
             licenseItem.Click += (s, e) =>
             {
-                var licenseWindow = new SimpleLicenseWindow();
-                licenseWindow.ShowDialog();
-
-                // Refresh main window after license dialog closes
-                if (mainWindow is MainWindow mw)
-                {
-                    mw.UpdateTrialStatus();
-                }
+                // License window removed - app is now fully free
+                MessageBox.Show("VoiceLite is now free to use!\n\nEnjoy unlimited voice typing with the tiny model.",
+                    "VoiceLite Free", MessageBoxButton.OK, MessageBoxImage.Information);
             };
 
             var separator = new System.Windows.Controls.Separator();
