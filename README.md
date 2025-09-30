@@ -4,9 +4,14 @@
 
   **Turn your voice into text instantly - anywhere in Windows!**
 
-  [![Download Latest](https://img.shields.io/badge/Download-v3.1-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
+  [![Download Latest](https://img.shields.io/badge/Download-v1.0.5-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
   [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
   [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+  [![GitHub Stars](https://img.shields.io/github/stars/mikha08-rgb/VoiceLite?style=social)](https://github.com/mikha08-rgb/VoiceLite)
+  [![GitHub Issues](https://img.shields.io/github/issues/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/issues)
+  [![GitHub Release](https://img.shields.io/github/v/release/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/releases)
+  [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red)](https://github.com/mikha08-rgb/VoiceLite)
 
 </div>
 
@@ -41,22 +46,21 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-| Version | Size | Description | Download |
-|---------|------|-------------|----------|
-| **Standard** ⭐ | 442MB | Best for most users - Good balance | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.1/VoiceLite-Base-v3.1.zip) |
-| **Lite** | 81MB | Faster but less accurate | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Lite-v3.0.zip) |
-| **Pro** | 318MB | Higher accuracy, slower | [⬇️ Download](https://github.com/mikha08-rgb/VoiceLite/releases/download/v3.0/VoiceLite-Pro-v3.0.zip) |
+**[⬇️ Download VoiceLite v1.0.5 Installer (125MB)](https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.5/VoiceLite-Setup-1.0.5.exe)**
+
+One-click installer • Includes Tiny model (Free tier) • All other models require Pro
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
-📌 **All versions include Left Alt as default hotkey (customizable)**
+📌 **Includes Left Alt as default hotkey (customizable in settings)**
 
 </div>
 
-### Step 3: Run!
-1. Extract ZIP to any folder
-2. Run `VoiceLite.exe`
-3. **Hold Left Alt** → Speak → Release to type!
+### Step 3: Install & Run!
+1. Run the installer (`VoiceLite-Setup-1.0.5.exe`)
+2. Follow the installation wizard
+3. Launch VoiceLite from Start Menu or Desktop
+4. **Hold Left Alt** → Speak → Release to type!
 
 ---
 
@@ -184,11 +188,19 @@ Currently English optimized. More languages coming soon!
 
 ## 🤝 Contributing
 
-Contributions welcome! Feel free to:
+VoiceLite is **open source** and contributions are welcome!
+
 - 🐛 [Report bugs](https://github.com/mikha08-rgb/VoiceLite/issues)
 - 💡 [Suggest features](https://github.com/mikha08-rgb/VoiceLite/issues)
 - 🔧 [Submit PRs](https://github.com/mikha08-rgb/VoiceLite/pulls)
+- 📖 Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - ⭐ Star if you find it useful!
+
+**Looking for contributors to help with:**
+- 🌍 Multi-language support
+- 🎨 UI/UX improvements
+- 📱 Additional keyboard shortcuts
+- 📝 Documentation improvements
 
 ---
 

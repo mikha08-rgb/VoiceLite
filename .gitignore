@@ -25,3 +25,16 @@ temp/
 whisper/*.bin
 whisper/*.exe
 whisper/*.dllVoiceLite/.claude/
+
+# Sensitive files - NEVER commit these!
+license-keys.txt
+*.env
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.txt
+api-keys.txt
