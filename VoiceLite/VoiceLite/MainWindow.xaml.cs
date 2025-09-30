@@ -21,9 +21,7 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private MemoryMonitor? memoryMonitor;
-        private LicenseManager? licenseManager;
         private LicenseInfo? currentLicense;
-        private ModelEncryptionService? modelEncryption;
         private SimpleLicenseManager? simpleLicenseManager;
         private UsageTracker? usageTracker;
         private DateTime recordingStartTime;
@@ -1407,9 +1405,6 @@ namespace VoiceLite
                 audioRecorder?.Dispose();
                 audioRecorder = null;
 
-                // Clean up temp model files
-                ModelEncryptionService.CleanupTempFiles();
-
                 // Stop security protection
                 SecurityService.StopProtection();
 
@@ -1484,18 +1479,25 @@ namespace VoiceLite
 
         private void RestrictModelSelection()
         {
-            if (currentLicense == null || licenseManager == null)
+            // Model restrictions now handled by SimpleLicenseManager + UsageTracker
+            // Free tier: limited to ggml-tiny.bin
+            // Pro tier: access to all models
+
+            if (simpleLicenseManager == null)
                 return;
 
-            // Check if current model is allowed
-            if (!licenseManager.CheckModelAccess(settings.WhisperModel))
+            var licenseType = simpleLicenseManager.GetLicenseType();
+            if (licenseType == SimpleLicenseType.Free)
             {
-                // Fallback to tiny model for trial users
-                settings.WhisperModel = "ggml-tiny.bin";
-                SaveSettings();
+                // Free users can only use tiny model
+                if (settings.WhisperModel != "ggml-tiny.bin")
+                {
+                    settings.WhisperModel = "ggml-tiny.bin";
+                    SaveSettings();
 
-                MessageBox.Show($"Your {currentLicense.Type} license only allows access to limited models.\n\nSwitching to Tiny model.",
-                    "Model Restriction", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Free tier is limited to Tiny model only.\n\nUpgrade to Pro for access to all models.",
+                        "Model Restriction", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
         }
     }

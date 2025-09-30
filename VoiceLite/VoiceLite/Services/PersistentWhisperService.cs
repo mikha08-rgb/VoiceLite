@@ -19,25 +19,11 @@ namespace VoiceLite.Services
         private string? dummyAudioPath;
         private volatile bool isWarmedUp = false;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
-        private ModelEncryptionService? modelEncryption;
 
         public PersistentWhisperService(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-            // Initialize model encryption service
-            try
-            {
-                var licenseManager = new LicenseManager();
-                modelEncryption = new ModelEncryptionService(licenseManager);
-                modelEncryption.EncryptModelsIfNeeded();
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Failed to initialize model encryption", ex);
-                // Continue without encryption for backward compatibility
-            }
 
             // Cache paths at initialization
             cachedWhisperExePath = ResolveWhisperExePath();
@@ -62,37 +48,82 @@ namespace VoiceLite.Services
         {
             var whisperExePath = Path.Combine(baseDir, "whisper", "whisper.exe");
             if (File.Exists(whisperExePath))
+            {
+                // Validate integrity before using
+                if (!ValidateWhisperExecutable(whisperExePath))
+                {
+                    ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (remove this in production)");
+                    // TODO: In production, throw exception instead of warning
+                    // throw new SecurityException("Whisper.exe integrity check failed");
+                }
                 return whisperExePath;
+            }
 
             whisperExePath = Path.Combine(baseDir, "whisper.exe");
             if (File.Exists(whisperExePath))
+            {
+                if (!ValidateWhisperExecutable(whisperExePath))
+                {
+                    ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (remove this in production)");
+                }
                 return whisperExePath;
+            }
 
             throw new FileNotFoundException("Whisper.exe not found");
         }
 
+        private bool ValidateWhisperExecutable(string path)
+        {
+            try
+            {
+                // TODO: Update this hash with the actual SHA256 hash of whisper.exe from official release
+                // To get the hash, run: certutil -hashfile whisper.exe SHA256
+                // Or use PowerShell: Get-FileHash whisper.exe -Algorithm SHA256
+                const string? EXPECTED_HASH = null; // Set to actual hash in production
+
+                // Skip validation if no expected hash is configured (development mode)
+                if (string.IsNullOrEmpty(EXPECTED_HASH))
+                {
+                    ErrorLogger.LogMessage("Whisper.exe integrity check skipped (no expected hash configured)");
+                    return true;
+                }
+
+                using var sha256 = System.Security.Cryptography.SHA256.Create();
+                using var stream = File.OpenRead(path);
+                var hash = sha256.ComputeHash(stream);
+                var hashString = BitConverter.ToString(hash).Replace("-", "");
+
+                if (!hashString.Equals(EXPECTED_HASH, StringComparison.OrdinalIgnoreCase))
+                {
+                    ErrorLogger.LogError($"Whisper.exe integrity check failed. Expected: {EXPECTED_HASH}, Got: {hashString}", null);
+                    return false;
+                }
+
+                ErrorLogger.LogMessage("Whisper.exe integrity check passed");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to validate whisper.exe integrity", ex);
+                // Allow execution on validation error (fail open) to avoid breaking legitimate use
+                return true;
+            }
+        }
+
         private string ResolveModelPath()
         {
+            // Support both short names (tiny, base, small) and full filenames (ggml-tiny.bin)
             var modelFile = settings.WhisperModel switch
             {
+                "tiny" => "ggml-tiny.bin",
+                "base" => "ggml-base.bin",
                 "small" => "ggml-small.bin",
                 "medium" => "ggml-medium.bin",
                 "large" => "ggml-large-v3.bin",
-                _ => "ggml-small.bin"
+                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
             };
 
-            // Try to get decrypted model path from encryption service first
-            if (modelEncryption != null)
-            {
-                var decryptedPath = modelEncryption.GetDecryptedModelPath(modelFile);
-                if (!string.IsNullOrEmpty(decryptedPath) && File.Exists(decryptedPath))
-                {
-                    ErrorLogger.LogMessage($"Using decrypted model at: {decryptedPath}");
-                    return decryptedPath;
-                }
-            }
-
-            // Fall back to unencrypted models for backward compatibility
+            // Check standard model locations
             var modelPath = Path.Combine(baseDir, "whisper", modelFile);
             if (File.Exists(modelPath))
                 return modelPath;
@@ -101,7 +132,15 @@ namespace VoiceLite.Services
             if (File.Exists(modelPath))
                 return modelPath;
 
-            throw new FileNotFoundException($"Model {modelFile} not found");
+            // Fallback: if requested model not found, try to find ggml-tiny.bin (free tier default)
+            var tinyPath = Path.Combine(baseDir, "whisper", "ggml-tiny.bin");
+            if (File.Exists(tinyPath))
+            {
+                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (Free tier)");
+                return tinyPath;
+            }
+
+            throw new FileNotFoundException($"Model {modelFile} not found. Searched in: {Path.Combine(baseDir, "whisper")} and {baseDir}");
         }
 
         private void CreateDummyAudioFile()
@@ -247,14 +286,15 @@ namespace VoiceLite.Services
                 var modelPath = cachedModelPath ?? ResolveModelPath();
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
-                // Build arguments optimized for speed - we're pre-warmed so can be more aggressive
+                // Build arguments using user settings for optimal accuracy/speed balance
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
                               $"--threads {Environment.ProcessorCount} " +
-                              "--no-timestamps --language en " +
-                              "--beam-size 1 " +          // Fastest possible
-                              "--best-of 1 " +            // Single candidate for speed
-                              "--entropy-thold 2.8";      // Slightly higher for speed
+                              $"--no-timestamps --language {settings.Language} " +
+                              $"--beam-size {settings.BeamSize} " +
+                              $"--best-of {settings.BestOf} " +
+                              $"--temperature {settings.WhisperTemperature:F1} " +
+                              "--entropy-thold 2.8";
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -439,7 +479,6 @@ namespace VoiceLite.Services
         {
             CleanupProcess();
             transcriptionSemaphore?.Dispose();
-            // Note: ModelEncryptionService doesn't implement IDisposable
         }
     }
 }

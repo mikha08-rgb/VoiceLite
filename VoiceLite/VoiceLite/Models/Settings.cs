@@ -25,7 +25,7 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.LeftAlt;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
-        private string _whisperModel = "ggml-small.bin";
+        private string _whisperModel = "tiny"; // Changed from ggml-small.bin to tiny (free tier default)
         private int _beamSize = 5;
         private int _bestOf = 5;
         private double _whisperTimeoutMultiplier = 2.0;
@@ -57,7 +57,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-small.bin" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "tiny" : value;
         }
 
         public int BeamSize

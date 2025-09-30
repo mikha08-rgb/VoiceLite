@@ -201,19 +201,30 @@ namespace VoiceLite.Services
         private void InjectViaClipboard(string text)
         {
             string? originalClipboard = null;
+            bool hadOriginalClipboard = false;
 
-            // Try to preserve original clipboard content
-            try
+            // Try to preserve original clipboard content with retry logic
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                if (Clipboard.ContainsText())
+                try
                 {
-                    originalClipboard = Clipboard.GetText();
+                    if (Clipboard.ContainsText())
+                    {
+                        originalClipboard = Clipboard.GetText();
+                        hadOriginalClipboard = true;
+                        ErrorLogger.LogMessage($"Original clipboard saved ({originalClipboard.Length} chars)");
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogMessage($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
+                    if (attempt < 2)
+                        Thread.Sleep(10); // Brief delay before retry
                 }
             }
-            catch
-            {
-                // Ignore clipboard read errors
-            }
+
+            bool clipboardRestored = false;
 
             try
             {
@@ -222,17 +233,33 @@ namespace VoiceLite.Services
             finally
             {
                 // Restore original clipboard if we had saved it
-                if (!string.IsNullOrEmpty(originalClipboard))
+                if (hadOriginalClipboard && !string.IsNullOrEmpty(originalClipboard))
                 {
-                    try
+                    // Retry restoration up to 3 times
+                    for (int attempt = 0; attempt < 3; attempt++)
                     {
-                        Thread.Sleep(100); // Wait a bit before restoring
-                        SetClipboardText(originalClipboard);
-                        ErrorLogger.LogMessage("Original clipboard content restored");
+                        try
+                        {
+                            Thread.Sleep(100); // Wait for paste to complete
+                            SetClipboardText(originalClipboard);
+                            ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
+                            clipboardRestored = true;
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
+                            if (attempt < 2)
+                                Thread.Sleep(50);
+                        }
                     }
-                    catch
+
+                    // If restoration failed after all retries, log warning
+                    if (!clipboardRestored)
                     {
-                        // Best effort - don't fail if we can't restore
+                        ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                        // Note: We don't show a UI notification here as it would be disruptive
+                        // Users can check logs if they notice clipboard issues
                     }
                 }
             }
