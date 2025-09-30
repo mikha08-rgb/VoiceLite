@@ -31,6 +31,10 @@ namespace VoiceLite.Services
         private const int CleanupIntervalMinutes = 30;
         private bool useMemoryBuffer = true; // Enable memory buffering by default
 
+        // CRITICAL FIX: Instance tracking to prevent race conditions
+        private int waveInInstanceId = 0;
+        private int currentRecordingInstanceId = 0;
+
 
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
@@ -258,6 +262,11 @@ namespace VoiceLite.Services
                     // Only force GC if absolutely necessary (removed for performance)
                     // Modern .NET handles this efficiently without manual intervention
 
+                    // CRITICAL FIX: Increment instance ID to track this new recording session
+                    waveInInstanceId++;
+                    currentRecordingInstanceId = waveInInstanceId;
+                    ErrorLogger.LogMessage($"StartRecording: New recording instance ID: {currentRecordingInstanceId}");
+
                     ErrorLogger.LogMessage($"StartRecording: Creating COMPLETELY FRESH WaveInEvent for device {deviceToUse}");
                     waveIn = new WaveInEvent
                     {
@@ -271,7 +280,7 @@ namespace VoiceLite.Services
                     waveIn.DataAvailable += OnDataAvailable;
                     waveIn.RecordingStopped += OnRecordingStopped;
                     eventHandlersAttached = true;
-                    ErrorLogger.LogMessage("StartRecording: Event handlers attached to COMPLETELY FRESH device");
+                    ErrorLogger.LogMessage($"StartRecording: Event handlers attached to COMPLETELY FRESH device (instance {currentRecordingInstanceId})");
 
                     if (useMemoryBuffer)
                     {
@@ -316,7 +325,10 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            // CRITICAL FIX: Immediate triple-check to prevent ANY late callbacks from contaminating next session
+            // CRITICAL FIX: Capture the instance ID at entry to detect stale callbacks
+            int callbackInstanceId;
+
+            // Quick pre-lock check for obvious late callbacks
             if (!isRecording)
             {
                 // Log late data and IMMEDIATELY discard it
@@ -340,13 +352,26 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                // EXTRA SAFETY: Check if sender is the current waveIn instance
-                if (sender != waveIn)
+                // CRITICAL FIX: Capture current recording instance ID under lock
+                callbackInstanceId = currentRecordingInstanceId;
+
+                // ENHANCED SAFETY: Check if sender is from an old waveIn instance using instance ID
+                if (sender is WaveInEvent senderWaveIn)
                 {
-                    if (e.BytesRecorded > 0)
+                    // If sender is not the current waveIn instance, reject it
+                    if (senderWaveIn != waveIn)
                     {
-                        ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - IGNORING {e.BytesRecorded} bytes from OLD waveIn instance");
+                        if (e.BytesRecorded > 0)
+                        {
+                            ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - IGNORING {e.BytesRecorded} bytes from OLD waveIn instance (wrong object reference)");
+                        }
+                        return;
                     }
+                }
+                else
+                {
+                    // Sender is not a WaveInEvent? This should never happen
+                    ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - sender is not WaveInEvent! Type: {sender?.GetType().Name ?? "null"}");
                     return;
                 }
 

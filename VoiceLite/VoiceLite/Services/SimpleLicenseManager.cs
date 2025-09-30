@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Management;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -165,18 +167,90 @@ namespace VoiceLite.Services
 
         private bool ValidateLicenseWithServer(string licenseKey)
         {
+            // TODO Phase 1.3: Implement JWT-based license tokens for enhanced security
+            // - Server returns signed JWT containing: {type, expiry, machineId, signature}
+            // - Client validates signature using public key (embedded in app)
+            // - Private key stays on server only
+            // - Requires: System.IdentityModel.Tokens.Jwt NuGet package
+
             try
             {
-                // In production, this would be an async call to the license server
-                // For now, return true if format is valid (will be replaced with actual server call)
-                return System.Text.RegularExpressions.Regex.IsMatch(
-                    licenseKey.Replace("-", ""),
-                    @"^(PRO|SUB)[A-F0-9]{12,}$"
-                );
+                // Validate with actual license server
+                var request = new
+                {
+                    key = licenseKey,
+                    machine_id = GetMachineId()
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Use synchronous call in constructor context
+                var task = httpClient.PostAsync($"{LICENSE_SERVER_URL}/api/validate", content);
+                task.Wait(TimeSpan.FromSeconds(10)); // 10 second timeout
+
+                if (!task.IsCompleted || task.Result == null)
+                {
+                    ErrorLogger.LogMessage("License validation timed out");
+                    return false; // Fail closed on timeout
+                }
+
+                var response = task.Result;
+                if (!response.IsSuccessStatusCode)
+                {
+                    ErrorLogger.LogMessage($"License validation failed: {response.StatusCode}");
+                    return false; // Fail closed on server error
+                }
+
+                var responseTask = response.Content.ReadAsStringAsync();
+                responseTask.Wait(TimeSpan.FromSeconds(5));
+
+                if (!responseTask.IsCompleted)
+                {
+                    return false;
+                }
+
+                var result = JsonSerializer.Deserialize<JsonElement>(responseTask.Result);
+
+                if (result.TryGetProperty("valid", out var valid))
+                {
+                    return valid.GetBoolean();
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("License validation failed", ex);
+                return false; // Fail closed on any error
+            }
+        }
+
+        private string GetMachineId()
+        {
+            try
+            {
+                // Use same machine ID generation as SecurityService for consistency
+                using var searcher = new System.Management.ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor");
+                var cpuId = searcher.Get().Cast<System.Management.ManagementObject>().FirstOrDefault()?["ProcessorId"]?.ToString() ?? "UNKNOWN";
+                var machineGuid = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography")?.GetValue("MachineGuid")?.ToString();
+
+                var combined = $"{cpuId}|{machineGuid}";
+                using (var sha256 = System.Security.Cryptography.SHA256.Create())
+                {
+                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
+                    return Convert.ToBase64String(hash).Substring(0, 16);
+                }
             }
             catch
             {
-                return false;
+                // Fallback to username + machine name
+                var fallback = Environment.UserName + Environment.MachineName;
+                using (var sha256 = System.Security.Cryptography.SHA256.Create())
+                {
+                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(fallback));
+                    return Convert.ToBase64String(hash).Substring(0, 16);
+                }
             }
         }
 
