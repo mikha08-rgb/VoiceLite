@@ -207,19 +207,15 @@ namespace VoiceLite.Services
 
         private static bool CheckProtectedFolder()
         {
-            var currentPath = AppDomain.CurrentDomain.BaseDirectory.ToLower();
+            // DISABLED: This check is no longer needed since we fixed the actual permission issues
+            // The app now uses Windows temp folder for all temporary files
+            // Program Files is the CORRECT location for Windows apps
+            return false;
 
-            // Check if running from problematic locations
-            var protectedPaths = new[]
-            {
-                @"c:\program files",
-                @"c:\program files (x86)",
-                @"c:\windows",
-                @"c:\users\public\desktop", // Sometimes problematic
-                Environment.GetFolderPath(Environment.SpecialFolder.System).ToLower()
-            };
-
-            return protectedPaths.Any(p => currentPath.StartsWith(p));
+            // Original check kept for reference but disabled:
+            // var currentPath = AppDomain.CurrentDomain.BaseDirectory.ToLower();
+            // var protectedPaths = new[] { @"c:\program files", @"c:\program files (x86)", ... };
+            // return protectedPaths.Any(p => currentPath.StartsWith(p));
         }
 
         private static bool CheckDiskSpace()
