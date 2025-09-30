@@ -48,7 +48,7 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.6/VoiceLite-Setup-1.0.6.exe"
+              href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.7/VoiceLite-Setup-1.0.7.exe"
               download
               className="inline-flex items-center px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -181,7 +181,7 @@ export default function Home() {
               <div className="p-6"></div>
               <div className="p-6 text-center bg-gray-50">
                 <a
-                  href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.6/VoiceLite-Setup-1.0.6.exe"
+                  href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.7/VoiceLite-Setup-1.0.7.exe"
                   download
                   className="inline-flex items-center px-6 py-3 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
