@@ -25,6 +25,10 @@ export async function sendMagicLinkEmail({
   deepLinkUrl,
   expiresInMinutes,
 }: MagicLinkParams) {
+  console.log('[Email] Attempting to send magic link to:', email);
+  console.log('[Email] FROM_ADDRESS:', FROM_ADDRESS);
+  console.log('[Email] Has RESEND_API_KEY:', !!process.env.RESEND_API_KEY);
+
   const resend = getResendClient();
   const html = `
     <h1>Sign in to VoiceLite</h1>
@@ -43,6 +47,7 @@ export async function sendMagicLinkEmail({
     throw new Error('Email service not configured. RESEND_API_KEY is required.');
   }
 
+  console.log('[Email] Calling Resend API...');
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: [email],
@@ -55,6 +60,8 @@ export async function sendMagicLinkEmail({
     console.error('Failed to send magic link email:', error);
     throw error;
   }
+
+  console.log('[Email] Magic link email sent successfully to:', email);
 }
 
 interface LicenseEmailParams {
