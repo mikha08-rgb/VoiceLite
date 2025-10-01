@@ -18,8 +18,10 @@
   "dependencies": {
     "@noble/ed25519": "^3.0.0",
     "@prisma/client": "^6.1.0",
+    "@types/canvas-confetti": "^1.9.0",
     "@upstash/ratelimit": "^2.0.6",
     "@upstash/redis": "^1.35.4",
+    "canvas-confetti": "^1.9.3",
     "lucide-react": "^0.544.0",
     "nanoid": "^5.0.7",
     "next": "15.5.4",

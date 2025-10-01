@@ -3,20 +3,21 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f9fafb;
+  --background: #fafaf9;
   --foreground: #18181b;
-  --surface-50: #f4f4f5;
-  --surface-100: #e9e9ec;
-  --surface-200: #dfe0e6;
-  --border-strong: #c3c5cf;
-  --border-subtle: #d7d8df;
-  --text-primary: #18181b;
-  --text-secondary: #4b5563;
-  --text-tertiary: #6b7280;
-  --accent-500: #4f46e5;
-  --accent-400: #6366f1;
-  --accent-300: #a5b4fc;
-  --focus-ring: rgba(79, 70, 229, 0.45);
+  --surface-50: #f5f5f4;
+  --surface-100: #e7e5e4;
+  --surface-200: #d6d3d1;
+  --border-strong: #a8a29e;
+  --border-subtle: #d6d3d1;
+  --text-primary: #0c0a09;
+  --text-secondary: #44403c;
+  --text-tertiary: #78716c;
+  --accent-500: #7c3aed;
+  --accent-400: #8b5cf6;
+  --accent-300: #a78bfa;
+  --accent-600: #6d28d9;
+  --focus-ring: rgba(124, 58, 237, 0.35);
 
   /* 8pt spacing scale (base 8px) */
   --space-0: 0;
@@ -31,20 +32,61 @@
 }
 
 html.dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --surface-50: #111115;
-  --surface-100: #18181b;
-  --surface-200: #27272a;
-  --border-strong: #3f3f46;
-  --border-subtle: #2a2a31;
-  --text-primary: #fafafa;
+  --background: #0f0f12;
+  --foreground: #fafaf9;
+  --surface-50: #1c1c1f;
+  --surface-100: #27272a;
+  --surface-200: #3f3f46;
+  --border-strong: #52525b;
+  --border-subtle: #3f3f46;
+  --text-primary: #fafaf9;
   --text-secondary: #d4d4d8;
   --text-tertiary: #a1a1aa;
-  --accent-500: #818cf8;
-  --accent-400: #a5b4fc;
-  --accent-300: #c7d2fe;
-  --focus-ring: rgba(129, 140, 248, 0.55);
+  --accent-500: #a78bfa;
+  --accent-400: #c4b5fd;
+  --accent-300: #ddd6fe;
+  --accent-600: #8b5cf6;
+  --focus-ring: rgba(167, 139, 250, 0.45);
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 600ms ease-out;
+}
+
+/* Focus ring improvements for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* Skip to main content link */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent-500);
+  color: white;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  border-radius: 0 0 0.25rem 0;
+  z-index: 100;
+  transition: top 0.2s ease-out;
+}
+
+.skip-to-content:focus {
+  top: 0;
 }
 
 @theme inline {
@@ -54,7 +96,7 @@ html.dark {
   --font-mono: var(--font-geist-mono);
 }
 
-html {
+html:not(.dark) {
   color-scheme: light;
 }
 

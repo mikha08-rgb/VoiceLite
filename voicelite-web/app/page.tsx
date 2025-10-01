@@ -1,8 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
-import { Check, CreditCard, Download, Lock, Mic, Shield, Zap } from 'lucide-react';
+import { useEffect, useRef, useState, useTransition, lazy, Suspense } from 'react';
+import { Download, Mic, Shield, Zap } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { FeatureCard } from '@/components/feature-card';
+import { LoadingSkeleton } from '@/components/loading-skeleton';
+import { ToastContainer } from '@/components/toast';
+import { useToast } from '@/hooks/use-toast';
+import { RippleButton } from '@/components/ripple-button';
+import { Tooltip } from '@/components/tooltip';
+
+// Lazy load below-the-fold components
+const PricingCard = lazy(() => import('@/components/pricing-card').then(mod => ({ default: mod.PricingCard })));
+const AccountCard = lazy(() => import('@/components/account-card').then(mod => ({ default: mod.AccountCard })));
+const FAQ = lazy(() => import('@/components/faq').then(mod => ({ default: mod.FAQ })));
+
+// Lazy load confetti only when needed
+const loadConfetti = () => import('canvas-confetti');
 
 interface User {
   id: string;
@@ -38,6 +52,41 @@ const plans = [
   },
 ];
 
+const faqItems = [
+  {
+    question: 'Is my voice data sent to the cloud?',
+    answer: 'No. VoiceLite runs 100% offline on your PC using local Whisper AI models. Your voice never leaves your computer - no internet connection required for transcription.',
+  },
+  {
+    question: "What's the difference between free and Pro?",
+    answer: 'The free version includes the tiny Whisper model (fastest, basic accuracy). Pro unlocks all premium models (base, small, medium) for higher accuracy and better performance on technical terms.',
+  },
+  {
+    question: 'Which Whisper model should I use?',
+    answer: 'Start with tiny (included free) for speed. Upgrade to base or small for better accuracy. Medium is best for technical jargon but uses more RAM. All models run offline.',
+  },
+  {
+    question: 'Does it work in games, Discord, VS Code?',
+    answer: 'Yes! VoiceLite works in any Windows application with a text field - browsers, IDEs, terminals, chat apps, and even games in windowed mode. Just hold your hotkey and speak.',
+  },
+  {
+    question: 'Can I cancel my subscription anytime?',
+    answer: 'Absolutely. Cancel anytime from your account dashboard. No questions asked, no fees. Your license remains active until the end of your billing period.',
+  },
+  {
+    question: 'How accurate is the transcription?',
+    answer: 'Accuracy depends on the model: tiny (85-90%), base (90-93%), small (93-95%), medium (95-97%). Technical terms and code (useState, npm, git) are recognized well with larger models.',
+  },
+  {
+    question: 'Can I use VoiceLite on multiple PCs?',
+    answer: 'Yes! Each license activates on up to 3 devices. Manage activations from your account dashboard. Deactivate old devices to free up slots.',
+  },
+  {
+    question: 'Is there a refund policy?',
+    answer: '30-day money-back guarantee on all purchases. If VoiceLite doesn\'t work for you, email support for a full refund - no questions asked.',
+  },
+];
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [licenses, setLicenses] = useState<License[]>([]);
@@ -47,16 +96,13 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [magicLinkRequested, setMagicLinkRequested] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const signInSectionRef = useRef<HTMLElement>(null);
-  const emailInputRef = useRef<HTMLInputElement>(null);
-
-  const statusMessageId = statusMessage ? 'account-status-message' : undefined;
-  const errorMessageId = errorMessage ? 'account-error-message' : undefined;
-  const otpErrorId = errorMessage && magicLinkRequested ? 'otp-error-message' : undefined;
+  const { toasts, showToast, removeToast } = useToast();
 
   const fetchProfile = async () => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/me', { cache: 'no-store' });
       if (!response.ok) {
@@ -72,6 +118,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Failed to load profile', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -120,6 +168,16 @@ export default function Home() {
         setMagicLinkRequested(false);
         setStatusMessage('You are signed in.');
         await fetchProfile();
+
+        // Trigger success confetti (lazy loaded)
+        loadConfetti().then((confetti) => {
+          confetti.default({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd'],
+          });
+        });
       } catch (error) {
         console.error(error);
         setErrorMessage(error instanceof Error ? error.message : 'Failed to verify code');
@@ -135,32 +193,22 @@ export default function Home() {
     setStatusMessage('Signed out.');
   };
 
-  const handleCheckout = async (plan: 'quarterly' | 'lifetime') => {
+  const handleCheckout = async (plan: string) => {
     if (!user) {
       setErrorMessage('Please sign in before upgrading.');
 
-      // Scroll to sign-in section and focus email input
+      // Scroll to sign-in section
       if (signInSectionRef.current) {
-        // Check if user prefers reduced motion
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
         signInSectionRef.current.scrollIntoView({
           behavior: prefersReducedMotion ? 'auto' : 'smooth',
           block: 'center'
         });
-
-        // Focus email input after scroll completes
-        // Use shorter delay for reduced motion, longer for smooth scroll
-        const focusDelay = prefersReducedMotion ? 100 : 500;
-        setTimeout(() => {
-          emailInputRef.current?.focus();
-        }, focusDelay);
       }
 
       return;
     }
 
-    setIsCheckoutLoading(plan);
     try {
       const response = await fetch('/api/checkout', {
         method: 'POST',
@@ -175,188 +223,93 @@ export default function Home() {
     } catch (error) {
       console.error('Checkout error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Unable to start checkout');
-    } finally {
-      setIsCheckoutLoading(null);
     }
   };
 
-  const describedBy = [statusMessageId, errorMessageId].filter(Boolean).join(' ') || undefined;
+  const handleLicenseCopy = () => {
+    showToast('License key copied to clipboard!', 'success');
+  };
 
   return (
-    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-      <section className="px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-6xl md:grid md:grid-cols-[1.05fr_0.95fr] md:gap-16">
-          <header className="max-w-2xl space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-                <Mic className="h-4 w-4 text-zinc-500 dark:text-zinc-300" aria-hidden="true" />
+    <main id="main-content" className="min-h-screen bg-stone-50 text-stone-900 dark:bg-[#0f0f12] dark:text-stone-50">
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+      <section className="px-6 py-32 md:py-40">
+        <div className="mx-auto max-w-6xl md:grid md:grid-cols-[1.05fr_0.95fr] md:gap-20">
+          <header className="max-w-2xl space-y-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <span className="inline-flex items-center gap-2 rounded-full border border-purple-200/50 bg-gradient-to-br from-purple-50 to-violet-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.24em] text-purple-900 shadow-sm shadow-purple-100/50 dark:border-purple-500/30 dark:from-purple-950/50 dark:to-violet-950/50 dark:text-purple-200 dark:shadow-purple-500/10">
+                <Mic className="h-4 w-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
                 100% Offline Voice Typing for Windows
               </span>
               <ThemeToggle />
             </div>
-            <div className="space-y-6">
-              <h1 className="text-4xl font-semibold leading-tight tracking-tight md:text-6xl">
+            <div className="space-y-7">
+              <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-6xl">
                 Turn Your Voice Into Text
                 <br />
-                <span className="text-indigo-600">Instantly</span>
+                <span className="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 bg-clip-text text-transparent dark:from-purple-400 dark:via-violet-400 dark:to-purple-400">Instantly</span>
               </h1>
-              <p className="text-base leading-7 text-zinc-600 dark:text-zinc-300 md:text-lg">
+              <p className="text-base leading-[1.7] text-stone-600 dark:text-stone-300 md:text-lg">
                 Hold Alt, speak naturally, release. Your words appear as typed text in{' '}
-                <span className="font-semibold text-zinc-900 dark:text-zinc-100">any</span> Windows application. No internet
-                required. Your voice never leaves your PC.
+                <span className="font-semibold text-stone-900 dark:text-stone-50">any</span> Windows application.{' '}
+                <Tooltip content="Powered by OpenAI Whisper AI - runs 100% on your PC">
+                  <span>100% offline</span>
+                </Tooltip>
+                . Your voice never leaves your PC.
               </p>
             </div>
-            <div className="flex flex-col items-stretch gap-4 sm:w-auto sm:flex-row sm:items-center">
-              <a
-                href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.8/VoiceLite-Setup-1.0.8.exe"
-                download
-                className="inline-flex w-full items-center justify-center rounded-full bg-indigo-600 px-7 py-3 text-base font-medium text-white transition duration-200 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
+              <RippleButton
+                onClick={() => {
+                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.8/VoiceLite-Setup-1.0.8.exe';
+                }}
+                className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
+                rippleColor="rgba(255, 255, 255, 0.4)"
               >
-                <Download className="mr-2 h-5 w-5" aria-hidden="true" />
+                <Download className="mr-2 h-5 w-5 transition-transform duration-300 group-hover:translate-y-0.5" aria-hidden="true" />
                 Download VoiceLite Free
-              </a>
+              </RippleButton>
             </div>
-            <div className="flex items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400" role="list" aria-label="Download prerequisites">
+            <div className="flex items-center gap-4 text-sm text-stone-500 dark:text-stone-400" role="list" aria-label="Download prerequisites">
               <span>Windows 10/11</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-stone-300 dark:bg-stone-600" />
               <span>One-click installer</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-stone-300 dark:bg-stone-600" />
               <span>Ready in 2 minutes</span>
             </div>
           </header>
 
-          <aside ref={signInSectionRef} className="mt-16 space-y-8 md:mt-0" aria-label="Account and activation">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-none">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                    <Lock className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h2 className="text-base font-semibold leading-6 dark:text-zinc-100">Your Account</h2>
-                </div>
-                {user && (
-                  <button
-                    onClick={handleLogout}
-                    className="text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:text-zinc-300 dark:hover:text-zinc-100"
-                  >
-                    Sign out
-                  </button>
-                )}
-              </div>
-
-              {statusMessage && (
-                <div
-                  id={statusMessageId}
-                  role="status"
-                  aria-live="polite"
-                  className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-200"
-                >
-                  {statusMessage}
-                </div>
-              )}
-              {errorMessage && (
-                <div
-                  id={errorMessageId}
-                  role="alert"
-                  aria-live="assertive"
-                  className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800 dark:border-rose-600 dark:bg-rose-950 dark:text-rose-200"
-                >
-                  {errorMessage}
-                </div>
-              )}
-
-              <div className="mt-6 space-y-6" aria-busy={isPending ? 'true' : 'false'}>
-                <label className="block text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400" htmlFor="email">
-                  Email address
-                </label>
-                <input
-                  ref={emailInputRef}
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm leading-6 text-zinc-900 transition duration-200 focus:border-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 placeholder:text-zinc-400 disabled:bg-zinc-100 disabled:text-zinc-500 motion-reduce:transition-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:disabled:bg-zinc-800"
-                  placeholder="you@example.com"
-                  disabled={!!user}
-                  aria-invalid={Boolean(errorMessage) && !user}
-                  aria-describedby={describedBy}
+          <aside ref={signInSectionRef} className="mt-20 space-y-8 md:mt-0" aria-label="Account and activation">
+            {isLoading ? (
+              <LoadingSkeleton />
+            ) : (
+              <Suspense fallback={<LoadingSkeleton />}>
+                <AccountCard
+                  user={user}
+                  licenses={licenses}
+                  email={email}
+                  otp={otp}
+                  statusMessage={statusMessage}
+                  errorMessage={errorMessage}
+                  magicLinkRequested={magicLinkRequested}
+                  isPending={isPending}
+                  onEmailChange={setEmail}
+                  onOtpChange={setOtp}
+                  onMagicLinkRequest={handleMagicLinkRequest}
+                  onOtpVerification={handleOtpVerification}
+                  onLogout={handleLogout}
+                  onLicenseCopy={handleLicenseCopy}
                 />
+              </Suspense>
+            )}
 
-                {!user && (
-                  <button
-                    onClick={handleMagicLinkRequest}
-                    disabled={isPending || !email}
-                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition duration-200 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 motion-reduce:transition-none dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500"
-                  >
-                    {isPending ? 'Sending...' : 'Email me a magic link'}
-                  </button>
-                )}
-
-                {!user && magicLinkRequested && (
-                  <div className="space-y-4">
-                    <label className="block text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400" htmlFor="otp">
-                      Enter 8-digit code from email
-                    </label>
-                    <input
-                      id="otp"
-                      inputMode="numeric"
-                      maxLength={8}
-                      value={otp}
-                      onChange={(event) => setOtp(event.target.value.replace(/[^0-9]/g, ''))}
-                      className="w-full rounded-xl border border-zinc-200 px-4 py-3 text-center font-mono text-lg tracking-[0.48em] text-zinc-900 transition duration-200 focus:border-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                      placeholder="12345678"
-                      aria-describedby={[describedBy, otpErrorId].filter(Boolean).join(' ') || undefined}
-                      aria-invalid={Boolean(errorMessage)}
-                    />
-                    <button
-                      onClick={handleOtpVerification}
-                      disabled={isPending || otp.length !== 8}
-                      className="w-full rounded-xl border border-indigo-600 bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition duration-200 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:border-zinc-300 disabled:bg-zinc-300 disabled:text-zinc-500 motion-reduce:transition-none dark:border-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:disabled:border-zinc-700 dark:disabled:bg-zinc-700"
-                    >
-                      {isPending ? 'Verifying...' : 'Verify code'}
-                    </button>
-                  </div>
-                )}
-
-                {user && (
-                  <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-4 dark:border-zinc-700 dark:bg-zinc-900">
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">Signed in as</p>
-                    <p className="mt-2 text-sm font-medium leading-6 text-zinc-900 dark:text-zinc-100">{user.email}</p>
-
-                    {licenses.length > 0 ? (
-                      <div className="mt-6 space-y-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">Active Licenses</p>
-                        <ul className="space-y-2">
-                          {licenses.map((license) => (
-                            <li key={license.id} className="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
-                              <code className="font-mono text-sm font-semibold text-zinc-800 dark:text-zinc-100">{license.licenseKey}</code>
-                              <div className="mt-4 flex flex-wrap gap-4 text-xs">
-                                <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                                  {license.type.toLowerCase()}
-                                </span>
-                                <span className="rounded-full bg-emerald-100 px-3 py-1 font-medium uppercase tracking-wide text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200">
-                                  {license.status.toLowerCase()}
-                                </span>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div className="mt-6">
-                        <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">No licenses yet. Choose a plan below to get started!</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-6 text-sm leading-6 text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200">
-              <strong>Important:</strong> If you get a "missing DLL" error, download{' '}
+            <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 px-6 py-6 text-sm leading-6 text-blue-900 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50 dark:text-blue-100">
+              <strong className="font-bold">Important:</strong> If you get a "missing DLL" error, download{' '}
               <a
                 href="https://aka.ms/vs/17/release/vc_redist.x64.exe"
-                className="font-semibold text-indigo-600 underline transition duration-200 hover:text-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:text-indigo-300 dark:hover:text-indigo-200"
+                className="font-bold text-purple-600 underline transition duration-200 hover:text-purple-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:text-purple-300 dark:hover:text-purple-200"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -368,118 +321,76 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-t border-zinc-200 bg-white px-6 py-24 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mx-auto max-w-6xl space-y-12">
-          <div className="space-y-4 text-center">
-            <h2 className="text-3xl font-semibold leading-tight md:text-4xl">Why VoiceLite?</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-zinc-600 dark:text-zinc-400">
+      <section className="border-t border-stone-200 bg-white px-6 py-32 dark:border-stone-800 dark:bg-[#0f0f12]">
+        <div className="mx-auto max-w-6xl space-y-16">
+          <div className="space-y-5 text-center">
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Why VoiceLite?</h2>
+            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
               Built for privacy, speed, and universal compatibility
             </p>
           </div>
 
           <div className="grid gap-8 md:grid-cols-3">
-            <article className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 transition duration-200 hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-zinc-900/40">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">
-                <Shield className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <h3 className="text-lg font-semibold leading-6">100% Private</h3>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                Completely offline. Your voice never leaves your computer. No cloud, no tracking, no data collection.
-              </p>
-            </article>
-
-            <article className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 transition duration-200 hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-zinc-900/40">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">
-                <Zap className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <h3 className="text-lg font-semibold leading-6">Lightning Fast</h3>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                Instant transcription with less than 200ms latency from speech to text. No waiting, no buffering.
-              </p>
-            </article>
-
-            <article className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 transition duration-200 hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-zinc-900/40">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">
-                <Mic className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <h3 className="text-lg font-semibold leading-6">Works Everywhere</h3>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                Discord, VS Code, Word, Terminal, Games—any Windows app, any text field, anywhere.
-              </p>
-            </article>
+            <FeatureCard
+              icon={Shield}
+              title="100% Private"
+              description="Completely offline. Your voice never leaves your computer. No cloud, no tracking, no data collection."
+            />
+            <FeatureCard
+              icon={Zap}
+              title="Lightning Fast"
+              description={
+                <>
+                  Instant transcription with{' '}
+                  <Tooltip content="From the moment you stop speaking to text appearing">
+                    <span>less than 200ms latency</span>
+                  </Tooltip>{' '}
+                  from speech to text. No waiting, no buffering.
+                </>
+              }
+            />
+            <FeatureCard
+              icon={Mic}
+              title="Works Everywhere"
+              description="Discord, VS Code, Word, Terminal, Games—any Windows app, any text field, anywhere."
+            />
           </div>
         </div>
       </section>
 
-      <section className="border-y border-zinc-200 bg-zinc-100/40 px-6 py-24 dark:border-zinc-800 dark:bg-zinc-900/40">
-        <div className="mx-auto max-w-5xl space-y-12">
-          <div className="space-y-4 text-center">
-            <h2 className="text-3xl font-semibold leading-tight md:text-4xl">Upgrade When You're Ready</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-zinc-600 dark:text-zinc-400">
+      <section className="border-y border-stone-200 bg-stone-100/50 px-6 py-32 dark:border-stone-800 dark:bg-stone-950/50">
+        <div className="mx-auto max-w-5xl space-y-16">
+          <div className="space-y-5 text-center">
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Upgrade When You're Ready</h2>
+            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
               Sign in, choose your plan, and get your license key instantly via email
             </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-2">
-            {plans.map((plan) => (
-              <article
-                key={plan.id}
-                className={`relative flex h-full flex-col justify-between gap-8 rounded-3xl border bg-white p-8 shadow-sm transition duration-200 focus-within:border-indigo-600 hover:-translate-y-1 hover:shadow-xl motion-reduce:transform-none motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-zinc-900/60 ${
-                  plan.popular ? 'border-indigo-600 dark:border-indigo-500' : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
-                }`}
-              >
-                {plan.popular && (
-                  <span className="absolute -top-4 left-8 rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white dark:bg-indigo-500">
-                    Most Popular
-                  </span>
-                )}
-
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-semibold leading-tight md:text-3xl">{plan.name}</h3>
-                    <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">{plan.description}</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-4xl font-semibold leading-none md:text-5xl">{plan.price.split(' ')[0]}</p>
-                    <p className="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{plan.price.split(' ').slice(1).join(' ')}</p>
-                  </div>
-
-                  <ul className="space-y-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                    {plan.bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-4">
-                        <span className="mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
-                          <Check className="h-3 w-3" aria-hidden="true" />
-                        </span>
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <button
-                  onClick={() => handleCheckout(plan.id as 'quarterly' | 'lifetime')}
-                  disabled={isCheckoutLoading === plan.id}
-                  className={`inline-flex w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-medium transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500 motion-reduce:transition-none dark:disabled:bg-zinc-700 dark:disabled:text-zinc-500 ${
-                    plan.popular
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400'
-                      : 'border border-zinc-300 bg-white text-zinc-900 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600'
-                  }`}
-                >
-                  <CreditCard className="mr-2 h-5 w-5" aria-hidden="true" />
-                  {isCheckoutLoading === plan.id ? 'Redirecting.' : 'Get Started'}
-                </button>
-              </article>
-            ))}
+          <div className="grid gap-10 md:grid-cols-2">
+            <Suspense fallback={<div className="h-96 animate-pulse rounded-3xl bg-stone-200 dark:bg-stone-800" />}>
+              {plans.map((plan) => (
+                <PricingCard
+                  key={plan.id}
+                  id={plan.id}
+                  name={plan.name}
+                  description={plan.description}
+                  price={plan.price}
+                  popular={plan.popular}
+                  bullets={plan.bullets}
+                  onCheckout={handleCheckout}
+                />
+              ))}
+            </Suspense>
           </div>
         </div>
       </section>
 
-      <section className="bg-white px-6 py-24 dark:bg-zinc-950">
-        <div className="mx-auto max-w-6xl space-y-12">
-          <div className="space-y-4 text-center">
-            <h2 className="text-3xl font-semibold leading-tight md:text-4xl">Everything You Need for Frictionless Dictation</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-zinc-600 dark:text-zinc-400">
+      <section className="bg-white px-6 py-32 dark:bg-[#0f0f12]">
+        <div className="mx-auto max-w-6xl space-y-16">
+          <div className="space-y-5 text-center">
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Everything You Need for Frictionless Dictation</h2>
+            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
               Simple, secure, and powerful voice typing for everyone
             </p>
           </div>
@@ -487,47 +398,63 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-3">
             {[
               {
+                icon: Shield,
                 title: 'Offline by Design',
                 description: 'No account needed to start. Upgrade when you want model packs and priority support.',
               },
               {
+                icon: Zap,
                 title: 'Passwordless Login',
                 description: 'Secure magic link + OTP authentication that works on both desktop and web.',
               },
               {
+                icon: Mic,
                 title: 'Multi-Device Licensing',
                 description: 'Activate your license on up to 3 devices. Managed from your account dashboard.',
               },
             ].map((feature) => (
-              <article key={feature.title} className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8 transition duration-200 hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-zinc-900/40">
-                <h3 className="text-lg font-semibold leading-6">{feature.title}</h3>
-                <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">{feature.description}</p>
-              </article>
+              <FeatureCard key={feature.title} icon={feature.icon} title={feature.title} description={feature.description} />
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-zinc-200 bg-white px-6 py-24 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="mx-auto max-w-6xl space-y-10">
-          <div className="grid gap-10 md:grid-cols-4">
-            <div className="space-y-4 md:col-span-2">
+      <section className="border-y border-stone-200 bg-stone-100/50 px-6 py-32 dark:border-stone-800 dark:bg-stone-950/50">
+        <div className="mx-auto max-w-4xl space-y-12">
+          <div className="space-y-5 text-center">
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Frequently Asked Questions</h2>
+            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
+              Everything you need to know about VoiceLite
+            </p>
+          </div>
+          <Suspense fallback={<div className="space-y-4">{[...Array(6)].map((_, i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-stone-200 dark:bg-stone-800" />)}</div>}>
+            <FAQ items={faqItems} />
+          </Suspense>
+        </div>
+      </section>
+
+      <footer className="border-t border-stone-200 bg-white px-6 py-24 dark:border-stone-800 dark:bg-[#0f0f12]">
+        <div className="mx-auto max-w-6xl space-y-12">
+          <div className="grid gap-12 md:grid-cols-4">
+            <div className="space-y-5 md:col-span-2">
               <div className="flex items-center gap-4">
-                <Mic className="h-5 w-5 text-zinc-500 dark:text-zinc-300" aria-hidden="true" />
-                <span className="text-base font-semibold leading-6">VoiceLite</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-600 shadow-md shadow-purple-500/30">
+                  <Mic className="h-5 w-5 text-white" aria-hidden="true" />
+                </div>
+                <span className="text-lg font-bold leading-6">VoiceLite</span>
               </div>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm leading-[1.7] text-stone-600 dark:text-stone-400">
                 Privacy-focused offline voice typing for Windows. Your voice never leaves your computer.
               </p>
             </div>
 
             <nav aria-label="Product links">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">Product</h4>
-              <ul className="mt-4 space-y-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+              <h4 className="text-xs font-bold uppercase tracking-[0.28em] text-stone-500 dark:text-stone-400">Product</h4>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
                 <li>
                   <a
                     href="https://github.com/mikha08-rgb/VoiceLite"
-                    className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -537,7 +464,7 @@ export default function Home() {
                 <li>
                   <a
                     href="https://github.com/mikha08-rgb/VoiceLite#features"
-                    className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -547,7 +474,7 @@ export default function Home() {
                 <li>
                   <a
                     href="https://github.com/mikha08-rgb/VoiceLite/releases"
-                    className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -558,12 +485,12 @@ export default function Home() {
             </nav>
 
             <nav aria-label="Support links">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-500 dark:text-zinc-400">Support</h4>
-              <ul className="mt-4 space-y-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+              <h4 className="text-xs font-bold uppercase tracking-[0.28em] text-stone-500 dark:text-stone-400">Support</h4>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
                 <li>
                   <a
                     href="https://github.com/mikha08-rgb/VoiceLite/issues"
-                    className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -573,7 +500,7 @@ export default function Home() {
                 <li>
                   <a
                     href="https://github.com/mikha08-rgb/VoiceLite#readme"
-                    className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -584,12 +511,12 @@ export default function Home() {
             </nav>
           </div>
 
-          <div className="flex flex-col gap-4 border-t border-zinc-200 pt-6 text-xs leading-6 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 border-t border-stone-200 pt-8 text-xs leading-6 text-stone-500 dark:border-stone-800 dark:text-stone-400 md:flex-row md:items-center md:justify-between">
             <p>© {new Date().getFullYear()} VoiceLite. Open source under MIT License.</p>
             <div className="flex gap-6">
               <a
                 href="https://github.com/mikha08-rgb/VoiceLite"
-                className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -597,7 +524,7 @@ export default function Home() {
               </a>
               <a
                 href="https://github.com/mikha08-rgb/VoiceLite/blob/master/LICENSE"
-                className="transition duration-200 hover:text-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 motion-reduce:transition-none dark:hover:text-zinc-100"
+                className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -611,6 +538,8 @@ export default function Home() {
       <div aria-live="polite" className="sr-only" id="otp-error-message">
         {magicLinkRequested && errorMessage ? errorMessage : null}
       </div>
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </main>
   );
 }
