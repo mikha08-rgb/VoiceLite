@@ -15,26 +15,64 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VoiceLite - Instant Voice Typing for Windows",
-  description: "Turn your voice into text instantly in ANY Windows app. 100% offline speech-to-text with global hotkey. No internet required. Your privacy guaranteed.",
-  keywords: "voice typing, speech to text, Windows, offline, transcription, Whisper AI, voice recognition",
+  title: "VoiceLite - Instant Offline Voice Typing for Windows | Privacy-First Speech-to-Text",
+  description: "Turn your voice into text instantly in ANY Windows app. 100% offline speech-to-text with OpenAI Whisper AI. Global hotkey, <200ms latency. No internet required, your voice never leaves your PC.",
+  keywords: [
+    "voice typing",
+    "speech to text",
+    "Windows voice typing",
+    "offline transcription",
+    "Whisper AI",
+    "voice recognition",
+    "privacy speech to text",
+    "offline voice typing",
+    "voice to text Windows",
+    "dictation software",
+    "global hotkey typing",
+    "fast speech to text",
+  ],
+  authors: [{ name: "VoiceLite Team" }],
+  creator: "VoiceLite",
+  publisher: "VoiceLite",
+  metadataBase: new URL("https://voicelite.app"),
   openGraph: {
-    title: "VoiceLite - Instant Voice Typing for Windows",
-    description: "Turn your voice into text instantly. Works offline, in any Windows app.",
+    title: "VoiceLite - Instant Offline Voice Typing for Windows",
+    description: "Turn your voice into text instantly in ANY Windows app. 100% offline with OpenAI Whisper AI. No internet required. <200ms latency. Your voice never leaves your PC.",
     type: "website",
     locale: "en_US",
     url: "https://voicelite.app",
     siteName: "VoiceLite",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "VoiceLite - Instant Voice Typing for Windows",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "VoiceLite - Instant Voice Typing for Windows",
-    description: "Turn your voice into text instantly. Works offline, in any Windows app.",
+    title: "VoiceLite - Instant Offline Voice Typing for Windows",
+    description: "Turn your voice into text instantly. 100% offline, works in any app. <200ms latency. Your voice never leaves your PC.",
+    images: ["/og-image.png"],
+    creator: "@voicelite",
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
+  alternates: {
+    canonical: "https://voicelite.app",
+  },
+  category: "productivity",
 };
 
 export default function RootLayout({
