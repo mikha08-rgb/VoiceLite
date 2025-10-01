@@ -126,18 +126,22 @@ namespace VoiceLite.Services
             {
                 var beforeGC = GC.GetTotalMemory(false);
 
-                // Only run aggressive GC if memory is high
-                if (beforeGC > WARNING_THRESHOLD_MB * 1024 * 1024)
+                // Only intervene if memory usage is truly critical (>600MB)
+                // Let .NET's GC handle normal memory management - forced collections defeat generational GC optimization
+                if (beforeGC > FORCE_CLEANUP_THRESHOLD_MB * 1024 * 1024)
                 {
-                    // Perform incremental GC to avoid UI freezes
+                    ErrorLogger.LogMessage($"Memory critically high ({beforeGC / 1024 / 1024}MB), requesting optimized GC");
+
+                    // Use Optimized mode instead of Forced - let .NET decide when it's safe to collect
+                    // This avoids UI freezes and respects application state
                     GC.Collect(0, GCCollectionMode.Optimized, false);
 
-                    // If still high, do more aggressive collection
-                    if (GC.GetTotalMemory(false) > CRITICAL_THRESHOLD_MB * 1024 * 1024)
+                    // Only do a full collection if Gen0 didn't help enough
+                    var afterGen0 = GC.GetTotalMemory(false);
+                    if (afterGen0 > FORCE_CLEANUP_THRESHOLD_MB * 1024 * 1024)
                     {
-                        GC.Collect(2, GCCollectionMode.Forced, true);
-                        GC.WaitForPendingFinalizers();
-                        GC.Collect(2, GCCollectionMode.Forced, true);
+                        // Use Optimized instead of Forced to minimize UI impact
+                        GC.Collect(2, GCCollectionMode.Optimized, false);
                     }
 
                     var afterGC = GC.GetTotalMemory(false);
@@ -149,12 +153,8 @@ namespace VoiceLite.Services
                     }
                 }
 
-                // Compact Large Object Heap periodically
-                if (DateTime.Now.Minute % 5 == 0)
-                {
-                    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                    GC.Collect(2, GCCollectionMode.Forced, true);
-                }
+                // Removed: LOH compaction every 5 minutes was too aggressive
+                // .NET will compact the LOH automatically when needed
             }
             catch (Exception ex)
             {

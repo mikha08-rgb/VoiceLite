@@ -68,18 +68,17 @@ git push
 
 ### Step 4: Update Your App
 
-1. Edit `SimpleLicenseManager.cs` line 24:
-```csharp
-private const string LICENSE_SERVER_URL = "https://your-railway-app.up.railway.app";
-```
+1. **Desktop Client**
+   - The current open release no longer includes `SimpleLicenseManager.cs`.
+   - If you maintain a commercial fork, update your legacy licensing component with the new server URL.
 
-2. Rebuild the app:
+2. Rebuild the app (for legacy forks only):
 ```bash
 cd VoiceLite
 dotnet publish VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 ```
 
-3. Create new ZIP with the updated app
+3. Create new ZIP with the updated app (legacy builds)
 4. Upload to Google Drive
 5. Update download link if needed
 

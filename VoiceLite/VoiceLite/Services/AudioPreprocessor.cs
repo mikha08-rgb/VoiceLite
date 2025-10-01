@@ -13,15 +13,21 @@ namespace VoiceLite.Services
         public static void ProcessAudioFile(string audioFilePath, Settings settings)
         {
             // Always apply some preprocessing for optimal accuracy
-            try
-            {
-                // Apply VAD first if enabled (trim silence)
-                if (settings.UseVAD)
-                {
-                    TrimSilenceWithVAD(audioFilePath, settings);
-                }
+            // Retry logic to handle file locking issues
+            const int maxRetries = 5;
+            const int retryDelayMs = 100;
 
-                using var reader = new AudioFileReader(audioFilePath);
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    // Apply VAD first if enabled (trim silence)
+                    if (settings.UseVAD)
+                    {
+                        TrimSilenceWithVAD(audioFilePath, settings);
+                    }
+
+                    using var reader = new AudioFileReader(audioFilePath);
                 var waveFormat = reader.WaveFormat;
                 var tempFile = audioFilePath + ".tmp";
 
@@ -65,23 +71,40 @@ namespace VoiceLite.Services
                     }
                 }
 
-                File.Delete(audioFilePath);
-                File.Move(tempFile, audioFilePath);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("AudioPreprocessor", ex);
+                    File.Delete(audioFilePath);
+                    File.Move(tempFile, audioFilePath);
 
-                try
-                {
-                    if (File.Exists(audioFilePath + ".tmp"))
-                    {
-                        File.Delete(audioFilePath + ".tmp");
-                    }
+                    // Success - exit retry loop
+                    return;
                 }
-                catch (Exception cleanupEx)
+                catch (IOException ioEx) when (attempt < maxRetries - 1)
                 {
-                    ErrorLogger.LogError("AudioPreprocessor cleanup", cleanupEx);
+                    // File is locked - wait and retry
+                    ErrorLogger.LogMessage($"AudioPreprocessor: File locked on attempt {attempt + 1}/{maxRetries}, retrying in {retryDelayMs}ms... ({ioEx.Message})");
+                    System.Threading.Thread.Sleep(retryDelayMs);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError($"AudioPreprocessor (attempt {attempt + 1}/{maxRetries})", ex);
+
+                    // On last attempt or non-IO error, clean up and give up
+                    if (attempt == maxRetries - 1)
+                    {
+                        try
+                        {
+                            if (File.Exists(audioFilePath + ".tmp"))
+                            {
+                                File.Delete(audioFilePath + ".tmp");
+                            }
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            ErrorLogger.LogError("AudioPreprocessor cleanup", cleanupEx);
+                        }
+
+                        // Re-throw on last attempt so caller knows preprocessing failed
+                        throw;
+                    }
                 }
             }
         }

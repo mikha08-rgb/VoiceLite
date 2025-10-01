@@ -1,5 +1,7 @@
 # VoiceLite License Server Deployment Guide
 
+> **Status (2025):** VoiceLite now ships as a fully free desktop build and no longer contacts a licensing server. This guide is retained for archival purposes only.
+
 ## Step 1: Generate Secure Keys
 
 Run the PowerShell script to generate secure keys:
@@ -55,12 +57,11 @@ Save these keys securely - you'll need them for Railway.
    - Copy the signing secret (starts with `whsec_`)
    - Add to Railway environment variables
 
-## Step 4: Update Your App
+## Step 4: Update Your App (Legacy Only)
 
-1. **Update License Server URL in SimpleLicenseManager.cs**
-   ```csharp
-   private const string LICENSE_SERVER_URL = "https://your-railway-domain.up.railway.app";
-   ```
+1. **Desktop Client**
+   - Current releases no longer include `SimpleLicenseManager.cs` or license validation.
+   - If you maintain an older commercial fork, update the server URL within your legacy licensing service.
 
 2. **Update Stripe Checkout Success URL**
    In your Stripe payment link or checkout session:
@@ -68,7 +69,7 @@ Save these keys securely - you'll need them for Railway.
    success_url: "https://voicelite.app/success?session_id={CHECKOUT_SESSION_ID}"
    ```
 
-## Step 5: Test the Flow
+## Step 5: Test the Flow (Legacy)
 
 1. **Generate Test License**
    ```bash

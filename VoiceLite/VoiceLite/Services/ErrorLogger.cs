@@ -4,6 +4,14 @@ using System.Linq;
 
 namespace VoiceLite.Services
 {
+    public enum LogLevel
+    {
+        Debug = 0,
+        Info = 1,
+        Warning = 2,
+        Error = 3
+    }
+
     public static class ErrorLogger
     {
         private static readonly string LogDirectory = Path.Combine(
@@ -15,6 +23,14 @@ namespace VoiceLite.Services
 
         private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB max
         private static readonly object LogLock = new object();
+
+        // Log level configuration - can be changed at runtime
+        // In Debug builds, log everything. In Release builds, only log warnings and errors.
+#if DEBUG
+        public static LogLevel MinimumLogLevel { get; set; } = LogLevel.Debug;
+#else
+        public static LogLevel MinimumLogLevel { get; set; } = LogLevel.Warning;
+#endif
 
         static ErrorLogger()
         {
@@ -33,11 +49,48 @@ namespace VoiceLite.Services
             }
         }
 
+        // New level-based logging methods
+        public static void LogDebug(string message) => Log(LogLevel.Debug, message);
+        public static void LogInfo(string message) => Log(LogLevel.Info, message);
+        public static void LogWarning(string message) => Log(LogLevel.Warning, message);
+
+        public static void Log(LogLevel level, string message)
+        {
+            // Filter based on minimum log level
+            if (level < MinimumLogLevel)
+                return;
+
+            try
+            {
+                var levelStr = level switch
+                {
+                    LogLevel.Debug => "DEBUG",
+                    LogLevel.Info => "INFO",
+                    LogLevel.Warning => "WARN",
+                    LogLevel.Error => "ERROR",
+                    _ => "INFO"
+                };
+
+                var logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{levelStr}] {message}\n";
+                lock (LogLock)
+                {
+                    RotateLogIfNeeded();
+                    File.AppendAllText(LogPath, logMessage);
+                }
+            }
+            catch
+            {
+                // Silent fail
+            }
+        }
+
+        // Legacy methods - kept for backward compatibility
+        // LogError() always logs regardless of level
         public static void LogError(string context, Exception ex)
         {
             try
             {
-                var message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {context}: {ex.Message}\n" +
+                var message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [ERROR] {context}: {ex.Message}\n" +
                              $"Stack: {ex.StackTrace}\n" +
                              $"Inner: {ex.InnerException?.Message}\n" +
                              "---\n";
@@ -54,22 +107,8 @@ namespace VoiceLite.Services
             }
         }
 
-        public static void LogMessage(string message)
-        {
-            try
-            {
-                var logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n";
-                lock (LogLock)
-                {
-                    RotateLogIfNeeded();
-                    File.AppendAllText(LogPath, logMessage);
-                }
-            }
-            catch
-            {
-                // Silent fail
-            }
-        }
+        // LogMessage() uses Info level by default
+        public static void LogMessage(string message) => Log(LogLevel.Info, message);
 
         private static void RotateLogIfNeeded()
         {
