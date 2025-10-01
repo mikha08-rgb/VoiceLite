@@ -1,8 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9fafb;
+  --foreground: #18181b;
+  --surface-50: #f4f4f5;
+  --surface-100: #e9e9ec;
+  --surface-200: #dfe0e6;
+  --border-strong: #c3c5cf;
+  --border-subtle: #d7d8df;
+  --text-primary: #18181b;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --accent-500: #4f46e5;
+  --accent-400: #6366f1;
+  --accent-300: #a5b4fc;
+  --focus-ring: rgba(79, 70, 229, 0.45);
+
+  /* 8pt spacing scale (base 8px) */
+  --space-0: 0;
+  --space-1: 0.5rem; /* 8px */
+  --space-2: 1rem;   /* 16px */
+  --space-3: 1.5rem; /* 24px */
+  --space-4: 2rem;   /* 32px */
+  --space-5: 2.5rem; /* 40px */
+  --space-6: 3rem;   /* 48px */
+  --space-7: 3.5rem; /* 56px */
+  --space-8: 4rem;   /* 64px */
+}
+
+html.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --surface-50: #111115;
+  --surface-100: #18181b;
+  --surface-200: #27272a;
+  --border-strong: #3f3f46;
+  --border-subtle: #2a2a31;
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d8;
+  --text-tertiary: #a1a1aa;
+  --accent-500: #818cf8;
+  --accent-400: #a5b4fc;
+  --accent-300: #c7d2fe;
+  --focus-ring: rgba(129, 140, 248, 0.55);
 }
 
 @theme inline {
@@ -12,15 +52,43 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  margin: 0;
+}
+
+body, button, input, textarea {
+  font-feature-settings: "ss01" 1, "cv02" 1;
+}
+
+::selection {
+  background-color: var(--accent-300);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-400);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
