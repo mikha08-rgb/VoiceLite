@@ -255,19 +255,15 @@ namespace VoiceLite.Services
                     // CRITICAL: Verify complete state reset before creating new session
                     if (waveIn != null || waveFile != null || eventHandlersAttached)
                     {
-                        ErrorLogger.LogMessage("StartRecording: CRITICAL ERROR - Previous session not fully cleaned up!");
+                        ErrorLogger.LogWarning("StartRecording: Previous session not fully cleaned up!");
                         throw new InvalidOperationException("Previous recording session not fully cleaned up. Cannot start new session.");
                     }
-
-                    // Only force GC if absolutely necessary (removed for performance)
-                    // Modern .NET handles this efficiently without manual intervention
 
                     // CRITICAL FIX: Increment instance ID to track this new recording session
                     waveInInstanceId++;
                     currentRecordingInstanceId = waveInInstanceId;
-                    ErrorLogger.LogMessage($"StartRecording: New recording instance ID: {currentRecordingInstanceId}");
+                    ErrorLogger.LogDebug($"StartRecording: New recording instance ID: {currentRecordingInstanceId}");
 
-                    ErrorLogger.LogMessage($"StartRecording: Creating COMPLETELY FRESH WaveInEvent for device {deviceToUse}");
                     waveIn = new WaveInEvent
                     {
                         WaveFormat = new WaveFormat(16000, 16, 1),
@@ -280,33 +276,27 @@ namespace VoiceLite.Services
                     waveIn.DataAvailable += OnDataAvailable;
                     waveIn.RecordingStopped += OnRecordingStopped;
                     eventHandlersAttached = true;
-                    ErrorLogger.LogMessage($"StartRecording: Event handlers attached to COMPLETELY FRESH device (instance {currentRecordingInstanceId})");
 
                     if (useMemoryBuffer)
                     {
                         // Use memory stream for zero file I/O
                         audioMemoryStream = new MemoryStream();
                         waveFile = new WaveFileWriter(audioMemoryStream, waveIn.WaveFormat);
-                        ErrorLogger.LogMessage("StartRecording: Using MEMORY BUFFER for zero file I/O latency");
+                        ErrorLogger.LogDebug("StartRecording: Using memory buffer mode");
                     }
                     else
                     {
                         // Fallback to file-based recording
-                        // Generate unique audio file path for this recording session
                         string guidPart = Guid.NewGuid().ToString("N")[..8];
                         currentAudioFilePath = Path.Combine(tempDirectory, $"recording_{DateTime.Now:yyyyMMddHHmmssfff}_{guidPart}.wav");
-                        ErrorLogger.LogMessage($"StartRecording: NEW isolated audio file path - {currentAudioFilePath}");
-
-                        // Create the wave file writer for this session only
                         waveFile = new WaveFileWriter(currentAudioFilePath, waveIn.WaveFormat);
-                        ErrorLogger.LogMessage($"StartRecording: NEW WaveFileWriter created for isolated session");
+                        ErrorLogger.LogDebug($"StartRecording: File mode - {currentAudioFilePath}");
                     }
 
                     // Start recording - this creates a completely fresh audio capture session
                     waveIn.StartRecording();
                     isRecording = true;
-                    ErrorLogger.LogMessage($"StartRecording: FRESH recording session started at {DateTime.Now:HH:mm:ss.fff}");
-                    ErrorLogger.LogMessage("StartRecording: SUCCESS - This session is completely isolated from any previous session");
+                    ErrorLogger.LogInfo("Recording session started");
                 }
                 catch (Exception ex)
                 {
@@ -331,11 +321,7 @@ namespace VoiceLite.Services
             // Quick pre-lock check for obvious late callbacks
             if (!isRecording)
             {
-                // Log late data and IMMEDIATELY discard it
-                if (e.BytesRecorded > 0)
-                {
-                    ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - IGNORING late {e.BytesRecorded} bytes - this session is ENDED");
-                }
+                // Silently discard late audio data - this is normal when stopping
                 return;
             }
 
@@ -344,13 +330,7 @@ namespace VoiceLite.Services
             {
                 // Re-check after acquiring lock - state might have changed
                 if (!isRecording)
-                {
-                    if (e.BytesRecorded > 0)
-                    {
-                        ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - IGNORING late {e.BytesRecorded} bytes after lock - session ENDED");
-                    }
                     return;
-                }
 
                 // CRITICAL FIX: Capture current recording instance ID under lock
                 callbackInstanceId = currentRecordingInstanceId;
@@ -361,17 +341,14 @@ namespace VoiceLite.Services
                     // If sender is not the current waveIn instance, reject it
                     if (senderWaveIn != waveIn)
                     {
-                        if (e.BytesRecorded > 0)
-                        {
-                            ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - IGNORING {e.BytesRecorded} bytes from OLD waveIn instance (wrong object reference)");
-                        }
+                        ErrorLogger.LogDebug($"OnDataAvailable: Ignoring {e.BytesRecorded} bytes from old waveIn instance");
                         return;
                     }
                 }
                 else
                 {
                     // Sender is not a WaveInEvent? This should never happen
-                    ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - sender is not WaveInEvent! Type: {sender?.GetType().Name ?? "null"}");
+                    ErrorLogger.LogWarning($"OnDataAvailable: Unexpected sender type: {sender?.GetType().Name ?? "null"}");
                     return;
                 }
 
@@ -380,8 +357,6 @@ namespace VoiceLite.Services
                     // Triple-check all conditions with defensive programming
                     if (waveFile != null && isRecording && e.BytesRecorded > 0)
                     {
-                        ErrorLogger.LogMessage($"OnDataAvailable: Writing {e.BytesRecorded} bytes to THIS session at {DateTime.Now:HH:mm:ss.fff}");
-
                         // Apply volume scaling (InputVolumeScale is const 0.8f)
                         // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
                         var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
@@ -406,14 +381,10 @@ namespace VoiceLite.Services
                             System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
                         }
                     }
-                    else if (e.BytesRecorded > 0)
-                    {
-                        ErrorLogger.LogMessage($"OnDataAvailable: CRITICAL - SKIPPING {e.BytesRecorded} bytes - waveFile null or session ended");
-                    }
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogMessage($"OnDataAvailable: Exception in THIS session - {ex.Message}");
+                    ErrorLogger.LogError("OnDataAvailable: Audio write failed", ex);
                     // Mic disconnected or error - stop this session gracefully
                     StopRecording();
                 }

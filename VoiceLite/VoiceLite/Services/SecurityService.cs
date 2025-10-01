@@ -39,70 +39,47 @@ namespace VoiceLite.Services
             if (isProtectionActive) return;
             isProtectionActive = true;
 
-            // Start anti-debugging thread
-            antiDebugThread = new Thread(AntiDebugLoop)
-            {
-                IsBackground = true,
-                Priority = ThreadPriority.Lowest
-            };
-            antiDebugThread.Start();
+            // DISABLED: Anti-debugging protection removed for open-source project
+            // This is an open-source application - anti-debugging is counterproductive and hostile to:
+            // - Contributors who need to debug the application
+            // - Developers running Fiddler/Wireshark for network debugging
+            // - Users with Process Explorer/Process Monitor for system monitoring
+            //
+            // The original implementation would:
+            // - Kill the app if ANY debugger was attached (preventing legitimate debugging)
+            // - Kill the app if Fiddler, Wireshark, Process Hacker, etc. were running ANYWHERE on the system
+            // - Consume CPU every 500ms checking for "suspicious" processes
+            // - Use Environment.FailFast() which terminates without cleanup (no resource disposal, no save settings)
+            //
+            // For open-source software, transparency and debuggability are features, not bugs.
 
-            // Check integrity on startup
-            // DISABLED FOR DEVELOPMENT - Re-enable for production builds
-            // if (!VerifyIntegrity())
-            // {
-            //     Environment.FailFast("Application integrity check failed");
-            // }
+            ErrorLogger.LogMessage("SecurityService: Anti-debugging protection is DISABLED (open-source build)");
+
+            // Check integrity on startup (warn only - no forced termination)
+            // Note: Environment.FailFast() was removed because it terminates without cleanup:
+            // - No resource disposal (audio files, settings, etc.)
+            // - No graceful shutdown
+            // - Generates crash dumps unnecessarily
+            // Instead, we log warnings and let the application continue
+            if (!VerifyIntegrity())
+            {
+                ErrorLogger.LogMessage("WARNING: Application integrity check failed - binary may have been modified");
+                ErrorLogger.LogMessage("This is a warning only - application will continue to run");
+            }
         }
 
         private static void AntiDebugLoop()
         {
-            while (isProtectionActive)
-            {
-                try
-                {
-                    // Check for debuggers
-                    if (IsDebuggerPresent())
-                    {
-                        Environment.FailFast("Debugger detected");
-                    }
-
-                    // Check for remote debugger
-                    bool isRemoteDebuggerPresent = false;
-                    CheckRemoteDebuggerPresent(Process.GetCurrentProcess().Handle, ref isRemoteDebuggerPresent);
-                    if (isRemoteDebuggerPresent)
-                    {
-                        Environment.FailFast("Remote debugger detected");
-                    }
-
-                    // Check for common debugging/RE tools
-                    var blacklistedProcesses = new[]
-                    {
-                        "dnspy", "ilspy", "dotpeek", "justdecompile", "reflector",
-                        "ollydbg", "x64dbg", "x32dbg", "windbg", "ida", "ida64",
-                        "cheatengine", "processhacker", "procmon", "procexp",
-                        "fiddler", "wireshark", "charles"
-                    };
-
-                    var runningProcesses = Process.GetProcesses()
-                        .Select(p => p.ProcessName.ToLower())
-                        .ToList();
-
-                    foreach (var blacklisted in blacklistedProcesses)
-                    {
-                        if (runningProcesses.Any(p => p.Contains(blacklisted)))
-                        {
-                            Environment.FailFast($"Suspicious process detected: {blacklisted}");
-                        }
-                    }
-
-                    Thread.Sleep(500); // Check every 0.5 seconds for faster shutdown
-                }
-                catch
-                {
-                    // Silently continue if we can't check
-                }
-            }
+            // DISABLED: This method is no longer called
+            // Keeping the method signature for compatibility, but it does nothing
+            // Original implementation would forcibly terminate the application if it detected:
+            // - Debuggers (IsDebuggerPresent, CheckRemoteDebuggerPresent)
+            // - Development tools (dnSpy, ILSpy, dotPeek, etc.)
+            // - Network analysis tools (Fiddler, Wireshark, Charles)
+            // - Process monitors (Process Hacker, Process Monitor, Process Explorer)
+            //
+            // This was inappropriate for an open-source project and has been removed.
+            ErrorLogger.LogMessage("SecurityService: AntiDebugLoop called but disabled (no-op)");
         }
 
         public static bool VerifyIntegrity()
@@ -324,7 +301,7 @@ namespace VoiceLite.Services
                 var machineGuid = GetMachineGuid();
                 var combined = $"{cpuId}|{machineGuid}|VoiceLite";
 
-                using (var pbkdf2 = new Rfc2898DeriveBytes(combined, Salt, 10000))
+                using (var pbkdf2 = new Rfc2898DeriveBytes(combined, Salt, 10000, HashAlgorithmName.SHA256))
                 {
                     return pbkdf2.GetBytes(32); // 256-bit key
                 }
@@ -332,7 +309,7 @@ namespace VoiceLite.Services
             catch
             {
                 // Fallback key
-                using (var pbkdf2 = new Rfc2898DeriveBytes("VoiceLite-Default", Salt, 10000))
+                using (var pbkdf2 = new Rfc2898DeriveBytes("VoiceLite-Default", Salt, 10000, HashAlgorithmName.SHA256))
                 {
                     return pbkdf2.GetBytes(32);
                 }

@@ -10,6 +10,9 @@ namespace VoiceLite.Services
         private TaskbarIcon? trayIcon;
         private System.Drawing.Icon? customIcon;
         private readonly Window mainWindow;
+        private System.Windows.Controls.MenuItem? accountMenuItem;
+
+        public event EventHandler? AccountMenuClicked;
 
         public SystemTrayManager(Window window)
         {
@@ -51,16 +54,11 @@ namespace VoiceLite.Services
                 IsEnabled = false
             };
 
-            var licenseItem = new System.Windows.Controls.MenuItem
+            accountMenuItem = new System.Windows.Controls.MenuItem
             {
-                Header = "License..."
+                Header = "Sign In"
             };
-            licenseItem.Click += (s, e) =>
-            {
-                // License window removed - app is now fully free
-                MessageBox.Show("VoiceLite is now free to use!\n\nEnjoy unlimited voice typing with the tiny model.",
-                    "VoiceLite Free", MessageBoxButton.OK, MessageBoxImage.Information);
-            };
+            accountMenuItem.Click += (s, e) => AccountMenuClicked?.Invoke(this, EventArgs.Empty);
 
             var separator = new System.Windows.Controls.Separator();
 
@@ -75,7 +73,7 @@ namespace VoiceLite.Services
 
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(settingsItem);
-            contextMenu.Items.Add(licenseItem);
+            contextMenu.Items.Add(accountMenuItem);
             contextMenu.Items.Add(separator);
             contextMenu.Items.Add(exitItem);
 
@@ -98,6 +96,14 @@ namespace VoiceLite.Services
         {
             mainWindow.Hide();
             ShowBalloonTip("VoiceLite", "Running in background. Hold Alt to dictate.");
+        }
+
+        public void UpdateAccountMenuText(string text)
+        {
+            if (accountMenuItem != null)
+            {
+                accountMenuItem.Header = text;
+            }
         }
 
         public void Dispose()

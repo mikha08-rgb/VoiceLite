@@ -72,7 +72,7 @@
                                            FontSize="11"
                                            Foreground="Gray"
                                            Margin="0,5,0,0"
-                                           Visibility="Collapsed"/>
+                                           Visibility="Visible"/>
                             </StackPanel>
                         </GroupBox>
 
@@ -145,12 +145,12 @@
                         <controls:SimpleModelSelector x:Name="SimpleModelSelector"
                                                       ModelSelected="SimpleModelSelector_ModelSelected"/>
 
-                        <Button Name="DownloadProModelsButton"
-                                Content="Download Pro Model (Medium - 1.5GB)"
+                        <Button Name="DownloadModelsButton"
+                                Content="Download Medium Model (1.5GB)"
                                 Height="35"
                                 Margin="0,15,0,0"
-                                Click="DownloadProModels_Click"
-                                Visibility="Collapsed"/>
+                                Click="DownloadModelsButton_Click"
+                                Visibility="Visible"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

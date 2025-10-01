@@ -1,13 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "mcp__sequential-thinking__sequentialthinking",
-      "Bash(gh auth:*)",
-      "Bash(vercel ls:*)",
-      "Bash(dotnet publish:*)",
-      "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" VoiceLiteSetup_Simple.iss)",
-      "Bash(gh release view:*)",
-      "Bash(curl:*)"
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Read(//c/Users/mishk/AppData/Roaming/VoiceLite/logs/**)",
+      "Read(//tmp/VoiceLite/audio/**)",
+      "Bash(./whisper.exe:*)",
+      "Bash(dotnet run:*)",
+      "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite\\Installer\\VoiceLiteSetup_Simple.iss\")",
+      "Bash(dotnet list:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

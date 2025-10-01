@@ -1,0 +1,195 @@
+END USER LICENSE AGREEMENT (EULA)
+VoiceLite Software
+
+Last Updated: January 2025
+
+IMPORTANT - READ CAREFULLY BEFORE INSTALLING OR USING THIS SOFTWARE
+
+This End User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity, "You" or "User") and VoiceLite ("Company," "we," "us," or "our") for the VoiceLite software product, which includes computer software and may include associated media, printed materials, and online or electronic documentation ("Software").
+
+BY INSTALLING, COPYING, OR OTHERWISE USING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS EULA. IF YOU DO NOT AGREE TO THE TERMS OF THIS EULA, DO NOT INSTALL OR USE THE SOFTWARE.
+
+================================================================================
+1. GRANT OF LICENSE
+================================================================================
+
+Subject to the terms and conditions of this EULA, we grant you a limited, non-exclusive, non-transferable, revocable license to:
+
+a) Install and use the Software on computers or devices you own or control
+b) Use the Software for personal, educational, or commercial purposes
+c) Make backup copies of the Software for archival purposes
+
+The Software's source code is available under the MIT License (see LICENSE file or https://github.com/mikha08-rgb/VoiceLite/blob/master/LICENSE). Certain premium features ("Pro Version") require a paid subscription as detailed in our Terms of Service.
+
+================================================================================
+2. RESTRICTIONS
+================================================================================
+
+You may NOT:
+
+a) Redistribute or sell the compiled binary versions of the Software without including this EULA
+b) Share your Pro subscription license key with others
+c) Use the Software to perform illegal activities or violate the rights of others
+d) Remove, alter, or obscure any proprietary notices (copyright, trademark, etc.) in the Software
+e) Attempt to circumvent license validation mechanisms for Pro features
+f) Use the Software in any manner that could damage, disable, overburden, or impair our servers or networks (if applicable)
+
+The MIT License grants you additional rights to modify and redistribute the source code - see the LICENSE file for complete details.
+
+================================================================================
+3. INTELLECTUAL PROPERTY
+================================================================================
+
+The Software is protected by copyright laws and international copyright treaties, as well as other intellectual property laws and treaties.
+
+a) VoiceLite source code is licensed under the MIT License
+b) The VoiceLite name, logo, and branding are trademarks of VoiceLite
+c) The Software incorporates OpenAI Whisper models (MIT License)
+d) All rights not expressly granted are reserved by VoiceLite
+
+================================================================================
+4. SUBSCRIPTION SERVICES (PRO VERSION)
+================================================================================
+
+Access to premium AI models requires a Pro subscription ($7/month):
+
+a) Subscriptions are billed monthly through Stripe
+b) You may cancel at any time; access continues until the end of the billing period
+c) Prices are subject to change with 30 days advance notice
+d) Refunds are available within 7 days of first purchase (see Terms of Service)
+
+================================================================================
+5. PRIVACY AND DATA COLLECTION
+================================================================================
+
+Your privacy is important to us:
+
+a) OFFLINE PROCESSING: All voice recordings are processed 100% offline on your local computer. Your voice data NEVER leaves your device.
+b) TEMPORARY FILES: Audio files are created temporarily during transcription and are immediately deleted after processing.
+c) PRO SUBSCRIPTIONS: If you purchase Pro, we collect your email address and payment information (processed by Stripe).
+d) NO TRACKING: We do not track your usage, keystrokes, or transcribed text.
+
+For complete details, see our Privacy Policy at https://voicelite.app/privacy
+
+================================================================================
+6. DISCLAIMER OF WARRANTIES
+================================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+WE DO NOT WARRANT THAT:
+a) The Software will meet your requirements
+b) The Software will be error-free or uninterrupted
+c) Transcriptions will be 100% accurate
+d) Defects will be corrected
+e) The Software is free from viruses or other harmful components
+
+YOU ASSUME ALL RISKS ASSOCIATED WITH THE USE OF THE SOFTWARE.
+
+================================================================================
+7. LIMITATION OF LIABILITY
+================================================================================
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL VOICELITE BE LIABLE FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR ANY OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+OUR TOTAL LIABILITY TO YOU SHALL NOT EXCEED THE AMOUNT YOU PAID FOR THE SOFTWARE IN THE 12 MONTHS PRIOR TO THE CLAIM, OR $100 USD, WHICHEVER IS LESS.
+
+Some jurisdictions do not allow the limitation or exclusion of liability, so the above limitations may not apply to you.
+
+================================================================================
+8. TERMINATION
+================================================================================
+
+This EULA is effective until terminated.
+
+a) YOU MAY TERMINATE this EULA at any time by uninstalling the Software and destroying all copies.
+b) WE MAY TERMINATE this EULA if you fail to comply with any term or condition, with or without notice.
+c) Upon termination, you must immediately cease all use of the Software and destroy all copies.
+
+Termination of this EULA does not affect your rights under the MIT License for the source code.
+
+================================================================================
+9. UPDATES AND MODIFICATIONS
+================================================================================
+
+We may provide updates, patches, or new versions of the Software:
+
+a) Updates may be automatic or require manual installation
+b) Updates may modify, add, or remove features
+c) We are not obligated to provide updates
+d) This EULA applies to all updates unless accompanied by a separate license agreement
+
+================================================================================
+10. EXPORT RESTRICTIONS
+================================================================================
+
+The Software may be subject to export control laws of the United States and other countries. You agree to comply with all applicable export and re-export restrictions.
+
+================================================================================
+11. THIRD-PARTY COMPONENTS
+================================================================================
+
+The Software includes or relies on third-party components:
+
+a) OpenAI Whisper (MIT License) - https://github.com/openai/whisper
+b) NAudio (MIT License) - https://github.com/naudio/NAudio
+c) See full list of dependencies in the source code repository
+
+Each component is subject to its own license terms.
+
+================================================================================
+12. GOVERNING LAW
+================================================================================
+
+This EULA shall be governed by the laws of [Your State/Country], without regard to its conflict of law provisions. Any legal action or proceeding arising under this EULA shall be brought exclusively in the courts of [Your Jurisdiction].
+
+================================================================================
+13. ENTIRE AGREEMENT
+================================================================================
+
+This EULA, together with our Privacy Policy and Terms of Service, constitutes the entire agreement between you and VoiceLite concerning the Software and supersedes all prior agreements and understandings.
+
+================================================================================
+14. SEVERABILITY
+================================================================================
+
+If any provision of this EULA is held to be unenforceable, such provision shall be reformed only to the extent necessary to make it enforceable, and the remaining provisions shall remain in full force and effect.
+
+================================================================================
+15. CONTACT INFORMATION
+================================================================================
+
+For questions about this EULA or the Software:
+
+Email: support@voicelite.app
+Website: https://voicelite.app
+GitHub: https://github.com/mikha08-rgb/VoiceLite
+
+================================================================================
+
+BY CLICKING "I ACCEPT" OR BY INSTALLING OR USING THE SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS EULA, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS AND CONDITIONS.
+
+IF YOU DO NOT AGREE, CLICK "I DO NOT ACCEPT" AND DO NOT INSTALL OR USE THE SOFTWARE.
+
+================================================================================
+MIT License (Source Code)
+
+Copyright (c) 2025 VoiceLite
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

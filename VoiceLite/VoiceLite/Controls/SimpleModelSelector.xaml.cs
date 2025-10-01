@@ -2,14 +2,13 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using VoiceLite.Models;
 
 namespace VoiceLite.Controls
 {
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-small.bin"; // Default
+        private string selectedModel = "ggml-tiny.bin";
 
         public string SelectedModel
         {
@@ -21,8 +20,6 @@ namespace VoiceLite.Controls
             }
         }
 
-        public bool IsProVersion { get; set; }
-
         public SimpleModelSelector()
         {
             InitializeComponent();
@@ -33,7 +30,6 @@ namespace VoiceLite.Controls
         {
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
 
-            // Check which models are installed (both encrypted and unencrypted)
             CheckAndUpdateRadio(TinyRadio, Path.Combine(whisperPath, "ggml-tiny.bin"));
             CheckAndUpdateRadio(BaseRadio, Path.Combine(whisperPath, "ggml-base.bin"));
             CheckAndUpdateRadio(SmallRadio, Path.Combine(whisperPath, "ggml-small.bin"));
@@ -43,48 +39,20 @@ namespace VoiceLite.Controls
 
         private void CheckAndUpdateRadio(RadioButton radio, string modelPath)
         {
-            var modelName = Path.GetFileName(modelPath);
-
-            // Check for both encrypted (.enc) and unencrypted (.bin) versions
             var encryptedPath = modelPath + ".enc";
             var modelExists = File.Exists(modelPath) || File.Exists(encryptedPath);
 
-            // For free users, only allow tiny model
-            if (!IsProVersion && modelName != "ggml-tiny.bin")
+            if (!modelExists)
             {
                 radio.IsEnabled = false;
                 radio.Opacity = 0.5;
-
-                // Add "(Pro Only)" to the label
-                var panel = radio.Content as StackPanel;
-                if (panel?.Children[0] is Grid grid)
-                {
-                    if (grid.Children[0] is StackPanel labelPanel && labelPanel.Children[0] is TextBlock nameBlock)
-                    {
-                        if (!nameBlock.Text.Contains("(Pro Only)") && !nameBlock.Text.Contains("(Not installed)"))
-                        {
-                            nameBlock.Text += " (Pro Only)";
-                        }
-                    }
-                }
+                radio.ToolTip = "Download this model from the settings page.";
             }
-            else if (!modelExists)
+            else
             {
-                radio.IsEnabled = false;
-                radio.Opacity = 0.5;
-
-                // Add "(Not installed)" to the label
-                var panel = radio.Content as StackPanel;
-                if (panel?.Children[0] is Grid grid)
-                {
-                    if (grid.Children[0] is StackPanel labelPanel && labelPanel.Children[0] is TextBlock nameBlock)
-                    {
-                        if (!nameBlock.Text.Contains("(Not installed)"))
-                        {
-                            nameBlock.Text += " (Not installed)";
-                        }
-                    }
-                }
+                radio.IsEnabled = true;
+                radio.Opacity = 1.0;
+                radio.ToolTip = null;
             }
         }
 
@@ -92,16 +60,6 @@ namespace VoiceLite.Controls
         {
             if (sender is RadioButton radio && radio.Tag is string modelFile)
             {
-                // For free users, only allow tiny model
-                if (!IsProVersion && modelFile != "ggml-tiny.bin")
-                {
-                    // Reset to tiny model
-                    TinyRadio.IsChecked = true;
-                    MessageBox.Show("Pro license required for this model. Using Tiny model instead.",
-                                    "Pro Feature", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
                 selectedModel = modelFile;
                 UpdateTip(modelFile);
                 ModelSelected?.Invoke(this, modelFile);
@@ -132,7 +90,6 @@ namespace VoiceLite.Controls
 
         private void UpdateSelection()
         {
-            // Update radio button selection based on the model
             switch (selectedModel)
             {
                 case "ggml-tiny.bin":

@@ -5,22 +5,38 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "keygen": "tsx scripts/keygen.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@noble/ed25519": "^3.0.0",
+    "@prisma/client": "^6.1.0",
+    "@upstash/ratelimit": "^2.0.6",
+    "@upstash/redis": "^1.35.4",
     "lucide-react": "^0.544.0",
+    "nanoid": "^5.0.7",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "resend": "^6.1.0",
-    "stripe": "^18.5.0"
+    "stripe": "^18.5.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "prisma": "^6.1.0",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

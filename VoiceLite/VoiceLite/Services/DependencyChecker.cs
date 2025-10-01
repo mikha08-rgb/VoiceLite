@@ -81,7 +81,7 @@ namespace VoiceLite.Services
                 return true;
             }
 
-            ErrorLogger.LogError("Whisper.exe not found in expected locations", null);
+            ErrorLogger.LogMessage("Whisper.exe not found in expected locations");
             return false;
         }
 
@@ -118,7 +118,7 @@ namespace VoiceLite.Services
                 }
             }
 
-            ErrorLogger.LogError("No Whisper models found", null);
+            ErrorLogger.LogMessage("No Whisper models found");
             return false;
         }
 
@@ -210,7 +210,7 @@ namespace VoiceLite.Services
                 if (!completed)
                 {
                     try { process.Kill(); } catch { }
-                    ErrorLogger.LogError("Whisper.exe timed out during test", null);
+                    ErrorLogger.LogMessage("Whisper.exe timed out during test");
                     return false;
                 }
 
@@ -227,7 +227,7 @@ namespace VoiceLite.Services
                     error.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
                     error.Contains("missing", StringComparison.OrdinalIgnoreCase))
                 {
-                    ErrorLogger.LogError($"Whisper.exe missing dependencies: {error}", null);
+                    ErrorLogger.LogMessage($"Whisper.exe missing dependencies: {error}");
                     return false;
                 }
 
@@ -243,7 +243,7 @@ namespace VoiceLite.Services
                 if (ex.Message.Contains("specified module could not be found") ||
                     ex.Message.Contains("application has failed to start"))
                 {
-                    ErrorLogger.LogError("Whisper.exe cannot start - missing runtime dependencies", null);
+                    ErrorLogger.LogMessage("Whisper.exe cannot start - missing runtime dependencies");
                 }
 
                 return false;
@@ -334,7 +334,7 @@ namespace VoiceLite.Services
                         return true;
                     }
 
-                    ErrorLogger.LogError($"VC Runtime installation failed with exit code: {installProcess.ExitCode}", null);
+                    ErrorLogger.LogMessage($"VC Runtime installation failed with exit code: {installProcess.ExitCode}");
                     return false;
                 }
                 finally

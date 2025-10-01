@@ -26,11 +26,8 @@ namespace VoiceLite
             InitializeComponent();
             settings = currentSettings ?? new Settings();
 
-            // Show download button if user has Pro license
-            if (settings.IsProVersion)
-            {
-                DownloadProModelsButton.Visibility = Visibility.Visible;
-            }
+            DownloadModelsButton.Visibility = Visibility.Visible;
+            UpdateModelDownloadButton();
 
             LoadSettings();
             SetupModelComparison();
@@ -73,17 +70,34 @@ namespace VoiceLite
 
         private void SetupModelComparison()
         {
-            // Pass Pro status to the selector
-            SimpleModelSelector.IsProVersion = settings.IsProVersion;
-
-            // For free users, force tiny model
-            if (!settings.IsProVersion)
+            if (!IsModelInstalled(settings.WhisperModel))
             {
                 settings.WhisperModel = "ggml-tiny.bin";
             }
 
-            // Set the current model in the simple selector
             SimpleModelSelector.SelectedModel = settings.WhisperModel;
+        }
+
+        private void UpdateModelDownloadButton()
+        {
+            var mediumInstalled = IsModelInstalled("ggml-medium.bin");
+
+            if (mediumInstalled)
+            {
+                DownloadModelsButton.Content = "Medium model installed";
+                DownloadModelsButton.IsEnabled = false;
+            }
+            else
+            {
+                DownloadModelsButton.Content = "Download Medium Model (1.5GB)";
+                DownloadModelsButton.IsEnabled = true;
+            }
+        }
+
+        private static bool IsModelInstalled(string fileName)
+        {
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", fileName);
+            return File.Exists(path) || File.Exists(path + ".enc");
         }
 
         private void LoadMicrophones()
@@ -278,9 +292,20 @@ namespace VoiceLite
             // Hotkey (already saved on change)
         }
 
-        private async void DownloadProModels_Click(object sender, RoutedEventArgs e)
+        private async void DownloadModelsButton_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
+            if (sender is not Button button)
+            {
+                return;
+            }
+
+            if (IsModelInstalled("ggml-medium.bin"))
+            {
+                UpdateModelDownloadButton();
+                StatusText.Text = "Medium model is already available";
+                return;
+            }
+
             button.IsEnabled = false;
             button.Content = "Downloading... (this may take several minutes)";
 
@@ -293,6 +318,7 @@ namespace VoiceLite
                 };
 
                 var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
+                Directory.CreateDirectory(whisperPath);
 
                 using (var client = new System.Net.Http.HttpClient())
                 {
@@ -310,23 +336,32 @@ namespace VoiceLite
                         }
 
                         button.Content = $"Downloading {name}...";
-                        var bytes = await client.GetByteArrayAsync(url);
-                        await File.WriteAllBytesAsync(targetPath, bytes);
+                        using (var response = await client.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                        {
+                            response.EnsureSuccessStatusCode();
+                            await using var sourceStream = await response.Content.ReadAsStreamAsync();
+                            await using var targetStream = File.Create(targetPath);
+                            await sourceStream.CopyToAsync(targetStream);
+                        }
                     }
                 }
 
                 button.Content = "Download Complete!";
                 // Models will be available after restart
 
-                MessageBox.Show("Pro model downloaded successfully! Restart the application to see it in the model list.",
+                MessageBox.Show("Model downloaded successfully! Restart the application to see it in the model list.",
                                "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                UpdateModelDownloadButton();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                button.Content = "Download Pro Model (Medium - 1.5GB)";
+                button.Content = "Download Medium Model (1.5GB)";
                 button.IsEnabled = true;
+                UpdateModelDownloadButton();
             }
         }
     }
 }
+
+

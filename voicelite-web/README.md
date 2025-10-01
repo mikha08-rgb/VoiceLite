@@ -88,4 +88,4 @@ Upgrade to database when you have >100 customers.
 
 ## Support
 
-Email: support@voicelite.app
+Email: contact@voicelite.app

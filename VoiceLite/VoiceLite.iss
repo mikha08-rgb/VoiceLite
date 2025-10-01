@@ -118,10 +118,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 Type: filesandordirs; Name: "{userappdata}\VoiceLite"
 Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
+
 [Code]
-var
-  LicenseKeyPage: TInputQueryWizardPage;
-  EmailPage: TInputQueryWizardPage;
 
 function InitializeSetup(): Boolean;
 begin
@@ -139,80 +137,11 @@ begin
   end;
 end;
 
-procedure InitializeWizard;
-begin
-  // Create license key input page
-  LicenseKeyPage := CreateInputQueryPage(wpLicense,
-    'License Activation',
-    'Enter your VoiceLite license information',
-    'Please enter your license key and email address. ' +
-    'If you are evaluating VoiceLite, leave these fields empty to start a 14-day trial.');
-
-  LicenseKeyPage.Add('License Key (leave empty for trial):', False);
-  LicenseKeyPage.Add('Email Address:', False);
-
-  // Set default values (empty for trial)
-  LicenseKeyPage.Values[0] := '';
-  LicenseKeyPage.Values[1] := '';
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-var
-  LicenseKey: string;
-  Email: string;
-begin
-  Result := True;
-
-  if CurPageID = LicenseKeyPage.ID then
-  begin
-    LicenseKey := Trim(LicenseKeyPage.Values[0]);
-    Email := Trim(LicenseKeyPage.Values[1]);
-
-    // If both are empty, continue with trial
-    if (LicenseKey = '') and (Email = '') then
-    begin
-      MsgBox('VoiceLite will be installed with a 14-day trial license.' + #13#10 +
-             'You can activate a full license at any time from the application.',
-             mbInformation, MB_OK);
-    end
-    else if (LicenseKey <> '') and (Email = '') then
-    begin
-      MsgBox('Please enter your email address to activate the license.',
-             mbError, MB_OK);
-      Result := False;
-    end
-    else if (LicenseKey = '') and (Email <> '') then
-    begin
-      MsgBox('Please enter your license key to activate.',
-             mbError, MB_OK);
-      Result := False;
-    end;
-
-    // In production, validate license key format here
-  end;
-end;
+// Licensing prompts removed; installer now assumes fully free build
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  LicenseKey: string;
-  Email: string;
-  ConfigPath: string;
 begin
-  if CurStep = ssPostInstall then
-  begin
-    // Save license information if provided
-    LicenseKey := Trim(LicenseKeyPage.Values[0]);
-    Email := Trim(LicenseKeyPage.Values[1]);
-
-    if (LicenseKey <> '') and (Email <> '') then
-    begin
-      // Save to registry for application to read on first launch
-      RegWriteStringValue(HKCU, 'Software\VoiceLite\Activation',
-                         'PendingKey', LicenseKey);
-      RegWriteStringValue(HKCU, 'Software\VoiceLite\Activation',
-                         'PendingEmail', Email);
-    end;
-  end;
+  // No post-install licensing actions required.
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -233,7 +162,7 @@ begin
     RegDeleteKeyIncludingSubkeys(HKLM, 'Software\VoiceLite Software');
 
     // Ask if user wants to remove settings
-    if MsgBox('Do you want to remove all VoiceLite settings and license data?',
+    if MsgBox('Do you want to remove all VoiceLite settings?',
               mbConfirmation, MB_YESNO) = IDYES then
     begin
       DelTree(ExpandConstant('{userappdata}\VoiceLite'), True, True, True);

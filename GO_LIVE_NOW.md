@@ -1,234 +1,91 @@
-# 🚀 GO LIVE NOW - Your 3-Hour Launch Checklist
+# 🚀 GO LIVE NOW – 3-Hour Launch Checklist (Free Edition)
+
+> **Status (2025):** VoiceLite now ships as a fully free desktop build. Skip any legacy
+> licensing/payment steps unless you are maintaining a historical commercial fork.
 
 ## Current Status
-- ✅ App built and working
-- ✅ Licensing system complete
-- ✅ Payment UI ready
-- ✅ Landing page created
-- ✅ License server prepared
-- ✅ All guides written
+- ✅ Desktop app verified in Debug/Release
+- ✅ Free build behaviour confirmed (no license prompts, all models unlocked once downloaded)
+- ✅ Installer script updated (`VoiceLite/VoiceLite.iss`)
+- ✅ Landing page content drafted
+- ✅ Release notes ready
 
-**You are 3 hours from your first sale!**
+**You are 3 hours from sharing VoiceLite with the world!**
 
 ---
 
-## ⏰ HOUR 1: Deploy License Server (30 min)
+## ⏰ HOUR 1: Package the Build (30 min)
 
-### A. Push to GitHub (5 min)
-```bash
-# 1. Create PRIVATE repo at github.com/new
-# 2. Name: voicelite-license-server
-# 3. Run these commands:
-cd license-server
-git remote add origin https://github.com/YOUR_USERNAME/voicelite-license-server.git
-git push -u origin main
-```
-
-### B. Deploy to Railway (10 min)
-1. Go to https://railway.app
-2. Sign up with GitHub
-3. New Project → Deploy from GitHub
-4. Select "voicelite-license-server"
-5. Wait for deployment (2-3 minutes)
-
-### C. Configure Railway (10 min)
-1. Click project → Variables tab
-2. Add these (COPY EXACTLY):
-```
-API_KEY=kJ8mN5qR2wX9yB3vC6zF1gH4tP7sL0aE
-ADMIN_KEY=uA2dE5fG8hJ1kM4nQ7pR0tV3wX6yZ9bC
-PORT=3000
-DATABASE_PATH=./data/licenses.db
-NODE_ENV=production
-```
-3. Settings → Generate Domain
-4. Copy your URL: `https://xxxxx.up.railway.app`
-
-### D. Update VoiceLite (5 min)
-Edit these files - Replace `http://localhost:3000` with your Railway URL:
-- `VoiceLite\VoiceLite\Services\LicenseManager.cs` line 21
-- `VoiceLite\VoiceLite\Services\PaymentProcessor.cs` line 20
-
-Rebuild:
+### A. Publish the desktop app (10 min)
 ```bash
 cd VoiceLite
-dotnet build VoiceLite.sln -c Release
+dotnet publish VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 ```
 
-✅ **Test:** Visit `https://your-url.railway.app/api/check` - should show "ok"
+Verify the output: `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 
----
-
-## ⏰ HOUR 2: Set Up Payments (30 min)
-
-### A. Create Stripe Account (10 min)
-1. Go to https://stripe.com → Start now
-2. Enter email, create password
-3. Verify email
-4. **You can accept payments immediately!**
-
-### B. Create Payment Links (15 min)
-For each product:
-1. Dashboard → Products → Add product
-2. Create 3 products:
-
-**Personal License**
-- Name: VoiceLite Personal License
-- Price: $29.99 (one-time)
-- → Create payment link → Copy URL
-
-**Professional License**
-- Name: VoiceLite Professional License
-- Price: $59.99 (one-time)
-- → Create payment link → Copy URL
-
-**Business License**
-- Name: VoiceLite Business License
-- Price: $199.99 (one-time)
-- → Create payment link → Copy URL
-
-### C. Update Landing Page (5 min)
-Edit `docs\index.html`:
-- Line 436: Replace with Personal Stripe URL
-- Line 451: Replace with Professional Stripe URL
-- Line 466: Replace with Business Stripe URL
-
-✅ **Test:** Click a buy button - should go to Stripe checkout
-
----
-
-## ⏰ HOUR 3: Go Live (30 min)
-
-### A. Deploy Landing Page (10 min)
-```bash
-# 1. Create PUBLIC repo at github.com/new
-# 2. Name: voicelite (or voicelite-landing)
-# 3. Run:
-cd docs
-git init
-git add .
-git commit -m "VoiceLite landing page"
-git remote add origin https://github.com/YOUR_USERNAME/voicelite.git
-git push -u origin main
-
-# 4. On GitHub: Settings → Pages → Source: main → Save
-# 5. Your site: https://YOUR_USERNAME.github.io/voicelite
+### B. Compile the installer (10 min)
+```powershell
+"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
 ```
 
-### B. Create Installer (10 min)
-1. Download Inno Setup: https://jrsoftware.org/isdl.php
-2. Open `VoiceLite.iss`
-3. Compile (F9)
-4. Output: `VoiceLite-Setup.exe`
-5. Upload to GitHub Releases
+Output lands in the repo root as `VoiceLite-Setup-<version>.exe`.
 
-### C. Final Tests (10 min)
-- [ ] Landing page loads
-- [ ] Buy buttons work
-- [ ] Download link works
-- [ ] Installer runs
-- [ ] License server responds
-- [ ] App activates license
+### C. Smoke test locally (10 min)
+- Install from the generated `.exe`
+- Confirm the app launches without license prompts
+- Verify model download button still works (tiny bundled, medium download path)
 
 ---
 
-## 🎉 YOU'RE LIVE!
+## ⏰ HOUR 2: Publish Downloads (45 min)
 
-### Your Links:
-- **Landing Page:** https://YOUR_USERNAME.github.io/voicelite
-- **License Server:** https://xxxxx.up.railway.app
-- **Stripe Dashboard:** https://dashboard.stripe.com
+### A. Create a GitHub release (15 min)
+1. Tag the release (`vX.Y.Z`)
+2. Upload artifacts:
+   - `VoiceLite-Setup-<version>.exe`
+   - Optional: zipped `publish/` folder for portable use
+   - Changelog snippet (highlight free build + model flow)
+3. Mark release as “Latest” and public
 
-### When You Get Your First Sale:
+### B. Update landing page / docs (20 min)
+1. `docs/index.html`
+   - Replace download buttons with direct links to the latest installer/release assets
+   - Remove pricing tables or add “Free Forever” messaging
+2. `README.md` (root + `VoiceLite/README.md`)
+   - Update badges/CTA to reflect the free edition
+   - Point download button to the GitHub release
+3. Regenerate or copy any screenshots if UI changed
 
-1. **You'll receive email from Stripe**
-   - "You have a new payment!"
-   - Shows customer email
-
-2. **Generate their license** (2 min)
-```bash
-cd license-server
-node admin.js generate customer@email.com Personal
-# Copy the license key
-```
-
-3. **Email them** (use this template):
-```
-Subject: Your VoiceLite License Key 🎉
-
-Hi [Name],
-
-Thank you for purchasing VoiceLite!
-
-Your license key is: PERS-XXXX-XXXX-XXXX
-
-To activate:
-1. Open VoiceLite
-2. Go to Help → Enter License
-3. Enter your email and the license key above
-4. Click Activate
-
-Download VoiceLite here:
-https://YOUR_USERNAME.github.io/voicelite
-
-If you need any help, just reply to this email!
-
-Best,
-[Your name]
-```
+### C. Validate live assets (10 min)
+- Visit GitHub release page (ensure assets download)
+- Load the landing page and click the download CTA
+- Run the installer from the downloaded link to confirm authenticity/signature
 
 ---
 
-## 🚦 Quick Launch Sequence
+## ⏰ HOUR 3: Announce & Support (45 min)
 
-**RIGHT NOW (5 minutes):**
-1. Open https://github.com/new (create license server repo)
-2. Open https://railway.app (sign up)
-3. Open https://stripe.com (sign up)
+### A. Update communication channels (15 min)
+- Draft blog post / newsletter announcing the free build
+- Queue social posts (X, LinkedIn, product communities)
+- Update Discord/Slack/Reddit posts with fresh download link
 
-**NEXT 30 minutes:**
-1. Push license server to GitHub
-2. Deploy on Railway
-3. Update app with Railway URL
-4. Rebuild app
+### B. Prep support responses (10 min)
+- Short FAQ: installation steps, model downloads, troubleshooting
+- Note that no license key is required; highlight optional donation/Patreon links if desired
 
-**NEXT 30 minutes:**
-1. Create Stripe products
-2. Get payment links
-3. Update landing page
-4. Test payment flow
-
-**FINAL 30 minutes:**
-1. Deploy landing page
-2. Create installer
-3. Share your first link!
+### C. Monitor feedback (20 min)
+- Keep GitHub Issues open in a tab
+- Track download metrics (GitHub release analytics, landing page analytics)
+- Respond quickly to installation/model questions
 
 ---
 
-## 📢 Your First Marketing Message
+## 📦 Optional Legacy Monetization
+If you plan to maintain paid tiers or a private fork, consult these legacy docs (archival):
+- `DEPLOY_LICENSE_SERVER.md`
+- `MONETIZATION_FIXED.md`
 
-Post this EVERYWHERE:
+Otherwise, enjoy the fully free VoiceLite experience! 🎉
 
-> 🎉 Just launched VoiceLite - instant speech-to-text for Windows!
->
-> 🎤 Press Alt, speak, release - text appears where your cursor is
-> 🔒 100% offline, your voice never leaves your computer
-> ⚡ Powered by OpenAI Whisper - 99% accuracy
-> 💰 One-time purchase, no subscriptions
->
-> Launch week special: 30% off!
->
-> Try it free: https://YOUR_USERNAME.github.io/voicelite
-
----
-
-## ⚠️ DON'T OVERTHINK IT!
-
-- Your product WORKS ✅
-- Security is DONE ✅
-- Licensing is READY ✅
-- You can improve later ✅
-
-**Just launch and get feedback!**
-
-Remember: You're 3 hours from your first sale. LET'S GO! 🚀

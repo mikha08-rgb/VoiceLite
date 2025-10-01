@@ -10,6 +10,8 @@ using VoiceLite.Services;
 using VoiceLite.Interfaces;
 using VoiceLite.Utilities;
 using System.Text.Json;
+using VoiceLite.Services.Auth;
+using VoiceLite.Services.Licensing;
 
 namespace VoiceLite
 {
@@ -21,11 +23,13 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private MemoryMonitor? memoryMonitor;
-        private LicenseInfo? currentLicense;
-        private SimpleLicenseManager? simpleLicenseManager;
-        private UsageTracker? usageTracker;
         private DateTime recordingStartTime;
         private Settings settings = new();
+        private AuthenticationService authenticationService = new();
+        private AuthenticationCoordinator? authenticationCoordinator;
+        private LicenseService licenseService = new();
+        private UserSession? currentSession;
+        private LicenseStatus currentLicenseStatus = LicenseStatus.Unknown;
         private bool _isRecording = false;
         private bool isRecording
         {
@@ -50,7 +54,6 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
-            // CheckLicense(); // Disabled: LicenseDialog not included in project. SimpleLicenseManager handles licensing.
 
             // Check dependencies before initializing services
             _ = CheckDependenciesAsync();
@@ -114,7 +117,7 @@ namespace VoiceLite
 
                 if (!result.AllDependenciesMet)
                 {
-                    ErrorLogger.LogError($"Dependency check failed: {result.GetErrorMessage()}", null);
+                    ErrorLogger.LogMessage($"Dependency check failed: {result.GetErrorMessage()}");
 
                     // Show user-friendly error
                     await Dispatcher.InvokeAsync(() =>
@@ -252,44 +255,6 @@ namespace VoiceLite
             UpdateConfigDisplay();
         }
 
-        public void UpdateTrialStatus()
-        {
-            if (simpleLicenseManager == null) return;
-
-            var daysRemaining = simpleLicenseManager.GetTrialDaysRemaining();
-
-            if (daysRemaining == -1) // Activated license - HIDE the trial bar completely
-            {
-                TrialStatusBar.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                // Show trial bar for trial users
-                TrialStatusBar.Visibility = Visibility.Visible;
-
-                if (daysRemaining > 0)
-                {
-                    TrialStatusText.Text = $"{daysRemaining} days left on trial";
-                    if (daysRemaining <= 3)
-                    {
-                        TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkRed);
-                        TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 215, 218));
-                    }
-                    else
-                    {
-                        TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(133, 100, 4));
-                        TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 243, 205));
-                    }
-                }
-                else
-                {
-                    TrialStatusText.Text = "Trial expired - Please activate";
-                    TrialStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkRed);
-                    TrialStatusBar.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(248, 215, 218));
-                }
-            }
-        }
-
         private void SaveSettings()
         {
             try
@@ -321,25 +286,11 @@ namespace VoiceLite
             }
         }
 
-        // CheckLicense method removed - LicenseDialog class no longer exists
-        // SimpleLicenseManager handles all license validation
-
         private void InitializeServices()
         {
             try
             {
-                // Simple license check
-                simpleLicenseManager = new SimpleLicenseManager();
-
-                // Initialize usage tracking
-                usageTracker = new UsageTracker(simpleLicenseManager);
-
-                // Update trial status display
-                UpdateTrialStatus();
-
-                // License check disabled - SimpleLicenseWindow not compiled in project
-                // IsValid() always returns true anyway, so this code never runs
-                // Keeping app free and accessible for all users
+                authenticationCoordinator = new AuthenticationCoordinator(authenticationService);
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
@@ -364,13 +315,6 @@ namespace VoiceLite
 
                 audioRecorder.AudioFileReady += OnAudioFileReady;
 
-                // For free users, force tiny model
-                if (!settings.IsProVersion && settings.WhisperModel != "ggml-tiny.bin")
-                {
-                    settings.WhisperModel = "ggml-tiny.bin";
-                    SaveSettings();
-                }
-
                 // Use persistent Whisper service for better performance
                 whisperService = new PersistentWhisperService(settings);
 
@@ -378,10 +322,13 @@ namespace VoiceLite
                 hotkeyManager.HotkeyReleased += OnHotkeyReleased;
 
                 systemTrayManager = new SystemTrayManager(this);
+                systemTrayManager.AccountMenuClicked += OnTrayAccountMenuClicked;
 
                 // Initialize memory monitoring
                 memoryMonitor = new MemoryMonitor();
                 memoryMonitor.MemoryAlert += OnMemoryAlert;
+
+                _ = RestoreAccountAsync();
             }
             catch (Exception ex)
             {
@@ -394,10 +341,6 @@ namespace VoiceLite
         {
             try
             {
-                // Update license status in UI
-                UpdateLicenseStatus();
-                RestrictModelSelection();
-
                 var helper = new WindowInteropHelper(this);
                 hotkeyManager?.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
@@ -467,41 +410,89 @@ namespace VoiceLite
 
         private void TestButton_Click(object sender, RoutedEventArgs e)
         {
-            ErrorLogger.LogMessage($"TestButton_Click: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            ErrorLogger.LogDebug($"TestButton_Click: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
             // Prevent rapid clicking (debounce to 300ms)
             var now = DateTime.Now;
             if ((now - lastClickTime).TotalMilliseconds < 300)
             {
-                ErrorLogger.LogMessage("TestButton_Click: Debounced - too rapid clicking");
+                ErrorLogger.LogDebug("TestButton_Click: Debounced - too rapid clicking");
                 return;
             }
             lastClickTime = now;
 
             if (audioRecorder == null)
             {
-                ErrorLogger.LogMessage("TestButton_Click: AudioRecorder is null");
+                ErrorLogger.LogWarning("TestButton_Click: AudioRecorder is null");
                 UpdateStatus("Audio recorder not initialized", Brushes.Red);
                 return;
             }
 
             lock (recordingLock)
             {
-                ErrorLogger.LogMessage($"TestButton_Click: Inside lock - isRecording={isRecording}");
                 if (!isRecording)
                 {
-                    ErrorLogger.LogMessage("TestButton_Click: Calling StartRecording()");
+                    ErrorLogger.LogInfo("User clicked to start recording");
                     StartRecording();
                 }
                 else
                 {
-                    ErrorLogger.LogMessage("TestButton_Click: Calling StopRecording()");
+                    ErrorLogger.LogInfo("User clicked to stop recording");
                     StopRecording();
                 }
-                ErrorLogger.LogMessage($"TestButton_Click: After action - isRecording={isRecording}");
+            }
+        }
+
+        private async void AccountButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (authenticationCoordinator == null)
+            {
+                MessageBox.Show("Authentication services are not initialized yet.", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
 
-            ErrorLogger.LogMessage($"TestButton_Click: Exit - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            if (currentSession == null)
+            {
+                var loginWindow = new LoginWindow(authenticationCoordinator)
+                {
+                    Owner = this,
+                };
+
+                if (loginWindow.ShowDialog() == true && loginWindow.Session != null)
+                {
+                    currentSession = loginWindow.Session;
+                    settings.LastSignedInEmail = currentSession.Email;
+                    SaveSettings();
+                    await UpdateLicenseStatusAsync();
+                    systemTrayManager?.UpdateAccountMenuText("Manage Account");
+                }
+
+                return;
+            }
+
+            // User is signed in - show account management
+            var message = $"Signed in as: {currentSession.Email}\n\n";
+            message += $"License Status: {currentLicenseStatus}\n\n";
+            message += "Would you like to sign out?";
+
+            var result = MessageBox.Show(message, "Account Management", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    await authenticationCoordinator.SignOutAsync();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("SignOutAsync", ex);
+                    MessageBox.Show($"Sign out failed: {ex.Message}", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                currentSession = null;
+                currentLicenseStatus = LicenseStatus.Unlicensed;
+                UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                systemTrayManager?.UpdateAccountMenuText("Sign In");
+            }
         }
 
         private void UpdateStatus(string status, Brush color)
@@ -538,26 +529,25 @@ namespace VoiceLite
 
         private void StartRecording()
         {
-            ErrorLogger.LogMessage($"StartRecording: Entry - isRecording={isRecording}, audioRecorder={audioRecorder != null}");
+            ErrorLogger.LogDebug($"StartRecording: Entry - isRecording={isRecording}");
 
             // Pre-check: if already recording, do nothing
             if (isRecording)
             {
-                ErrorLogger.LogMessage("StartRecording: Already recording, returning early");
+                ErrorLogger.LogDebug("StartRecording: Already recording, returning early");
                 return;
             }
 
             try
             {
-                ErrorLogger.LogMessage("StartRecording: Setting isRecording=true and starting audio recorder");
                 // Set state BEFORE attempting to start (defensive)
                 isRecording = true;
                 isCancelled = false; // Reset cancel flag when starting
+                recordingStartTime = DateTime.Now;
 
                 audioRecorder?.StartRecording();
 
                 // Only update UI if we get here successfully
-                ErrorLogger.LogMessage("StartRecording: AudioRecorder started successfully, updating UI");
                 UpdateStatus("Recording...", Brushes.Red);
 
                 // Update button and text based on mode
@@ -573,11 +563,10 @@ namespace VoiceLite
 
                 UpdateUIForCurrentMode();
                 TranscriptionText.Foreground = Brushes.Gray;
-                ErrorLogger.LogMessage($"StartRecording: Success - isRecording={isRecording}");
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("No microphone"))
             {
-                ErrorLogger.LogMessage($"StartRecording: No microphone exception - {ex.Message}");
+                ErrorLogger.LogWarning($"StartRecording failed: No microphone - {ex.Message}");
                 isRecording = false; // Reset on failure
                 UpdateStatus("No microphone!", Brushes.Red);
 
@@ -585,12 +574,11 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
                 TranscriptionText.Foreground = Brushes.Black;
 
-                ErrorLogger.LogMessage($"StartRecording: After no mic error - isRecording={isRecording}");
                 MessageBox.Show(ex.Message, "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("Failed to access"))
             {
-                ErrorLogger.LogMessage($"StartRecording: Microphone access exception - {ex.Message}");
+                ErrorLogger.LogWarning($"StartRecording failed: Microphone busy - {ex.Message}");
                 isRecording = false; // Reset on failure
                 UpdateStatus("Microphone busy", Brushes.Red);
 
@@ -598,12 +586,11 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
                 TranscriptionText.Foreground = Brushes.Black;
 
-                ErrorLogger.LogMessage($"StartRecording: After access error - isRecording={isRecording}");
                 MessageBox.Show(ex.Message, "Microphone Access Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogMessage($"StartRecording: General exception - {ex.Message}");
+                ErrorLogger.LogError("StartRecording failed", ex);
                 isRecording = false; // Reset on failure
                 UpdateStatus("Error", Brushes.Red);
 
@@ -611,22 +598,19 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
                 TranscriptionText.Foreground = Brushes.Black;
 
-                ErrorLogger.LogMessage($"StartRecording: After general error - isRecording={isRecording}");
                 MessageBox.Show($"Failed to start recording: {ex.Message}",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-
-            ErrorLogger.LogMessage($"StartRecording: Exit - isRecording={isRecording}");
         }
 
         private void StopRecording(bool cancel = false)
         {
-            ErrorLogger.LogMessage($"StopRecording: Entry - isRecording={isRecording}, cancel={cancel}");
+            ErrorLogger.LogDebug($"StopRecording: Entry - isRecording={isRecording}, cancel={cancel}");
 
             // Pre-check: if not recording, do nothing
             if (!isRecording)
             {
-                ErrorLogger.LogMessage("StopRecording: Not recording, returning early");
+                ErrorLogger.LogDebug("StopRecording: Not recording, returning early");
                 return;
             }
 
@@ -635,18 +619,14 @@ namespace VoiceLite
                 if (cancel)
                 {
                     isCancelled = true;
-                    ErrorLogger.LogMessage("StopRecording: Recording cancelled by user");
+                    ErrorLogger.LogInfo("Recording cancelled by user");
                 }
 
-                ErrorLogger.LogMessage("StopRecording: Calling audioRecorder.StopRecording()");
                 audioRecorder?.StopRecording();
-
-                ErrorLogger.LogMessage("StopRecording: Setting isRecording=false");
                 isRecording = false;
 
                 if (cancel)
                 {
-                    ErrorLogger.LogMessage("StopRecording: Cancelled - resetting UI");
                     UpdateStatus("Cancelled", Brushes.Gray);
                     string hotkeyDisplay = GetHotkeyDisplayString();
                     TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
@@ -654,7 +634,6 @@ namespace VoiceLite
                 }
                 else
                 {
-                    ErrorLogger.LogMessage("StopRecording: Updating UI to processing state");
                     UpdateStatus("Processing...", Brushes.Orange);
                     string hotkeyDisplay = GetHotkeyDisplayString();
                     TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
@@ -663,12 +642,10 @@ namespace VoiceLite
                     TranscriptionText.Text = "Processing audio...";
                     TranscriptionText.Foreground = Brushes.Orange;
                 }
-
-                ErrorLogger.LogMessage($"StopRecording: Success - isRecording={isRecording}");
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogMessage($"StopRecording: Exception during stop - {ex.Message}");
+                ErrorLogger.LogError("StopRecording failed", ex);
                 // Even if stop fails, reset our state
                 isRecording = false;
                 UpdateStatus("Error stopping", Brushes.Red);
@@ -677,12 +654,7 @@ namespace VoiceLite
                 string hotkeyDisplay = GetHotkeyDisplayString();
                 TranscriptionText.Text = $"Ready! Press and hold {hotkeyDisplay} to record, release to transcribe and type.";
                 TranscriptionText.Foreground = Brushes.Black;
-
-                ErrorLogger.LogError("StopRecording", ex);
-                ErrorLogger.LogMessage($"StopRecording: After exception - isRecording={isRecording}");
             }
-
-            ErrorLogger.LogMessage($"StopRecording: Exit - isRecording={isRecording}");
         }
 
         private void OnHotkeyPressed(object? sender, EventArgs e)
@@ -925,13 +897,10 @@ namespace VoiceLite
             ErrorLogger.LogMessage($"OnAudioFileReady: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}, isCancelled={isCancelled}, file={audioFilePath}");
 
             // Track usage for free users
-            if (usageTracker != null && recordingStartTime != DateTime.MinValue)
             {
                 var duration = (DateTime.Now - recordingStartTime).TotalSeconds;
-                usageTracker.RecordUsage(duration);
 
                 // Update status to show remaining time
-                UpdateTrialStatus();
             }
 
             // If recording was cancelled, just clean up and return
@@ -1347,23 +1316,154 @@ namespace VoiceLite
             }
         }
 
+        private async Task RestoreAccountAsync()
+        {
+            if (authenticationCoordinator == null)
+            {
+                UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                systemTrayManager?.UpdateAccountMenuText("Sign In");
+                return;
+            }
+
+            try
+            {
+                var session = await authenticationCoordinator.TryRestoreSessionAsync().ConfigureAwait(false);
+                if (session == null)
+                {
+                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                    systemTrayManager?.UpdateAccountMenuText("Sign In");
+                    return;
+                }
+
+                currentSession = session;
+                settings.LastSignedInEmail = session.Email;
+                SaveSettings();
+                await UpdateLicenseStatusAsync().ConfigureAwait(false);
+
+                // Update tray menu for signed-in user
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    systemTrayManager?.UpdateAccountMenuText("Manage Account");
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("RestoreAccountAsync", ex);
+                UpdateAccountStatusUI("Account unavailable", Brushes.OrangeRed);
+            }
+        }
+
+        private async Task UpdateLicenseStatusAsync()
+        {
+            try
+            {
+                // First validate local license file if it exists
+                var validationResult = await licenseService.ValidateLocalLicenseAsync().ConfigureAwait(false);
+
+                if (validationResult.IsValid)
+                {
+                    currentLicenseStatus = LicenseStatus.Active;
+
+                    if (validationResult.IsInGracePeriod)
+                    {
+                        var expiresAt = DateTime.Parse(validationResult.Payload!.ExpiresAt);
+                        var daysRemaining = (expiresAt - DateTime.UtcNow).Days;
+                        UpdateAccountStatusUI($"Pro license (expires in {daysRemaining} days)", Brushes.Orange);
+                        ErrorLogger.LogMessage($"License in grace period, expires in {daysRemaining} days");
+                    }
+                    else
+                    {
+                        UpdateAccountStatusUI("Pro license active (offline)", Brushes.SeaGreen);
+                    }
+                }
+                else if (!string.IsNullOrEmpty(validationResult.Reason))
+                {
+                    ErrorLogger.LogMessage($"Local license validation failed: {validationResult.Reason}");
+                }
+
+                // Then check online status (if authenticated)
+                if (currentSession != null)
+                {
+                    var status = await licenseService.GetCurrentStatusAsync().ConfigureAwait(false);
+                    currentLicenseStatus = status;
+
+                    switch (status)
+                    {
+                        case LicenseStatus.Active:
+                            UpdateAccountStatusUI("Pro license active", Brushes.SeaGreen);
+                            try
+                            {
+                                // Fetch and save updated license file
+                                var fetched = await licenseService.FetchAndSaveLicenseAsync().ConfigureAwait(false);
+                                if (fetched)
+                                {
+                                    ErrorLogger.LogMessage("License file updated from server");
+                                }
+
+                                await licenseService.SyncAsync().ConfigureAwait(false);
+                            }
+                            catch (Exception syncEx)
+                            {
+                                ErrorLogger.LogError("License sync", syncEx);
+                            }
+                            break;
+                        case LicenseStatus.Expired:
+                            UpdateAccountStatusUI("License expired", Brushes.OrangeRed);
+                            break;
+                        case LicenseStatus.Unlicensed:
+                            UpdateAccountStatusUI("Signed in (no license)", Brushes.SlateBlue);
+                            break;
+                        default:
+                            UpdateAccountStatusUI("License status unknown", Brushes.OrangeRed);
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("UpdateLicenseStatusAsync", ex);
+                UpdateAccountStatusUI("Unable to contact licensing service", Brushes.OrangeRed);
+            }
+        }
+
+        private void UpdateAccountStatusUI(string text, Brush brush)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                AccountStatusText.Text = text;
+                AccountStatusText.Foreground = brush;
+            });
+        }
+
         private void ValidateWhisperModel()
         {
             try
             {
-                var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", settings.WhisperModel);
+                // Use PersistentWhisperService's logic: support both short names and full filenames
+                var modelFile = settings.WhisperModel switch
+                {
+                    "tiny" => "ggml-tiny.bin",
+                    "base" => "ggml-base.bin",
+                    "small" => "ggml-small.bin",
+                    "medium" => "ggml-medium.bin",
+                    "large" => "ggml-large-v3.bin",
+                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
+                };
+
+                var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
                 if (!File.Exists(modelPath))
                 {
-                    // Try fallback to ggml-small.bin
-                    var fallbackPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-small.bin");
+                    // Fallback to ggml-tiny.bin (free tier default)
+                    var fallbackPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-tiny.bin");
                     if (File.Exists(fallbackPath))
                     {
-                        settings.WhisperModel = "ggml-small.bin";
-                        ErrorLogger.LogMessage($"Model {settings.WhisperModel} not found, falling back to ggml-small.bin");
+                        settings.WhisperModel = "ggml-tiny.bin";
+                        ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (free tier)");
+                        SaveSettings();
                     }
                     else
                     {
-                        MessageBox.Show("Whisper model files not found!\n\nPlease ensure the whisper folder contains model files.",
+                        MessageBox.Show("Whisper model files not found!\n\nPlease ensure the whisper folder contains ggml-tiny.bin.",
                             "Missing Model Files", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
@@ -1418,100 +1518,44 @@ namespace VoiceLite
             base.OnClosed(e);
         }
 
-        private void ShowLicenseWarning()
+        private void OnTrayAccountMenuClicked(object? sender, EventArgs e)
         {
-            if (currentLicense == null)
-            {
-                currentLicense = new LicenseInfo { Status = LicenseStatus.NoLicense };
-            }
-
-            string message = currentLicense.Status switch
-            {
-                LicenseStatus.TrialExpired => "Your trial period has expired.\n\nPlease purchase a license to continue using VoiceLite.",
-                LicenseStatus.Expired => "Your license has expired.\n\nPlease renew your license to continue using VoiceLite.",
-                LicenseStatus.Invalid => "Invalid license detected.\n\nPlease contact support if you believe this is an error.",
-                LicenseStatus.NoLicense => "No license found.\n\nStarting 14-day trial period.",
-                _ => ""
-            };
-
-            if (!string.IsNullOrEmpty(message))
-            {
-                MessageBox.Show(message, "License Status", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+            ShowMainWindow();
+            // The AccountButton_Click is already defined above and will handle the action
         }
 
-        private void UpdateLicenseStatus()
+        private async Task SignOutAsync()
         {
-            if (currentLicense == null)
-                return;
-
-            // Update window title with license status
-            string licenseText = currentLicense.Type == LicenseType.Trial
-                ? $"Trial ({currentLicense.TrialDaysRemaining} days left)"
-                : currentLicense.Type.ToString();
-
-            this.Title = $"VoiceLite - {licenseText}";
-
-            // Update status text color based on license
-            if (currentLicense.Type == LicenseType.Trial && currentLicense.TrialDaysRemaining <= 3)
+            try
             {
-                StatusText.Foreground = Brushes.Orange;
-            }
-        }
+                await authenticationService.SignOutAsync().ConfigureAwait(false);
+                currentSession = null;
+                currentLicenseStatus = LicenseStatus.Unknown;
+                settings.LastSignedInEmail = string.Empty;
+                SaveSettings();
 
-        private bool CheckFeatureAccess(string feature)
-        {
-            if (currentLicense == null || !currentLicense.IsValid())
-                return false;
-
-            switch (feature)
-            {
-                case "large-models":
-                    return currentLicense.CanUseAllModels;
-                case "advanced-features":
-                    return currentLicense.CanUseAdvancedFeatures;
-                case "unlimited-usage":
-                    return currentLicense.IsUnlimited;
-                default:
-                    return true;
-            }
-        }
-
-        private void RestrictModelSelection()
-        {
-            // Model restrictions now handled by SimpleLicenseManager + UsageTracker
-            // Free tier: limited to ggml-tiny.bin
-            // Pro tier: access to all models
-
-            if (simpleLicenseManager == null)
-                return;
-
-            var licenseType = simpleLicenseManager.GetLicenseType();
-            if (licenseType == SimpleLicenseType.Free)
-            {
-                // Free users can only use tiny model
-                if (settings.WhisperModel != "ggml-tiny.bin")
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    settings.WhisperModel = "ggml-tiny.bin";
-                    SaveSettings();
-
-                    MessageBox.Show("Free tier is limited to Tiny model only.\n\nUpgrade to Pro for access to all models.",
-                        "Model Restriction", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
+                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                    systemTrayManager?.UpdateAccountMenuText("Sign In");
+                });
             }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("SignOutAsync", ex);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show($"Failed to sign out: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+        }
+
+        private void ShowMainWindow()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

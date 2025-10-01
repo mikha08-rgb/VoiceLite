@@ -222,7 +222,13 @@ namespace VoiceLite.Services
         {
             try
             {
-                var drive = new DriveInfo(Path.GetPathRoot(AppDomain.CurrentDomain.BaseDirectory));
+                var root = Path.GetPathRoot(AppDomain.CurrentDomain.BaseDirectory);
+                if (string.IsNullOrEmpty(root))
+                {
+                    return false;
+                }
+
+                var drive = new DriveInfo(root);
                 var availableSpaceGB = drive.AvailableFreeSpace / (1024.0 * 1024.0 * 1024.0);
 
                 // Need at least 500MB free for temp files and operation
@@ -349,7 +355,7 @@ namespace VoiceLite.Services
                 if (!File.Exists(file))
                 {
                     missing.Add(Path.GetFileName(file));
-                    ErrorLogger.LogError($"Missing critical file: {file}", null);
+                    ErrorLogger.LogMessage($"Missing critical file: {file}");
                 }
             }
 
@@ -454,7 +460,7 @@ namespace VoiceLite.Services
 
                     if (fileInfo.Length < minSize || fileInfo.Length > maxSize)
                     {
-                        ErrorLogger.LogError($"Model file {model.Key} has unexpected size: {fileInfo.Length} bytes", null);
+                        ErrorLogger.LogMessage($"Model file {model.Key} has unexpected size: {fileInfo.Length} bytes");
                         return true; // Corrupt model detected
                     }
 
@@ -469,7 +475,7 @@ namespace VoiceLite.Services
                             // Check for GGML magic number (simplified check)
                             if (buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 0 && buffer[3] == 0)
                             {
-                                ErrorLogger.LogError($"Model file {model.Key} appears to be corrupt (null bytes)", null);
+                                ErrorLogger.LogMessage($"Model file {model.Key} appears to be corrupt (null bytes)");
                                 return true;
                             }
                         }
@@ -568,6 +574,12 @@ namespace VoiceLite.Services
                 };
 
                 var process = Process.Start(psi);
+                if (process == null)
+                {
+                    ErrorLogger.LogMessage("Failed to start PowerShell for Defender exclusion");
+                    return;
+                }
+
                 await Task.Run(() => process.WaitForExit());
 
                 ErrorLogger.LogMessage("Added Windows Defender exclusion");

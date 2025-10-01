@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Input;
 
@@ -25,7 +25,7 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.LeftAlt;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
-        private string _whisperModel = "tiny"; // Changed from ggml-small.bin to tiny (free tier default)
+        private string _whisperModel = "ggml-tiny.bin"; // Free tier default
         private int _beamSize = 5;
         private int _bestOf = 5;
         private double _whisperTimeoutMultiplier = 2.0;
@@ -57,7 +57,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "tiny" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
         }
 
         public int BeamSize
@@ -104,6 +104,11 @@ namespace VoiceLite.Models
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
 
+        // Authentication placeholders - populated once login/auth flow ships
+        public string? LastSignedInEmail { get; set; }
+
+        public bool RememberLastSession { get; set; } = false;
+
         // Accuracy Improvement Features - ALWAYS ON for best experience
         public bool UseTemperatureOptimization { get; set; } = true; // Use temperature 0.2 for better accuracy
         private float _whisperTemperature = 0.2f;
@@ -126,9 +131,6 @@ namespace VoiceLite.Models
         public bool ShowModelComparison { get; set; } = true; // Show visual comparison by default
         public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
 
-        // License properties
-        public string? LicenseKey { get; set; }
-        public bool IsProVersion => !string.IsNullOrEmpty(LicenseKey) && LicenseKey.StartsWith("PRO-2024-");
     }
 
     public class ModelBenchmarkCache

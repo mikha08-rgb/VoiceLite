@@ -46,6 +46,9 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 ### Installer (Inno Setup)
 ```bash
 # Build installer (requires Inno Setup installed)
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLiteSetup_Simple.iss
+
+# Build from project root (if script is in Installer/ directory)
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
 ```
 
@@ -79,25 +82,25 @@ npm start
 
 2. **Service Layer** (`Services/`): Modular, single-responsibility services
    - `AudioRecorder`: NAudio-based recording with noise suppression
-   - `WhisperService`/`PersistentWhisperService`: Whisper.cpp subprocess management
+   - `PersistentWhisperService`: Main Whisper.cpp subprocess manager with warmup and process pooling
    - `TextInjector`: Text injection using InputSimulator (supports multiple modes)
    - `HotkeyManager`: Global hotkey registration via Win32 API
    - `SystemTrayManager`: System tray icon and context menu
    - `AudioPreprocessor`: Audio enhancement (noise gate, gain control)
    - `TranscriptionPostProcessor`: Text corrections and formatting
-   - `WhisperProcessPool`: Process pooling for performance
    - `ModelBenchmarkService`: Model performance testing
    - `MemoryMonitor`: Memory usage tracking
    - `ErrorLogger`: Centralized error logging
    - `StartupDiagnostics`: Comprehensive startup checks and auto-fixes
-   - `LicenseManager`/`SimpleLicenseManager`: License validation and Pro features
-   - `UsageTracker`: Track usage minutes for freemium model
+   - _Legacy licensing components removed_: VoiceLite now ships as a fully free build
+   - `MetricsTracker`: Performance metrics collection
+   - `SecurityService`: Security and obfuscation helpers
+   - `DependencyChecker`: Verify runtime dependencies
 
 3. **Models** (`Models/`): Data structures and configuration
    - `Settings`: User preferences with validation
    - `TranscriptionResult`: Whisper output parsing
    - `WhisperModelInfo`: Model metadata and benchmarking
-   - `LicenseInfo`: License information and Pro status
 
 4. **Interfaces** (`Interfaces/`): Contract definitions for dependency injection
    - `IRecorder`, `ITranscriber`, `ITextInjector`
@@ -110,19 +113,21 @@ npm start
 ## Whisper Integration
 
 ### Available Models (in `whisper/` directory)
-- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy - **Free tier default**
-- `ggml-base.bin` (148MB): Fast, good for basic use - **Requires Pro**
-- `ggml-small.bin` (488MB): Balanced performance - **Requires Pro**
-- `ggml-medium.bin` (1.5GB): Higher accuracy, slower - **Requires Pro**
-- `ggml-large-v3.bin` (3.1GB): Best accuracy, slowest - **Requires Pro**
+- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy - ships with the app
+- `ggml-base.bin` (148MB): Fast, good for basic use
+- `ggml-small.bin` (488MB): Balanced performance
+- `ggml-medium.bin` (1.5GB): Higher accuracy, optional download from settings
+- `ggml-large-v3.bin` (3.1GB): Highest accuracy, manual download required and resource heavy
 
 ### Whisper Process Management
-- Uses process pooling for performance (`WhisperProcessPool`)
-- Persistent mode available for reduced latency
+- **PersistentWhisperService is the primary implementation** (WhisperService/WhisperProcessPool are deprecated)
+- Warmup process on startup using dummy audio file for reduced first-transcription latency
+- Process spawned per transcription with automatic cleanup
+- Semaphore-based concurrency control (1 transcription at a time)
 - Automatic timeout handling with configurable multiplier
 - Temperature optimization (0.2) for better accuracy
-- Context prompting using recent transcriptions
 - Beam search parameters (beam_size=5, best_of=5)
+- Path caching for whisper.exe and model files
 
 ### Whisper Command Format
 ```bash
@@ -132,22 +137,15 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 ## Licensing & Freemium Model
 
 ### Free Tier
-- 10 minutes of usage per week
-- Resets every Monday at midnight
-- Tiny model only
-- Usage tracked in `%APPDATA%/VoiceLite/usage.json`
-
-### Pro Tier ($7/month)
-- Unlimited usage
-- All models available (base, small, medium, large)
-- Stripe subscription via web app
-- License validation via SimpleLicenseManager
+- Fully free build – no tiers or caps
+- All local Whisper models available once installed
+- Optional medium model download triggered from settings
+- Legacy license services removed from desktop client
 
 ### Implementation Details
-- `UsageTracker` monitors recording time
-- `SimpleLicenseManager` validates Pro status
-- Upgrade prompts shown when free tier exhausted
-- Model restrictions enforced in Settings UI
+- Usage tracking removed; recordings only saved temporarily for transcription
+- Model selection UI now reflects installed files without license gating
+- System tray no longer exposes licensing entry points
 
 ## Key Technical Details
 
@@ -173,8 +171,6 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ### Settings & Configuration
 - **Settings stored in `%APPDATA%\VoiceLite\settings.json`** (NOT in Program Files)
-- Usage tracked in `%APPDATA%\VoiceLite\usage.json`
-- License stored in `%APPDATA%\VoiceLite\license.json`
 - AppData directory created automatically on first run
 - Settings migration from old Program Files location (if exists)
 - Default hotkey: Left Alt (customizable)
@@ -215,8 +211,8 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 4. **Process Management**: Whisper.exe path relative to executable location
 5. **Memory Management**: Automatic cleanup after transcription
 6. **Thread Safety**: Recording state protected by lock
-7. **License Validation**: Pro features locked behind SimpleLicenseManager checks
-8. **Usage Tracking**: Freemium limits enforced by UsageTracker
+7. **Distribution Model**: Licensing removed – desktop client runs fully unlocked
+8. **Usage Tracking**: No freemium caps; recordings are processed locally and discarded
 
 ### Testing Compatibility
 Works across all Windows applications:
@@ -252,10 +248,11 @@ The `voicelite-web` directory contains a Next.js 15 application for:
 ## Deployment & Distribution
 
 ### Installer Creation
-1. Build Release version with `dotnet publish`
-2. Copy to installer source directory
-3. Run Inno Setup compiler on `VoiceLiteSetup_Simple.iss`
+1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
+2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
+3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLiteSetup_Simple.iss`
 4. Output: `VoiceLite-Setup-1.0.5.exe` in root directory (current version)
+5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
 - Includes only tiny model by default (minimal size)
@@ -278,9 +275,129 @@ The `voicelite-web` directory contains a Next.js 15 application for:
 5. **License Server**: Requires online connection for Pro validation
 6. **English Only**: Multi-language support planned but not yet implemented
 
-## Fixed in v1.0.5
+## Changelog Highlights
 
-- **Settings Location**: Fixed critical bug where settings were saved to Program Files (protected directory) instead of AppData. This caused permission errors on first run for non-admin users.
+### v1.0.5 (Current)
+- **Settings Location**: Fixed critical bug where settings were saved to Program Files (protected directory) instead of AppData
 - **Error Logs Location**: Fixed error logs being written to Program Files. Now correctly uses `%APPDATA%\VoiceLite\logs\`
 - **First-Run Experience**: Added automatic AppData directory creation and settings migration
-- **Installer**: Now pre-creates AppData directories during installation to prevent first-run issues
+- **Installer**: Pre-creates AppData directories during installation to prevent first-run issues
+- **Service Refactor**: Migrated to PersistentWhisperService as primary transcription service
+
+### Architecture Changes
+- **Deprecated Services**: WhisperService, WhisperProcessPool, ModelEncryptionService (deleted from codebase)
+- **Active Services**: PersistentWhisperService is now the sole Whisper integration point
+
+---
+
+## Custom Agents for VoiceLite
+
+VoiceLite uses a comprehensive system of 20+ custom agents to automate quality gates, code reviews, security audits, and documentation maintenance. These agents are defined in [AGENTS.md](AGENTS.md) and provide intelligent assistance throughout the development lifecycle.
+
+### Quick Reference: When to Use Agents
+
+**Daily Development**:
+- **Before commits**: `"Run pre-commit-workflow"` - Fast quality gates (<10s)
+- **After modifying Services**: File-specific validators auto-trigger (<30s)
+- **Code review**: `"Use code-reviewer to review all modified files"` (~45s)
+
+**Weekly Maintenance**:
+- **Security audit**: `"Use security-audit-workflow"` (~5min)
+- **Dependency updates**: `"Use dependency-upgrade-advisor to check for updates"` (~3min)
+
+**Release Workflow**:
+- **Production release**: `"Use ship-to-production-workflow to prepare v{version}"` (~15min)
+  - Runs 6 phases: Code quality → Security → Tests → Legal → Build → Deployment
+  - Blocks on critical issues, warns on medium/low issues
+  - Generates installer and changelog
+
+**Domain Expertise**:
+- **Whisper accuracy issues**: `"Use whisper-model-expert to debug {issue}"`
+- **WPF/XAML questions**: `"Use wpf-ui-expert to review {component}"`
+- **Stripe integration**: `"Use stripe-integration-expert to explain {topic}"`
+
+**Documentation**:
+- **Sync CLAUDE.md**: `"Use claude-md-sync-agent to update CLAUDE.md"` (<1min)
+- **Generate API docs**: `"Use api-docs-generator"` (~2min)
+
+### Agent Categories
+
+**1. Workflow Orchestrators** (4 agents)
+- `ship-to-production-workflow`: Complete CI/CD pipeline from code review to release
+- `pre-commit-workflow`: Fast quality gates before git commits (<10s)
+- `security-audit-workflow`: Comprehensive security review (~5min)
+- `performance-optimization-workflow`: Systematic bottleneck identification
+
+**2. File-Specific Validators** (8 agents)
+Auto-trigger when specific files are modified:
+- `whisper-service-guardian`: Validates PersistentWhisperService.cs changes
+- `mainwindow-coordinator-guard`: Validates MainWindow.xaml.cs (thread safety, null checks)
+- `audio-recorder-validator`: Validates AudioRecorder.cs (audio format, disposal)
+- `stripe-checkout-guardian`: Validates checkout/route.ts (security, pricing)
+- `webhook-security-enforcer`: Validates webhook/route.ts (signature verification)
+- `settings-persistence-guard`: Validates Settings.cs (AppData paths)
+- `legal-docs-sync-validator`: Validates privacy/terms consistency
+- `api-route-security-scanner`: Validates all API routes (auth, injection, errors)
+
+**3. Domain Experts** (5 agents)
+- `whisper-model-expert`: Whisper AI troubleshooting (accuracy, models, parameters)
+- `wpf-ui-expert`: WPF/XAML patterns (MVVM, thread safety, disposal)
+- `stripe-integration-expert`: Stripe payments (webhooks, testing, errors)
+- `test-coverage-enforcer`: Test coverage analysis and test generation
+- `dependency-upgrade-advisor`: NuGet/npm dependency management and CVE scanning
+
+**4. Documentation Agents** (3 agents)
+- `claude-md-sync-agent`: Keeps CLAUDE.md synchronized with codebase
+- `readme-generator`: Auto-generates README.md from codebase state
+- `api-docs-generator`: Creates OpenAPI specs and API documentation
+
+### Example Workflow: Feature Development
+
+```bash
+# 1. Develop feature (modify Services/AudioRecorder.cs)
+# → audio-recorder-validator auto-triggers
+
+# 2. Before committing
+"Run pre-commit-workflow"
+# → Checks secrets, localhost URLs, debug code
+
+# 3. Review code quality
+"Use code-reviewer to review all files I changed today"
+# → Scores code quality, suggests improvements
+
+# 4. Add tests
+"Use test-coverage-enforcer to suggest tests for AudioRecorder.cs"
+# → Generates test stubs with expected cases
+
+# 5. Prepare release
+"Use ship-to-production-workflow to prepare v1.0.12"
+# → 6-phase pipeline, generates installer + changelog
+
+# 6. Update docs
+"Use claude-md-sync-agent to update CLAUDE.md"
+# → Syncs service list, dependencies, version numbers
+```
+
+### Additional Resources
+
+- **[AGENTS.md](AGENTS.md)** - Full agent definitions with detailed instructions (1385 lines)
+- **[WORKFLOWS.md](WORKFLOWS.md)** - Comprehensive workflow guide with real-world examples
+- **[AGENT-EXAMPLES.md](AGENT-EXAMPLES.md)** - Copy-paste examples and expected outputs
+
+### Agent Quality Standards
+
+All agents follow strict quality standards:
+- **Single responsibility** - Each agent has one clear purpose
+- **Explicit triggers** - Clear conditions for when to use each agent
+- **Measurable success** - Pass/fail criteria with severity levels (CRITICAL/HIGH/MEDIUM/LOW)
+- **Actionable output** - Specific file:line references and fixes
+- **Safety checks** - Validates before making changes
+- **Performance budgets** - File validators <30s, workflows <5min
+
+### Integration with Development Workflow
+
+Agents integrate seamlessly with daily development:
+1. **Auto-validation**: File-specific agents auto-trigger when you modify critical files
+2. **Manual invocation**: Run agents via Claude Code chat (e.g., "Run pre-commit-workflow")
+3. **Chaining**: Combine agents for complex workflows (e.g., ship-to-production-workflow spawns 10+ agents)
+4. **Error handling**: Agents use fail-fast for critical issues, collect warnings for minor issues

@@ -8,22 +8,7 @@
         StateChanged="Window_StateChanged"
         Background="#FAFAFA">
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- Trial Status Bar -->
-        <Border Grid.Row="0" x:Name="TrialStatusBar" Background="#FFF3CD" BorderBrush="#FFC107" BorderThickness="0,0,0,1" Visibility="Visible">
-            <TextBlock x:Name="TrialStatusText"
-                       Text="14 days left on trial"
-                       Padding="10,5"
-                       FontWeight="SemiBold"
-                       Foreground="#856404"
-                       TextAlignment="Center"/>
-        </Border>
-
-        <Grid Grid.Row="1" Margin="24">
+        <Grid Margin="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -61,6 +46,11 @@
                     <TextBlock x:Name="MicrophoneText" Text="Default" Foreground="#2C3E50" FontWeight="SemiBold"/>
                 </StackPanel>
             </Grid>
+            <TextBlock x:Name="AccountStatusText"
+                       Text="Not signed in"
+                       Foreground="#2563EB"
+                       FontWeight="SemiBold"
+                       Margin="0,12,0,0"/>
         </StackPanel>
 
         <!-- Cleaner transcription area -->
@@ -112,6 +102,19 @@
                         BorderThickness="1"
                         Cursor="Hand"
                         Click="SettingsButton_Click"
+                        Margin="0,0,8,0"
+                        Padding="16,0"/>
+
+                <Button x:Name="AccountButton"
+                        Content="Account"
+                        MinWidth="100"
+                        Height="32"
+                        Background="White"
+                        Foreground="#2563EB"
+                        BorderBrush="#2563EB"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        Click="AccountButton_Click"
                         Padding="16,0"/>
             </StackPanel>
 
