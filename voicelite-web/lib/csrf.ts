@@ -14,7 +14,7 @@ export function validateOrigin(request: NextRequest): boolean {
   // Get allowed origins from environment
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const allowedOrigins = [
-    'https://app.voicelite.com', // Production URL
+    'https://voicelite.app', // Production URL
     appUrl, // Environment-specific URL
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
   ].filter((url): url is string => Boolean(url));

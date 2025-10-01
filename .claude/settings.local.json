@@ -9,7 +9,8 @@
       "Bash(dotnet run:*)",
       "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite\\Installer\\VoiceLiteSetup_Simple.iss\")",
       "Bash(dotnet list:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx vercel env add:*)"
     ],
     "deny": [],
     "ask": []
