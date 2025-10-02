@@ -1,21 +1,43 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Ultra Minimal Color Palette - Very Light -->
-    <SolidColorBrush x:Key="PrimaryBackgroundBrush" Color="#FCFCFC"/>
+    <!-- Modern Color Palette with Depth -->
+    <SolidColorBrush x:Key="PrimaryBackgroundBrush" Color="#F8F9FA"/>
     <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="#F0F0F0"/>
-    <SolidColorBrush x:Key="HoverBorderBrush" Color="#E8E8E8"/>
-    <SolidColorBrush x:Key="AccentBrush" Color="#7A7A7A"/>
-    <SolidColorBrush x:Key="AccentHoverBrush" Color="#666666"/>
-    <SolidColorBrush x:Key="AccentPressedBrush" Color="#555555"/>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#4A4A4A"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#7A7A7A"/>
-    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#B0B0B0"/>
-    <SolidColorBrush x:Key="RecordingBrush" Color="#FF9999"/>
-    <SolidColorBrush x:Key="ProcessingBrush" Color="#FFD699"/>
-    <SolidColorBrush x:Key="ReadyBrush" Color="#C8E6C9"/>
-    <SolidColorBrush x:Key="ShadowBrush" Color="#08000000"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="HoverBorderBrush" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#4169E1"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#3451B2"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#2A3F8F"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#2C3E50"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#7A8899"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#95A5A6"/>
+    <SolidColorBrush x:Key="RecordingBrush" Color="#E74C3C"/>
+    <SolidColorBrush x:Key="ProcessingBrush" Color="#F39C12"/>
+    <SolidColorBrush x:Key="ReadyBrush" Color="#27AE60"/>
+    <SolidColorBrush x:Key="ShadowBrush" Color="#15000000"/>
+
+    <!-- Drop Shadow Effects -->
+    <DropShadowEffect x:Key="CardShadow"
+                      Color="#000000"
+                      BlurRadius="12"
+                      ShadowDepth="2"
+                      Opacity="0.08"
+                      Direction="270"/>
+
+    <DropShadowEffect x:Key="CardShadowHover"
+                      Color="#000000"
+                      BlurRadius="16"
+                      ShadowDepth="4"
+                      Opacity="0.12"
+                      Direction="270"/>
+
+    <DropShadowEffect x:Key="ButtonShadow"
+                      Color="#000000"
+                      BlurRadius="8"
+                      ShadowDepth="1"
+                      Opacity="0.06"
+                      Direction="270"/>
 
     <!-- Typography -->
     <Style x:Key="TitleTextStyle" TargetType="TextBlock">
@@ -56,28 +78,35 @@
         <Setter Property="Margin" Value="0,4,0,4"/>
     </Style>
 
-    <!-- Ultra Minimal Card Style -->
+    <!-- Modern Card Style with Depth -->
     <Style x:Key="ModernCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="16"/>
-        <Setter Property="Margin" Value="0,0,0,12"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="20"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+        <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Effect" Value="{StaticResource CardShadowHover}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
-    <!-- Ultra Minimal Button Style -->
+    <!-- Modern Button Style with Depth -->
     <Style x:Key="ModernButtonStyle" TargetType="Button">
         <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="FontSize" Value="14"/>
-        <Setter Property="FontWeight" Value="Normal"/>
-        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="18,10"/>
         <Setter Property="Margin" Value="0,0,8,0"/>
         <Setter Property="Background" Value="#F5F5F5"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Effect" Value="{StaticResource ButtonShadow}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -85,17 +114,48 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="3"
+                            CornerRadius="6"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
-                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                       To="1.0" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                       To="1.0" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </VisualState>
                                 <VisualState x:Name="MouseOver">
                                     <Storyboard>
                                         <ColorAnimation Storyboard.TargetName="border"
                                                         Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
-                                                        To="#EBEBEB" Duration="0:0:0.1"/>
+                                                        To="#EBEBEB" Duration="0:0:0.15"/>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                       To="1.02" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                       To="1.02" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
@@ -103,6 +163,12 @@
                                         <ColorAnimation Storyboard.TargetName="border"
                                                         Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
                                                         To="#E0E0E0" Duration="0:0:0.05"/>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                       To="0.98" Duration="0:0:0.05"/>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                       To="0.98" Duration="0:0:0.05"/>
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -110,10 +176,19 @@
                                         <ColorAnimation Storyboard.TargetName="border"
                                                         Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
                                                         To="#FAFAFA" Duration="0:0:0.1"/>
+                                        <DoubleAnimation Storyboard.TargetName="border"
+                                                       Storyboard.TargetProperty="Opacity"
+                                                       To="0.5" Duration="0:0:0.1"/>
                                     </Storyboard>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="1.0" ScaleY="1.0"/>
+                        </Border.RenderTransform>
+                        <Border.RenderTransformOrigin>
+                            <Point X="0.5" Y="0.5"/>
+                        </Border.RenderTransformOrigin>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>

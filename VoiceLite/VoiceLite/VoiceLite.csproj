@@ -44,18 +44,6 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Update="FirstRunWizard.xaml.cs">
-      <DependentUpon>FirstRunWizard.xaml</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Page Update="FirstRunWizard.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
-
   <!-- Post-build obfuscation for Release builds -->
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
     <Message Text="Running post-build obfuscation..." Importance="high" />

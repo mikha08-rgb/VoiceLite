@@ -52,22 +52,7 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
 ```
 
-### License Server (Node.js Backend)
-```bash
-# Navigate to license server directory
-cd license-server
-
-# Install dependencies
-npm install
-
-# Run development server (with auto-reload)
-npm run dev
-
-# Run production server
-npm start
-```
-
-### Web Application (Next.js)
+### Web Application (Next.js Backend)
 ```bash
 # Navigate to web directory
 cd voicelite-web
@@ -156,6 +141,7 @@ npm run keygen
    - `DictionaryManagerWindow.xaml`: Custom dictionary editor with template presets
    - `LoginWindow.xaml`: Pro license activation window
    - `Controls/SimpleModelSelector`: Model selection control
+   - `Controls/ModelComparisonControl`: Model comparison and selection UI
    - `Resources/ModernStyles.xaml`: WPF styling resources
    - `Utilities/RelativeTimeConverter`: Converter for "5 mins ago" timestamps
    - `Utilities/TruncateTextConverter`: Converter for text preview truncation
@@ -197,17 +183,19 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ### Web-Based Pro Tier (Optional)
 - Stripe subscription managed via voicelite.app ($20/3mo or $99 lifetime)
-- License server validates Pro subscriptions for premium models (Base, Medium, Large)
+- Modern Next.js backend validates Pro subscriptions for premium models (Base, Medium, Large)
 - Unlocks: Even better accuracy (93-97%), advanced models, priority support, early access
-- License server located in `license-server/` (Node.js/Express/SQLite)
-- Desktop app validates Pro licenses via server API for premium model downloads
+- Backend platform: Next.js 15 + PostgreSQL + Prisma at `voicelite-web/`
+- Desktop app validates Pro licenses via Ed25519 cryptographic signatures
 
 ### Implementation Details
+- **Single Backend Architecture**: Modern Next.js platform at https://voicelite.app
 - Free tier: Small model runs standalone without any server connection (temporary promotion)
-- Pro tier: Premium models (Base, Medium, Large) require server-side license validation before download
+- Pro tier: Premium models require license validation via Ed25519 signed licenses
 - Recordings processed locally and discarded after transcription (both tiers)
-- License keys use Ed25519 cryptographic signing for security
+- License keys use Ed25519 cryptographic signing for tamper-proof security
 - Desktop app can function fully offline after premium models are downloaded
+- License validation includes Certificate Revocation List (CRL) checks
 
 ## Key Technical Details
 
@@ -315,42 +303,42 @@ The `voicelite-web` directory contains a Next.js 15 application for:
 - Ed25519 cryptography (@noble/ed25519) for license signing
 - Zod for schema validation
 
-## License Server Architecture
+## Backend API Architecture
 
-The `license-server/` directory contains the Pro subscription backend for validating licenses and managing subscriptions.
+The desktop application communicates with the modern Next.js backend at `voicelite.app` for Pro tier features.
 
-### Architecture
-- **Framework**: Express.js with SQLite database
-- **Authentication**: API_KEY for desktop client, ADMIN_KEY for admin operations
-- **Database**: SQLite (dev/production), schema managed via raw SQL migrations
-- **Deployment**: Vercel (serverless)
+### Desktop App API Integration
 
-### Key Files
-- `server.js`: Main Express server with license validation endpoints
-- `admin.js`: Command-line admin tool for license management
-- `emailService.js`: Nodemailer integration for license notifications
-- `vercel.json`: Deployment configuration
+**Base URL**: `https://voicelite.app` (hardcoded in Release builds)
 
-### API Endpoints
-- `GET /api/check`: Health check endpoint
-- `POST /api/generate`: Generate new license (requires ADMIN_KEY)
-- `POST /api/activate`: Activate license on device (requires API_KEY)
-- `POST /api/validate`: Validate license status (requires API_KEY)
-- `POST /api/revoke`: Revoke license (requires ADMIN_KEY)
-- `GET /api/stats`: License statistics (requires ADMIN_KEY)
-- `POST /api/webhook/stripe`: Stripe webhook handler for subscription events
+**Authentication Endpoints** (Magic Link + OTP):
+- `POST /api/auth/request` - Send magic link email to user
+- `POST /api/auth/otp` - Verify OTP code and create JWT session
+- `POST /api/auth/logout` - Revoke current session
 
-### Database Schema
-- `licenses` table: License keys, email, type, activation status, Stripe metadata
-- `activations` table: Device activations with machine_id tracking
+**License Endpoints** (Ed25519 Cryptographic Signatures):
+- `GET /api/me` - Get user profile + active licenses
+- `POST /api/licenses/activate` - Activate license on device (machine fingerprinting)
+- `POST /api/licenses/issue` - Issue cryptographically signed license file
+- `GET /api/licenses/crl` - Fetch Certificate Revocation List (CRL)
 
-### Environment Variables Required
-- `API_KEY`: API key for desktop client validation
-- `ADMIN_KEY`: Admin key for management operations
-- `DATABASE_PATH`: Path to SQLite database file
-- `ALLOWED_ORIGINS`: CORS allowed origins (comma-separated)
-- `STRIPE_SECRET_KEY`: Stripe API key for webhook verification
-- `EMAIL_*`: SMTP credentials for Nodemailer
+### Backend Technology Stack
+- **Framework**: Next.js 15 (App Router) with React 19
+- **Database**: PostgreSQL (Supabase) with Prisma ORM
+- **Authentication**: Passwordless magic link + JWT sessions
+- **Security**: Ed25519 signatures, rate limiting (Upstash Redis), CSRF protection
+- **Payments**: Stripe (subscriptions + one-time payments)
+- **Email**: Resend for transactional emails
+- **Deployment**: Vercel (serverless API routes)
+
+### License Validation Flow
+
+1. **Desktop App** → Fetches signed license via `POST /api/licenses/issue`
+2. **Server** → Signs license payload with Ed25519 private key
+3. **Desktop App** → Verifies signature using embedded public key (BouncyCastle.Cryptography)
+4. **Desktop App** → Checks CRL for revoked licenses via `GET /api/licenses/crl`
+5. **Desktop App** → Validates device fingerprint, expiry, grace period locally
+6. **Result** → License valid/invalid/expired/revoked (fully offline validation after initial fetch)
 
 ## Deployment & Distribution
 
@@ -358,7 +346,7 @@ The `license-server/` directory contains the Pro subscription backend for valida
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
-4. Output: `VoiceLite-Setup-1.0.14.exe` in root directory (current version: v1.0.14)
+4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.15)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
@@ -368,6 +356,7 @@ The `license-server/` directory contains the Pro subscription backend for valida
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
+- Current installer: `VoiceLite-Setup-1.0.15.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -381,6 +370,14 @@ The `license-server/` directory contains the Pro subscription backend for valida
 3. **Windows Defender**: Files may need to be unblocked (right-click → Properties → Unblock)
 4. **First Run Diagnostics**: StartupDiagnostics checks and auto-fixes common issues
 5. **English Only**: Multi-language support planned but not yet implemented
+
+## Recent Cleanup Activities
+
+The project underwent significant cleanup in October 2025:
+- **Legacy code removal**: 40GB+ freed (build outputs, old releases, dead code)
+- **Architecture simplification**: Removed legacy license server, unified backend at voicelite.app
+- **Documentation consolidation**: Historical docs moved to archives
+- See [CLEANUP_COMPLETE.md](CLEANUP_COMPLETE.md) and [DEAD_CODE_ANALYSIS.md](DEAD_CODE_ANALYSIS.md) for details
 
 ## Development Troubleshooting
 
@@ -403,13 +400,17 @@ The `license-server/` directory contains the Pro subscription backend for valida
 
 ## Version Information
 
-- **Desktop App**: v1.0.14 (current release)
+- **Desktop App**: v1.0.15 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
-- **License Server**: v1.0.0 (see license-server/package.json)
 
 ## Changelog Highlights
 
-### v1.0.14 (Current Desktop Release - Growth Promotion)
+### v1.0.15 (Current Desktop Release)
+- **Major UX improvements**: Improved user experience across the application
+- **Performance optimizations**: Better resource management and speed
+- **Stability enhancements**: Bug fixes and reliability improvements
+
+### v1.0.14 (Growth Promotion)
 - **Free Tier Upgrade**: Small model (466MB) now ships as free tier default instead of Tiny (75MB)
 - **Accuracy Boost**: Free users now get ~90-93% accuracy (up from 80-85%)
 - **Strategic**: Temporary promotion to improve first impressions during growth phase
