@@ -170,11 +170,8 @@ namespace VoiceLite.Services
         {
             try
             {
-                var testPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_permissions.tmp");
-
-                // Try to create and delete a test file
-                File.WriteAllText(testPath, "test");
-                File.Delete(testPath);
+                // NOTE: We don't test BaseDirectory (Program Files) because it's expected to be read-only
+                // VoiceLite writes all data to AppData and system temp, not Program Files
 
                 // Check if we can write to temp folder
                 var tempPath = Path.Combine(Path.GetTempPath(), $"voicelite_test_{Guid.NewGuid()}.tmp");
