@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { randomUUID } from 'crypto';
 
 // Rate limiting: 100 events/hour per anonymousUserId
 const ratelimit = new Ratelimit({
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
     // Store analytics event
     await prisma.analyticsEvent.create({
       data: {
+        id: randomUUID(),
         anonymousUserId: validatedData.anonymousUserId,
         eventType: validatedData.eventType,
         tier: validatedData.tier,
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
         osVersion: validatedData.osVersion,
         modelUsed: validatedData.modelUsed,
         metadata: validatedData.metadata ? JSON.stringify(validatedData.metadata) : null,
-        ipAddress: ipAddress,
+        ipAddress: null, // Privacy: Don't log IP addresses
       },
     });
 

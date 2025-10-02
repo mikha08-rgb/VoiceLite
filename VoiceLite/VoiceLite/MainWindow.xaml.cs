@@ -1319,7 +1319,7 @@ namespace VoiceLite
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
 
-            var settingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()));
+            var settingsWindow = new SettingsWindowNew(settings, analyticsService, () => TestButton_Click(this, new RoutedEventArgs()));
             settingsWindow.Owner = this;
 
             if (settingsWindow.ShowDialog() == true)

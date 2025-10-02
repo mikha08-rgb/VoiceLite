@@ -20,14 +20,18 @@ namespace VoiceLite
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
         private Action? testRecordingCallback;
+        private AnalyticsService? analyticsService;
+        private string? originalModel;
 
         public Settings Settings => settings;
 
-        public SettingsWindowNew(Settings currentSettings, Action? onTestRecording = null)
+        public SettingsWindowNew(Settings currentSettings, AnalyticsService? analytics = null, Action? onTestRecording = null)
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
+            analyticsService = analytics;
             testRecordingCallback = onTestRecording;
+            originalModel = settings.WhisperModel;
 
             DownloadModelsButton.Visibility = Visibility.Visible;
             UpdateModelDownloadButton();
@@ -262,6 +266,10 @@ namespace VoiceLite
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             SaveSettings();
+
+            // Track analytics if enabled
+            TrackAnalyticsChangesAsync();
+
             DialogResult = true;
             Close();
         }
@@ -452,6 +460,21 @@ namespace VoiceLite
         {
             // This event handler allows users to toggle analytics from settings
             // The actual save happens in SaveSettings() when they click Save/Apply
+        }
+
+        private async void TrackAnalyticsChangesAsync()
+        {
+            if (analyticsService == null)
+                return;
+
+            // Track model changes
+            if (originalModel != null && originalModel != settings.WhisperModel)
+            {
+                await analyticsService.TrackModelChangeAsync(originalModel, settings.WhisperModel);
+            }
+
+            // Track settings save
+            await analyticsService.TrackSettingsChangeAsync("settings_saved");
         }
     }
 }
