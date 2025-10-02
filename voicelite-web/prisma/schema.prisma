@@ -238,3 +238,39 @@ model UserActivity {
   @@index([activityType])
   @@index([createdAt])
 }
+
+// Analytics event types for anonymous usage tracking
+enum AnalyticsEventType {
+  APP_LAUNCHED
+  TRANSCRIPTION_COMPLETED
+  MODEL_CHANGED
+  SETTINGS_CHANGED
+  ERROR_OCCURRED
+  PRO_UPGRADE
+}
+
+// Tier types for analytics segmentation
+enum TierType {
+  FREE
+  PRO
+}
+
+// Anonymous analytics events (privacy-first, opt-in)
+model AnalyticsEvent {
+  id              String               @id @default(cuid())
+  anonymousUserId String               // SHA256 hash, no PII
+  eventType       AnalyticsEventType
+  tier            TierType             @default(FREE)
+  appVersion      String?              // e.g., "1.0.16"
+  osVersion       String?              // e.g., "Windows 11"
+  modelUsed       String?              // e.g., "ggml-small.bin"
+  metadata        String?              // JSON - additional event-specific data
+  ipAddress       String?              // Optional, for geo analytics only
+  createdAt       DateTime             @default(now())
+
+  @@index([anonymousUserId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([tier])
+  @@index([appVersion])
+}

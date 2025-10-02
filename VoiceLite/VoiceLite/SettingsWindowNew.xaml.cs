@@ -72,6 +72,9 @@ namespace VoiceLite
             EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
             UpdateDictionaryCount();
 
+            // Analytics (Privacy)
+            EnableAnalyticsCheckBox.IsChecked = settings.EnableAnalytics ?? false;
+
             // Current Model is set in SetupModelComparison
         }
 
@@ -292,6 +295,13 @@ namespace VoiceLite
             // Custom Dictionary
             settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked ?? true;
 
+            // Analytics (Privacy)
+            settings.EnableAnalytics = EnableAnalyticsCheckBox.IsChecked;
+            if (settings.EnableAnalytics.HasValue && settings.AnalyticsConsentDate == null)
+            {
+                settings.AnalyticsConsentDate = DateTime.UtcNow;
+            }
+
             // Whisper Model is already saved when selected
 
             // Whisper Parameters
@@ -436,6 +446,12 @@ namespace VoiceLite
                 button.IsEnabled = true;
                 UpdateModelDownloadButton();
             }
+        }
+
+        private void EnableAnalyticsCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            // This event handler allows users to toggle analytics from settings
+            // The actual save happens in SaveSettings() when they click Save/Apply
         }
     }
 }

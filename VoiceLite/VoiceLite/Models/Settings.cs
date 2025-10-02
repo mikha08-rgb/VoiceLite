@@ -147,6 +147,11 @@ namespace VoiceLite.Models
         public List<DictionaryEntry> CustomDictionaryEntries { get; set; } = new List<DictionaryEntry>();
         public DictionaryCategory? ActiveDictionaryCategory { get; set; } = null; // null = all categories
 
+        // Anonymous Analytics (Privacy-First, Opt-In)
+        public bool? EnableAnalytics { get; set; } = null; // null = not asked yet, false = opted out, true = opted in
+        public string? AnonymousUserId { get; set; } // SHA256 hash for anonymous tracking
+        public DateTime? AnalyticsConsentDate { get; set; } // When user consented (or declined)
+
     }
 
     public class ModelBenchmarkCache
