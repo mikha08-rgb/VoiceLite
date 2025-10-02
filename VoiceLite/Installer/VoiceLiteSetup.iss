@@ -3,7 +3,7 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.0
+AppVersion=1.0.12
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -131,14 +131,14 @@ begin
         MsgBox('Please install the required components and run this setup again.' + #13#10#13#10 +
                'Downloads:' + #13#10 +
                '1. .NET 8 Desktop Runtime (choose Windows x64)' + #13#10 +
-               '2. Visual C++ Runtime x64' + #13#10 +
-               #13#10 + 'After installation, click OK to continue setup.',
+               '2. Visual C++ Runtime x64' + #13#10 + #13#10 +
+               'After installation, click OK to continue setup.',
                mbInformation, MB_OK)
       else
         MsgBox('Please install the required components and run this setup again.' + #13#10#13#10 +
                'Downloads:' + #13#10 +
-               '1. .NET 8 Desktop Runtime (choose Windows x64)' + #13#10 +
-               #13#10 + 'After installation, click OK to continue setup.',
+               '1. .NET 8 Desktop Runtime (choose Windows x64)' + #13#10 + #13#10 +
+               'After installation, click OK to continue setup.',
                mbInformation, MB_OK);
 
       // Re-check after user says they installed

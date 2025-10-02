@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Custom Dictionary Manager" Height="600" Width="800"
         WindowStartupLocation="CenterOwner"
-        Background="#FCFCFC">
+        Background="#FCFCFC"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
