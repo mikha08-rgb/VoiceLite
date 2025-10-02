@@ -396,6 +396,30 @@ namespace VoiceLite
             {
                 MicrophoneText.Text = "Microphone " + settings.SelectedMicrophoneIndex;
             }
+
+            // Update model display
+            ModelText.Text = GetModelDisplayName(settings.WhisperModel);
+        }
+
+        private string GetModelDisplayName(string modelPath)
+        {
+            if (string.IsNullOrEmpty(modelPath))
+                return "Tiny (Free)";
+
+            // Extract model name from path
+            string modelName = modelPath.ToLower();
+            if (modelName.Contains("tiny"))
+                return "Tiny (Free)";
+            else if (modelName.Contains("base"))
+                return "Base";
+            else if (modelName.Contains("small"))
+                return "Small";
+            else if (modelName.Contains("medium"))
+                return "Medium";
+            else if (modelName.Contains("large"))
+                return "Large";
+            else
+                return "Tiny (Free)"; // Default fallback
         }
 
         private void UpdateUIForCurrentMode()
@@ -1813,6 +1837,31 @@ namespace VoiceLite
 
                 MessageBox.Show(
                     $"Cleared {cleared} items from history.",
+                    "History Cleared",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        /// <summary>
+        /// Clears ALL history items including pinned items.
+        /// </summary>
+        private void ClearAllHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove ALL transcriptions from history including pinned items.\n\nThis action cannot be undone.\n\nContinue?",
+                "Clear All History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                int cleared = historyService?.ClearAllHistory() ?? 0;
+                UpdateHistoryUI();
+                SaveSettings();
+
+                MessageBox.Show(
+                    $"Cleared all {cleared} items from history.",
                     "History Cleared",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);

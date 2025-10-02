@@ -237,6 +237,23 @@ namespace VoiceLite
                 .FirstOrDefault(r => r.IsChecked == true);
             FilterEntries(selectedRadio?.Name);
         }
+
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // Ctrl+S to save and close
+            if (e.Key == System.Windows.Input.Key.S && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control)
+            {
+                e.Handled = true;
+                CloseButton_Click(this, new RoutedEventArgs());
+            }
+            // Escape to close
+            else if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                e.Handled = true;
+                DialogResult = true;
+                Close();
+            }
+        }
     }
 
     // Add/Edit Entry Dialog

@@ -159,6 +159,17 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
+        /// Clears ALL items from the history, including pinned items.
+        /// </summary>
+        public int ClearAllHistory()
+        {
+            int count = settings.TranscriptionHistory.Count;
+            settings.TranscriptionHistory.Clear();
+            ErrorLogger.LogMessage($"Cleared ALL {count} history items (including pinned)");
+            return count;
+        }
+
+        /// <summary>
         /// Gets all pinned items (for special display/export).
         /// </summary>
         public IEnumerable<TranscriptionHistoryItem> GetPinnedItems()
