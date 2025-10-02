@@ -34,10 +34,10 @@ namespace VoiceLite.Services.Auth
 #if DEBUG
             // In DEBUG builds, allow environment variable override for local testing
             BaseAddress = new Uri(Environment.GetEnvironmentVariable("VOICELITE_API_BASE_URL")
-                                   ?? "https://app.voicelite.com"),
+                                   ?? "https://voicelite.app"),
 #else
             // In RELEASE builds, hardcode production URL to prevent hijacking
-            BaseAddress = new Uri("https://app.voicelite.com"),
+            BaseAddress = new Uri("https://voicelite.app"),
 #endif
             Timeout = TimeSpan.FromSeconds(30),
         };
@@ -105,7 +105,7 @@ namespace VoiceLite.Services.Auth
             {
                 Directory.CreateDirectory(AppDataPath);
 
-                var baseUri = Client.BaseAddress ?? new Uri("https://app.voicelite.com");
+                var baseUri = Client.BaseAddress ?? new Uri("https://voicelite.app");
                 var cookies = CookieJar.GetCookies(baseUri).Cast<Cookie>()
                     .Select(c => new CookieDto
                     {
@@ -145,7 +145,7 @@ namespace VoiceLite.Services.Auth
                 }
 
                 // Clear in-memory cookies
-                var baseUri = Client.BaseAddress ?? new Uri("https://app.voicelite.com");
+                var baseUri = Client.BaseAddress ?? new Uri("https://voicelite.app");
                 var cookies = CookieJar.GetCookies(baseUri).Cast<Cookie>().ToArray();
                 foreach (var cookie in cookies)
                 {
