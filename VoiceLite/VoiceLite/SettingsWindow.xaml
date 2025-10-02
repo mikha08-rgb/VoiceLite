@@ -74,11 +74,20 @@
                         <ComboBox Name="MicrophoneComboBox"
                                   Margin="0,0,0,10"
                                   DisplayMemberPath="Name"/>
-                        <Button Name="RefreshMicrophonesButton"
-                                Content="Refresh Microphones"
-                                Width="150"
-                                HorizontalAlignment="Left"
-                                Click="RefreshMicrophonesButton_Click"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Button Name="RefreshMicrophonesButton"
+                                    Content="Refresh Microphones"
+                                    Width="150"
+                                    HorizontalAlignment="Left"
+                                    Click="RefreshMicrophonesButton_Click"
+                                    Margin="0,0,8,0"/>
+                            <Button Name="TestMicrophoneButton"
+                                    Content="Test Microphone"
+                                    Width="130"
+                                    HorizontalAlignment="Left"
+                                    Click="TestMicrophoneButton_Click"
+                                    ToolTip="Click to start/stop recording test"/>
+                        </StackPanel>
 
                         <CheckBox Name="PlaySoundFeedbackCheckBox"
                                   Content="Play sound feedback (beep on record start/stop)"

@@ -125,11 +125,18 @@ namespace VoiceLite.Services
             if (File.Exists(modelPath))
                 return modelPath;
 
-            // Fallback: if requested model not found, try to find ggml-tiny.bin (free tier default)
+            // Fallback: if requested model not found, try Small (current free tier) then Tiny (legacy fallback)
+            var smallPath = Path.Combine(baseDir, "whisper", "ggml-small.bin");
+            if (File.Exists(smallPath))
+            {
+                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-small.bin (Free tier default)");
+                return smallPath;
+            }
+
             var tinyPath = Path.Combine(baseDir, "whisper", "ggml-tiny.bin");
             if (File.Exists(tinyPath))
             {
-                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (Free tier)");
+                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (Legacy free tier)");
                 return tinyPath;
             }
 

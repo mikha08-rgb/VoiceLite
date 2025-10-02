@@ -163,11 +163,11 @@ npm run keygen
 ## Whisper Integration
 
 ### Available Models (in `whisper/` directory)
-- `ggml-tiny.bin` (77MB): Fastest, lowest accuracy - ships with the app
-- `ggml-base.bin` (148MB): Fast, good for basic use
-- `ggml-small.bin` (488MB): Balanced performance
-- `ggml-medium.bin` (1.5GB): Higher accuracy, optional download from settings
-- `ggml-large-v3.bin` (3.1GB): Highest accuracy, manual download required and resource heavy
+- `ggml-tiny.bin` (75MB): Fastest, lowest accuracy - legacy free tier, kept as fallback
+- `ggml-small.bin` (466MB): **Current free tier default** - balanced accuracy and speed, ships with installer (temporary promotion)
+- `ggml-base.bin` (142MB): Fast, good for basic use - Pro tier
+- `ggml-medium.bin` (1.5GB): Higher accuracy - Pro tier, optional download from settings
+- `ggml-large-v3.bin` (2.9GB): Highest accuracy - Pro tier, manual download required and resource heavy
 
 ### Whisper Process Management
 - **PersistentWhisperService is the primary implementation** (WhisperService/WhisperProcessPool are deprecated)
@@ -188,21 +188,23 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ### Desktop App (Free Tier)
 - Desktop client is **100% free** with no usage caps
-- Tiny model (77MB) ships with installer and works offline
+- **Small model (466MB)** ships with installer as free tier default (temporary growth promotion)
+- Tiny model (75MB) kept as legacy fallback for compatibility
 - Works completely offline - no license validation required
 - No online authentication or tracking
 - All core features available (hotkeys, text injection, settings)
+- **Accuracy**: ~90-93% with Small model (vs 80-85% with Tiny)
 
 ### Web-Based Pro Tier (Optional)
 - Stripe subscription managed via voicelite.app ($20/3mo or $99 lifetime)
-- License server validates Pro subscriptions for premium models (Base, Small, Medium)
-- Unlocks: Better accuracy (93-97%), technical term recognition, priority support, early access
+- License server validates Pro subscriptions for premium models (Base, Medium, Large)
+- Unlocks: Even better accuracy (93-97%), advanced models, priority support, early access
 - License server located in `license-server/` (Node.js/Express/SQLite)
 - Desktop app validates Pro licenses via server API for premium model downloads
 
 ### Implementation Details
-- Free tier: Tiny model runs standalone without any server connection
-- Pro tier: Premium models require server-side license validation before download
+- Free tier: Small model runs standalone without any server connection (temporary promotion)
+- Pro tier: Premium models (Base, Medium, Large) require server-side license validation before download
 - Recordings processed locally and discarded after transcription (both tiers)
 - License keys use Ed25519 cryptographic signing for security
 - Desktop app can function fully offline after premium models are downloaded
@@ -355,12 +357,13 @@ The `license-server/` directory contains the Pro subscription backend for valida
 ### Installer Creation
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
-3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup.iss`
-4. Output: `VoiceLite-Setup.exe` in root directory (current version: v1.0.13)
+3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
+4. Output: `VoiceLite-Setup-1.0.14.exe` in root directory (current version: v1.0.14)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
-- Includes only tiny model by default (minimal size)
+- **Includes Small model (466MB) + Tiny model (75MB)** - temporary growth promotion (v1.0.14+)
+- Installer size: ~540MB (up from ~150MB with tiny-only)
 - Auto-installs to Program Files
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
@@ -368,7 +371,7 @@ The `license-server/` directory contains the Pro subscription backend for valida
 
 ### Distribution Channels
 - GitHub Releases (primary)
-- Google Drive for large downloads (442MB with models)
+- Google Drive for large downloads (~540MB with Small model)
 - Direct download from voicelite.app
 
 ## Known Issues & Limitations
@@ -400,13 +403,21 @@ The `license-server/` directory contains the Pro subscription backend for valida
 
 ## Version Information
 
-- **Desktop App**: v1.0.13 (current release)
+- **Desktop App**: v1.0.14 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 - **License Server**: v1.0.0 (see license-server/package.json)
 
 ## Changelog Highlights
 
-### v1.0.13 (Current Desktop Release)
+### v1.0.14 (Current Desktop Release - Growth Promotion)
+- **Free Tier Upgrade**: Small model (466MB) now ships as free tier default instead of Tiny (75MB)
+- **Accuracy Boost**: Free users now get ~90-93% accuracy (up from 80-85%)
+- **Strategic**: Temporary promotion to improve first impressions during growth phase
+- **Installer Size**: ~540MB (up from ~150MB) - includes Small + Tiny models
+- **Fallback Safety**: Tiny model kept as legacy fallback for compatibility
+- **Code Changes**: Updated Settings.cs, SettingsWindow.xaml.cs, PersistentWhisperService.cs, installer script
+
+### v1.0.13
 - **Critical Fix**: Fixed permission errors on launch - temp files now use AppData instead of Program Files
 - **Warmup Fix**: Whisper warmup process now works without admin permissions
 - **Diagnostics Fix**: Removed Program Files write test from permission checks (expected to be read-only)

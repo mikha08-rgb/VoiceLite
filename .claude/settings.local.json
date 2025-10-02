@@ -15,7 +15,10 @@
       "Bash(curl -sI https://www.voicelite.app/)",
       "Bash(curl -sL -w \"FINAL_URL: %{url_effective}\\nHTTP_CODE: %{http_code}\\n\" -o /dev/null https://www.voicelite.app/)",
       "Bash(vercel domains:*)",
-      "Bash(vercel deploy:*)"
+      "Bash(vercel deploy:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(start VoiceLite.exe)"
     ],
     "deny": [],
     "ask": []

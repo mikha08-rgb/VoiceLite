@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -125,7 +126,6 @@ namespace VoiceLite
                     await Dispatcher.InvokeAsync(() =>
                     {
                         StatusText.Text = "Setup Required";
-                        TestButton.IsEnabled = false;
 
                         var message = result.GetErrorMessage() + "\n\n";
 
@@ -150,7 +150,6 @@ namespace VoiceLite
                                         await Dispatcher.InvokeAsync(() =>
                                         {
                                             StatusText.Text = "Ready";
-                                            TestButton.IsEnabled = true;
                                         });
                                     }
                                 });
@@ -306,7 +305,6 @@ namespace VoiceLite
                         "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
                     StatusText.Text = "No microphone detected";
                     StatusText.Foreground = Brushes.Red;
-                    TestButton.IsEnabled = false;
                 }
 
                 // Set the selected microphone if configured
@@ -357,7 +355,6 @@ namespace VoiceLite
 
                 string hotkeyDisplay = GetHotkeyDisplayString();
                 UpdateUIForCurrentMode();
-                TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
                 UpdateConfigDisplay();
             }
             catch (Exception ex)
@@ -585,16 +582,12 @@ namespace VoiceLite
                 // Only update UI if we get here successfully
                 UpdateStatus("Recording...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF9999")));
 
+                // Start pulsing animation on status indicator
+                var pulseAnimation = (System.Windows.Media.Animation.Storyboard)FindResource("PulseAnimation");
+                pulseAnimation.Begin(StatusIndicator);
+
                 // Update button and text based on mode
-                if (settings.Mode == Models.RecordMode.PushToTalk)
-                {
-                    TestButton.Content = "Stop Recording (Click again or release F1)";
-                }
-                else // Toggle mode
-                {
-                    string hotkeyDisplay = GetHotkeyDisplayString();
-                    TestButton.Content = $"Stop Recording (Click again or press {hotkeyDisplay})";
-                }
+                // Recording started - mode-specific handling in hotkey manager
 
                 UpdateUIForCurrentMode();
                 TranscriptionText.Foreground = Brushes.Gray;
@@ -660,18 +653,18 @@ namespace VoiceLite
                 audioRecorder?.StopRecording();
                 isRecording = false;
 
+                // Stop pulsing animation on status indicator
+                StatusIndicator.BeginAnimation(System.Windows.UIElement.OpacityProperty, null);
+                StatusIndicator.Opacity = 1.0;
+
                 if (cancel)
                 {
                     UpdateStatus("Cancelled", Brushes.Gray);
-                    string hotkeyDisplay = GetHotkeyDisplayString();
-                    TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
                     UpdateUIForCurrentMode();
                 }
                 else
                 {
                     UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD699")));
-                    string hotkeyDisplay = GetHotkeyDisplayString();
-                    TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
 
                     // Reset TranscriptionText to show processing state
                     TranscriptionText.Text = "Processing audio...";
@@ -1249,7 +1242,7 @@ namespace VoiceLite
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
 
-            var settingsWindow = new SettingsWindowNew(settings);
+            var settingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()));
             settingsWindow.Owner = this;
 
             if (settingsWindow.ShowDialog() == true)
@@ -1339,8 +1332,6 @@ namespace VoiceLite
 
                 // Always update UI regardless of service recreation success
                 UpdateUIForCurrentMode();
-                string hotkeyDisplay = GetHotkeyDisplayString();
-                TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
                 UpdateConfigDisplay();
             }
         }
@@ -1408,7 +1399,8 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("RestoreAccountAsync", ex);
-                UpdateAccountStatusUI("Account unavailable", Brushes.OrangeRed);
+                // Hide account status for errors - don't alarm free users
+                UpdateAccountStatusUI("", Brushes.Transparent);
             }
         }
 
@@ -1481,7 +1473,8 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("UpdateLicenseStatusAsync", ex);
-                UpdateAccountStatusUI("Unable to contact licensing service", Brushes.OrangeRed);
+                // Hide licensing errors - they're logged but don't alarm users
+                UpdateAccountStatusUI("", Brushes.Transparent);
             }
         }
 
@@ -1639,6 +1632,13 @@ namespace VoiceLite
                     if (count == 0)
                     {
                         EmptyHistoryMessage.Visibility = Visibility.Visible;
+                        // Update empty state with current hotkey
+                        var hotkeyDisplay = GetHotkeyDisplayString();
+                        var hotkeyHintElement = EmptyHistoryMessage.FindName("EmptyStateHotkeyHint") as TextBlock;
+                        if (hotkeyHintElement != null)
+                        {
+                            hotkeyHintElement.Text = $"Press {hotkeyDisplay} to start recording";
+                        }
                         return;
                     }
 
@@ -1676,9 +1676,7 @@ namespace VoiceLite
                 Tag = item // Store the item for event handlers
             };
 
-            // Hover effect
-            border.MouseEnter += (s, e) => border.Background = new SolidColorBrush(Color.FromRgb(249, 249, 249));
-            border.MouseLeave += (s, e) => border.Background = Brushes.White;
+            // Hover effect will be added later with copy button visibility
 
             // Click to copy
             border.MouseLeftButtonDown += (s, e) =>
@@ -1764,9 +1762,48 @@ namespace VoiceLite
                 Text = (string)relativeConverter.Convert(item.Timestamp, null!, null!, null!),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166)),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = item.Timestamp.ToString("MMM d, yyyy h:mm tt") // Full timestamp on hover
             };
             headerGrid.Children.Add(timeText);
+
+            // Copy button (visible on hover)
+            var copyButton = new System.Windows.Controls.Button
+            {
+                Content = "📋 Copy",
+                FontSize = 10,
+                Padding = new Thickness(6, 2, 6, 2),
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 0, item.IsPinned ? 25 : 0, 0) // Space for pin icon if pinned
+            };
+            copyButton.Click += (s, e) =>
+            {
+                e.Handled = true; // Prevent card click event
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                    // Visual feedback - briefly change button text
+                    copyButton.Content = "✓ Copied";
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                    timer.Tick += (ts, te) =>
+                    {
+                        copyButton.Content = "📋 Copy";
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy button", ex);
+                }
+            };
+            headerGrid.Children.Add(copyButton);
 
             if (item.IsPinned)
             {
@@ -1778,6 +1815,18 @@ namespace VoiceLite
                 };
                 headerGrid.Children.Add(pinIcon);
             }
+
+            // Show/hide copy button on hover
+            border.MouseEnter += (s, e) =>
+            {
+                border.Background = new SolidColorBrush(Color.FromRgb(249, 249, 249));
+                copyButton.Visibility = Visibility.Visible;
+            };
+            border.MouseLeave += (s, e) =>
+            {
+                border.Background = Brushes.White;
+                copyButton.Visibility = Visibility.Collapsed;
+            };
 
             grid.Children.Add(headerGrid);
 

@@ -19,13 +19,15 @@ namespace VoiceLite
         private bool isCapturingHotkey = false;
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
+        private Action? testRecordingCallback;
 
         public Settings Settings => settings;
 
-        public SettingsWindowNew(Settings currentSettings)
+        public SettingsWindowNew(Settings currentSettings, Action? onTestRecording = null)
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
+            testRecordingCallback = onTestRecording;
 
             DownloadModelsButton.Visibility = Visibility.Visible;
             UpdateModelDownloadButton();
@@ -221,6 +223,12 @@ namespace VoiceLite
         {
             LoadMicrophones();
             StatusText.Text = "Microphone list refreshed";
+        }
+
+        private void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Invoke the test recording callback if provided
+            testRecordingCallback?.Invoke();
         }
 
         private void SimpleModelSelector_ModelSelected(object sender, string modelFileName)
