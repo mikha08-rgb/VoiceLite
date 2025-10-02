@@ -356,7 +356,7 @@ The `license-server/` directory contains the Pro subscription backend for valida
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup.iss`
-4. Output: `VoiceLite-Setup.exe` in root directory (current version: v1.0.12)
+4. Output: `VoiceLite-Setup.exe` in root directory (current version: v1.0.13)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
@@ -400,13 +400,19 @@ The `license-server/` directory contains the Pro subscription backend for valida
 
 ## Version Information
 
-- **Desktop App**: v1.0.12 (current release)
+- **Desktop App**: v1.0.13 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 - **License Server**: v1.0.0 (see license-server/package.json)
 
 ## Changelog Highlights
 
-### v1.0.12 (Current Desktop Release)
+### v1.0.13 (Current Desktop Release)
+- **Critical Fix**: Fixed permission errors on launch - temp files now use AppData instead of Program Files
+- **Warmup Fix**: Whisper warmup process now works without admin permissions
+- **Diagnostics Fix**: Removed Program Files write test from permission checks (expected to be read-only)
+- **Stability**: Zero permission errors, all file operations now use appropriate directories
+
+### v1.0.12
 - **UX Improvement**: Added keyboard shortcuts to Dictionary Manager (Ctrl+S to save, Escape to close)
 - **Transparency**: AI model name now displayed on main window (Tiny/Base/Small/Medium/Large)
 - **History Control**: Added "Clear All" button to delete all history items including pinned ones

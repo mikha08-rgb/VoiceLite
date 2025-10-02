@@ -140,9 +140,13 @@ namespace VoiceLite.Services
         {
             try
             {
-                var tempDir = Path.Combine(baseDir, "temp");
-                Directory.CreateDirectory(tempDir);
-                dummyAudioPath = Path.Combine(tempDir, "dummy_warmup.wav");
+                // Use AppData temp directory instead of Program Files (avoid permission issues)
+                var appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "VoiceLite",
+                    "temp");
+                Directory.CreateDirectory(appDataDir);
+                dummyAudioPath = Path.Combine(appDataDir, "dummy_warmup.wav");
 
                 // Create 1 second of silence at 16kHz (whisper's preferred format)
                 var sampleRate = 16000;
