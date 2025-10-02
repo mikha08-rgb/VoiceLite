@@ -1,7 +1,7 @@
 <Window x:Class="VoiceLite.DictionaryManagerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Custom Dictionary Manager" Height="600" Width="800"
+        Title="VoiceShortcuts Manager" Height="600" Width="800"
         WindowStartupLocation="CenterOwner"
         Background="#FCFCFC"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -34,7 +34,7 @@
         </Border>
 
         <!-- Title -->
-        <TextBlock Text="Custom Dictionary Manager"
+        <TextBlock Text="VoiceShortcuts"
                    FontSize="20"
                    FontWeight="SemiBold"
                    Foreground="#4A4A4A"

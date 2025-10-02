@@ -21,14 +21,14 @@
 **VoiceLite** is a privacy-first Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
 
 ## 🆓 Free Tier (Always Free)
-- ✅ **Small Whisper model** (balanced, 90-93% accuracy)
+- ✅ **Pro Whisper model** (balanced, 90-93% accuracy)
 - ✅ **Unlimited usage** - no trials, no time limits
 - ✅ **Works completely offline** - your voice never leaves your PC
 - ✅ **All core features** - hotkeys, text injection, settings
 - ✅ **Auditable source code** - verify privacy yourself
 
 ## 💎 Pro Tier ($20/3mo or $99 lifetime)
-- ✨ **Premium models**: Base (93%), Medium (95%), Large (97%)
+- ✨ **Premium models**: Swift (93%), Elite (95%), Ultra (97%)
 - ✨ **Excellent accuracy** on technical terms (code, jargon, commands)
 - ✨ **Priority email support** - get help within 24 hours
 - ✨ **Early access** to new features and beta releases
@@ -64,9 +64,9 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.15 Installer (540MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.16 Installer (540MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-One-click installer • Includes Small model (Free tier) • Premium models require Pro
+One-click installer • Includes Pro model (Free tier) • Premium models require Pro subscription
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
@@ -75,7 +75,7 @@ One-click installer • Includes Small model (Free tier) • Premium models requ
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.15.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.16.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
 4. **Hold Left Alt** → Speak → Release to type!

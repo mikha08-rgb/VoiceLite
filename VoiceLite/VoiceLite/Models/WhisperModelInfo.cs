@@ -45,7 +45,7 @@ namespace VoiceLite.Models
                 new WhisperModelInfo
                 {
                     FileName = "ggml-tiny.bin",
-                    DisplayName = "Tiny",
+                    DisplayName = "Lite",
                     FileSizeBytes = 75 * 1024 * 1024, // 75MB
                     SpeedRating = 5,
                     AccuracyRating = 1,
@@ -71,7 +71,7 @@ namespace VoiceLite.Models
                 new WhisperModelInfo
                 {
                     FileName = "ggml-base.bin",
-                    DisplayName = "Base",
+                    DisplayName = "Swift",
                     FileSizeBytes = 142 * 1024 * 1024, // 142MB
                     SpeedRating = 4,
                     AccuracyRating = 2,
@@ -97,7 +97,7 @@ namespace VoiceLite.Models
                 new WhisperModelInfo
                 {
                     FileName = "ggml-small.bin",
-                    DisplayName = "Small",
+                    DisplayName = "Pro",
                     FileSizeBytes = 466 * 1024 * 1024, // 466MB
                     SpeedRating = 3,
                     AccuracyRating = 3,
@@ -122,7 +122,7 @@ namespace VoiceLite.Models
                 new WhisperModelInfo
                 {
                     FileName = "ggml-medium.bin",
-                    DisplayName = "Medium",
+                    DisplayName = "Elite",
                     FileSizeBytes = 1500L * 1024 * 1024, // 1.5GB
                     SpeedRating = 2,
                     AccuracyRating = 4,
@@ -148,7 +148,7 @@ namespace VoiceLite.Models
                 new WhisperModelInfo
                 {
                     FileName = "ggml-large-v3.bin",
-                    DisplayName = "Large V3",
+                    DisplayName = "Ultra",
                     FileSizeBytes = 2900L * 1024 * 1024, // 2.9GB
                     SpeedRating = 1,
                     AccuracyRating = 5,

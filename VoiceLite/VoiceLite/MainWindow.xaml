@@ -52,7 +52,7 @@
             <TextBlock Text="  •  " Foreground="#E0E0E0" FontSize="13" VerticalAlignment="Center"/>
 
             <TextBlock Text="Model: " Foreground="#7A7A7A" FontSize="13"/>
-            <TextBlock x:Name="ModelText" Text="Tiny (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
+            <TextBlock x:Name="ModelText" Text="Lite (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
 
             <!-- Hidden references for backward compatibility -->
             <TextBlock x:Name="MicrophoneText" Text="Default" Visibility="Collapsed"/>
@@ -274,7 +274,7 @@
 
                 <Button x:Name="DictionaryButton"
                         Grid.Column="0"
-                        Content="Custom Words"
+                        Content="VoiceShortcuts"
                         Height="40"
                         Background="#F5F5F5"
                         Foreground="#2C3E50"
@@ -284,7 +284,7 @@
                         FontSize="13"
                         Cursor="Hand"
                         Click="DictionaryButton_Click"
-                        ToolTip="Manage custom word replacements"/>
+                        ToolTip="Manage voice shortcuts and custom word replacements"/>
 
                 <Button x:Name="SettingsButton"
                         Grid.Column="2"

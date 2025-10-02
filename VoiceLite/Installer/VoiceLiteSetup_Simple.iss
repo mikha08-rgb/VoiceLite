@@ -1,10 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.15: Major UX improvements - keyboard shortcuts, performance optimizations, visual clarity enhancements
+; v1.0.16: UI Rebranding - renamed models (Lite/Swift/Pro/Elite/Ultra) and dictionary to VoiceShortcuts
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.15
+AppVersion=1.0.16
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -12,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.15
+OutputBaseFilename=VoiceLite-Setup-1.0.16
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes

@@ -155,7 +155,7 @@
                                                       ModelSelected="SimpleModelSelector_ModelSelected"/>
 
                         <Button Name="DownloadModelsButton"
-                                Content="Download Medium Model (1.5GB)"
+                                Content="Download Elite Model (1.5GB)"
                                 Height="35"
                                 Margin="0,15,0,0"
                                 Click="DownloadModelsButton_Click"
@@ -169,7 +169,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
                     <StackPanel>
                         <!-- Header Info -->
-                        <TextBlock Text="Custom Dictionary"
+                        <TextBlock Text="VoiceShortcuts"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="#333333"
@@ -187,7 +187,7 @@
                                 Margin="0,0,0,20">
                             <StackPanel>
                                 <CheckBox Name="EnableCustomDictionaryCheckBox"
-                                          Content="Enable custom dictionary replacements"
+                                          Content="Enable VoiceShortcuts"
                                           IsChecked="True"
                                           FontSize="13"
                                           FontWeight="SemiBold"
@@ -204,12 +204,12 @@
                         <GroupBox Header="Quick Actions" Margin="0,0,0,20">
                             <StackPanel Margin="10">
                                 <Button Name="ManageDictionaryButton"
-                                        Content="📝 Manage Dictionary Entries"
+                                        Content="📝 Manage VoiceShortcuts"
                                         Height="40"
                                         FontSize="13"
                                         HorizontalAlignment="Stretch"
                                         Click="ManageDictionaryButton_Click"
-                                        ToolTip="Add, edit, or remove custom word replacements"
+                                        ToolTip="Add, edit, or remove voice shortcuts and custom word replacements"
                                         Margin="0,0,0,10"/>
 
                                 <TextBlock Text="Load Pre-built Templates:"

@@ -193,7 +193,7 @@ namespace VoiceLite
         {
             var dialog = new OpenFileDialog
             {
-                Title = "Import Custom Dictionary",
+                Title = "Import VoiceShortcuts",
                 Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*",
                 DefaultExt = "json"
             };
@@ -248,10 +248,10 @@ namespace VoiceLite
 
             var dialog = new SaveFileDialog
             {
-                Title = "Export Custom Dictionary",
+                Title = "Export VoiceShortcuts",
                 Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*",
                 DefaultExt = "json",
-                FileName = "voicelite-dictionary.json"
+                FileName = "voicelite-shortcuts.json"
             };
 
             if (dialog.ShowDialog() == true)

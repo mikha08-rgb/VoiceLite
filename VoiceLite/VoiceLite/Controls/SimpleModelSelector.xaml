@@ -25,7 +25,7 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel Name="ModelsPanel">
 
-                    <!-- Tiny Model -->
+                    <!-- Lite Model -->
                     <RadioButton Name="TinyRadio"
                                  GroupName="ModelSelection"
                                  Margin="0,5"
@@ -39,7 +39,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Fastest"
+                                    <TextBlock Text="Lite"
                                                FontWeight="Bold"
                                                FontSize="14"/>
                                     <TextBlock Text="75 MB"
@@ -63,7 +63,7 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <!-- Base Model -->
+                    <!-- Swift Model -->
                     <RadioButton Name="BaseRadio"
                                  GroupName="ModelSelection"
                                  Margin="0,5"
@@ -77,7 +77,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Fast"
+                                    <TextBlock Text="Swift"
                                                FontWeight="Bold"
                                                FontSize="14"/>
                                     <TextBlock Text="142 MB"
@@ -101,7 +101,7 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <!-- Small Model (Recommended) -->
+                    <!-- Pro Model (Recommended) -->
                     <Border Background="#E8F5E9"
                             CornerRadius="4"
                             Padding="5"
@@ -120,7 +120,7 @@
 
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Balanced"
+                                            <TextBlock Text="Pro"
                                                        FontWeight="Bold"
                                                        FontSize="14"/>
                                             <TextBlock Text=" ⭐"
@@ -149,7 +149,7 @@
                         </RadioButton>
                     </Border>
 
-                    <!-- Medium Model -->
+                    <!-- Elite Model -->
                     <RadioButton Name="MediumRadio"
                                  GroupName="ModelSelection"
                                  Margin="0,5"
@@ -163,7 +163,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Accurate"
+                                    <TextBlock Text="Elite"
                                                FontWeight="Bold"
                                                FontSize="14"/>
                                     <TextBlock Text="1.5 GB"
@@ -187,7 +187,7 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <!-- Large Model -->
+                    <!-- Ultra Model -->
                     <RadioButton Name="LargeRadio"
                                  GroupName="ModelSelection"
                                  Margin="0,5"
@@ -201,7 +201,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Maximum"
+                                    <TextBlock Text="Ultra"
                                                FontWeight="Bold"
                                                FontSize="14"/>
                                     <TextBlock Text="2.9 GB"
@@ -248,7 +248,7 @@
 
                     <TextBlock Grid.Column="1"
                                Name="TipText"
-                               Text="'Balanced' offers the best experience for most users"
+                               Text="'Pro' offers the best experience for most users"
                                FontSize="12"
                                Foreground="#666"
                                TextWrapping="Wrap"/>
