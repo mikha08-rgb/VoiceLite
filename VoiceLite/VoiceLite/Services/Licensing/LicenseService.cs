@@ -21,17 +21,14 @@ namespace VoiceLite.Services.Licensing
         private const string CRLEndpoint = "/api/licenses/crl";
         private const string IssueEndpoint = "/api/licenses/issue";
 
-        // Ed25519 public key for license verification (base64url encoded)
-        //
-        // ⚠️ PRODUCTION DEPLOYMENT INSTRUCTIONS:
-        // 1. Run: cd voicelite-web && npm run keygen
-        // 2. Copy the LICENSE_SIGNING_PUBLIC_B64 value from the output
-        // 3. Replace the value below with your production public key
-        // 4. Add the LICENSE_SIGNING_PRIVATE_B64 to your .env.local on the server
-        // 5. Rebuild desktop client: dotnet publish -c Release
-        //
-        // Current key (REPLACE BEFORE PRODUCTION):
-        private const string LICENSE_PUBLIC_KEY = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
+        private const string LicensePublicKeyEnvVar = "VOICELITE_LICENSE_PUBLIC_KEY";
+        private const string CrlPublicKeyEnvVar = "VOICELITE_CRL_PUBLIC_KEY";
+        private const string LicensePublicKeyFallback = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
+        private const string CrlPublicKeyFallback = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
+
+        private static string ResolvedLicensePublicKey => GetKeyOrFallback(LicensePublicKeyEnvVar, LicensePublicKeyFallback);
+        private static string ResolvedCrlPublicKey => GetKeyOrFallback(CrlPublicKeyEnvVar, CrlPublicKeyFallback, LicensePublicKeyFallback);
+
 
         private readonly LicenseStorage storage = new();
         private LicenseStatus cachedStatus = LicenseStatus.Unknown;
@@ -145,7 +142,7 @@ namespace VoiceLite.Services.Licensing
         /// Verify Ed25519 signature on a signed license string.
         /// </summary>
         /// <param name="signedLicense">Format: base64url(payload).base64url(signature)</param>
-        /// <param name="publicKeyB64">Base64url encoded public key (32 bytes). If null, uses LICENSE_PUBLIC_KEY constant.</param>
+        /// <param name="publicKeyB64">Base64url encoded public key (32 bytes). If null, uses the configured VoiceLite license verification key.</param>
         /// <returns>True if signature is valid, false otherwise</returns>
         public bool VerifySignedLicense(string signedLicense, string? publicKeyB64 = null)
         {
@@ -156,7 +153,7 @@ namespace VoiceLite.Services.Licensing
 
                 var payloadBytes = Base64UrlDecode(parts[0]);
                 var signatureBytes = Base64UrlDecode(parts[1]);
-                var publicKeyBytes = Base64UrlDecode(publicKeyB64 ?? LICENSE_PUBLIC_KEY);
+                var publicKeyBytes = Base64UrlDecode(publicKeyB64 ?? ResolvedLicensePublicKey);
 
                 if (publicKeyBytes.Length != 32 || signatureBytes.Length != 64)
                 {
@@ -210,7 +207,7 @@ namespace VoiceLite.Services.Licensing
 
                 var payloadBytes = Base64UrlDecode(parts[0]);
                 var signatureBytes = Base64UrlDecode(parts[1]);
-                var publicKeyBytes = Base64UrlDecode(publicKeyB64 ?? LICENSE_PUBLIC_KEY);
+                var publicKeyBytes = Base64UrlDecode(publicKeyB64 ?? ResolvedCrlPublicKey);
 
                 if (publicKeyBytes.Length != 32 || signatureBytes.Length != 64)
                 {
@@ -410,6 +407,22 @@ namespace VoiceLite.Services.Licensing
             {
                 return new LicenseValidationResult { IsValid = false, Reason = $"Validation error: {ex.Message}" };
             }
+        }
+
+        private static string GetKeyOrFallback(string environmentVariable, string primaryFallback, string? secondaryFallback = null)
+        {
+            var candidate = Environment.GetEnvironmentVariable(environmentVariable);
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                return candidate.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(secondaryFallback))
+            {
+                return secondaryFallback!;
+            }
+
+            return primaryFallback;
         }
 
         /// <summary>

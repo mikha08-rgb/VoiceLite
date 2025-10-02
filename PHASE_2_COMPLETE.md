@@ -14,13 +14,18 @@ All production configuration files and cryptographic keys have been generated an
 **Keys Generated**:
 ```bash
 # License Signing Keys
-LICENSE_SIGNING_PRIVATE_B64="kgh68w4YfLQQmn5BsimTKscDvr70FlzYbhV76t-uKik"
-LICENSE_SIGNING_PUBLIC_B64="_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms"
+LICENSE_SIGNING_PRIVATE_B64="<securely generated>"
+LICENSE_SIGNING_PUBLIC_B64="<securely generated>"
 
 # CRL Signing Keys
-CRL_SIGNING_PRIVATE_B64="PF-gFncB9ADmHXMbwcIQX0jUc5I1xTasI8-QN-d0RYQ"
-CRL_SIGNING_PUBLIC_B64="TSnzHX-auBPNqJF8P6vRS4ukfl7WcqZeAVHW9pnrD-0"
+CRL_SIGNING_PRIVATE_B64="<securely generated>"
+CRL_SIGNING_PUBLIC_B64="<securely generated>"
 ```
+
+**Storage Guidance**:
+- Store private keys in your password manager or secret manager only.
+- Never commit filled values to git; keep `.env.production.template` placeholders unchanged.
+- Rotate keys via `npm run keygen` and update deployment secrets accordingly.
 
 **Security Notes**:
 - Keys are Ed25519 (256-bit) for license file signing
@@ -30,32 +35,18 @@ CRL_SIGNING_PUBLIC_B64="TSnzHX-auBPNqJF8P6vRS4ukfl7WcqZeAVHW9pnrD-0"
 
 ---
 
-### 2. ✅ Desktop Client Updated with Production Public Key
+### 2. ? Desktop Client Uses Environment-Based Signing Keys
 
-**File**: [VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs](VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs:34)
+**File**: [VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs](VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs:24)
 
 **Changes**:
-- Updated `LICENSE_PUBLIC_KEY` constant with production public key
-- Added detailed deployment instructions in comments
-- Includes step-by-step guide for future key updates
+- Added environment-driven loading for license and CRL verification keys (`VOICELITE_LICENSE_PUBLIC_KEY`, `VOICELITE_CRL_PUBLIC_KEY`)
+- Retained a development fallback constant while enforcing environment overrides in production
+- Introduced helper methods that validate env input and enable key rotation without recompiling
 
-**Before Production Deployment**:
-```csharp
-// TODO: Replace before production
-private const string LICENSE_PUBLIC_KEY = "A8aHG17W1d2u6uMU3bomtJGM12Gr897zGhoKVDM9rUQ";
-```
-
-**After**:
-```csharp
-// ⚠️ PRODUCTION DEPLOYMENT INSTRUCTIONS:
-// 1. Run: cd voicelite-web && npm run keygen
-// 2. Copy the LICENSE_SIGNING_PUBLIC_B64 value from the output
-// 3. Replace the value below with your production public key
-// 4. Add the LICENSE_SIGNING_PRIVATE_B64 to your .env.local on the server
-// 5. Rebuild desktop client: dotnet publish -c Release
-
-private const string LICENSE_PUBLIC_KEY = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
-```
+**Deployment Notes**:
+- Set both `VOICELITE_LICENSE_PUBLIC_KEY` and `VOICELITE_CRL_PUBLIC_KEY` wherever the desktop app runs
+- Keep the corresponding private keys (`LICENSE_SIGNING_PRIVATE_B64`, `CRL_SIGNING_PRIVATE_B64`) in the server-side secret manager
 
 ---
 
@@ -180,8 +171,8 @@ cp .env.production.template .env.local
 ## Files Modified
 
 1. **VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs**
-   - Updated LICENSE_PUBLIC_KEY with production key
-   - Added deployment instructions in comments
+   - Loads license and CRL verification keys from environment variables
+   - Documents required `VOICELITE_…` env vars for deployment
 
 ---
 
@@ -189,7 +180,7 @@ cp .env.production.template .env.local
 
 ### ✅ Keys Properly Secured
 - Private keys only in .env.production.template (not committed)
-- Public key embedded in desktop client (correct and expected)
+- Public keys provided via `VOICELITE_LICENSE_PUBLIC_KEY` / `VOICELITE_CRL_PUBLIC_KEY` environment variables
 - Clear warnings in documentation about key secrecy
 
 ### ✅ Key Management
@@ -262,3 +253,4 @@ cp .env.production.template .env.local
 **Ready for Phase 3**: Yes
 
 **Next**: Phase 3 - Testing & Build
+

@@ -268,7 +268,8 @@ namespace VoiceLite.Services
                 // Preprocess audio if needed
                 try
                 {
-                    AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
+                    // TEMPORARILY DISABLED - AudioPreprocessor is too aggressive and silences all audio
+                    // AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
                 }
                 catch (Exception preprocessEx)
                 {
@@ -286,14 +287,12 @@ namespace VoiceLite.Services
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
                 // Build arguments using user settings for optimal accuracy/speed balance
+                // NOTE: --temperature is not supported in this version of whisper.exe (removed)
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
-                              $"--threads {Environment.ProcessorCount} " +
                               $"--no-timestamps --language {settings.Language} " +
                               $"--beam-size {settings.BeamSize} " +
-                              $"--best-of {settings.BestOf} " +
-                              $"--temperature {settings.WhisperTemperature:F1} " +
-                              "--entropy-thold 2.8";
+                              $"--best-of {settings.BestOf}";
 
                 ErrorLogger.LogMessage($"Whisper command: {whisperExePath} {arguments}");
 
@@ -440,7 +439,8 @@ namespace VoiceLite.Services
                 result = cleanedResult.ToString().Trim();
 
                 // Post-process the transcription
-                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary);
+                var customDict = settings.EnableCustomDictionary ? settings.CustomDictionaryEntries : null;
+                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary, customDict);
 
                 var totalTime = DateTime.Now - startTime;
                 ErrorLogger.LogMessage($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms");

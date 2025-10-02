@@ -66,41 +66,12 @@
 
 ---
 
-## High-Priority Issues Remaining ⚠️
+## High-Priority Issues Remaining ??
 
-### 1. ⚠️ Update BouncyCastle to 2.x
-**File**: `VoiceLite/VoiceLite/VoiceLite.csproj:19`
-- **Current**: `Portable.BouncyCastle` v1.9.0 (2021)
-- **Recommended**: `BouncyCastle.Cryptography` v2.3.1
-- **Impact**: Security patches and bug fixes
-- **Breaking Change**: Package name changed, requires updating using statements
-
-### 2. ⚠️ No CSRF Protection on State-Changing Operations
-**Status**: Partially protected by `sameSite: 'strict'`
-- **Recommendation**: Add Origin/Referer header validation for additional protection
-- **Impact**: Defense-in-depth against CSRF attacks
-
-### 3. ⚠️ Missing Environment Variable Validation
-**Recommendation**: Add startup validation in `voicelite-web/lib/config.ts`
-- **Impact**: Earlier detection of misconfiguration
-- **Required vars**: DATABASE_URL, STRIPE_SECRET_KEY, LICENSE_SIGNING_PRIVATE_B64, etc.
-
-### 4. ⚠️ Account Enumeration Via Timing
-**Files**: `voicelite-web/app/api/auth/request/route.ts`, `voicelite-web/app/api/auth/otp/route.ts`
-- **Issue**: Can determine if email exists by measuring response time
-- **Recommendation**: Always return success for magic link requests
-
-### 5. ⚠️ Session Rotation Race Condition
-**File**: `voicelite-web/app/api/me/route.ts`
-- **Issue**: Multiple concurrent calls may cause unexpected logouts
-- **Recommendation**: Use optimistic locking or skip if recently rotated
-
-### 6. ⚠️ No Rate Limiting on /api/me
-**Impact**: Can be spammed for session rotation abuse
-- **Recommendation**: Add rate limiting similar to other endpoints
-
----
-
+### 1. ?? Session Rotation Concurrency
+**File**: `voicelite-web/lib/auth/session.ts`
+- **Status**: Sessions younger than seven days are skipped, but concurrent `/api/me` requests can still rotate the same session simultaneously.
+- **Recommendation**: Add row-level locking or serialized background refresh to guarantee a single writer per session id.
 ## Medium-Priority Issues Remaining ℹ️
 
 ### 1. License Activation Limit Not Enforced at DB Level
@@ -125,31 +96,23 @@
 ## Before Production Deployment Checklist
 
 **CRITICAL - Must Complete:**
-- [ ] Generate new Ed25519 keys with `npm run keygen`
-- [ ] Update `LICENSE_PUBLIC_KEY` in `LicenseService.cs` with actual key
-- [ ] Set up all environment variables (see `.env.example`)
-- [ ] Run database migration: `npm run db:migrate`
-- [ ] Seed products: `npm run db:seed`
-- [ ] Test authentication flow end-to-end
-- [ ] Test checkout and webhook flow with Stripe test mode
-- [ ] Verify license validation works in desktop client
-- [ ] Build desktop client in RELEASE mode (not DEBUG)
+- [ ] Implement a durable fix or documented mitigation for the session rotation concurrency risk.
+- [ ] Generate new Ed25519 keys with `npm run keygen`.
+- [ ] Provide `VOICELITE_LICENSE_PUBLIC_KEY` and `VOICELITE_CRL_PUBLIC_KEY` via environment variables.
+- [ ] Set up all environment variables (see `.env.example` / `.env.production.template`).
+- [ ] Run database migration: `npm run db:migrate`.
+- [ ] Seed products: `npm run db:seed`.
+- [ ] Test authentication flow end-to-end.
+- [ ] Test checkout and webhook flow with Stripe test mode.
+- [ ] Verify license validation works in desktop client.
+- [ ] Build desktop client in RELEASE mode (not DEBUG).
 
-**RECOMMENDED - High Priority:**
-- [ ] Update BouncyCastle to version 2.x
-- [ ] Add environment variable validation at startup
-- [ ] Implement account enumeration protection
-- [ ] Add CSRF origin validation
-- [ ] Add rate limiting to /api/me endpoint
-
-**OPTIONAL - Nice to Have:**
-- [ ] Add certificate pinning to desktop client
-- [ ] Implement security event logging
-- [ ] Add database connection pooling config
-- [ ] Fix session rotation race condition
-
----
-
+**RECOMMENDED - Security Follow-ups:**
+- [ ] Enforce license activation limits at the database level.
+- [ ] Configure Prisma connection pooling explicitly.
+- [ ] Add certificate pinning to desktop client.
+- [ ] Implement security/audit logging.
+- [ ] Add integrity protection for on-disk license storage.
 ## Testing Recommendations
 
 ### API Security Testing
@@ -197,3 +160,4 @@ curl -X POST https://app.voicelite.com/api/webhook \
 2. Address remaining high-priority issues
 3. Set up monitoring and alerting
 4. Schedule security audit post-launch
+

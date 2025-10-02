@@ -180,12 +180,18 @@ namespace VoiceLite.Services
             };
         }
 
-        public static string ProcessTranscription(string transcription, bool useEnhancedDictionary = true)
+        public static string ProcessTranscription(string transcription, bool useEnhancedDictionary = true, List<Models.DictionaryEntry>? customDictionary = null)
         {
             if (string.IsNullOrWhiteSpace(transcription))
                 return transcription;
 
             var processed = transcription;
+
+            // Apply custom dictionary FIRST (user overrides defaults)
+            if (customDictionary != null && customDictionary.Count > 0)
+            {
+                processed = ApplyCustomDictionary(processed, customDictionary);
+            }
 
             // Apply technical corrections using pre-compiled regex
             foreach (var correction in TechnicalCorrections)
@@ -206,6 +212,25 @@ namespace VoiceLite.Services
             processed = FixSpacing(processed);
 
             return processed;
+        }
+
+        private static string ApplyCustomDictionary(string text, List<Models.DictionaryEntry> entries)
+        {
+            // Apply all enabled entries
+            foreach (var entry in entries.Where(e => e.IsEnabled))
+            {
+                try
+                {
+                    var regex = entry.GetCompiledRegex();
+                    text = regex.Replace(text, entry.Replacement);
+                }
+                catch (Exception)
+                {
+                    // Skip invalid regex patterns silently
+                    continue;
+                }
+            }
+            return text;
         }
 
         private static string FixPunctuation(string text)

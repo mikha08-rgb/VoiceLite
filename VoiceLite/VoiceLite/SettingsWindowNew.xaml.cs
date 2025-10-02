@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -65,7 +66,20 @@ namespace VoiceLite
             TargetRmsTextBox.Text = settings.TargetRmsLevel.ToString("0.###", CultureInfo.InvariantCulture);
             NoiseThresholdTextBox.Text = settings.NoiseGateThreshold.ToString("0.###", CultureInfo.InvariantCulture);
 
+            // Custom Dictionary
+            EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
+            UpdateDictionaryCount();
+
             // Current Model is set in SetupModelComparison
+        }
+
+        private void UpdateDictionaryCount()
+        {
+            var count = settings.CustomDictionaryEntries?.Count ?? 0;
+            var enabledCount = settings.CustomDictionaryEntries?.Count(e => e.IsEnabled) ?? 0;
+            DictionaryCountText.Text = count == 0
+                ? "No entries loaded"
+                : $"{enabledCount} of {count} entries enabled";
         }
 
         private void SetupModelComparison()
@@ -267,6 +281,9 @@ namespace VoiceLite
                 settings.SelectedMicrophoneName = selectedDevice.Name;
             }
 
+            // Custom Dictionary
+            settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked ?? true;
+
             // Whisper Model is already saved when selected
 
             // Whisper Parameters
@@ -290,6 +307,57 @@ namespace VoiceLite
                 settings.NoiseGateThreshold = Math.Max(0.0, Math.Min(0.5, noiseThreshold));
 
             // Hotkey (already saved on change)
+        }
+
+        private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DictionaryManagerWindow(settings);
+            if (dialog.ShowDialog() == true)
+            {
+                // Refresh the count display
+                UpdateDictionaryCount();
+                StatusText.Text = "Dictionary updated";
+            }
+        }
+
+        private void LoadMedicalTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            LoadTemplate(Models.CustomDictionaryTemplates.GetMedicalTemplate(), "Medical");
+        }
+
+        private void LoadLegalTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            LoadTemplate(Models.CustomDictionaryTemplates.GetLegalTemplate(), "Legal");
+        }
+
+        private void LoadTechTemplate_Click(object sender, RoutedEventArgs e)
+        {
+            LoadTemplate(Models.CustomDictionaryTemplates.GetTechTemplate(), "Tech");
+        }
+
+        private void LoadTemplate(List<Models.DictionaryEntry> template, string templateName)
+        {
+            var result = MessageBox.Show(
+                $"Load {template.Count} {templateName} entries?\n\nThis will add new entries without removing existing ones.",
+                "Load Template",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                int added = 0;
+                foreach (var entry in template)
+                {
+                    // Avoid duplicates
+                    if (!settings.CustomDictionaryEntries.Any(e => e.Pattern.Equals(entry.Pattern, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        settings.CustomDictionaryEntries.Add(entry);
+                        added++;
+                    }
+                }
+                UpdateDictionaryCount();
+                StatusText.Text = $"Loaded {added} {templateName} entries";
+            }
         }
 
         private async void DownloadModelsButton_Click(object sender, RoutedEventArgs e)

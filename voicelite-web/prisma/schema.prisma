@@ -28,15 +28,17 @@ enum LicenseActivationStatus {
 }
 
 model User {
-  id         String    @id @default(cuid())
-  email      String    @unique
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  sessions   Session[]
-  magicLinks MagicLinkToken[]
-  licenses   License[]
-  purchases  Purchase[]
-  apiKeys    ApiKey[]
+  id           String         @id @default(cuid())
+  email        String         @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     Session[]
+  magicLinks   MagicLinkToken[]
+  licenses     License[]
+  purchases    Purchase[]
+  apiKeys      ApiKey[]
+  feedback     Feedback[]
+  activities   UserActivity[]
 }
 
 model MagicLinkToken {
@@ -167,4 +169,72 @@ model ApiKey {
   lastUsedAt DateTime?
 
   @@index([userId])
+}
+
+enum FeedbackType {
+  BUG
+  FEATURE_REQUEST
+  GENERAL
+  QUESTION
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum FeedbackPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Feedback {
+  id        String           @id @default(cuid())
+  userId    String?
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String?
+  type      FeedbackType     @default(GENERAL)
+  subject   String
+  message   String
+  metadata  String?          // JSON - browser, OS, version, etc.
+  status    FeedbackStatus   @default(OPEN)
+  priority  FeedbackPriority @default(MEDIUM)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ActivityType {
+  USER_REGISTERED
+  USER_LOGIN
+  USER_LOGOUT
+  CHECKOUT_STARTED
+  CHECKOUT_COMPLETED
+  LICENSE_ISSUED
+  LICENSE_ACTIVATED
+  LICENSE_DEACTIVATED
+  LICENSE_RENEWED
+  FEEDBACK_SUBMITTED
+}
+
+model UserActivity {
+  id           String       @id @default(cuid())
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activityType ActivityType
+  metadata     String?      // JSON - additional context
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime     @default(now())
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
 }

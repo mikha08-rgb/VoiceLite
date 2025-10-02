@@ -155,6 +155,117 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Dictionary Tab -->
+            <TabItem Header="Dictionary" Name="DictionaryTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <!-- Header Info -->
+                        <TextBlock Text="Custom Dictionary"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#333333"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Text="Create custom word replacements to improve transcription accuracy. Perfect for abbreviations, industry terms, and personal names."
+                                   TextWrapping="Wrap"
+                                   Foreground="#666666"
+                                   FontSize="12"
+                                   Margin="0,0,0,20"/>
+
+                        <!-- Enable/Disable -->
+                        <Border Background="#F8F9FA"
+                                Padding="15"
+                                CornerRadius="6"
+                                Margin="0,0,0,20">
+                            <StackPanel>
+                                <CheckBox Name="EnableCustomDictionaryCheckBox"
+                                          Content="Enable custom dictionary replacements"
+                                          IsChecked="True"
+                                          FontSize="13"
+                                          FontWeight="SemiBold"
+                                          Margin="0,0,0,8"/>
+                                <TextBlock Name="DictionaryCountText"
+                                           Text="0 entries loaded"
+                                           FontSize="12"
+                                           Foreground="#666666"
+                                           Margin="20,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Quick Actions -->
+                        <GroupBox Header="Quick Actions" Margin="0,0,0,20">
+                            <StackPanel Margin="10">
+                                <Button Name="ManageDictionaryButton"
+                                        Content="📝 Manage Dictionary Entries"
+                                        Height="40"
+                                        FontSize="13"
+                                        HorizontalAlignment="Stretch"
+                                        Click="ManageDictionaryButton_Click"
+                                        ToolTip="Add, edit, or remove custom word replacements"
+                                        Margin="0,0,0,10"/>
+
+                                <TextBlock Text="Load Pre-built Templates:"
+                                           FontWeight="SemiBold"
+                                           FontSize="12"
+                                           Margin="0,10,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Name="LoadMedicalTemplateButton"
+                                            Grid.Column="0"
+                                            Content="🏥 Medical (33 terms)"
+                                            Height="35"
+                                            FontSize="11"
+                                            Margin="0,0,5,0"
+                                            Click="LoadMedicalTemplate_Click"
+                                            ToolTip="Load medical abbreviations: BP, CBC, PRN, etc."/>
+                                    <Button Name="LoadLegalTemplateButton"
+                                            Grid.Column="1"
+                                            Content="⚖️ Legal (20 terms)"
+                                            Height="35"
+                                            FontSize="11"
+                                            Margin="5,0,5,0"
+                                            Click="LoadLegalTemplate_Click"
+                                            ToolTip="Load legal terms: SCOTUS, NDA, LLC, etc."/>
+                                    <Button Name="LoadTechTemplateButton"
+                                            Grid.Column="2"
+                                            Content="💻 Tech (31 terms)"
+                                            Height="35"
+                                            FontSize="11"
+                                            Margin="5,0,0,0"
+                                            Click="LoadTechTemplate_Click"
+                                            ToolTip="Load tech abbreviations: AWS, k8s, API, etc."/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Examples -->
+                        <GroupBox Header="Examples" Margin="0,0,0,0">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Medical:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="• Say 'BP is elevated' → 'blood pressure is elevated'"
+                                           FontSize="11" Foreground="#666666" Margin="10,0,0,3"/>
+                                <TextBlock Text="• Say 'CBC was normal' → 'complete blood count was normal'"
+                                           FontSize="11" Foreground="#666666" Margin="10,0,0,10"/>
+
+                                <TextBlock Text="Tech:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="• Say 'Deploy to k8s' → 'Deploy to Kubernetes'"
+                                           FontSize="11" Foreground="#666666" Margin="10,0,0,3"/>
+                                <TextBlock Text="• Say 'Using AWS' → 'Using Amazon Web Services'"
+                                           FontSize="11" Foreground="#666666" Margin="10,0,0,10"/>
+
+                                <TextBlock Text="Custom:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="• Pattern: 'VL' → Replacement: 'VoiceLite'"
+                                           FontSize="11" Foreground="#666666" Margin="10,0,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- Advanced Tab -->
             <TabItem Header="Advanced">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">

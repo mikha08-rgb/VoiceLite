@@ -490,7 +490,7 @@ curl -X POST http://localhost:3000/api/webhook \
 2. **Verify Public Key**:
    ```bash
    # Check VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs
-   # Verify LICENSE_PUBLIC_KEY matches LICENSE_SIGNING_PUBLIC_B64 from .env.local
+   # Verify signing environment variables are configured
    ```
 
 3. **Run Desktop App**:
@@ -795,7 +795,7 @@ npx prisma studio
 - Check browser console for errors
 
 ### Issue: License signature invalid
-- Verify LICENSE_PUBLIC_KEY in LicenseService.cs matches LICENSE_SIGNING_PUBLIC_B64
+- Verify `VOICELITE_LICENSE_PUBLIC_KEY`/`VOICELITE_CRL_PUBLIC_KEY` are set and match the production keys
 - Rebuild desktop client after key change
 - Check base64url encoding (no padding, URL-safe)
 

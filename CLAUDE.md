@@ -52,6 +52,21 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
 ```
 
+### License Server (Node.js Backend)
+```bash
+# Navigate to license server directory
+cd license-server
+
+# Install dependencies
+npm install
+
+# Run development server (with auto-reload)
+npm run dev
+
+# Run production server
+npm start
+```
+
 ### Web Application (Next.js)
 ```bash
 # Navigate to web directory
@@ -68,6 +83,30 @@ npm run build
 
 # Start production server
 npm start
+
+# Deploy to Vercel (requires Vercel CLI)
+vercel deploy --prod
+```
+
+### Database (Prisma)
+```bash
+# Navigate to web directory
+cd voicelite-web
+
+# Create and apply migration
+npm run db:migrate
+
+# Push schema changes (without migration)
+npm run db:push
+
+# Seed database with initial data
+npm run db:seed
+
+# Open Prisma Studio (database GUI)
+npm run db:studio
+
+# Generate license keys
+npm run keygen
 ```
 
 ## Architecture Overview
@@ -88,6 +127,8 @@ npm start
    - `SystemTrayManager`: System tray icon and context menu
    - `AudioPreprocessor`: Audio enhancement (noise gate, gain control)
    - `TranscriptionPostProcessor`: Text corrections and formatting
+   - `TranscriptionHistoryService`: Manages transcription history with pinning and auto-cleanup
+   - `SoundService`: Custom UI sound effects (wood-tap-click.ogg)
    - `ModelBenchmarkService`: Model performance testing
    - `MemoryMonitor`: Memory usage tracking
    - `ErrorLogger`: Centralized error logging
@@ -101,14 +142,23 @@ npm start
    - `Settings`: User preferences with validation
    - `TranscriptionResult`: Whisper output parsing
    - `WhisperModelInfo`: Model metadata and benchmarking
+   - `TranscriptionHistoryItem`: History panel items with metadata
+   - `CustomDictionary`: Custom word/phrase replacements with templates (Medical, Legal, Tech)
+   - `UserSession`: Session tracking and metrics
+   - `LicensePayload`: License validation structures
 
 4. **Interfaces** (`Interfaces/`): Contract definitions for dependency injection
    - `IRecorder`, `ITranscriber`, `ITextInjector`
 
 5. **UI Components**
-   - `SettingsWindow`: Settings UI with model selection
+   - `MainWindow.xaml`: Main application window with recording status and history panel
+   - `SettingsWindow.xaml` / `SettingsWindowNew.xaml`: Settings UI with model selection
+   - `DictionaryManagerWindow.xaml`: Custom dictionary editor with template presets
+   - `LoginWindow.xaml`: Pro license activation window
    - `Controls/SimpleModelSelector`: Model selection control
    - `Resources/ModernStyles.xaml`: WPF styling resources
+   - `Utilities/RelativeTimeConverter`: Converter for "5 mins ago" timestamps
+   - `Utilities/TruncateTextConverter`: Converter for text preview truncation
 
 ## Whisper Integration
 
@@ -136,25 +186,37 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ## Licensing & Freemium Model
 
-### Free Tier
-- Fully free build – no tiers or caps
-- All local Whisper models available once installed
-- Optional medium model download triggered from settings
-- Legacy license services removed from desktop client
+### Desktop App (Free Tier)
+- Desktop client is **100% free** with no usage caps
+- Tiny model (77MB) ships with installer and works offline
+- Works completely offline - no license validation required
+- No online authentication or tracking
+- All core features available (hotkeys, text injection, settings)
+
+### Web-Based Pro Tier (Optional)
+- Stripe subscription managed via voicelite.app ($20/3mo or $99 lifetime)
+- License server validates Pro subscriptions for premium models (Base, Small, Medium)
+- Unlocks: Better accuracy (93-97%), technical term recognition, priority support, early access
+- License server located in `license-server/` (Node.js/Express/SQLite)
+- Desktop app validates Pro licenses via server API for premium model downloads
 
 ### Implementation Details
-- Usage tracking removed; recordings only saved temporarily for transcription
-- Model selection UI now reflects installed files without license gating
-- System tray no longer exposes licensing entry points
+- Free tier: Tiny model runs standalone without any server connection
+- Pro tier: Premium models require server-side license validation before download
+- Recordings processed locally and discarded after transcription (both tiers)
+- License keys use Ed25519 cryptographic signing for security
+- Desktop app can function fully offline after premium models are downloaded
 
 ## Key Technical Details
 
 ### Dependencies (NuGet Packages)
 - `NAudio` (2.2.1): Audio recording and processing
+- `NAudio.Vorbis` (1.5.0): OGG audio file support for sound effects
 - `H.InputSimulator` (1.2.1): Keyboard/mouse simulation for text injection
 - `Hardcodet.NotifyIcon.Wpf` (2.0.1): System tray integration
 - `System.Text.Json` (9.0.9): Settings persistence
 - `System.Management` (8.0.0): System information
+- `BouncyCastle.Cryptography` (2.4.0): License encryption and cryptographic operations
 
 ### Test Dependencies (xUnit)
 - `xunit` (2.9.2): Test framework
@@ -177,7 +239,9 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 - Default mode: Push-to-talk (not toggle)
 - Auto-paste enabled by default
 - Multiple text injection modes (SmartAuto, AlwaysType, AlwaysPaste, PreferType, PreferPaste)
-- Sound feedback disabled by default
+- Sound feedback disabled by default (wood-tap-click.ogg via NAudio.Vorbis)
+- **Transcription history**: Configurable max items (default 50), supports pinning, auto-cleanup
+- **Custom dictionaries**: Pattern-based replacements with templates (Medical, Legal, Tech)
 
 ### Error Handling & Logging
 - Comprehensive error logging via `ErrorLogger` service
@@ -241,9 +305,50 @@ The `voicelite-web` directory contains a Next.js 15 application for:
 ### Tech Stack
 - Next.js 15.5.4 (React 19)
 - TypeScript
-- Tailwind CSS v4
-- Stripe for payments
-- Resend for email notifications
+- Tailwind CSS v4 (PostCSS-based, no config file)
+- Prisma ORM with SQLite (dev) / PostgreSQL (production)
+- Stripe for Pro subscription payments
+- Resend for transactional emails
+- Upstash Redis for rate limiting
+- Ed25519 cryptography (@noble/ed25519) for license signing
+- Zod for schema validation
+
+## License Server Architecture
+
+The `license-server/` directory contains the Pro subscription backend for validating licenses and managing subscriptions.
+
+### Architecture
+- **Framework**: Express.js with SQLite database
+- **Authentication**: API_KEY for desktop client, ADMIN_KEY for admin operations
+- **Database**: SQLite (dev/production), schema managed via raw SQL migrations
+- **Deployment**: Vercel (serverless)
+
+### Key Files
+- `server.js`: Main Express server with license validation endpoints
+- `admin.js`: Command-line admin tool for license management
+- `emailService.js`: Nodemailer integration for license notifications
+- `vercel.json`: Deployment configuration
+
+### API Endpoints
+- `GET /api/check`: Health check endpoint
+- `POST /api/generate`: Generate new license (requires ADMIN_KEY)
+- `POST /api/activate`: Activate license on device (requires API_KEY)
+- `POST /api/validate`: Validate license status (requires API_KEY)
+- `POST /api/revoke`: Revoke license (requires ADMIN_KEY)
+- `GET /api/stats`: License statistics (requires ADMIN_KEY)
+- `POST /api/webhook/stripe`: Stripe webhook handler for subscription events
+
+### Database Schema
+- `licenses` table: License keys, email, type, activation status, Stripe metadata
+- `activations` table: Device activations with machine_id tracking
+
+### Environment Variables Required
+- `API_KEY`: API key for desktop client validation
+- `ADMIN_KEY`: Admin key for management operations
+- `DATABASE_PATH`: Path to SQLite database file
+- `ALLOWED_ORIGINS`: CORS allowed origins (comma-separated)
+- `STRIPE_SECRET_KEY`: Stripe API key for webhook verification
+- `EMAIL_*`: SMTP credentials for Nodemailer
 
 ## Deployment & Distribution
 
@@ -268,16 +373,40 @@ The `voicelite-web` directory contains a Next.js 15 application for:
 
 ## Known Issues & Limitations
 
-1. **VCRUNTIME140_1.dll Error**: Requires Visual C++ Redistributable 2015-2022 x64
+1. **VCRUNTIME140_1.dll Error**: Requires Visual C++ Redistributable 2015-2022 x64 ([Download](https://aka.ms/vs/17/release/vc_redist.x64.exe))
 2. **Antivirus False Positives**: Global hotkeys and text injection may trigger warnings
 3. **Windows Defender**: Files may need to be unblocked (right-click → Properties → Unblock)
 4. **First Run Diagnostics**: StartupDiagnostics checks and auto-fixes common issues
-5. **License Server**: Requires online connection for Pro validation
-6. **English Only**: Multi-language support planned but not yet implemented
+5. **English Only**: Multi-language support planned but not yet implemented
+
+## Development Troubleshooting
+
+### Common Build Issues
+- **Missing whisper.exe**: Ensure `whisper/whisper.exe` exists in project directory
+- **Build fails on Services/**: Clean solution (`dotnet clean`) then rebuild
+- **Test project won't load**: Verify xUnit, Moq, FluentAssertions packages are restored
+
+### Common Runtime Issues
+- **Settings not persisting**: Check AppData write permissions (`%APPDATA%\VoiceLite\`)
+- **UnauthorizedAccessException on logs**: ErrorLogger auto-creates `%APPDATA%\VoiceLite\logs\`
+- **Whisper process hangs**: Check timeout multiplier in settings (default 2.0x)
+- **No text injection**: Verify InputSimulator has proper permissions
+
+### Web/License Server Issues
+- **Prisma migrations fail**: Check `voicelite-web/prisma/schema.prisma` is valid
+- **Stripe webhook errors**: Verify webhook secret in environment variables
+- **License validation fails**: Check API_KEY matches between desktop app and server
+- **CORS errors**: Verify ALLOWED_ORIGINS environment variable
+
+## Version Information
+
+- **Desktop App**: v1.0.5 (check installer output filename)
+- **Web App**: v0.1.0 (see voicelite-web/package.json)
+- **License Server**: v1.0.0 (see license-server/package.json)
 
 ## Changelog Highlights
 
-### v1.0.5 (Current)
+### v1.0.5 (Current Desktop Release)
 - **Settings Location**: Fixed critical bug where settings were saved to Program Files (protected directory) instead of AppData
 - **Error Logs Location**: Fixed error logs being written to Program Files. Now correctly uses `%APPDATA%\VoiceLite\logs\`
 - **First-Run Experience**: Added automatic AppData directory creation and settings migration

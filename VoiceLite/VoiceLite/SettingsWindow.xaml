@@ -151,6 +151,27 @@
                     </StackPanel>
                 </GroupBox>
 
+                <!-- Custom Dictionary -->
+                <GroupBox Header="Custom Dictionary" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <CheckBox Name="EnableCustomDictionaryCheckBox"
+                                  Content="Enable custom dictionary replacements"
+                                  IsChecked="True"
+                                  Margin="0,0,0,10"/>
+                        <TextBlock Name="DictionaryCountText"
+                                   Text="0 entries loaded"
+                                   FontSize="11"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,10"/>
+                        <Button Name="ManageDictionaryButton"
+                                Content="Manage Dictionary..."
+                                Width="150"
+                                HorizontalAlignment="Left"
+                                Click="ManageDictionaryButton_Click"
+                                ToolTip="Add, edit, or remove custom word replacements"/>
+                    </StackPanel>
+                </GroupBox>
+
                 <!-- Other Settings -->
                 <GroupBox Header="Other Settings" Margin="0,0,0,15">
                     <StackPanel Margin="10">
@@ -176,6 +197,12 @@
         <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
+            <Button Name="SendFeedbackButton"
+                    Content="Send Feedback"
+                    Width="120"
+                    Margin="0,0,10,0"
+                    Click="SendFeedbackButton_Click"
+                    ToolTip="Send feedback, report bugs, or request features"/>
             <Button Name="SaveButton"
                     Content="Save"
                     Width="80"

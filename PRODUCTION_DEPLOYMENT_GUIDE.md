@@ -196,17 +196,13 @@ Copy all 4 keys to your `.env.local` file
 
 ### 5.3 Update Desktop Client
 
-**CRITICAL**: Copy `LICENSE_SIGNING_PUBLIC_B64` to desktop client:
+**CRITICAL**: Expose the signing public keys to the desktop client at runtime:
 
-1. Open `VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs`
-2. Find line ~34: `private const string LICENSE_PUBLIC_KEY`
-3. Replace with your `LICENSE_SIGNING_PUBLIC_B64` value:
+1. Set the `VOICELITE_LICENSE_PUBLIC_KEY` environment variable (or installer configuration) to the `LICENSE_SIGNING_PUBLIC_B64` value.
+2. Set the `VOICELITE_CRL_PUBLIC_KEY` environment variable to the matching `CRL_SIGNING_PUBLIC_B64` value.
+3. Keep the private keys (LICENSE_SIGNING_PRIVATE_B64, CRL_SIGNING_PRIVATE_B64) in your deployment secret manager—never commit them to the repository.
 
-```csharp
-private const string LICENSE_PUBLIC_KEY = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
-```
-
-4. Save the file
+The fallback constant in `LicenseService.cs` remains for development builds, but production deployments **must** provide the environment variables above so you can rotate keys without recompiling.
 
 ---
 
@@ -303,12 +299,9 @@ dotnet publish VoiceLite.csproj -c Release -r win-x64 --self-contained
 # VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/
 ```
 
-### 7.2 Verify Public Key
+### 7.2 Verify License Key Configuration
 
-Check that `LicenseService.cs` has the correct production public key:
-```csharp
-private const string LICENSE_PUBLIC_KEY = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
-```
+Confirm that the build environment supplies `VOICELITE_LICENSE_PUBLIC_KEY` and `VOICELITE_CRL_PUBLIC_KEY` before packaging. The fallback constant in `LicenseService.cs` should match your staging key, but production installers rely on the environment variables so keys can rotate without recompiling.
 
 ### 7.3 Build Installer
 
@@ -446,7 +439,7 @@ private const string LICENSE_PUBLIC_KEY = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esL
 - Ensure webhook URL is correct: https://app.voicelite.com/api/webhook
 
 **Issue**: Desktop client can't activate license
-- Verify LICENSE_PUBLIC_KEY in LicenseService.cs matches LICENSE_SIGNING_PUBLIC_B64 in .env
+- Verify `VOICELITE_LICENSE_PUBLIC_KEY`/`VOICELITE_CRL_PUBLIC_KEY` env vars are populated on the build machine
 - Check /api/licenses/issue endpoint returns signed license
 - Check desktop client can reach https://app.voicelite.com
 
@@ -550,3 +543,8 @@ See `.env.production.template` for complete list with examples.
 **Deployment Guide Version**: 1.0
 **Last Updated**: 2025-01-XX
 **Author**: VoiceLite Development Team
+
+
+
+
+

@@ -1,0 +1,208 @@
+<Window x:Class="VoiceLite.DictionaryManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Custom Dictionary Manager" Height="600" Width="800"
+        WindowStartupLocation="CenterOwner"
+        Background="#FCFCFC">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Text="Custom Dictionary Manager"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="#4A4A4A"
+                   Grid.Row="0"
+                   Margin="0,0,0,16"/>
+
+        <!-- Category Tabs -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
+            <RadioButton x:Name="AllCategoriesRadio"
+                         Content="All"
+                         IsChecked="True"
+                         Margin="0,0,16,0"
+                         Checked="CategoryRadio_Checked"/>
+            <RadioButton x:Name="GeneralCategoryRadio"
+                         Content="General"
+                         Margin="0,0,16,0"
+                         Checked="CategoryRadio_Checked"/>
+            <RadioButton x:Name="MedicalCategoryRadio"
+                         Content="Medical"
+                         Margin="0,0,16,0"
+                         Checked="CategoryRadio_Checked"/>
+            <RadioButton x:Name="LegalCategoryRadio"
+                         Content="Legal"
+                         Margin="0,0,16,0"
+                         Checked="CategoryRadio_Checked"/>
+            <RadioButton x:Name="TechCategoryRadio"
+                         Content="Tech"
+                         Margin="0,0,16,0"
+                         Checked="CategoryRadio_Checked"/>
+            <RadioButton x:Name="PersonalCategoryRadio"
+                         Content="Personal"
+                         Checked="CategoryRadio_Checked"/>
+        </StackPanel>
+
+        <!-- DataGrid -->
+        <Border Grid.Row="2"
+                BorderBrush="#E0E0E0"
+                BorderThickness="1"
+                Background="White"
+                CornerRadius="6"
+                Margin="0,0,0,16">
+            <DataGrid x:Name="EntriesDataGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      GridLinesVisibility="Horizontal"
+                      HeadersVisibility="Column"
+                      BorderThickness="0"
+                      Background="White"
+                      RowBackground="White"
+                      AlternatingRowBackground="#FAFAFA"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="Enabled"
+                                            Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"
+                                            Width="70"/>
+                    <DataGridTextColumn Header="Pattern"
+                                        Binding="{Binding Pattern}"
+                                        Width="2*"/>
+                    <DataGridTextColumn Header="Replacement"
+                                        Binding="{Binding Replacement}"
+                                        Width="2*"/>
+                    <DataGridTextColumn Header="Category"
+                                        Binding="{Binding Category}"
+                                        Width="*"
+                                        IsReadOnly="True"/>
+                    <DataGridCheckBoxColumn Header="Case Sensitive"
+                                            Binding="{Binding CaseSensitive, UpdateSourceTrigger=PropertyChanged}"
+                                            Width="110"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Action Buttons -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left side buttons -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button x:Name="AddButton"
+                        Content="Add Entry"
+                        Width="100"
+                        Height="36"
+                        Background="#F5F5F5"
+                        Foreground="#4A4A4A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        Margin="0,0,8,0"
+                        Click="AddButton_Click"/>
+                <Button x:Name="EditButton"
+                        Content="Edit"
+                        Width="80"
+                        Height="36"
+                        Background="#F5F5F5"
+                        Foreground="#4A4A4A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        Margin="0,0,8,0"
+                        Click="EditButton_Click"/>
+                <Button x:Name="DeleteButton"
+                        Content="Delete"
+                        Width="80"
+                        Height="36"
+                        Background="#F5F5F5"
+                        Foreground="#E74C3C"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        Margin="0,0,16,0"
+                        Click="DeleteButton_Click"/>
+            </StackPanel>
+
+            <!-- Middle - Template buttons -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="Load Template:"
+                           VerticalAlignment="Center"
+                           Foreground="#7A7A7A"
+                           FontSize="12"
+                           Margin="0,0,8,0"/>
+                <Button x:Name="LoadMedicalButton"
+                        Content="Medical"
+                        Width="70"
+                        Height="28"
+                        Background="Transparent"
+                        Foreground="#7A7A7A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        FontSize="12"
+                        Margin="0,0,4,0"
+                        Click="LoadMedicalButton_Click"/>
+                <Button x:Name="LoadLegalButton"
+                        Content="Legal"
+                        Width="70"
+                        Height="28"
+                        Background="Transparent"
+                        Foreground="#7A7A7A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        FontSize="12"
+                        Margin="0,0,4,0"
+                        Click="LoadLegalButton_Click"/>
+                <Button x:Name="LoadTechButton"
+                        Content="Tech"
+                        Width="70"
+                        Height="28"
+                        Background="Transparent"
+                        Foreground="#7A7A7A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        FontSize="12"
+                        Click="LoadTechButton_Click"/>
+            </StackPanel>
+
+            <!-- Right side buttons -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="ImportButton"
+                        Content="Import..."
+                        Width="80"
+                        Height="36"
+                        Background="#F5F5F5"
+                        Foreground="#4A4A4A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        Margin="0,0,8,0"
+                        Click="ImportButton_Click"/>
+                <Button x:Name="ExportButton"
+                        Content="Export..."
+                        Width="80"
+                        Height="36"
+                        Background="#F5F5F5"
+                        Foreground="#4A4A4A"
+                        BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        Margin="0,0,16,0"
+                        Click="ExportButton_Click"/>
+                <Button x:Name="CloseButton"
+                        Content="Close"
+                        Width="80"
+                        Height="36"
+                        Background="#4169E1"
+                        Foreground="White"
+                        BorderBrush="#4169E1"
+                        BorderThickness="1"
+                        Click="CloseButton_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

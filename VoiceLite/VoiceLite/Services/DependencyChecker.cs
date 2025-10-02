@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
@@ -256,7 +258,6 @@ namespace VoiceLite.Services
             {
                 var tempPath = Path.Combine(Path.GetTempPath(), "vc_redist.x64.exe");
 
-                // Show download progress
                 var progressWindow = new Window
                 {
                     Title = "Installing Dependencies",
@@ -287,7 +288,6 @@ namespace VoiceLite.Services
 
                 try
                 {
-                    // Download the installer
                     using (var client = new HttpClient())
                     {
                         client.Timeout = TimeSpan.FromMinutes(5);
@@ -296,11 +296,14 @@ namespace VoiceLite.Services
 
                         var bytes = await response.Content.ReadAsByteArrayAsync();
                         await File.WriteAllBytesAsync(tempPath, bytes);
+                        VerifyMicrosoftSignature(tempPath);
                     }
 
-                    progressWindow.Close();
+                    if (progressWindow.IsVisible)
+                    {
+                        progressWindow.Close();
+                    }
 
-                    // Run the installer
                     var installProcess = new Process
                     {
                         StartInfo = new ProcessStartInfo
@@ -308,23 +311,21 @@ namespace VoiceLite.Services
                             FileName = tempPath,
                             Arguments = "/quiet /norestart",
                             UseShellExecute = true,
-                            Verb = "runas" // Request admin rights
+                            Verb = "runas"
                         }
                     };
 
                     installProcess.Start();
                     await Task.Run(() => installProcess.WaitForExit());
 
-                    // Clean up
                     try { File.Delete(tempPath); } catch { }
 
-                    if (installProcess.ExitCode == 0 || installProcess.ExitCode == 3010) // 3010 = restart required
+                    if (installProcess.ExitCode == 0 || installProcess.ExitCode == 3010)
                     {
                         if (installProcess.ExitCode == 3010)
                         {
                             MessageBox.Show(
-                                "Visual C++ Runtime installed successfully.\n" +
-                                "A system restart may be required for changes to take effect.",
+                                "Visual C++ Runtime installed successfully.\nA system restart may be required for changes to take effect.",
                                 "Installation Complete",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Information);
@@ -339,8 +340,24 @@ namespace VoiceLite.Services
                 }
                 finally
                 {
-                    progressWindow.Close();
+                    if (progressWindow.IsVisible)
+                    {
+                        progressWindow.Close();
+                    }
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                ErrorLogger.LogError("VC Runtime installer validation failed", ex);
+
+                MessageBox.Show(
+                    "The downloaded Visual C++ Runtime could not be verified as an authentic Microsoft package.\n\n" +
+                    "Please download the installer directly from:\nhttps://aka.ms/vs/17/release/vc_redist.x64.exe",
+                    "Installer Verification Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return false;
             }
             catch (Exception ex)
             {
@@ -348,8 +365,7 @@ namespace VoiceLite.Services
 
                 MessageBox.Show(
                     "Failed to install Visual C++ Runtime automatically.\n\n" +
-                    "Please download and install it manually from:\n" +
-                    "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+                    "Please download and install it manually from:\nhttps://aka.ms/vs/17/release/vc_redist.x64.exe",
                     "Installation Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -357,6 +373,24 @@ namespace VoiceLite.Services
                 return false;
             }
         }
+
+        private static void VerifyMicrosoftSignature(string installerPath)
+        {
+            try
+            {
+                using var certificate = new X509Certificate2(installerPath);
+                var subject = certificate.Subject ?? string.Empty;
+                if (!subject.Contains("Microsoft Corporation", StringComparison.OrdinalIgnoreCase) || !certificate.Verify())
+                {
+                    throw new InvalidOperationException("VC++ runtime download did not pass Microsoft signature validation.");
+                }
+            }
+            catch (CryptographicException ex)
+            {
+                throw new InvalidOperationException("Unable to verify digital signature for VC++ runtime package.", ex);
+            }
+        }
+
     }
 
     public class DependencyCheckResult
