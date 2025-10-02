@@ -2,17 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // One-time setup endpoint to create AnalyticsEvent table
+// TEMPORARY: No auth - DELETE THIS ENDPOINT AFTER USE!
 export async function POST(req: NextRequest) {
   try {
-    const { secret } = await req.json();
-
-    // Simple secret check
-    if (secret !== process.env.MIGRATION_SECRET) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // Create AnalyticsEvent table using raw SQL
     await prisma.$executeRaw`
