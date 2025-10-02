@@ -1,11 +1,13 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using VoiceLite.Models;
 using VoiceLite.Services;
 using VoiceLite.Interfaces;
@@ -52,6 +54,8 @@ namespace VoiceLite
         private DateTime lastHotkeyPressTime = DateTime.MinValue;
         private System.Timers.Timer? autoTimeoutTimer;
         private bool isCancelled = false; // Track if recording was cancelled
+        private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
+        private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
 
         public MainWindow()
         {
@@ -256,7 +260,34 @@ namespace VoiceLite
             UpdateConfigDisplay();
         }
 
+        /// <summary>
+        /// Debounced settings save - queues save request and executes after 500ms of inactivity
+        /// </summary>
         private void SaveSettings()
+        {
+            // Reset or create timer
+            if (settingsSaveTimer == null)
+            {
+                settingsSaveTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(500)
+                };
+                settingsSaveTimer.Tick += (s, e) =>
+                {
+                    settingsSaveTimer.Stop();
+                    SaveSettingsInternal();
+                };
+            }
+
+            // Restart timer (debounce)
+            settingsSaveTimer.Stop();
+            settingsSaveTimer.Start();
+        }
+
+        /// <summary>
+        /// Internal method that actually saves settings to disk
+        /// </summary>
+        private void SaveSettingsInternal()
         {
             try
             {
@@ -536,26 +567,7 @@ namespace VoiceLite
             if (StatusIndicator != null)
             {
                 StatusIndicator.Fill = color;
-
-                // Add pulsing animation for recording state
-                if (status == "Recording...")
-                {
-                    var animation = new System.Windows.Media.Animation.DoubleAnimation
-                    {
-                        From = 0.3,
-                        To = 1.0,
-                        Duration = TimeSpan.FromSeconds(0.75),
-                        AutoReverse = true,
-                        RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
-                    };
-                    StatusIndicator.BeginAnimation(UIElement.OpacityProperty, animation);
-                }
-                else
-                {
-                    // Stop any animation
-                    StatusIndicator.BeginAnimation(UIElement.OpacityProperty, null);
-                    StatusIndicator.Opacity = 1.0;
-                }
+                StatusIndicator.Opacity = 1.0;
             }
         }
 
@@ -580,11 +592,23 @@ namespace VoiceLite
                 audioRecorder?.StartRecording();
 
                 // Only update UI if we get here successfully
-                UpdateStatus("Recording...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF9999")));
+                UpdateStatus("Recording 0:00", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
 
-                // Start pulsing animation on status indicator
-                var pulseAnimation = (System.Windows.Media.Animation.Storyboard)FindResource("PulseAnimation");
-                pulseAnimation.Begin(StatusIndicator);
+                // Add red border for visual recording indicator
+                this.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+                this.BorderThickness = new Thickness(3);
+
+                // Start elapsed time timer
+                recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                recordingElapsedTimer.Tick += (s, e) =>
+                {
+                    var elapsed = DateTime.Now - recordingStartTime;
+                    UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
+                };
+                recordingElapsedTimer.Start();
 
                 // Update button and text based on mode
                 // Recording started - mode-specific handling in hotkey manager
@@ -653,10 +677,6 @@ namespace VoiceLite
                 audioRecorder?.StopRecording();
                 isRecording = false;
 
-                // Stop pulsing animation on status indicator
-                StatusIndicator.BeginAnimation(System.Windows.UIElement.OpacityProperty, null);
-                StatusIndicator.Opacity = 1.0;
-
                 if (cancel)
                 {
                     UpdateStatus("Cancelled", Brushes.Gray);
@@ -664,11 +684,11 @@ namespace VoiceLite
                 }
                 else
                 {
-                    UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD699")));
+                    UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
 
                     // Reset TranscriptionText to show processing state
                     TranscriptionText.Text = "Processing audio...";
-                    TranscriptionText.Foreground = Brushes.Orange;
+                    TranscriptionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
                 }
             }
             catch (Exception ex)
@@ -988,6 +1008,10 @@ namespace VoiceLite
                 workingAudioPath = audioFilePath;
             }
 
+            // Stop elapsed time timer
+            recordingElapsedTimer?.Stop();
+            recordingElapsedTimer = null;
+
             // Update UI immediately on UI thread
             Dispatcher.Invoke(() => UpdateStatus("Transcribing...", Brushes.Blue));
 
@@ -1058,7 +1082,10 @@ namespace VoiceLite
                     Dispatcher.Invoke(() =>
                     {
                         ErrorLogger.LogMessage($"OnAudioFileReady: Final UI update - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
+                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+
+                        // Remove window border when done recording
+                        this.BorderThickness = new Thickness(0);
 
                         // Reset TranscriptionText to ready state after successful completion
                         string hotkeyDisplay = GetHotkeyDisplayString();
@@ -1338,6 +1365,55 @@ namespace VoiceLite
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Handle Ctrl+D - Open dictionary
+            if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                DictionaryButton_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            // Handle Ctrl+F - Toggle search box
+            if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                ToggleSearchButton_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            // Handle Ctrl+E - Export history
+            if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                ExportHistory_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            // Handle Ctrl+Shift+Delete - Clear all history
+            if (e.Key == Key.Delete && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                ClearAllHistory_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            // Handle Ctrl+, - Open settings
+            if (e.Key == Key.OemComma && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                SettingsButton_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            // Handle Esc key to close search box (if open)
+            if (e.Key == Key.Escape && SearchBoxRow.Visibility == Visibility.Visible)
+            {
+                SearchBoxRow.Visibility = Visibility.Collapsed;
+                HistorySearchBox.Text = "";
+                e.Handled = true;
+                return;
+            }
+
             // Handle Esc key to cancel recording
             if (e.Key == Key.Escape && isRecording)
             {
@@ -1526,6 +1602,7 @@ namespace VoiceLite
             }
         }
 
+
         protected override void OnClosed(EventArgs e)
         {
             SaveSettings();
@@ -1570,10 +1647,11 @@ namespace VoiceLite
             base.OnClosed(e);
         }
 
-        private void OnTrayAccountMenuClicked(object? sender, EventArgs e)
+        private async void OnTrayAccountMenuClicked(object? sender, EventArgs e)
         {
             ShowMainWindow();
-            // The AccountButton_Click is already defined above and will handle the action
+            // Call the account button logic directly
+            await Dispatcher.InvokeAsync(() => AccountButton_Click(sender, new RoutedEventArgs()));
         }
 
         private async Task SignOutAsync()
@@ -1644,7 +1722,7 @@ namespace VoiceLite
 
                     EmptyHistoryMessage.Visibility = Visibility.Collapsed;
 
-                    // Create UI for each history item
+                    // Create UI for each history item - instant, no animations
                     foreach (var item in settings.TranscriptionHistory!)
                     {
                         var card = CreateHistoryCard(item);
@@ -1668,15 +1746,31 @@ namespace VoiceLite
             {
                 Background = Brushes.White,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
-                BorderThickness = new Thickness(0, 0, 0, 1),
-                Padding = new Thickness(12),
-                Margin = new Thickness(0, 0, 0, 8),
-                CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(14),
+                Margin = new Thickness(0, 0, 0, 10),
+                CornerRadius = new CornerRadius(6),
                 Cursor = Cursors.Hand,
-                Tag = item // Store the item for event handlers
+                Tag = item, // Store the item for event handlers
+                Effect = new DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    BlurRadius = 4,
+                    ShadowDepth = 1,
+                    Opacity = 0.06,
+                    Direction = 270,
+                    RenderingBias = RenderingBias.Quality
+                },
+                // Improve rendering clarity
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true
             };
 
-            // Hover effect will be added later with copy button visibility
+            // Improve text rendering for the entire card
+            System.Windows.Media.TextOptions.SetTextRenderingMode(border, System.Windows.Media.TextRenderingMode.ClearType);
+            System.Windows.Media.TextOptions.SetTextFormattingMode(border, System.Windows.Media.TextFormattingMode.Display);
+
+            // Enhanced hover effects
 
             // Click to copy
             border.MouseLeftButtonDown += (s, e) =>
@@ -1684,7 +1778,16 @@ namespace VoiceLite
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
-                    MessageBox.Show("Copied to clipboard!", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+
+                    // Revert to "Ready" after 1.5 seconds
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                    timer.Tick += (ts, te) =>
+                    {
+                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                        timer.Stop();
+                    };
+                    timer.Start();
                 }
                 catch (Exception ex)
                 {
@@ -1701,6 +1804,16 @@ namespace VoiceLite
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+
+                    // Revert to "Ready" after 1.5 seconds
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                    timer.Tick += (ts, te) =>
+                    {
+                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                        timer.Stop();
+                    };
+                    timer.Start();
                 }
                 catch (Exception ex)
                 {
@@ -1767,33 +1880,42 @@ namespace VoiceLite
             };
             headerGrid.Children.Add(timeText);
 
-            // Copy button (visible on hover)
+            // Copy button (visible on hover) - NO ANIMATIONS
             var copyButton = new System.Windows.Controls.Button
             {
                 Content = "📋 Copy",
-                FontSize = 10,
-                Padding = new Thickness(6, 2, 6, 2),
+                FontSize = 11,
+                Padding = new Thickness(8, 3, 8, 3),
                 Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
                 BorderThickness = new Thickness(1),
                 Cursor = Cursors.Hand,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
-                Visibility = Visibility.Collapsed,
-                Margin = new Thickness(0, 0, item.IsPinned ? 25 : 0, 0) // Space for pin icon if pinned
+                Opacity = 0, // Hidden by default via opacity, NOT visibility
+                IsHitTestVisible = false, // Can't be clicked when hidden
+                Margin = new Thickness(0, 0, item.IsPinned ? 25 : 0, 0), // Space for pin icon if pinned
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true
             };
+
+            // Improve text rendering clarity
+            System.Windows.Media.TextOptions.SetTextRenderingMode(copyButton, System.Windows.Media.TextRenderingMode.ClearType);
+            System.Windows.Media.TextOptions.SetTextFormattingMode(copyButton, System.Windows.Media.TextFormattingMode.Display);
+
             copyButton.Click += (s, e) =>
             {
                 e.Handled = true; // Prevent card click event
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
-                    // Visual feedback - briefly change button text
-                    copyButton.Content = "✓ Copied";
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+
+                    // Revert to "Ready" after 1.5 seconds
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
                     timer.Tick += (ts, te) =>
                     {
-                        copyButton.Content = "📋 Copy";
+                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
                         timer.Stop();
                     };
                     timer.Start();
@@ -1816,16 +1938,25 @@ namespace VoiceLite
                 headerGrid.Children.Add(pinIcon);
             }
 
-            // Show/hide copy button on hover
+            // Instant hover effects - NO animations
             border.MouseEnter += (s, e) =>
             {
-                border.Background = new SolidColorBrush(Color.FromRgb(249, 249, 249));
-                copyButton.Visibility = Visibility.Visible;
+                // Instant background change
+                border.Background = new SolidColorBrush(Color.FromRgb(248, 249, 250));
+
+                // Show copy button instantly via opacity (no WPF visibility animations)
+                copyButton.Opacity = 1;
+                copyButton.IsHitTestVisible = true;
             };
+
             border.MouseLeave += (s, e) =>
             {
+                // Instant background reset
                 border.Background = Brushes.White;
-                copyButton.Visibility = Visibility.Collapsed;
+
+                // Hide copy button instantly via opacity
+                copyButton.Opacity = 0;
+                copyButton.IsHitTestVisible = false;
             };
 
             grid.Children.Add(headerGrid);
@@ -1914,6 +2045,136 @@ namespace VoiceLite
                     "History Cleared",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+            }
+        }
+
+        /// <summary>
+        /// Handles search text changes for filtering history.
+        /// </summary>
+        private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var searchText = HistorySearchBox.Text?.ToLower() ?? "";
+
+            // Show/hide clear button
+            ClearSearchButton.Visibility = string.IsNullOrEmpty(searchText) ? Visibility.Collapsed : Visibility.Visible;
+
+            // Filter history items
+            if (string.IsNullOrEmpty(searchText))
+            {
+                // Show all items
+                UpdateHistoryUI();
+            }
+            else
+            {
+                // Show only matching items
+                FilterHistoryBySearch(searchText);
+            }
+        }
+
+        /// <summary>
+        /// Handles keyboard shortcuts in search box.
+        /// </summary>
+        private void HistorySearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                // Clear search on Escape
+                HistorySearchBox.Text = "";
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Toggles search box visibility.
+        /// </summary>
+        private void ToggleSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (SearchBoxRow.Visibility == Visibility.Collapsed)
+            {
+                SearchBoxRow.Visibility = Visibility.Visible;
+                HistorySearchBox.Focus();
+            }
+            else
+            {
+                SearchBoxRow.Visibility = Visibility.Collapsed;
+                HistorySearchBox.Text = ""; // Clear search when hiding
+            }
+        }
+
+        /// <summary>
+        /// Opens history actions menu.
+        /// </summary>
+        private void HistoryMenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button button && button.ContextMenu != null)
+            {
+                button.ContextMenu.PlacementTarget = button;
+                button.ContextMenu.IsOpen = true;
+            }
+        }
+
+        /// <summary>
+        /// Clears the search box.
+        /// </summary>
+        private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            HistorySearchBox.Text = "";
+            HistorySearchBox.Focus();
+        }
+
+        /// <summary>
+        /// Filters history items by search text.
+        /// </summary>
+        private void FilterHistoryBySearch(string searchText)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    // Clear existing items
+                    HistoryItemsPanel.Children.Clear();
+
+                    if (settings.TranscriptionHistory == null || settings.TranscriptionHistory.Count == 0)
+                    {
+                        EmptyHistoryMessage.Visibility = Visibility.Visible;
+                        return;
+                    }
+
+                    // Filter items that match search text
+                    var matchingItems = settings.TranscriptionHistory
+                        .Where(item => item.Text.ToLower().Contains(searchText))
+                        .ToList();
+
+                    // Update count
+                    HistoryCountText.Text = matchingItems.Count == 1
+                        ? "1 match"
+                        : $"{matchingItems.Count} matches";
+
+                    // Show empty state if no matches
+                    if (matchingItems.Count == 0)
+                    {
+                        EmptyHistoryMessage.Visibility = Visibility.Visible;
+                        var emptyMessage = EmptyHistoryMessage.Children.OfType<TextBlock>().FirstOrDefault();
+                        if (emptyMessage != null)
+                        {
+                            emptyMessage.Text = $"No results for \"{searchText}\"";
+                        }
+                        return;
+                    }
+
+                    EmptyHistoryMessage.Visibility = Visibility.Collapsed;
+
+                    // Create UI for each matching item
+                    foreach (var item in matchingItems)
+                    {
+                        var card = CreateHistoryCard(item);
+                        HistoryItemsPanel.Children.Add(card);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("FilterHistoryBySearch", ex);
             }
         }
 

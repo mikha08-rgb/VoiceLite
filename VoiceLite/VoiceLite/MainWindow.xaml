@@ -7,23 +7,23 @@
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
         StateChanged="Window_StateChanged"
-        Background="#FCFCFC">
+        Background="#F8F9FA"
+        BorderThickness="0"
+        AllowsTransparency="False"
+        ResizeMode="CanResize"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <!-- Value Converters -->
     <Window.Resources>
         <local:RelativeTimeConverter x:Key="RelativeTimeConverter"/>
         <local:TruncateTextConverter x:Key="TruncateTextConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-
-        <!-- Pulsing animation for recording indicator -->
-        <Storyboard x:Key="PulseAnimation" RepeatBehavior="Forever">
-            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                           From="1.0" To="0.3" Duration="0:0:0.8"
-                           AutoReverse="True"/>
-        </Storyboard>
     </Window.Resources>
 
-    <Grid Margin="24">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- Title bar -->
             <RowDefinition Height="Auto"/>   <!-- Config info -->
@@ -32,47 +32,31 @@
         </Grid.RowDefinitions>
 
         <!-- Title bar with status -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
+        <Grid Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="VoiceLite"
-                       FontSize="20" FontWeight="SemiBold"
+                       FontSize="16" FontWeight="SemiBold"
                        Foreground="#4A4A4A"
                        HorizontalAlignment="Left"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Ellipse x:Name="StatusIndicator" Width="6" Height="6" Fill="#C8E6C9" Margin="0,0,6,0"/>
+                <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Fill="#C8E6C9" Margin="0,0,6,0"/>
                 <TextBlock x:Name="StatusText" Text="Ready"
                           Foreground="#7A7A7A" FontWeight="Normal" FontSize="14"/>
             </StackPanel>
         </Grid>
 
-        <!-- Configuration information -->
-        <StackPanel Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Margin="0,0,0,16">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="24"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="24"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <TextBlock Text="Hotkey: " Foreground="#7A7A7A" FontSize="14"/>
-                    <TextBlock x:Name="HotkeyText" Text="F1" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="14"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <TextBlock Text="Microphone: " Foreground="#7A7A7A" FontSize="14"/>
-                    <TextBlock x:Name="MicrophoneText" Text="Default" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="14"/>
-                </StackPanel>
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <TextBlock Text="Model: " Foreground="#7A7A7A" FontSize="14"/>
-                    <TextBlock x:Name="ModelText" Text="Tiny (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="14"/>
-                </StackPanel>
-            </Grid>
-            <TextBlock x:Name="AccountStatusText"
-                       Text="Not signed in"
-                       Foreground="#7A7A7A"
-                       FontWeight="Normal"
-                       FontSize="12"
-                       Margin="0,12,0,0"/>
+        <!-- Configuration information (simplified) -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,8" Orientation="Horizontal">
+            <TextBlock Text="Hotkey: " Foreground="#7A7A7A" FontSize="13"/>
+            <TextBlock x:Name="HotkeyText" Text="F1" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
+
+            <TextBlock Text="  •  " Foreground="#E0E0E0" FontSize="13" VerticalAlignment="Center"/>
+
+            <TextBlock Text="Model: " Foreground="#7A7A7A" FontSize="13"/>
+            <TextBlock x:Name="ModelText" Text="Tiny (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
+
+            <!-- Hidden references for backward compatibility -->
+            <TextBlock x:Name="MicrophoneText" Text="Default" Visibility="Collapsed"/>
+            <TextBlock x:Name="AccountStatusText" Text="Not signed in" Visibility="Collapsed"/>
         </StackPanel>
 
         <!-- HISTORY PANEL (replaces transcription box - fills all remaining space) -->
@@ -80,8 +64,11 @@
                 BorderBrush="#E0E0E0"
                 BorderThickness="1"
                 Background="White"
-                CornerRadius="6"
-                Margin="0,0,0,16">
+                CornerRadius="8"
+                Margin="0,0,0,12">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="6" ShadowDepth="1" Opacity="0.06" Direction="270"/>
+            </Border.Effect>
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -89,68 +76,143 @@
                     <RowDefinition Height="*"/>    <!-- Scrollable list -->
                 </Grid.RowDefinitions>
 
-                <!-- Compact Header (single line) -->
+                <!-- Enhanced Header with Search -->
                 <Border Grid.Row="0"
                         Background="#FAFAFA"
                         BorderBrush="#E0E0E0"
                         BorderThickness="0,0,0,1"
+                        CornerRadius="8,8,0,0"
                         Padding="16,12">
                     <Grid>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Recent Transcriptions"
-                                       FontWeight="SemiBold"
-                                       FontSize="14"
-                                       Foreground="#4A4A4A"
-                                       VerticalAlignment="Center"/>
-                            <TextBlock x:Name="HistoryCountText"
-                                       Text="• 0 items"
-                                       FontSize="12"
-                                       Foreground="#B0B0B0"
-                                       Margin="8,0,0,0"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <!-- Compact action buttons (ghost style) -->
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="ClearHistoryButton"
-                                    Content="Clear"
-                                    Height="28"
-                                    Padding="12,0"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="#7A7A7A"
-                                    FontSize="12"
-                                    Cursor="Hand"
-                                    Click="ClearHistory_Click"
-                                    ToolTip="Clear all unpinned items"
-                                    Margin="0,0,4,0"/>
-                            <Button x:Name="ClearAllHistoryButton"
-                                    Content="Clear All"
-                                    Height="28"
-                                    Padding="12,0"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="#E74C3C"
-                                    FontSize="12"
-                                    Cursor="Hand"
-                                    Click="ClearAllHistory_Click"
-                                    ToolTip="Delete all items including pinned"
-                                    Margin="0,0,8,0"/>
-                            <Button x:Name="ExportHistoryButton"
-                                    Content="Export"
-                                    Height="28"
-                                    Padding="12,0"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="#7A7A7A"
-                                    FontSize="12"
-                                    Cursor="Hand"
-                                    Click="ExportHistory_Click"
-                                    ToolTip="Export history to text file"/>
-                        </StackPanel>
+                        <!-- Top row: Title and Count -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Recent Transcriptions"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"
+                                           Foreground="#2C3E50"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="HistoryCountText"
+                                           Text="• 0 items"
+                                           FontSize="12"
+                                           Foreground="#95A5A6"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Compact action buttons (ghost style) -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="ToggleSearchButton"
+                                        Content="🔍"
+                                        Height="28"
+                                        Width="28"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#7A8899"
+                                        FontSize="14"
+                                        Cursor="Hand"
+                                        Click="ToggleSearchButton_Click"
+                                        ToolTip="Toggle search box (Ctrl+F)"
+                                        Margin="0,0,8,0"/>
+                                <Button x:Name="HistoryMenuButton"
+                                        Content="•••"
+                                        Height="28"
+                                        Width="32"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#7A8899"
+                                        FontSize="16"
+                                        FontWeight="Bold"
+                                        Cursor="Hand"
+                                        Click="HistoryMenuButton_Click"
+                                        ToolTip="History actions">
+                                    <Button.ContextMenu>
+                                        <ContextMenu x:Name="HistoryActionsMenu">
+                                            <MenuItem Header="Clear" Click="ClearHistory_Click" ToolTip="Clear all unpinned items"/>
+                                            <MenuItem Header="Clear All" Click="ClearAllHistory_Click" ToolTip="Delete all items including pinned"/>
+                                            <Separator/>
+                                            <MenuItem Header="Export..." Click="ExportHistory_Click" ToolTip="Export history to text file"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Bottom row: Search box (hidden by default) -->
+                        <Grid x:Name="SearchBoxRow" Grid.Row="1" Visibility="Collapsed">
+                            <Border Background="White"
+                                    BorderBrush="#E0E0E0"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Search icon -->
+                                    <TextBlock Grid.Column="0"
+                                              Text="🔍"
+                                              FontSize="12"
+                                              Foreground="#95A5A6"
+                                              Margin="0,0,6,0"
+                                              VerticalAlignment="Center"/>
+
+                                    <!-- Search textbox -->
+                                    <TextBox x:Name="HistorySearchBox"
+                                            Grid.Column="1"
+                                            BorderThickness="0"
+                                            Background="Transparent"
+                                            FontSize="12"
+                                            VerticalAlignment="Center"
+                                            TextChanged="HistorySearchBox_TextChanged"
+                                            KeyDown="HistorySearchBox_KeyDown">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="TextBox">
+                                                            <Grid>
+                                                                <TextBlock Text="Search transcriptions... (Ctrl+F)"
+                                                                          FontSize="12"
+                                                                          Foreground="#95A5A6"
+                                                                          VerticalAlignment="Center"
+                                                                          Visibility="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                                                <ScrollViewer x:Name="PART_ContentHost"/>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
+
+                                    <!-- Clear search button -->
+                                    <Button x:Name="ClearSearchButton"
+                                           Grid.Column="2"
+                                           Content="✕"
+                                           Width="20"
+                                           Height="20"
+                                           Background="Transparent"
+                                           BorderThickness="0"
+                                           Foreground="#95A5A6"
+                                           FontSize="14"
+                                           Cursor="Hand"
+                                           Click="ClearSearchButton_Click"
+                                           Visibility="Collapsed"
+                                           ToolTip="Clear search (Esc)"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Border>
 
@@ -158,7 +220,12 @@
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
-                              Padding="12,10,12,10">
+                              Padding="12,10,12,10"
+                              CanContentScroll="True"
+                              ScrollViewer.IsDeferredScrollingEnabled="False"
+                              VirtualizingPanel.IsVirtualizing="False"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.ScrollUnit="Pixel">
                     <StackPanel x:Name="HistoryItemsPanel">
                         <!-- History items added programmatically -->
 
@@ -167,7 +234,7 @@
                                    Margin="20,40,20,20"
                                    HorizontalAlignment="Center"
                                    Visibility="Visible">
-                            <TextBlock Text="✨ Ready to transcribe!"
+                            <TextBlock Text="Ready to transcribe"
                                       TextAlignment="Center"
                                       Foreground="#7A7A7A"
                                       FontSize="16"
@@ -198,25 +265,31 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Stretch">
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
                 <Button x:Name="DictionaryButton"
-                        Content="📝 Dictionary"
-                        Height="36"
+                        Grid.Column="0"
+                        Content="Custom Words"
+                        Height="40"
                         Background="#F5F5F5"
-                        Foreground="#4A4A4A"
+                        Foreground="#2C3E50"
                         BorderBrush="#E0E0E0"
                         BorderThickness="1"
-                        FontWeight="Normal"
+                        FontWeight="SemiBold"
                         FontSize="13"
                         Cursor="Hand"
                         Click="DictionaryButton_Click"
-                        Margin="0,0,8,0"
-                        Padding="12,0"
                         ToolTip="Manage custom word replacements"/>
 
                 <Button x:Name="SettingsButton"
-                        Content="⚙️ Settings"
-                        Height="36"
+                        Grid.Column="2"
+                        Content="Settings"
+                        Height="40"
                         Background="#4169E1"
                         Foreground="White"
                         BorderBrush="#4169E1"
@@ -224,23 +297,10 @@
                         FontWeight="SemiBold"
                         FontSize="13"
                         Cursor="Hand"
-                        Click="SettingsButton_Click"
-                        Margin="0,0,8,0"
-                        Padding="14,0"/>
+                        Click="SettingsButton_Click"/>
 
-                <Button x:Name="AccountButton"
-                        Content="Account"
-                        Height="36"
-                        Background="#F5F5F5"
-                        Foreground="#4A4A4A"
-                        BorderBrush="#E0E0E0"
-                        BorderThickness="1"
-                        FontWeight="Normal"
-                        FontSize="13"
-                        Cursor="Hand"
-                        Click="AccountButton_Click"
-                        Padding="14,0"/>
-            </StackPanel>
+                <!-- Account button removed - access via system tray menu -->
+            </Grid>
 
             <CheckBox Grid.Row="1"
                      x:Name="MinimizeCheckBox"
