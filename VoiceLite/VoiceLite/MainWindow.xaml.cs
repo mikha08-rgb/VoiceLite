@@ -1651,7 +1651,7 @@ namespace VoiceLite
         {
             ShowMainWindow();
             // Call the account button logic directly
-            await Dispatcher.InvokeAsync(() => AccountButton_Click(sender, new RoutedEventArgs()));
+            await Dispatcher.InvokeAsync(() => AccountButton_Click(sender ?? this, new RoutedEventArgs()));
         }
 
         private async Task SignOutAsync()

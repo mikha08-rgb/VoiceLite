@@ -126,9 +126,9 @@ npm run keygen
 3. **Models** (`Models/`): Data structures and configuration
    - `Settings`: User preferences with validation
    - `TranscriptionResult`: Whisper output parsing
-   - `WhisperModelInfo`: Model metadata and benchmarking
+   - `WhisperModelInfo`: Model metadata and benchmarking (Lite/Swift/Pro/Elite/Ultra)
    - `TranscriptionHistoryItem`: History panel items with metadata
-   - `CustomDictionary`: Custom word/phrase replacements with templates (Medical, Legal, Tech)
+   - `CustomDictionary`: VoiceShortcuts - custom word/phrase replacements with templates (Medical, Legal, Tech)
    - `UserSession`: Session tracking and metrics
    - `LicensePayload`: License validation structures
 
@@ -138,7 +138,7 @@ npm run keygen
 5. **UI Components**
    - `MainWindow.xaml`: Main application window with recording status and history panel
    - `SettingsWindow.xaml` / `SettingsWindowNew.xaml`: Settings UI with model selection
-   - `DictionaryManagerWindow.xaml`: Custom dictionary editor with template presets
+   - `DictionaryManagerWindow.xaml`: VoiceShortcuts manager with template presets
    - `LoginWindow.xaml`: Pro license activation window
    - `Controls/SimpleModelSelector`: Model selection control
    - `Controls/ModelComparisonControl`: Model comparison and selection UI
@@ -149,11 +149,11 @@ npm run keygen
 ## Whisper Integration
 
 ### Available Models (in `whisper/` directory)
-- `ggml-tiny.bin` (75MB): Fastest, lowest accuracy - legacy free tier, kept as fallback
-- `ggml-small.bin` (466MB): **Current free tier default** - balanced accuracy and speed, ships with installer (temporary promotion)
-- `ggml-base.bin` (142MB): Fast, good for basic use - Pro tier
-- `ggml-medium.bin` (1.5GB): Higher accuracy - Pro tier, optional download from settings
-- `ggml-large-v3.bin` (2.9GB): Highest accuracy - Pro tier, manual download required and resource heavy
+- `ggml-tiny.bin` (75MB): **Lite** - Fastest, lowest accuracy - legacy free tier, kept as fallback
+- `ggml-small.bin` (466MB): **Pro** ⭐ - **Current free tier default** - balanced accuracy and speed, ships with installer (temporary promotion)
+- `ggml-base.bin` (142MB): **Swift** - Fast, good for basic use - Pro tier
+- `ggml-medium.bin` (1.5GB): **Elite** - Higher accuracy - Pro tier, optional download from settings
+- `ggml-large-v3.bin` (2.9GB): **Ultra** - Highest accuracy - Pro tier, manual download required and resource heavy
 
 ### Whisper Process Management
 - **PersistentWhisperService is the primary implementation** (WhisperService/WhisperProcessPool are deprecated)
@@ -174,23 +174,23 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 
 ### Desktop App (Free Tier)
 - Desktop client is **100% free** with no usage caps
-- **Small model (466MB)** ships with installer as free tier default (temporary growth promotion)
-- Tiny model (75MB) kept as legacy fallback for compatibility
+- **Pro model (466MB)** ships with installer as free tier default (temporary growth promotion)
+- Lite model (75MB) kept as legacy fallback for compatibility
 - Works completely offline - no license validation required
 - No online authentication or tracking
 - All core features available (hotkeys, text injection, settings)
-- **Accuracy**: ~90-93% with Small model (vs 80-85% with Tiny)
+- **Accuracy**: ~90-93% with Pro model (vs 80-85% with Lite)
 
 ### Web-Based Pro Tier (Optional)
 - Stripe subscription managed via voicelite.app ($20/3mo or $99 lifetime)
-- Modern Next.js backend validates Pro subscriptions for premium models (Base, Medium, Large)
+- Modern Next.js backend validates Pro subscriptions for premium models (Swift, Elite, Ultra)
 - Unlocks: Even better accuracy (93-97%), advanced models, priority support, early access
 - Backend platform: Next.js 15 + PostgreSQL + Prisma at `voicelite-web/`
 - Desktop app validates Pro licenses via Ed25519 cryptographic signatures
 
 ### Implementation Details
 - **Single Backend Architecture**: Modern Next.js platform at https://voicelite.app
-- Free tier: Small model runs standalone without any server connection (temporary promotion)
+- Free tier: Pro model runs standalone without any server connection (temporary promotion)
 - Pro tier: Premium models require license validation via Ed25519 signed licenses
 - Recordings processed locally and discarded after transcription (both tiers)
 - License keys use Ed25519 cryptographic signing for tamper-proof security
@@ -231,7 +231,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperatur
 - Multiple text injection modes (SmartAuto, AlwaysType, AlwaysPaste, PreferType, PreferPaste)
 - Sound feedback disabled by default (wood-tap-click.ogg via NAudio.Vorbis)
 - **Transcription history**: Configurable max items (default 50), supports pinning, auto-cleanup
-- **Custom dictionaries**: Pattern-based replacements with templates (Medical, Legal, Tech)
+- **VoiceShortcuts**: Pattern-based replacements with templates (Medical, Legal, Tech)
 
 ### Error Handling & Logging
 - Comprehensive error logging via `ErrorLogger` service
@@ -346,17 +346,17 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
-4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.15)
+4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.16)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
-- **Includes Small model (466MB) + Tiny model (75MB)** - temporary growth promotion (v1.0.14+)
-- Installer size: ~540MB (up from ~150MB with tiny-only)
+- **Includes Pro model (466MB) + Lite model (75MB)** - temporary growth promotion (v1.0.14+)
+- Installer size: ~540MB (up from ~150MB with Lite-only)
 - Auto-installs to Program Files
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
-- Current installer: `VoiceLite-Setup-1.0.15.exe`
+- Current installer: `VoiceLite-Setup-1.0.16.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -411,11 +411,11 @@ The project underwent significant cleanup in October 2025:
 - **Stability enhancements**: Bug fixes and reliability improvements
 
 ### v1.0.14 (Growth Promotion)
-- **Free Tier Upgrade**: Small model (466MB) now ships as free tier default instead of Tiny (75MB)
+- **Free Tier Upgrade**: Pro model (466MB) now ships as free tier default instead of Lite (75MB)
 - **Accuracy Boost**: Free users now get ~90-93% accuracy (up from 80-85%)
 - **Strategic**: Temporary promotion to improve first impressions during growth phase
-- **Installer Size**: ~540MB (up from ~150MB) - includes Small + Tiny models
-- **Fallback Safety**: Tiny model kept as legacy fallback for compatibility
+- **Installer Size**: ~540MB (up from ~150MB) - includes Pro + Lite models
+- **Fallback Safety**: Lite model kept as legacy fallback for compatibility
 - **Code Changes**: Updated Settings.cs, SettingsWindow.xaml.cs, PersistentWhisperService.cs, installer script
 
 ### v1.0.13
@@ -425,8 +425,8 @@ The project underwent significant cleanup in October 2025:
 - **Stability**: Zero permission errors, all file operations now use appropriate directories
 
 ### v1.0.12
-- **UX Improvement**: Added keyboard shortcuts to Dictionary Manager (Ctrl+S to save, Escape to close)
-- **Transparency**: AI model name now displayed on main window (Tiny/Base/Small/Medium/Large)
+- **UX Improvement**: Added keyboard shortcuts to VoiceShortcuts Manager (Ctrl+S to save, Escape to close)
+- **Transparency**: AI model name now displayed on main window (Lite/Swift/Pro/Elite/Ultra)
 - **History Control**: Added "Clear All" button to delete all history items including pinned ones
 - **Quality**: All three quick wins implemented with zero breaking changes
 
