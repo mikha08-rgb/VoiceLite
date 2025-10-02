@@ -65,17 +65,15 @@ namespace VoiceLite.Services.Auth
         public async Task SignOutAsync(CancellationToken cancellationToken = default)
         {
             using var response = await ApiClient.Client.PostAsync("/api/auth/logout", content: null, cancellationToken).ConfigureAwait(false);
+
+            cachedSession = null;
+            ApiClient.ClearCookies();
+
             if (!response.IsSuccessStatusCode)
             {
-                // We still clear cached session even if the network request fails.
                 var error = await SafeReadErrorAsync(response).ConfigureAwait(false);
                 throw new InvalidOperationException(error ?? "Failed to sign out.");
             }
-
-            cachedSession = null;
-
-            // Clear persisted cookies
-            ApiClient.ClearCookies();
         }
 
         public async Task<bool> RefreshSessionAsync(CancellationToken cancellationToken = default)

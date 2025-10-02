@@ -13,7 +13,7 @@
 ```csharp
 // TODO: Before deployment, replace this with the actual public key from your .env.local file
 // Generate keys with: cd voicelite-web && npm run keygen
-private const string LICENSE_PUBLIC_KEY = "A8aHG17W1d2u6uMU3bomtJGM12Gr897zGhoKVDM9rUQ";
+// Public key now loaded from VOICELITE_LICENSE_PUBLIC_KEY
 ```
 
 ### 2. ✅ Exposed Ed25519 Private Keys in .env.example
@@ -217,49 +217,32 @@ function getStripeClient() {
 }
 ```
 
-## Remaining HIGH Priority Issues (6/17)
+## Remaining HIGH Priority Issues (1/17)
 
-⚠️ **These should be fixed before production deployment:**
+?? **These should be addressed before production deployment:**
 
-1. **BouncyCastle Vulnerable Version** (VoiceLite.csproj)
-   - Upgrade from 1.8.5 to 2.x (breaking change)
-   - Requires updating using statements
-
-2. **Missing CSRF Origin Validation** (app/api/*/route.ts)
-   - Add origin validation helper
-   - Validate Origin/Referer headers
-
-3. **No Environment Variable Validation** (startup)
-   - Add validation at app startup
-   - Fail fast on missing critical vars
-
-4. **Account Enumeration** (app/api/auth/request/route.ts)
-   - Return generic message regardless of email existence
-   - Prevent email enumeration attacks
-
-5. **Session Rotation Race Condition** (lib/auth/session.ts)
-   - Use row-level locking for session updates
-   - Prevent concurrent rotation conflicts
-
-6. **Missing /api/me Rate Limit** (app/api/me/route.ts)
-   - Add rate limiting (e.g., 100 requests/hour)
-
+1. **Session Rotation Concurrency** (`voicelite-web/lib/auth/session.ts`)
+   - Sessions younger than seven days are no longer rotated, but simultaneous `/api/me` calls can still race and invalidate fresh sessions.
+   - Mitigation: add row-level locking or queue refresh work so only one request issues a new token per session id.
 ## Pre-Deployment Checklist
 
-- [ ] Fix remaining 6 HIGH priority issues above
-- [ ] Generate new Ed25519 keys: `cd voicelite-web && npm run keygen`
-- [ ] Update LICENSE_PUBLIC_KEY in LicenseService.cs with production key
-- [ ] Set all environment variables in production
-- [ ] Run database migration: `npx prisma migrate deploy`
-- [ ] Seed Stripe products: `npm run seed-products`
-- [ ] Test authentication flow end-to-end
-- [ ] Test checkout and webhook flow with Stripe test mode
-- [ ] Verify license validation works in desktop client
-- [ ] Build desktop client in RELEASE mode
-- [ ] Security audit of remaining MEDIUM/LOW issues
-- [ ] Load testing for API endpoints
-- [ ] Monitor error logs for first 48 hours after launch
+- [ ] Implement a durable fix or documented mitigation for the session rotation concurrency risk noted above.
+- [ ] Generate new Ed25519 keys: `cd voicelite-web && npm run keygen`.
+- [ ] Ensure `VOICELITE_LICENSE_PUBLIC_KEY` and `VOICELITE_CRL_PUBLIC_KEY` are set in the desktop build environment.
+- [ ] Populate all required environment variables in production (see `.env.production.template`).
+- [ ] Run database migration: `npx prisma migrate deploy`.
+- [ ] Seed Stripe products or confirm they exist.
+- [ ] Test authentication, checkout, webhook, and desktop activation end-to-end.
+- [ ] Build the desktop client in RELEASE mode and generate the installer.
+- [ ] Capture coverage and test evidence for the release candidate.
+- [ ] Load-test critical API endpoints and monitor error logs for the first 48 hours post-launch.
 
+**RECOMMENDED - Security Follow-ups:**
+- [ ] Enforce license activation limits at the database level.
+- [ ] Configure Prisma connection pooling for production workloads.
+- [ ] Add certificate pinning to the desktop client.
+- [ ] Introduce centralized security/audit logging.
+- [ ] Add integrity protection for on-disk license storage.
 ## Impact Summary
 
 **Before Fixes:**
@@ -283,8 +266,7 @@ function getStripeClient() {
 
 ## Next Steps
 
-**Option 1**: Fix remaining 6 HIGH priority issues (recommended)
-**Option 2**: Proceed to Phase 5 Testing with current fixes
-**Option 3**: Begin deployment with monitoring plan for remaining issues
+1. Finalize the session rotation concurrency mitigation (or accept the risk with documented rollback procedures).
+2. Coordinate production credential provisioning across Supabase, Stripe, Resend, and Upstash before the release build.
+3. Run the full Phase 3/4 test matrices once the Resend magic-link fix lands, capturing logs and coverage reports for the release packet.
 
-Recommendation: **Fix at least issues #1-4 from remaining HIGH priority list** before production deployment, as they represent significant security gaps.

@@ -10,7 +10,12 @@
       "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite\\Installer\\VoiceLiteSetup_Simple.iss\")",
       "Bash(dotnet list:*)",
       "Bash(npm run build:*)",
-      "Bash(npx vercel env add:*)"
+      "Bash(npx vercel env add:*)",
+      "Read(//c/Users/mishk/Pictures/Screenshots/**)",
+      "Bash(curl -sI https://www.voicelite.app/)",
+      "Bash(curl -sL -w \"FINAL_URL: %{url_effective}\\nHTTP_CODE: %{http_code}\\n\" -o /dev/null https://www.voicelite.app/)",
+      "Bash(vercel domains:*)",
+      "Bash(vercel deploy:*)"
     ],
     "deny": [],
     "ask": []

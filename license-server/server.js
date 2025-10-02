@@ -12,7 +12,28 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+
+const rawOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+const defaultDevOrigins = process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : [];
+const allowedOrigins = rawOrigins.length > 0 ? rawOrigins : defaultDevOrigins;
+
+if (allowedOrigins.length === 0) {
+    console.warn('[VoiceLite] No ALLOWED_ORIGINS configured for license server; CORS will reject all browser requests.');
+}
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        console.warn(`[VoiceLite] Blocked CORS request from origin ${origin}`);
+        return callback(new Error('Origin not allowed'));// respond with error for disallowed origins
+    },
+    credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 // Initialize SQLite database
 const DATABASE_PATH = process.env.DATABASE_PATH || './licenses.db';

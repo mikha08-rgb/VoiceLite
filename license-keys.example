@@ -1,0 +1,7 @@
+# VoiceLite License Keys Template
+# Keep real customer licenses in a secure CRM or licensing service.
+# Never store production license keys in the repository.
+
+# Example format (replace with secure storage reference):
+# PRO-YYYY-XXXXX-XXX
+

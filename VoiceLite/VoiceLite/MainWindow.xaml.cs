@@ -23,6 +23,8 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private MemoryMonitor? memoryMonitor;
+        private TranscriptionHistoryService? historyService;
+        private SoundService? soundService;
         private DateTime recordingStartTime;
         private Settings settings = new();
         private AuthenticationService authenticationService = new();
@@ -328,6 +330,15 @@ namespace VoiceLite
                 memoryMonitor = new MemoryMonitor();
                 memoryMonitor.MemoryAlert += OnMemoryAlert;
 
+                // Initialize transcription history service
+                historyService = new TranscriptionHistoryService(settings);
+
+                // Initialize sound service
+                soundService = new SoundService();
+
+                // Load and display existing history
+                UpdateHistoryUI();
+
                 _ = RestoreAccountAsync();
             }
             catch (Exception ex)
@@ -548,7 +559,7 @@ namespace VoiceLite
                 audioRecorder?.StartRecording();
 
                 // Only update UI if we get here successfully
-                UpdateStatus("Recording...", Brushes.Red);
+                UpdateStatus("Recording...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF9999")));
 
                 // Update button and text based on mode
                 if (settings.Mode == Models.RecordMode.PushToTalk)
@@ -634,7 +645,7 @@ namespace VoiceLite
                 }
                 else
                 {
-                    UpdateStatus("Processing...", Brushes.Orange);
+                    UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD699")));
                     string hotkeyDisplay = GetHotkeyDisplayString();
                     TestButton.Content = $"Test Recording (Click or Press {hotkeyDisplay})";
 
@@ -731,7 +742,7 @@ namespace VoiceLite
                 // Audio feedback for push-to-talk start
                 if (settings.PlaySoundFeedback)
                 {
-                    System.Media.SystemSounds.Beep.Play();
+                    soundService?.PlaySound();
                 }
 
                 StartRecording();
@@ -767,7 +778,7 @@ namespace VoiceLite
                 // Audio feedback for push-to-talk stop
                 if (settings.PlaySoundFeedback)
                 {
-                    System.Media.SystemSounds.Asterisk.Play();
+                    soundService?.PlaySound();
                 }
 
                 StopRecording(false);
@@ -813,7 +824,7 @@ namespace VoiceLite
                 // Audio feedback for toggle start
                 if (settings.PlaySoundFeedback)
                 {
-                    System.Media.SystemSounds.Beep.Play();
+                    soundService?.PlaySound();
                 }
 
                 StartRecording();
@@ -827,7 +838,7 @@ namespace VoiceLite
                 // Audio feedback for toggle stop
                 if (settings.PlaySoundFeedback)
                 {
-                    System.Media.SystemSounds.Asterisk.Play();
+                    soundService?.PlaySound();
                 }
 
                 StopRecording(false);
@@ -878,7 +889,7 @@ namespace VoiceLite
                         // Audio feedback for timeout
                         if (settings.PlaySoundFeedback)
                         {
-                            System.Media.SystemSounds.Exclamation.Play();
+                            soundService?.PlaySound();
                         }
 
                         StopRecording(false);
@@ -980,6 +991,20 @@ namespace VoiceLite
                         {
                             TranscriptionText.Text = transcription;
                             TranscriptionText.Foreground = Brushes.Black;
+
+                            // Add to history
+                            var historyItem = new TranscriptionHistoryItem
+                            {
+                                Timestamp = DateTime.Now,
+                                Text = transcription,
+                                WordCount = transcription.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length,
+                                DurationSeconds = (DateTime.Now - recordingStartTime).TotalSeconds,
+                                ModelUsed = settings.WhisperModel
+                            };
+
+                            historyService?.AddToHistory(historyItem);
+                            UpdateHistoryUI(); // Refresh the history panel
+                            SaveSettings(); // Persist history to disk
                         }
                         else
                         {
@@ -1016,7 +1041,7 @@ namespace VoiceLite
                     Dispatcher.Invoke(() =>
                     {
                         ErrorLogger.LogMessage($"OnAudioFileReady: Final UI update - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                        UpdateStatus("Ready", Brushes.Green);
+                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
 
                         // Reset TranscriptionText to ready state after successful completion
                         string hotkeyDisplay = GetHotkeyDisplayString();
@@ -1066,7 +1091,7 @@ namespace VoiceLite
                             if (!isRecording)
                             {
                                 UpdateUIForCurrentMode();
-                                UpdateStatus("Ready", Brushes.Green);
+                                UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
                             }
                         }));
 
@@ -1105,7 +1130,7 @@ namespace VoiceLite
                             if (!isRecording)
                             {
                                 UpdateUIForCurrentMode();
-                                UpdateStatus("Ready", Brushes.Green);
+                                UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
                             }
                         }); } catch { /* Dispatcher might be shut down */ }
                     });
@@ -1181,6 +1206,16 @@ namespace VoiceLite
             {
                 e.Cancel = true;
                 systemTrayManager?.MinimizeToTray();
+            }
+        }
+
+        private void DictionaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DictionaryManagerWindow(settings);
+            dialog.Owner = this;
+            if (dialog.ShowDialog() == true)
+            {
+                SaveSettings();
             }
         }
 
@@ -1300,7 +1335,7 @@ namespace VoiceLite
                         // Audio feedback for cancel
                         if (settings.PlaySoundFeedback)
                         {
-                            System.Media.SystemSounds.Hand.Play();
+                            soundService?.PlaySound();
                         }
 
                         // Cancel the recording
@@ -1555,6 +1590,284 @@ namespace VoiceLite
             Show();
             WindowState = WindowState.Normal;
             Activate();
+        }
+
+        // ===== TRANSCRIPTION HISTORY METHODS =====
+
+        /// <summary>
+        /// Updates the history panel UI with current history items.
+        /// Creates visual cards for each transcription.
+        /// </summary>
+        private void UpdateHistoryUI()
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    // Update count
+                    int count = settings.TranscriptionHistory?.Count ?? 0;
+                    HistoryCountText.Text = count == 1 ? "1 item" : $"{count} items";
+
+                    // Clear existing items
+                    HistoryItemsPanel.Children.Clear();
+
+                    // Show empty state if no history
+                    if (count == 0)
+                    {
+                        EmptyHistoryMessage.Visibility = Visibility.Visible;
+                        return;
+                    }
+
+                    EmptyHistoryMessage.Visibility = Visibility.Collapsed;
+
+                    // Create UI for each history item
+                    foreach (var item in settings.TranscriptionHistory!)
+                    {
+                        var card = CreateHistoryCard(item);
+                        HistoryItemsPanel.Children.Add(card);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("UpdateHistoryUI", ex);
+            }
+        }
+
+        /// <summary>
+        /// Creates a visual card for a single history item.
+        /// </summary>
+        private System.Windows.Controls.Border CreateHistoryCard(TranscriptionHistoryItem item)
+        {
+            // Main container
+            var border = new System.Windows.Controls.Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 8),
+                CornerRadius = new CornerRadius(4),
+                Cursor = Cursors.Hand,
+                Tag = item // Store the item for event handlers
+            };
+
+            // Hover effect
+            border.MouseEnter += (s, e) => border.Background = new SolidColorBrush(Color.FromRgb(249, 249, 249));
+            border.MouseLeave += (s, e) => border.Background = Brushes.White;
+
+            // Click to copy
+            border.MouseLeftButtonDown += (s, e) =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                    MessageBox.Show("Copied to clipboard!", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy history item", ex);
+                }
+            };
+
+            // Context menu
+            var contextMenu = new System.Windows.Controls.ContextMenu();
+
+            var copyMenuItem = new System.Windows.Controls.MenuItem { Header = "📋 Copy" };
+            copyMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(copyMenuItem);
+
+            var reinjectMenuItem = new System.Windows.Controls.MenuItem { Header = "📤 Re-inject" };
+            reinjectMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    textInjector?.InjectText(item.Text);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Re-inject menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(reinjectMenuItem);
+
+            contextMenu.Items.Add(new System.Windows.Controls.Separator());
+
+            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
+            pinMenuItem.Click += (s, e) =>
+            {
+                historyService?.TogglePin(item.Id);
+                UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(pinMenuItem);
+
+            var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
+            deleteMenuItem.Click += (s, e) =>
+            {
+                historyService?.RemoveFromHistory(item.Id);
+                UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(deleteMenuItem);
+
+            border.ContextMenu = contextMenu;
+
+            // Content grid
+            var grid = new System.Windows.Controls.Grid();
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+
+            // Timestamp and pin indicator
+            var headerGrid = new System.Windows.Controls.Grid();
+            System.Windows.Controls.Grid.SetRow(headerGrid, 0);
+            headerGrid.Margin = new Thickness(0, 0, 0, 6);
+
+            var relativeConverter = new Utilities.RelativeTimeConverter();
+            var timeText = new System.Windows.Controls.TextBlock
+            {
+                Text = (string)relativeConverter.Convert(item.Timestamp, null!, null!, null!),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            headerGrid.Children.Add(timeText);
+
+            if (item.IsPinned)
+            {
+                var pinIcon = new System.Windows.Controls.TextBlock
+                {
+                    Text = "📌",
+                    FontSize = 12,
+                    HorizontalAlignment = HorizontalAlignment.Right
+                };
+                headerGrid.Children.Add(pinIcon);
+            }
+
+            grid.Children.Add(headerGrid);
+
+            // Transcription text
+            var truncateConverter = new Utilities.TruncateTextConverter();
+            var textBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = (string)truncateConverter.Convert(item.Text, null!, null!, null!),
+                FontSize = 13,
+                Foreground = new SolidColorBrush(Color.FromRgb(44, 62, 80)),
+                TextWrapping = TextWrapping.Wrap,
+                MaxHeight = 60,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(0, 0, 0, 6),
+                ToolTip = item.Text // Full text on hover
+            };
+            System.Windows.Controls.Grid.SetRow(textBlock, 1);
+            grid.Children.Add(textBlock);
+
+            // Metadata
+            var metadataText = new System.Windows.Controls.TextBlock
+            {
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166))
+            };
+
+            metadataText.Inlines.Add(new System.Windows.Documents.Run(item.WordCount.ToString()));
+            metadataText.Inlines.Add(new System.Windows.Documents.Run(" words • "));
+            metadataText.Inlines.Add(new System.Windows.Documents.Run($"{item.DurationSeconds:F1}s"));
+            metadataText.Inlines.Add(new System.Windows.Documents.Run(" • "));
+            metadataText.Inlines.Add(new System.Windows.Documents.Run(item.ModelUsed));
+
+            System.Windows.Controls.Grid.SetRow(metadataText, 2);
+            grid.Children.Add(metadataText);
+
+            border.Child = grid;
+            return border;
+        }
+
+
+        /// <summary>
+        /// Clears all unpinned history items.
+        /// </summary>
+        private void ClearHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove all unpinned transcriptions from history.\n\nPinned items will be kept.\n\nContinue?",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                int cleared = historyService?.ClearHistory() ?? 0;
+                UpdateHistoryUI();
+                SaveSettings();
+
+                MessageBox.Show(
+                    $"Cleared {cleared} items from history.",
+                    "History Cleared",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        /// <summary>
+        /// Exports history to a text file.
+        /// </summary>
+        private void ExportHistory_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    FileName = $"VoiceLite_History_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+                    Filter = "Text files (*.txt)|*.txt|CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    DefaultExt = ".txt"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    var content = new System.Text.StringBuilder();
+                    content.AppendLine("VoiceLite Transcription History");
+                    content.AppendLine($"Exported: {DateTime.Now:F}");
+                    content.AppendLine(new string('=', 60));
+                    content.AppendLine();
+
+                    foreach (var item in settings.TranscriptionHistory!)
+                    {
+                        content.AppendLine($"[{item.Timestamp:yyyy-MM-dd HH:mm:ss}] {(item.IsPinned ? "📌 " : "")}");
+                        content.AppendLine($"Text: {item.Text}");
+                        content.AppendLine($"Words: {item.WordCount} | Duration: {item.DurationSeconds:F1}s | Model: {item.ModelUsed}");
+                        content.AppendLine(new string('-', 60));
+                        content.AppendLine();
+                    }
+
+                    File.WriteAllText(dialog.FileName, content.ToString());
+
+                    MessageBox.Show(
+                        $"History exported successfully to:\n{dialog.FileName}",
+                        "Export Complete",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("ExportHistory", ex);
+                MessageBox.Show(
+                    $"Failed to export history:\n{ex.Message}",
+                    "Export Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
     }
 }

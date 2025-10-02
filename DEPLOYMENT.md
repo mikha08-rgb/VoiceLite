@@ -250,15 +250,15 @@ Click "Deploy" and wait for build to complete (~2 minutes).
 
 ## Phase 7: Update Desktop Client
 
-### 7.1 Add Public Key to Desktop Client
+### 7.1 Configure Signing Keys
 
-Open `VoiceLite/VoiceLite/Services/Licensing/LicenseService.cs`:
+Set the following environment variables or installer configuration values before building the desktop client:
 
-```csharp
-private const string LICENSE_PUBLIC_KEY = "A8aHG17W1d2u6uMU3bomtJGM12Gr897zGhoKVDM9rUQ";
-```
+- `VOICELITE_LICENSE_PUBLIC_KEY` → the `LICENSE_SIGNING_PUBLIC_B64` from Phase 1
+- `VOICELITE_CRL_PUBLIC_KEY` → the `CRL_SIGNING_PUBLIC_B64` from Phase 1
+- Keep the private keys (`LICENSE_SIGNING_PRIVATE_B64`, `CRL_SIGNING_PRIVATE_B64`) in your server-side secret manager
 
-Replace with your **LICENSE_SIGNING_PUBLIC_B64** value from Phase 1.
+The fallback constant in `LicenseService.cs` should remain the staging key for development only.
 
 ### 7.2 Update API Base URL
 
@@ -376,7 +376,7 @@ WHERE id = 'your-license-id';
 
 ### Desktop client "License invalid"
 
-- Verify `LICENSE_PUBLIC_KEY` in desktop client matches backend
+- Verify `VOICELITE_LICENSE_PUBLIC_KEY`/`VOICELITE_CRL_PUBLIC_KEY` are set and match the backend keys
 - Check license was issued for correct device fingerprint
 - Look for errors in `%APPDATA%\VoiceLite\logs\voicelite.log`
 

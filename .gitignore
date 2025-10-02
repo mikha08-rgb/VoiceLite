@@ -24,10 +24,14 @@ temp/
 # Whisper executables and models
 whisper/*.bin
 whisper/*.exe
-whisper/*.dllVoiceLite/.claude/
+whisper/*.dll
+
+# Tooling artifacts
+VoiceLite/.claude/
 
 # Sensitive files - NEVER commit these!
 license-keys.txt
+PRODUCTION_KEYS.txt
 *.env
 .env
 .env.local
@@ -38,3 +42,4 @@ license-keys.txt
 *.pfx
 secrets.txt
 api-keys.txt
+.vercel

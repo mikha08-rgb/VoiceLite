@@ -35,8 +35,16 @@ db.serialize(() => {
     `);
 });
 
-const API_KEY = process.env.API_KEY || 'CE7038B50A2FC2F91C52D042EAADAA77';
-const ADMIN_KEY = process.env.ADMIN_KEY || 'F50BB8D40F0262CFFE40D254B789C317';
+// SECURITY: API keys MUST be set via environment variables
+// Never use hardcoded fallback keys - they are a security vulnerability
+const API_KEY = process.env.API_KEY;
+const ADMIN_KEY = process.env.ADMIN_KEY;
+
+if (!API_KEY || !ADMIN_KEY) {
+    console.error('CRITICAL: API_KEY and ADMIN_KEY environment variables must be set');
+    console.error('Generate secure random keys and set them in your .env file');
+    throw new Error('Missing required environment variables: API_KEY and/or ADMIN_KEY');
+}
 
 // Helper to generate license key
 function generateLicenseKey(type) {

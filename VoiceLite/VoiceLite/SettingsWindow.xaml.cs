@@ -69,6 +69,19 @@ namespace VoiceLite
 
             // Load Text Injection Mode
             TextInjectionModeComboBox.SelectedIndex = (int)settings.TextInjectionMode;
+
+            // Load Custom Dictionary settings
+            EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
+            UpdateDictionaryCount();
+        }
+
+        private void UpdateDictionaryCount()
+        {
+            var count = settings.CustomDictionaryEntries?.Count ?? 0;
+            var enabledCount = settings.CustomDictionaryEntries?.Count(e => e.IsEnabled) ?? 0;
+            DictionaryCountText.Text = count == 0
+                ? "No entries loaded"
+                : $"{enabledCount} of {count} entries enabled";
         }
 
         private void LoadMicrophones()
@@ -235,6 +248,9 @@ namespace VoiceLite
             settings.NoiseGateThreshold = Math.Clamp(ParseDoubleOrDefault(NoiseThresholdTextBox.Text, settings.NoiseGateThreshold), 0.001, 0.2);
             settings.Language = "en";
 
+            // Save Custom Dictionary settings
+            settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked == true;
+
             // Save Text Injection Mode
             settings.TextInjectionMode = (TextInjectionMode)TextInjectionModeComboBox.SelectedIndex;
 
@@ -253,6 +269,46 @@ namespace VoiceLite
             LoadMicrophones();
         }
 
+        private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DictionaryManagerWindow(settings);
+            if (dialog.ShowDialog() == true)
+            {
+                // Refresh the count display
+                UpdateDictionaryCount();
+            }
+        }
+
+        private void SendFeedbackButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Get app version
+                var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+
+                // Get OS version
+                var osVersion = $"{Environment.OSVersion.Platform} {Environment.OSVersion.Version}";
+
+                // Build feedback URL with pre-filled data
+                var feedbackUrl = $"https://voicelite.app/feedback?source=desktop&version={Uri.EscapeDataString(version)}&os={Uri.EscapeDataString(osVersion)}";
+
+                // Open URL in default browser
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = feedbackUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to open feedback page: {ex.Message}\n\nPlease visit: https://voicelite.app/feedback",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+            }
+        }
 
         private static int ParseIntOrDefault(string? value, int fallback)
         {

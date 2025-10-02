@@ -17,7 +17,9 @@ namespace VoiceLite.Services
         private static readonly byte[] Salt = Encoding.UTF8.GetBytes("VL2024@Secure#");
         private static readonly string RegistryPath = @"SOFTWARE\VoiceLite\Security";
         private static bool isProtectionActive = false;
-        private static Thread? antiDebugThread;
+        // Anti-debugging thread is intentionally disabled for open-source build
+        // This field exists for compatibility but is never used
+        private static Thread? antiDebugThread = null;
 
         [DllImport("kernel32.dll")]
         private static extern bool IsDebuggerPresent();

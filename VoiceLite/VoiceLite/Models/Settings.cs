@@ -131,6 +131,22 @@ namespace VoiceLite.Models
         public bool ShowModelComparison { get; set; } = true; // Show visual comparison by default
         public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
 
+        // Transcription History
+        public int MaxHistoryItems { get; set; } = 10; // Maximum number of history items to keep (unpinned)
+        public bool EnableHistory { get; set; } = true; // Allow users to disable history tracking
+        public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
+
+        // History Display Preferences
+        public bool ShowHistoryPanel { get; set; } = true; // Toggle history panel visibility
+        public bool HistoryShowWordCount { get; set; } = true; // Show word count in history items
+        public bool HistoryShowTimestamp { get; set; } = true; // Show timestamp in history items
+        public double HistoryPanelWidth { get; set; } = 280; // Remember panel width
+
+        // Custom Dictionary
+        public bool EnableCustomDictionary { get; set; } = true; // Enable custom dictionary replacements
+        public List<DictionaryEntry> CustomDictionaryEntries { get; set; } = new List<DictionaryEntry>();
+        public DictionaryCategory? ActiveDictionaryCategory { get; set; } = null; // null = all categories
+
     }
 
     public class ModelBenchmarkCache

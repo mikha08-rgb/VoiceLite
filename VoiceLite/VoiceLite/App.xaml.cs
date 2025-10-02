@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -64,22 +65,25 @@ namespace VoiceLite
         {
             try
             {
+                var installRoot = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
                 var whisperProcesses = Process.GetProcessesByName("whisper");
-                if (whisperProcesses.Length > 0)
+                var managedProcesses = whisperProcesses
+                    .Where(process => IsProcessOwnedByVoiceLite(process, installRoot))
+                    .ToArray();
+
+                if (managedProcesses.Length > 0)
                 {
-                    ErrorLogger.LogMessage($"Found {whisperProcesses.Length} whisper processes to clean up");
+                    ErrorLogger.LogMessage($"Cleaning up {managedProcesses.Length} whisper process(es) started by VoiceLite");
                 }
 
-                foreach (var process in whisperProcesses)
+                foreach (var process in managedProcesses)
                 {
                     try
                     {
                         if (!process.HasExited)
                         {
                             ErrorLogger.LogMessage($"Killing whisper process: PID {process.Id}");
-
-                            // Kill entire process tree to ensure child processes are terminated
-                            process.Kill(true);
+                            process.Kill(entireProcessTree: true);
                             process.WaitForExit(1000);
                         }
                     }
@@ -93,6 +97,36 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("CleanupOrphanedWhisperProcesses", ex);
+            }
+        }
+
+        private static bool IsProcessOwnedByVoiceLite(Process process, string installRoot)
+        {
+            try
+            {
+                if (process.HasExited)
+                {
+                    return false;
+                }
+
+                var module = process.MainModule;
+                if (module == null)
+                {
+                    return false;
+                }
+
+                var executablePath = module.FileName;
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    return false;
+                }
+
+                var normalizedPath = Path.GetFullPath(executablePath);
+                return normalizedPath.StartsWith(installRoot, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
             }
         }
 

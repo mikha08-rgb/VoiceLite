@@ -9,7 +9,12 @@ const http = require('http');
 
 // Configuration - update these for your deployment
 const SERVER_URL = process.env.LICENSE_SERVER_URL || 'http://localhost:3000';
-const ADMIN_KEY = process.env.ADMIN_KEY || 'admin-secret-key-change-this';
+const ADMIN_KEY = process.env.ADMIN_KEY;
+
+if (!ADMIN_KEY) {
+    console.error('ADMIN_KEY environment variable must be set before using the admin CLI.');
+    process.exit(1);
+}
 
 const rl = readline.createInterface({
     input: process.stdin,
