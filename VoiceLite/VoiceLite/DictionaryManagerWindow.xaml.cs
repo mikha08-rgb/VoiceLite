@@ -16,6 +16,7 @@ namespace VoiceLite
         private ObservableCollection<DictionaryEntry> allEntries;
         private ObservableCollection<DictionaryEntry> filteredEntries;
         private Settings settings;
+        private System.Windows.Threading.DispatcherTimer? toastTimer;
 
         public DictionaryManagerWindow(Settings settings)
         {
@@ -27,6 +28,23 @@ namespace VoiceLite
             filteredEntries = new ObservableCollection<DictionaryEntry>(allEntries);
 
             EntriesDataGrid.ItemsSource = filteredEntries;
+
+            // Initialize toast timer
+            toastTimer = new System.Windows.Threading.DispatcherTimer();
+            toastTimer.Interval = TimeSpan.FromSeconds(2);
+            toastTimer.Tick += (s, e) =>
+            {
+                ToastNotification.Visibility = Visibility.Collapsed;
+                toastTimer?.Stop();
+            };
+        }
+
+        private void ShowToast(string message)
+        {
+            ToastText.Text = message;
+            ToastNotification.Visibility = Visibility.Visible;
+            toastTimer?.Stop();
+            toastTimer?.Start();
         }
 
         private void CategoryRadio_Checked(object sender, RoutedEventArgs e)
@@ -43,6 +61,7 @@ namespace VoiceLite
 
             filteredEntries.Clear();
 
+            // Apply category filter
             IEnumerable<DictionaryEntry> filtered = radioName switch
             {
                 nameof(AllCategoriesRadio) => allEntries,
@@ -54,9 +73,31 @@ namespace VoiceLite
                 _ => allEntries
             };
 
+            // Apply search filter if search text is not empty
+            var searchText = SearchTextBox?.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                filtered = filtered.Where(e =>
+                    e.Pattern.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    e.Replacement.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+            }
+
             foreach (var entry in filtered)
             {
                 filteredEntries.Add(entry);
+            }
+        }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshFilter();
+        }
+
+        private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (SearchTextBox != null)
+            {
+                SearchTextBox.Text = string.Empty;
             }
         }
 
@@ -132,6 +173,7 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
+                int addedCount = 0;
                 foreach (var entry in template)
                 {
                     // Avoid duplicates
@@ -139,10 +181,11 @@ namespace VoiceLite
                     {
                         allEntries.Add(entry);
                         settings.CustomDictionaryEntries.Add(entry);
+                        addedCount++;
                     }
                 }
                 RefreshFilter();
-                MessageBox.Show($"Loaded {templateName} template successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast($"✓ Loaded {addedCount} {templateName} entries");
             }
         }
 
@@ -169,16 +212,18 @@ namespace VoiceLite
 
                         if (result == MessageBoxResult.Yes)
                         {
+                            int addedCount = 0;
                             foreach (var entry in imported)
                             {
                                 if (!allEntries.Any(e => e.Pattern.Equals(entry.Pattern, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     allEntries.Add(entry);
                                     settings.CustomDictionaryEntries.Add(entry);
+                                    addedCount++;
                                 }
                             }
                             RefreshFilter();
-                            MessageBox.Show("Import successful!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                            ShowToast($"✓ Imported {addedCount} entries");
                         }
                     }
                     else
@@ -215,7 +260,7 @@ namespace VoiceLite
                 {
                     var json = JsonSerializer.Serialize(allEntries.ToList(), new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(dialog.FileName, json);
-                    MessageBox.Show("Export successful!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowToast($"✓ Exported {allEntries.Count} entries");
                 }
                 catch (Exception ex)
                 {
@@ -252,6 +297,15 @@ namespace VoiceLite
                 e.Handled = true;
                 DialogResult = true;
                 Close();
+            }
+        }
+
+        private void EntriesDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Only trigger if double-clicking on a row (not headers or empty space)
+            if (EntriesDataGrid.SelectedItem is DictionaryEntry)
+            {
+                EditButton_Click(sender, e);
             }
         }
     }

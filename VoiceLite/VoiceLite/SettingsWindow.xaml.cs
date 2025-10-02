@@ -18,6 +18,7 @@ namespace VoiceLite
         private bool isCapturingHotkey = false;
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
+        private Action? testRecordingCallback;
         private static readonly string[] DefaultModelCandidates = new[]
         {
             "ggml-small.bin",
@@ -29,10 +30,11 @@ namespace VoiceLite
 
         public Settings Settings => settings;
 
-        public SettingsWindow(Settings currentSettings)
+        public SettingsWindow(Settings currentSettings, Action? onTestRecording = null)
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
+            testRecordingCallback = onTestRecording;
             LoadSettings();
         }
 
@@ -53,7 +55,7 @@ namespace VoiceLite
             LoadWhisperModels();
 
             WhisperModelComboBox.Text = string.IsNullOrWhiteSpace(settings.WhisperModel)
-                ? "ggml-small.bin"
+                ? "ggml-small.bin" // Free tier default (matches Settings.cs)
                 : settings.WhisperModel;
 
             BeamSizeTextBox.Text = settings.BeamSize.ToString(CultureInfo.InvariantCulture);
@@ -267,6 +269,12 @@ namespace VoiceLite
         private void RefreshMicrophonesButton_Click(object sender, RoutedEventArgs e)
         {
             LoadMicrophones();
+        }
+
+        private void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Invoke the test recording callback if provided
+            testRecordingCallback?.Invoke();
         }
 
         private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e)

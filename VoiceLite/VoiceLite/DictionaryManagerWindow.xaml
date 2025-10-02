@@ -14,6 +14,25 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Toast Notification (overlays at top) -->
+        <Border x:Name="ToastNotification"
+                Grid.Row="0"
+                Grid.RowSpan="4"
+                Background="#4A4A4A"
+                CornerRadius="6"
+                Padding="16,12"
+                Margin="0,0,0,0"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Visibility="Collapsed"
+                Panel.ZIndex="1000">
+            <TextBlock x:Name="ToastText"
+                       Text="Success!"
+                       Foreground="White"
+                       FontSize="13"
+                       TextAlignment="Center"/>
+        </Border>
+
         <!-- Title -->
         <TextBlock Text="Custom Dictionary Manager"
                    FontSize="20"
@@ -22,33 +41,77 @@
                    Grid.Row="0"
                    Margin="0,0,0,16"/>
 
-        <!-- Category Tabs -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
-            <RadioButton x:Name="AllCategoriesRadio"
-                         Content="All"
-                         IsChecked="True"
-                         Margin="0,0,16,0"
-                         Checked="CategoryRadio_Checked"/>
-            <RadioButton x:Name="GeneralCategoryRadio"
-                         Content="General"
-                         Margin="0,0,16,0"
-                         Checked="CategoryRadio_Checked"/>
-            <RadioButton x:Name="MedicalCategoryRadio"
-                         Content="Medical"
-                         Margin="0,0,16,0"
-                         Checked="CategoryRadio_Checked"/>
-            <RadioButton x:Name="LegalCategoryRadio"
-                         Content="Legal"
-                         Margin="0,0,16,0"
-                         Checked="CategoryRadio_Checked"/>
-            <RadioButton x:Name="TechCategoryRadio"
-                         Content="Tech"
-                         Margin="0,0,16,0"
-                         Checked="CategoryRadio_Checked"/>
-            <RadioButton x:Name="PersonalCategoryRadio"
-                         Content="Personal"
-                         Checked="CategoryRadio_Checked"/>
-        </StackPanel>
+        <!-- Category Tabs and Search -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Category Tabs -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <RadioButton x:Name="AllCategoriesRadio"
+                             Content="All"
+                             IsChecked="True"
+                             Margin="0,0,16,0"
+                             Checked="CategoryRadio_Checked"/>
+                <RadioButton x:Name="GeneralCategoryRadio"
+                             Content="General"
+                             Margin="0,0,16,0"
+                             Checked="CategoryRadio_Checked"/>
+                <RadioButton x:Name="MedicalCategoryRadio"
+                             Content="Medical"
+                             Margin="0,0,16,0"
+                             Checked="CategoryRadio_Checked"/>
+                <RadioButton x:Name="LegalCategoryRadio"
+                             Content="Legal"
+                             Margin="0,0,16,0"
+                             Checked="CategoryRadio_Checked"/>
+                <RadioButton x:Name="TechCategoryRadio"
+                             Content="Tech"
+                             Margin="0,0,16,0"
+                             Checked="CategoryRadio_Checked"/>
+                <RadioButton x:Name="PersonalCategoryRadio"
+                             Content="Personal"
+                             Checked="CategoryRadio_Checked"/>
+            </StackPanel>
+
+            <!-- Search Box -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <TextBlock Text="Search:"
+                           VerticalAlignment="Center"
+                           Foreground="#7A7A7A"
+                           FontSize="12"
+                           Margin="0,0,8,0"/>
+                <Border BorderBrush="#E0E0E0"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Background="White">
+                    <TextBox x:Name="SearchTextBox"
+                             Width="200"
+                             Height="28"
+                             Padding="8,4"
+                             BorderThickness="0"
+                             FontSize="12"
+                             TextChanged="SearchTextBox_TextChanged"
+                             ToolTip="Search by pattern or replacement"/>
+                </Border>
+                <Button x:Name="ClearSearchButton"
+                        Content="×"
+                        Width="28"
+                        Height="28"
+                        Background="Transparent"
+                        Foreground="#7A7A7A"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        FontSize="18"
+                        FontWeight="Bold"
+                        Margin="4,0,0,0"
+                        Click="ClearSearchButton_Click"
+                        ToolTip="Clear search"
+                        Cursor="Hand"/>
+            </StackPanel>
+        </Grid>
 
         <!-- DataGrid -->
         <Border Grid.Row="2"
@@ -68,7 +131,8 @@
                       RowBackground="White"
                       AlternatingRowBackground="#FAFAFA"
                       SelectionMode="Single"
-                      SelectionUnit="FullRow">
+                      SelectionUnit="FullRow"
+                      MouseDoubleClick="EntriesDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
                     <DataGridCheckBoxColumn Header="Enabled"
                                             Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}"

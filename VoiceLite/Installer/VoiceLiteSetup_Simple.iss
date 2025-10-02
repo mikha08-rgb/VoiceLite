@@ -1,9 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
+; v1.0.14: Includes Small model (466MB) as free tier default for temporary growth promotion
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.10
+AppVersion=1.0.14
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -11,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.10
+OutputBaseFilename=VoiceLite-Setup-1.0.14
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -33,7 +34,7 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (ONLY tiny model for minimal size)
+; Whisper files (Small + Tiny models - Small is new free tier default, Tiny is legacy fallback)
 Source: "..\whisper_installer\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file
