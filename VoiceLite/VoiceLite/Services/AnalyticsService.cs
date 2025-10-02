@@ -20,6 +20,7 @@ namespace VoiceLite.Services
         private string? anonymousUserId;
         private DateTime lastTranscriptionLogTime = DateTime.MinValue;
         private int dailyTranscriptionCount = 0;
+        private int dailyTotalWordCount = 0;
 
         public AnalyticsService(Settings settings)
         {
@@ -85,12 +86,14 @@ namespace VoiceLite.Services
             if (lastTranscriptionLogTime.Date != today)
             {
                 dailyTranscriptionCount = 0;
+                dailyTotalWordCount = 0;
                 lastTranscriptionLogTime = today;
             }
 
             dailyTranscriptionCount++;
+            dailyTotalWordCount += wordCount;
 
-            // Send aggregated count once per day
+            // Send aggregated event once per day (first transcription)
             if (dailyTranscriptionCount == 1)
             {
                 await TrackEventAsync(new AnalyticsEventPayload
@@ -101,7 +104,21 @@ namespace VoiceLite.Services
                     AppVersion = GetAppVersion(),
                     OsVersion = GetOsVersion(),
                     ModelUsed = modelUsed,
-                    Metadata = new { wordCount }
+                    Metadata = new { transcriptionCount = dailyTranscriptionCount, totalWords = dailyTotalWordCount }
+                });
+            }
+            // Update metadata every 10 transcriptions to track aggregate stats
+            else if (dailyTranscriptionCount % 10 == 0)
+            {
+                await TrackEventAsync(new AnalyticsEventPayload
+                {
+                    AnonymousUserId = anonymousUserId!,
+                    EventType = "TRANSCRIPTION_COMPLETED",
+                    Tier = GetCurrentTier(),
+                    AppVersion = GetAppVersion(),
+                    OsVersion = GetOsVersion(),
+                    ModelUsed = modelUsed,
+                    Metadata = new { transcriptionCount = dailyTranscriptionCount, totalWords = dailyTotalWordCount }
                 });
             }
         }
