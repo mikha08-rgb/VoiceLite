@@ -28,6 +28,7 @@ namespace VoiceLite
         private MemoryMonitor? memoryMonitor;
         private TranscriptionHistoryService? historyService;
         private SoundService? soundService;
+        private AnalyticsService? analyticsService;
         private DateTime recordingStartTime;
         private Settings settings = new();
         private AuthenticationService authenticationService = new();
@@ -365,6 +366,9 @@ namespace VoiceLite
                 // Initialize sound service
                 soundService = new SoundService();
 
+                // Initialize analytics service
+                analyticsService = new AnalyticsService(settings);
+
                 // Load and display existing history
                 UpdateHistoryUI();
 
@@ -387,11 +391,50 @@ namespace VoiceLite
                 string hotkeyDisplay = GetHotkeyDisplayString();
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
+
+                // Check for analytics consent on first run
+                CheckAnalyticsConsentAsync();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to register hotkey: {ex.Message}\n\nThe hotkey may be in use by another application.",
                     "Hotkey Registration Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private async void CheckAnalyticsConsentAsync()
+        {
+            try
+            {
+                // If consent not asked yet (null), show consent dialog
+                if (settings.EnableAnalytics == null)
+                {
+                    // Small delay to let the main window fully load
+                    await Task.Delay(1000);
+
+                    var consentWindow = new AnalyticsConsentWindow(settings);
+                    consentWindow.Owner = this;
+                    var result = consentWindow.ShowDialog();
+
+                    // Save settings after consent decision
+                    SaveSettings();
+
+                    // If user consented, track app launch
+                    if (settings.EnableAnalytics == true && analyticsService != null)
+                    {
+                        await analyticsService.TrackAppLaunchAsync();
+                    }
+                }
+                else if (settings.EnableAnalytics == true && analyticsService != null)
+                {
+                    // User already consented, track app launch
+                    await analyticsService.TrackAppLaunchAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Analytics consent check failed", ex);
+                // Fail silently - analytics should never break the app
             }
         }
 
@@ -1024,6 +1067,13 @@ namespace VoiceLite
                         await whisperService.TranscribeAsync(workingAudioPath));
 
                     ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
+
+                    // Track analytics for successful transcription
+                    if (!string.IsNullOrWhiteSpace(transcription) && analyticsService != null)
+                    {
+                        var wordCount = transcription.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
+                        _ = analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount);
+                    }
 
                     // Update UI on UI thread after transcription completes
                     await Dispatcher.InvokeAsync(() =>
