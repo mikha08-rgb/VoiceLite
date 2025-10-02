@@ -2,16 +2,15 @@
 
 <div align="center">
 
-  **Turn your voice into text instantly - anywhere in Windows!**
+  **Free forever. Upgrade to Pro for premium accuracy.**
 
-  [![Download Latest](https://img.shields.io/badge/Download-v1.0.5-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
-  [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
-  [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+  [![Download Free](https://img.shields.io/badge/Download-Free-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
+  [![Upgrade to Pro](https://img.shields.io/badge/Upgrade-Pro-purple?style=for-the-badge)](https://voicelite.app)
+  [![Auditable Source](https://img.shields.io/badge/Source-Auditable-green?style=for-the-badge)](https://github.com/mikha08-rgb/VoiceLite)
 
   [![GitHub Stars](https://img.shields.io/github/stars/mikha08-rgb/VoiceLite?style=social)](https://github.com/mikha08-rgb/VoiceLite)
   [![GitHub Issues](https://img.shields.io/github/issues/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/issues)
   [![GitHub Release](https://img.shields.io/github/v/release/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/releases)
-  [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red)](https://github.com/mikha08-rgb/VoiceLite)
 
 </div>
 
@@ -19,7 +18,26 @@
 
 ## 🚀 What is VoiceLite?
 
-**VoiceLite** is a lightweight Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
+**VoiceLite** is a privacy-first Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
+
+## 🆓 Free Tier (Always Free)
+- ✅ **Tiny Whisper model** (fastest, 85-90% accuracy)
+- ✅ **Unlimited usage** - no trials, no time limits
+- ✅ **Works completely offline** - your voice never leaves your PC
+- ✅ **All core features** - hotkeys, text injection, settings
+- ✅ **Auditable source code** - verify privacy yourself
+
+## 💎 Pro Tier ($20/3mo or $99 lifetime)
+- ✨ **Premium models**: Base (93%), Small (95%), Medium (97%)
+- ✨ **Excellent accuracy** on technical terms (code, jargon, commands)
+- ✨ **Priority email support** - get help within 24 hours
+- ✨ **Early access** to new features and beta releases
+
+<div align="center">
+
+[🚀 **Upgrade to Pro**](https://voicelite.app) | [📖 **View Source Code**](https://github.com/mikha08-rgb/VoiceLite)
+
+</div>
 
 ### ✨ Perfect For:
 - 💻 **Developers** - Write code comments, documentation, variable names
@@ -153,7 +171,22 @@ Yes! Works in most games. Some fullscreen games may block hotkeys.
 
 <details>
 <summary><b>Is it really free?</b></summary>
-Yes! Free and open source forever. No subscriptions, no ads.
+Yes! The free tier with Tiny model is 100% free forever. No trials, no time limits. Pro tier unlocks premium models for better accuracy.
+</details>
+
+<details>
+<summary><b>Why can I see the source code?</b></summary>
+Transparency. Since VoiceLite processes your voice locally, we want you to verify there's no telemetry or cloud uploads. Audit the code yourself - your privacy, your choice.
+</details>
+
+<details>
+<summary><b>Can I use this commercially?</b></summary>
+Personal use is free. Organizations with 5+ users are encouraged to purchase Pro licenses to support continued development.
+</details>
+
+<details>
+<summary><b>How do Pro features work if the code is public?</b></summary>
+Pro models require server-side license validation. The core audio/transcription code is open for privacy auditing, but premium features are gated by our licensing server (not included in this repo).
 </details>
 
 <details>
