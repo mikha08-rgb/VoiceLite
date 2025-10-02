@@ -167,8 +167,10 @@ npm run keygen
 
 ### Whisper Command Format
 ```bash
-whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperature 0.2 --beam-size 5 --best-of 5
+whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temperature 0.2 --beam-size 5 --best-of 5
 ```
+
+**Language Support**: VoiceLite supports 99 languages via Whisper's multilingual capabilities. Default is English (`en`), but can be configured in settings.
 
 ## Licensing & Freemium Model
 
@@ -369,7 +371,6 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 2. **Antivirus False Positives**: Global hotkeys and text injection may trigger warnings
 3. **Windows Defender**: Files may need to be unblocked (right-click → Properties → Unblock)
 4. **First Run Diagnostics**: StartupDiagnostics checks and auto-fixes common issues
-5. **English Only**: Multi-language support planned but not yet implemented
 
 ## Recent Cleanup Activities
 
@@ -400,12 +401,18 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.15 (current release)
+- **Desktop App**: v1.0.16 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.15 (Current Desktop Release)
+### v1.0.16 (Current Desktop Release)
+- **VoiceShortcuts Rebrand**: Renamed custom dictionary feature to "VoiceShortcuts" for clarity
+- **Model Naming Updates**: Improved model naming consistency across UI
+- **Minor fixes**: Documentation and UI polish
+
+### v1.0.15
+- **Multi-Language Support**: Added support for 99 languages via Whisper AI
 - **Major UX improvements**: Improved user experience across the application
 - **Performance optimizations**: Better resource management and speed
 - **Stability enhancements**: Bug fixes and reliability improvements

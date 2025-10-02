@@ -23,7 +23,15 @@
       "Bash(find:*)",
       "Bash(git branch:*)",
       "Bash(awk:*)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(start VoiceLite/VoiceLite/bin/Debug/net8.0-windows/VoiceLite.exe)",
+      "Bash(npx vercel deploy:*)",
+      "Bash(npx vercel:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx dotenv-cli:*)",
+      "Bash(set DATABASE_URL=postgresql://postgres.kkjfmnwjchlugzxlqipw:jY%26%23DvbBo2a%25Oo%2Az@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true)",
+      "Bash(npx prisma db push:*)"
     ],
     "deny": [],
     "ask": []
