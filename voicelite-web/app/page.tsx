@@ -269,7 +269,7 @@ export default function Home() {
             <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
               <RippleButton
                 onClick={() => {
-                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.15/VoiceLite-Setup-1.0.15.exe';
+                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.16/VoiceLite-Setup-1.0.16.exe';
                 }}
                 className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
                 rippleColor="rgba(255, 255, 255, 0.4)"
