@@ -40,6 +40,7 @@ const plans = [
     priceId: 'quarterly',
     popular: true,
     bullets: ['All Whisper models', 'Priority support', 'Automatic updates'],
+    comingSoon: true, // Added: Pro tier launching soon
   },
   {
     id: 'lifetime',
@@ -49,6 +50,7 @@ const plans = [
     priceId: 'lifetime',
     popular: false,
     bullets: ['Permanent license', 'All future updates', 'Priority support'],
+    comingSoon: true, // Added: Pro tier launching soon
   },
 ];
 
@@ -56,6 +58,10 @@ const faqItems = [
   {
     question: 'Is my voice data sent to the cloud?',
     answer: 'No. VoiceLite runs 100% offline on your PC using local Whisper AI models. Your voice never leaves your computer - no internet connection required for transcription.',
+  },
+  {
+    question: 'When will Pro tier launch?',
+    answer: 'Pro tier is launching in 2-3 weeks! We\'re finalizing payment infrastructure (LLC setup and Stripe integration). The free tier with Tiny model is fully functional now. Pro will unlock premium models (base, small, medium) for 95%+ accuracy on technical terms.',
   },
   {
     question: "What's the difference between free and Pro?",
@@ -378,6 +384,7 @@ export default function Home() {
                   price={plan.price}
                   popular={plan.popular}
                   bullets={plan.bullets}
+                  comingSoon={plan.comingSoon}
                   onCheckout={handleCheckout}
                 />
               ))}

@@ -12,6 +12,7 @@ interface PricingCardProps {
   price: string;
   popular: boolean;
   bullets: string[];
+  comingSoon?: boolean;
   onCheckout: (planId: string) => Promise<void>;
 }
 
@@ -22,6 +23,7 @@ export function PricingCard({
   price,
   popular,
   bullets,
+  comingSoon = false,
   onCheckout,
 }: PricingCardProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -79,19 +81,32 @@ export function PricingCard({
         </div>
       </div>
 
-      <RippleButton
-        onClick={handleCheckout}
-        disabled={isLoading}
-        className={`inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-base font-semibold shadow-md transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${
-          popular
-            ? 'bg-gradient-to-br from-purple-600 to-violet-600 text-white shadow-purple-500/25 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/30 motion-reduce:transform-none dark:shadow-purple-500/20'
-            : 'border-2 border-purple-200 bg-white text-purple-700 hover:border-purple-300 hover:bg-purple-50 dark:border-purple-800 dark:bg-stone-900/50 dark:text-purple-300 dark:hover:border-purple-700'
-        }`}
-        rippleColor={popular ? 'rgba(255, 255, 255, 0.4)' : 'rgba(124, 58, 237, 0.3)'}
-      >
-        <CreditCard className="mr-2 h-5 w-5" aria-hidden="true" />
-        {isLoading ? 'Redirecting...' : 'Get Started'}
-      </RippleButton>
+      {comingSoon ? (
+        <div className="space-y-3">
+          <div className="rounded-xl border-2 border-dashed border-purple-300 bg-purple-50 px-6 py-4 text-center dark:border-purple-800 dark:bg-purple-950/30">
+            <p className="text-sm font-semibold text-purple-900 dark:text-purple-300">
+              🚀 Launching in 2-3 weeks
+            </p>
+            <p className="mt-1 text-xs text-purple-700 dark:text-purple-400">
+              Payment infrastructure being finalized
+            </p>
+          </div>
+        </div>
+      ) : (
+        <RippleButton
+          onClick={handleCheckout}
+          disabled={isLoading}
+          className={`inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-base font-semibold shadow-md transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${
+            popular
+              ? 'bg-gradient-to-br from-purple-600 to-violet-600 text-white shadow-purple-500/25 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/30 motion-reduce:transform-none dark:shadow-purple-500/20'
+              : 'border-2 border-purple-200 bg-white text-purple-700 hover:border-purple-300 hover:bg-purple-50 dark:border-purple-800 dark:bg-stone-900/50 dark:text-purple-300 dark:hover:border-purple-700'
+          }`}
+          rippleColor={popular ? 'rgba(255, 255, 255, 0.4)' : 'rgba(124, 58, 237, 0.3)'}
+        >
+          <CreditCard className="mr-2 h-5 w-5" aria-hidden="true" />
+          {isLoading ? 'Redirecting...' : 'Get Started'}
+        </RippleButton>
+      )}
     </article>
   );
 }
