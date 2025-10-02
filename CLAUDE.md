@@ -348,7 +348,7 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
-4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.16)
+4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.17)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
@@ -401,12 +401,19 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.16 (current release)
+- **Desktop App**: v1.0.17 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.16 (Current Desktop Release)
+### v1.0.17 (Current Desktop Release)
+- **Analytics System**: Add privacy-first opt-in analytics with SHA256 anonymous user IDs
+- **Analytics Tracking**: Track app launches, transcriptions (aggregated daily), model changes, settings changes
+- **Privacy Enhancements**: No PII collection, no IP logging, full transparency in consent dialog
+- **Bug Fixes**: Fix UUID generation for analytics events, improve daily transcription aggregation
+- **Code Quality**: Wire up analytics tracking throughout desktop app
+
+### v1.0.16
 - **VoiceShortcuts Rebrand**: Renamed custom dictionary feature to "VoiceShortcuts" for clarity
 - **Model Naming Updates**: Improved model naming consistency across UI
 - **Minor fixes**: Documentation and UI polish
