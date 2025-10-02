@@ -6,13 +6,37 @@ import { prisma } from '@/lib/prisma';
 export async function POST(req: NextRequest) {
   try {
 
+    // Create ENUM types first
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        CREATE TYPE "AnalyticsEventType" AS ENUM (
+          'APP_LAUNCHED',
+          'TRANSCRIPTION_COMPLETED',
+          'MODEL_CHANGED',
+          'SETTINGS_CHANGED',
+          'ERROR_OCCURRED',
+          'PRO_UPGRADE'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
+
+    await prisma.$executeRaw`
+      DO $$ BEGIN
+        CREATE TYPE "TierType" AS ENUM ('FREE', 'PRO');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
+
     // Create AnalyticsEvent table using raw SQL
     await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "AnalyticsEvent" (
         "id" TEXT NOT NULL,
         "anonymousUserId" TEXT NOT NULL,
-        "eventType" TEXT NOT NULL,
-        "tier" TEXT NOT NULL DEFAULT 'FREE',
+        "eventType" "AnalyticsEventType" NOT NULL,
+        "tier" "TierType" NOT NULL DEFAULT 'FREE',
         "appVersion" TEXT,
         "osVersion" TEXT,
         "modelUsed" TEXT,
