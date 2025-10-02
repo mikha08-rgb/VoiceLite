@@ -194,7 +194,7 @@ namespace VoiceLite.Services
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{dummyAudioPath}\" " +
                               $"--threads {Environment.ProcessorCount} " +
-                              "--no-timestamps --language en " +
+                              $"--no-timestamps --language {settings.Language} " +
                               "--beam-size 1 " +          // Fastest possible
                               "--best-of 1 " +            // Single candidate
                               "--entropy-thold 3.0";

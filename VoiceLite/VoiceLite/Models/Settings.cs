@@ -165,8 +165,12 @@ namespace VoiceLite.Models
             if (settings == null)
                 return new Settings();
 
-            // Validate language code
-            var validLanguages = new HashSet<string> { "en", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh" };
+            // Validate language code (top 30 most popular languages supported by Whisper)
+            var validLanguages = new HashSet<string> {
+                "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
+                "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi",
+                "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no"
+            };
             if (!validLanguages.Contains(settings.Language))
             {
                 settings.Language = "en";

@@ -141,6 +141,43 @@
                     </StackPanel>
                 </GroupBox>
 
+                <!-- Language Settings -->
+                <GroupBox Header="Language Settings" Margin="0,0,0,15">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="Transcription Language:" Margin="0,0,0,5"/>
+                        <ComboBox Name="LanguageComboBox"
+                                  Margin="0,0,0,5"
+                                  SelectedValuePath="Tag"
+                                  SelectionChanged="LanguageComboBox_SelectionChanged">
+                            <!-- Top 20 most requested languages -->
+                            <ComboBoxItem Content="English" Tag="en" IsSelected="True"/>
+                            <ComboBoxItem Content="Spanish (Español)" Tag="es"/>
+                            <ComboBoxItem Content="French (Français)" Tag="fr"/>
+                            <ComboBoxItem Content="German (Deutsch)" Tag="de"/>
+                            <ComboBoxItem Content="Italian (Italiano)" Tag="it"/>
+                            <ComboBoxItem Content="Portuguese (Português)" Tag="pt"/>
+                            <ComboBoxItem Content="Chinese (中文)" Tag="zh"/>
+                            <ComboBoxItem Content="Japanese (日本語)" Tag="ja"/>
+                            <ComboBoxItem Content="Korean (한국어)" Tag="ko"/>
+                            <ComboBoxItem Content="Russian (Русский)" Tag="ru"/>
+                            <ComboBoxItem Content="Arabic (العربية)" Tag="ar"/>
+                            <ComboBoxItem Content="Dutch (Nederlands)" Tag="nl"/>
+                            <ComboBoxItem Content="Polish (Polski)" Tag="pl"/>
+                            <ComboBoxItem Content="Turkish (Türkçe)" Tag="tr"/>
+                            <ComboBoxItem Content="Hindi (हिन्दी)" Tag="hi"/>
+                            <ComboBoxItem Content="Swedish (Svenska)" Tag="sv"/>
+                            <ComboBoxItem Content="Indonesian (Bahasa Indonesia)" Tag="id"/>
+                            <ComboBoxItem Content="Finnish (Suomi)" Tag="fi"/>
+                            <ComboBoxItem Content="Vietnamese (Tiếng Việt)" Tag="vi"/>
+                            <ComboBoxItem Content="Hebrew (עברית)" Tag="he"/>
+                        </ComboBox>
+                        <TextBlock Text="Select the language you'll be speaking"
+                                   FontSize="11"
+                                   Foreground="Gray"
+                                   Margin="0,5,0,0"/>
+                    </StackPanel>
+                </GroupBox>
+
                 <!-- Audio Enhancements -->
                 <GroupBox Header="Audio Enhancements" Margin="0,0,0,15">
                     <StackPanel Margin="10">
@@ -160,24 +197,24 @@
                     </StackPanel>
                 </GroupBox>
 
-                <!-- Custom Dictionary -->
-                <GroupBox Header="Custom Dictionary" Margin="0,0,0,15">
+                <!-- VoiceShortcuts -->
+                <GroupBox Header="VoiceShortcuts" Margin="0,0,0,15">
                     <StackPanel Margin="10">
                         <CheckBox Name="EnableCustomDictionaryCheckBox"
-                                  Content="Enable custom dictionary replacements"
+                                  Content="Enable VoiceShortcuts"
                                   IsChecked="True"
                                   Margin="0,0,0,10"/>
                         <TextBlock Name="DictionaryCountText"
-                                   Text="0 entries loaded"
+                                   Text="0 shortcuts loaded"
                                    FontSize="11"
                                    Foreground="Gray"
                                    Margin="0,0,0,10"/>
                         <Button Name="ManageDictionaryButton"
-                                Content="Manage Dictionary..."
-                                Width="150"
+                                Content="Manage VoiceShortcuts..."
+                                Width="180"
                                 HorizontalAlignment="Left"
                                 Click="ManageDictionaryButton_Click"
-                                ToolTip="Add, edit, or remove custom word replacements"/>
+                                ToolTip="Add, edit, or remove voice shortcuts and custom word replacements"/>
                     </StackPanel>
                 </GroupBox>
 

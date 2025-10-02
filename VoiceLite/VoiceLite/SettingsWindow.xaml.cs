@@ -55,7 +55,7 @@ namespace VoiceLite
             LoadWhisperModels();
 
             WhisperModelComboBox.Text = string.IsNullOrWhiteSpace(settings.WhisperModel)
-                ? "ggml-small.bin" // Free tier default (matches Settings.cs)
+                ? "ggml-small.bin" // Pro model - Free tier default (matches Settings.cs)
                 : settings.WhisperModel;
 
             BeamSizeTextBox.Text = settings.BeamSize.ToString(CultureInfo.InvariantCulture);
@@ -75,6 +75,16 @@ namespace VoiceLite
             // Load Custom Dictionary settings
             EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
             UpdateDictionaryCount();
+
+            // Load Language settings
+            foreach (ComboBoxItem item in LanguageComboBox.Items)
+            {
+                if (item.Tag?.ToString() == settings.Language)
+                {
+                    LanguageComboBox.SelectedItem = item;
+                    break;
+                }
+            }
         }
 
         private void UpdateDictionaryCount()
@@ -82,8 +92,8 @@ namespace VoiceLite
             var count = settings.CustomDictionaryEntries?.Count ?? 0;
             var enabledCount = settings.CustomDictionaryEntries?.Count(e => e.IsEnabled) ?? 0;
             DictionaryCountText.Text = count == 0
-                ? "No entries loaded"
-                : $"{enabledCount} of {count} entries enabled";
+                ? "No shortcuts loaded"
+                : $"{enabledCount} of {count} shortcuts enabled";
         }
 
         private void LoadMicrophones()
@@ -248,7 +258,12 @@ namespace VoiceLite
             settings.AutoPaste = AutoPasteCheckBox.IsChecked == true;
             settings.TargetRmsLevel = (float)Math.Clamp(ParseDoubleOrDefault(TargetRmsTextBox.Text, settings.TargetRmsLevel), 0.05, 0.9);
             settings.NoiseGateThreshold = Math.Clamp(ParseDoubleOrDefault(NoiseThresholdTextBox.Text, settings.NoiseGateThreshold), 0.001, 0.2);
-            settings.Language = "en";
+
+            // Save Language settings
+            if (LanguageComboBox.SelectedItem is ComboBoxItem selectedLanguage)
+            {
+                settings.Language = selectedLanguage.Tag?.ToString() ?? "en";
+            }
 
             // Save Custom Dictionary settings
             settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked == true;
@@ -333,6 +348,12 @@ namespace VoiceLite
             if (value < min) return min;
             if (value > max) return max;
             return value;
+        }
+
+        private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Language will be saved when user clicks Save button
+            // This handler exists to satisfy the XAML SelectionChanged binding
         }
     }
 }
