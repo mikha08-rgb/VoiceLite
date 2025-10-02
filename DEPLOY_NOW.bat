@@ -3,7 +3,7 @@ echo ========================================
 echo VoiceLite Deployment Script
 echo ========================================
 echo.
-echo This will deploy your website and API to Vercel.
+echo This will deploy the Next.js web platform to Vercel.
 echo.
 echo STEP 1: Login to Vercel
 echo ------------------------
@@ -11,25 +11,13 @@ echo Opening Vercel login in browser...
 echo.
 npx vercel login
 echo.
-echo STEP 2: Deploy Landing Page
+echo STEP 2: Deploy Web Platform
 echo ----------------------------
-echo Deploying landing page to voicelite.app...
+echo Deploying Next.js platform to voicelite.app...
 echo.
-cd landing-page
+cd voicelite-web
 echo When prompted:
 echo - Project name: voicelite
-echo - Link to existing project: No
-echo - Production deployment: Yes
-echo.
-npx vercel --prod
-echo.
-echo STEP 3: Deploy API Server
-echo -------------------------
-echo Deploying API to api.voicelite.app...
-echo.
-cd ../license-server
-echo When prompted:
-echo - Project name: voicelite-api
 echo - Link to existing project: No
 echo - Production deployment: Yes
 echo.
@@ -41,11 +29,13 @@ echo ========================================
 echo.
 echo Next steps:
 echo 1. Go to https://vercel.com/dashboard
-echo 2. Add custom domains:
-echo    - voicelite.app to 'voicelite' project
-echo    - api.voicelite.app to 'voicelite-api' project
-echo 3. Update your domain DNS:
-echo    A     @     76.76.21.21
-echo    CNAME api   cname.vercel-dns.com
+echo 2. Add custom domain voicelite.app to your project
+echo 3. Configure environment variables in Vercel dashboard:
+echo    - DATABASE_URL (PostgreSQL connection string)
+echo    - STRIPE_SECRET_KEY
+echo    - LICENSE_SIGNING_PRIVATE_B64
+echo    - RESEND_API_KEY
+echo    - UPSTASH_REDIS_REST_URL
+echo 4. Run database migrations: npm run db:migrate:deploy
 echo.
 pause
