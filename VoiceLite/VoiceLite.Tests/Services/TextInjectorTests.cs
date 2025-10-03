@@ -50,7 +50,7 @@ namespace VoiceLite.Tests.Services
             var injector = new TextInjector(_settings);
 
             // Act
-            Action act = () => injector.InjectText(text);
+            Action act = () => injector.InjectText(text!);
 
             // Assert
             act.Should().NotThrow();
