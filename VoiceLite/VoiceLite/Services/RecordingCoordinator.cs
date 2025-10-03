@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using VoiceLite.Interfaces;
 using VoiceLite.Models;
+using VoiceLite.Utilities;
 
 namespace VoiceLite.Services
 {
@@ -235,7 +236,7 @@ namespace VoiceLite.Services
                 // Track analytics for successful transcription
                 if (!string.IsNullOrWhiteSpace(transcription) && analyticsService != null)
                 {
-                    var wordCount = transcription.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
+                    var wordCount = TextAnalyzer.CountWords(transcription);
                     _ = analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount);
                 }
 
@@ -247,7 +248,7 @@ namespace VoiceLite.Services
                     {
                         Timestamp = DateTime.Now,
                         Text = transcription,
-                        WordCount = transcription.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length,
+                        WordCount = TextAnalyzer.CountWords(transcription),
                         DurationSeconds = (DateTime.Now - recordingStartTime).TotalSeconds,
                         ModelUsed = settings.WhisperModel
                     };
@@ -312,7 +313,7 @@ namespace VoiceLite.Services
         /// </summary>
         private async Task CleanupAudioFileAsync(string audioFilePath)
         {
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < TimingConstants.FileCleanupMaxRetries; i++)
             {
                 try
                 {
@@ -324,9 +325,9 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    if (i == 2) // Last attempt
+                    if (i == TimingConstants.FileCleanupMaxRetries - 1) // Last attempt
                         ErrorLogger.LogError("RecordingCoordinator.CleanupAudioFile", ex);
-                    await Task.Delay(100); // Wait before retry
+                    await Task.Delay(TimingConstants.FileCleanupRetryDelayMs);
                 }
             }
         }
