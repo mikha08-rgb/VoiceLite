@@ -57,7 +57,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-small.bin" : value;
         }
 
         public int BeamSize

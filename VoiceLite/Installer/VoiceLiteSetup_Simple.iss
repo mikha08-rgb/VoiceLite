@@ -1,10 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.18: Privacy fixes, RecordingCoordinator refactor, and comprehensive unit tests
+; v1.0.19: Privacy fixes, history tracking, and legacy code cleanup
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.18
+AppVersion=1.0.19
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -12,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.18
+OutputBaseFilename=VoiceLite-Setup-1.0.19
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes

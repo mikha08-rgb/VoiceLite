@@ -123,6 +123,7 @@ npm run keygen
    - `SecurityService`: Security and obfuscation helpers
    - `DependencyChecker`: Verify runtime dependencies
    - `AnalyticsService`: Privacy-first opt-in analytics with SHA256 anonymous user IDs (v1.0.17+)
+   - `RecordingCoordinator`: Orchestrates recording workflow and state management (v1.0.18+)
 
 3. **Models** (`Models/`): Data structures and configuration
    - `Settings`: User preferences with validation
@@ -383,7 +384,7 @@ VoiceLite includes a **privacy-first, opt-in analytics system** that respects us
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
 3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
-4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.17)
+4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.19)
 5. Installer script expects published files in specific location - verify paths in `.iss` file
 
 ### Installer Features
@@ -393,7 +394,7 @@ VoiceLite includes a **privacy-first, opt-in analytics system** that respects us
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
-- Current installer: `VoiceLite-Setup-1.0.16.exe`
+- Current installer: `VoiceLite-Setup-1.0.19.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -436,12 +437,27 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.17 (current release)
+- **Desktop App**: v1.0.19 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.17 (Current Desktop Release)
+### v1.0.19 (Current Desktop Release)
+- **CRITICAL FIX**: History tracking now works correctly - new transcriptions appear in history panel
+- **Privacy Enhancement**: Old Roaming AppData folder deleted after migration (prevents history syncing across PCs via Microsoft account)
+- **Privacy First**: Transcription history cleared during migration from old versions (sensitive data not migrated)
+- **Removed Legacy Fallback**: No more silent degradation to lower-quality models - fail-fast with clear error messages
+- **Improved Error Messages**: Clear "Please reinstall VoiceLite" errors instead of silent fallbacks to Tiny model
+- **Default Model Updated**: Changed default from Tiny (75MB) → Small (466MB) in all locations
+- **Code Quality**: Removed ~30 lines of complex fallback logic, fixed misleading comments
+
+### v1.0.18
+- **Privacy Fixes**: Improved analytics consent flow and data handling
+- **RecordingCoordinator Refactor**: New service to orchestrate recording workflow and state management
+- **Comprehensive Unit Tests**: Added extensive test coverage for RecordingCoordinator
+- **Code Quality**: Improved separation of concerns in recording logic
+
+### v1.0.17
 - **Analytics System**: Add privacy-first opt-in analytics with SHA256 anonymous user IDs
 - **Analytics Tracking**: Track app launches, transcriptions (aggregated daily), model changes, settings changes
 - **Privacy Enhancements**: No PII collection, no IP logging, full transparency in consent dialog

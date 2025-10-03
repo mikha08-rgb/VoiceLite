@@ -54,7 +54,7 @@
             <TextBlock Text="Model: " Foreground="#7A7A7A" FontSize="13"/>
             <TextBlock x:Name="ModelText" Text="Lite (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
 
-            <!-- Hidden references for backward compatibility -->
+            <!-- Hidden UI elements used for state storage (not displayed but referenced in MainWindow.xaml.cs) -->
             <TextBlock x:Name="MicrophoneText" Text="Default" Visibility="Collapsed"/>
             <TextBlock x:Name="AccountStatusText" Text="Not signed in" Visibility="Collapsed"/>
         </StackPanel>
@@ -312,7 +312,7 @@
                      Margin="0,16,0,0"/>
         </Grid>
 
-        <!-- Hidden transcription text box for backward compatibility -->
+        <!-- Hidden transcription text box for state storage (referenced in MainWindow.xaml.cs) -->
         <TextBox x:Name="TranscriptionText"
                  Grid.Row="2"
                  Visibility="Collapsed"

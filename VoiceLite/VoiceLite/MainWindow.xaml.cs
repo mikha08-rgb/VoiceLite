@@ -235,6 +235,39 @@ namespace VoiceLite
                         File.Copy(oldRoamingPath, settingsPath);
                         ErrorLogger.LogMessage("✅ Migrated settings from Roaming to Local AppData (privacy fix)");
 
+                        // Clear transcription history from migrated settings (privacy-sensitive data)
+                        try
+                        {
+                            string json = File.ReadAllText(settingsPath);
+                            Settings? migratedSettings = JsonSerializer.Deserialize<Settings>(json);
+                            if (migratedSettings != null && migratedSettings.TranscriptionHistory != null && migratedSettings.TranscriptionHistory.Count > 0)
+                            {
+                                int historyCount = migratedSettings.TranscriptionHistory.Count;
+                                migratedSettings.TranscriptionHistory.Clear();
+                                File.WriteAllText(settingsPath, JsonSerializer.Serialize(migratedSettings, new JsonSerializerOptions { WriteIndented = true }));
+                                ErrorLogger.LogMessage($"🗑️ Cleared {historyCount} migrated transcriptions for privacy");
+                            }
+                        }
+                        catch (Exception clearEx)
+                        {
+                            ErrorLogger.LogError("Failed to clear migrated history (non-critical)", clearEx);
+                        }
+
+                        // Delete old Roaming folder to prevent cloud sync (privacy)
+                        try
+                        {
+                            string roamingDir = Path.GetDirectoryName(oldRoamingPath);
+                            if (!string.IsNullOrEmpty(roamingDir) && Directory.Exists(roamingDir))
+                            {
+                                Directory.Delete(roamingDir, recursive: true);
+                                ErrorLogger.LogMessage("🗑️ Deleted old Roaming AppData folder to prevent sync across PCs");
+                            }
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            ErrorLogger.LogError("Failed to delete old Roaming folder (non-critical)", deleteEx);
+                        }
+
                         // Optionally inform user about the change
                         MessageBox.Show(
                             "VoiceLite has moved your settings to Local AppData.\n\n" +
@@ -1000,7 +1033,8 @@ namespace VoiceLite
                         TranscriptionText.Text = e.Transcription;
                         TranscriptionText.Foreground = Brushes.Black;
 
-                        // Update history UI
+                        // History is already added by RecordingCoordinator
+                        // Just update UI and save settings
                         UpdateHistoryUI();
                         SaveSettings(); // Persist history to disk
                     }
@@ -1454,25 +1488,20 @@ namespace VoiceLite
                     "small" => "ggml-small.bin",
                     "medium" => "ggml-medium.bin",
                     "large" => "ggml-large-v3.bin",
-                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
+                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
                 };
 
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
                 if (!File.Exists(modelPath))
                 {
-                    // Fallback to ggml-tiny.bin (free tier default)
-                    var fallbackPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-tiny.bin");
-                    if (File.Exists(fallbackPath))
-                    {
-                        settings.WhisperModel = "ggml-tiny.bin";
-                        ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (free tier)");
-                        SaveSettings();
-                    }
-                    else
-                    {
-                        MessageBox.Show("Whisper model files not found!\n\nPlease ensure the whisper folder contains ggml-tiny.bin.",
-                            "Missing Model Files", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
+                    // Show clear error message - no fallback
+                    MessageBox.Show(
+                        $"Model file '{modelFile}' is missing.\n\n" +
+                        "Please reinstall VoiceLite to restore missing files.\n\n" +
+                        $"Expected location: {modelPath}",
+                        "Model File Missing",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 }
             }
             catch (Exception ex)

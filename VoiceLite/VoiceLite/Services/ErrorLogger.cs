@@ -84,7 +84,7 @@ namespace VoiceLite.Services
             }
         }
 
-        // Legacy methods - kept for backward compatibility
+        // Primary logging methods used throughout the application
         // LogError() always logs regardless of level
         public static void LogError(string context, Exception ex)
         {
