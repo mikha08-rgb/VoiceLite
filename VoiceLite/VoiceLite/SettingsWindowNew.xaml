@@ -45,19 +45,9 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
                     <StackPanel>
                         <!-- Hotkey Settings -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🔑" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Hotkey Settings" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Configure your global recording shortcut" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Hotkey Input -->
-                                <TextBlock Text="Record Hotkey:" Margin="0,0,0,6" FontWeight="Medium" FontSize="13"/>
+                        <GroupBox Header="Hotkey Settings" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Record Hotkey:" Margin="0,0,0,5"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" MaxWidth="300"/>
@@ -68,9 +58,8 @@
                                              Grid.Column="0"
                                              IsReadOnly="True"
                                              Text="F1"
-                                             Padding="10,8"
-                                             Background="#F8F9FA"
-                                             FontSize="13"
+                                             Padding="5"
+                                             Background="#F0F0F0"
                                              PreviewKeyDown="HotkeyTextBox_PreviewKeyDown"
                                              GotFocus="HotkeyTextBox_GotFocus"
                                              LostFocus="HotkeyTextBox_LostFocus"/>
@@ -78,157 +67,86 @@
                                     <Button Name="ClearHotkeyButton"
                                             Grid.Column="1"
                                             Content="Clear"
-                                            Width="70"
-                                            Height="34"
-                                            Margin="8,0,0,0"
+                                            Width="60"
+                                            Margin="5,0,0,0"
                                             Click="ClearHotkeyButton_Click"/>
                                 </Grid>
                                 <TextBlock Name="HotkeyInstructionText"
-                                           Text="💡 Click the box above and press your desired key combination (e.g., Left Alt, F1, Ctrl+Space)"
-                                           Style="{StaticResource SettingsHelperTextStyle}"
+                                           Text="Click the box and press your desired key combination"
+                                           FontSize="11"
+                                           Foreground="Gray"
+                                           Margin="0,5,0,0"
                                            Visibility="Visible"/>
                             </StackPanel>
-                        </Border>
+                        </GroupBox>
 
                         <!-- Recording Mode -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="⏺️" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Recording Mode" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Choose how you want to trigger recording" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Mode Options -->
+                        <GroupBox Header="Recording Mode" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
                                 <RadioButton Name="PushToTalkRadio"
+                                             Content="Push-to-Talk (Hold key to record)"
                                              IsChecked="True"
-                                             Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Push-to-Talk" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Hold your hotkey while speaking, release to transcribe"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
-                                <RadioButton Name="ToggleRadio" IsEnabled="True">
-                                    <StackPanel>
-                                        <TextBlock Text="Toggle Mode" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Press once to start recording, press again to stop and transcribe"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
+                                             Margin="0,0,0,5"/>
+                                <RadioButton Name="ToggleRadio"
+                                             Content="Toggle (Press once to start, again to stop)"
+                                             IsEnabled="True"/>
                             </StackPanel>
-                        </Border>
+                        </GroupBox>
 
                         <!-- Audio Settings -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🎙️" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Audio Settings" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Configure your microphone and audio feedback" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Microphone Selection -->
-                                <TextBlock Text="Microphone:" Margin="0,0,0,6" FontWeight="Medium" FontSize="13"/>
+                        <GroupBox Header="Audio Settings" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Microphone:" Margin="0,0,0,5"/>
                                 <ComboBox Name="MicrophoneComboBox"
                                           Margin="0,0,0,10"
                                           DisplayMemberPath="Name"
                                           MaxWidth="400"
-                                          HorizontalAlignment="Left"
-                                          Padding="10,8"
-                                          FontSize="13"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                          HorizontalAlignment="Left"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <Button Name="RefreshMicrophonesButton"
-                                            Content="🔄 Refresh"
-                                            Width="120"
+                                            Content="Refresh Microphones"
+                                            Width="150"
                                             HorizontalAlignment="Left"
                                             Click="RefreshMicrophonesButton_Click"
-                                            Margin="0,0,8,0"
-                                            ToolTip="Rescan for connected microphones"/>
+                                            Margin="0,0,8,0"/>
                                     <Button Name="TestMicrophoneButton"
-                                            Content="🎤 Test"
-                                            Width="120"
+                                            Content="Test Microphone"
+                                            Width="130"
                                             HorizontalAlignment="Left"
                                             Click="TestMicrophoneButton_Click"
-                                            ToolTip="Click to start/stop a test recording"/>
+                                            ToolTip="Click to start/stop recording test"/>
                                 </StackPanel>
 
-                                <!-- Feedback Options -->
                                 <CheckBox Name="PlaySoundFeedbackCheckBox"
-                                          Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Play sound feedback" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Plays a subtle click sound when recording starts and stops"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          Content="Play sound feedback (beep on record start/stop)"
+                                          Margin="0,10,0,5"/>
 
                                 <CheckBox Name="AutoPasteCheckBox"
-                                          IsChecked="True">
-                                    <StackPanel>
-                                        <TextBlock Text="Auto-paste transcribed text" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Automatically pastes text into active application. When disabled, text is only copied to clipboard (manual Ctrl+V required)"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          Content="Auto-paste transcribed text (Ctrl+V)"
+                                          IsChecked="True"
+                                          Margin="0,0,0,0"
+                                          ToolTip="When enabled, transcribed text will automatically paste into the active application. When disabled, text is only copied to clipboard."/>
                             </StackPanel>
-                        </Border>
+                        </GroupBox>
 
-                        <!-- System Settings -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="⚙️" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="System Settings" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Configure startup and system tray behavior" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- System Options -->
+                        <!-- Other Settings -->
+                        <GroupBox Header="System Settings" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
                                 <CheckBox Name="StartWithWindowsCheckBox"
-                                          Margin="0,0,0,10"
-                                          IsEnabled="False">
-                                    <StackPanel>
-                                        <TextBlock Text="Start with Windows" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Automatically launch VoiceLite when Windows starts (coming soon)"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          Content="Start with Windows"
+                                          Margin="0,0,0,5"
+                                          IsEnabled="False"/>
                                 <CheckBox Name="MinimizeToTrayCheckBox"
+                                          Content="Minimize to system tray on close"
                                           IsChecked="True"
-                                          Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Minimize to system tray on close" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Clicking X will minimize to tray instead of fully closing the app"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          Margin="0,0,0,5"/>
                                 <CheckBox Name="ShowTrayIconCheckBox"
+                                          Content="Show system tray icon"
                                           IsChecked="True"
-                                          IsEnabled="False">
-                                    <StackPanel>
-                                        <TextBlock Text="Show system tray icon" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Display VoiceLite icon in system tray (always enabled)"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          IsEnabled="False"
+                                          Margin="0,0,0,5"/>
                             </StackPanel>
-                        </Border>
+                        </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -478,215 +396,102 @@
             <TabItem Header="Privacy">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
                     <StackPanel>
-                        <!-- Offline Processing -->
-                        <Border Style="{StaticResource SuccessBoxStyle}" Margin="0,0,0,16">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="🔒" FontSize="18" Margin="0,0,8,0"/>
-                                    <TextBlock Text="100% Offline Processing" FontWeight="Bold" FontSize="14" Foreground="#2E7D32"/>
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#2E7D32">
-                                    All voice recordings are processed locally using OpenAI Whisper AI running on your PC. Your voice data never leaves your computer. No internet connection required (except for optional Pro tier license validation).
-                                </TextBlock>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Data Storage Locations -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="💾" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Data Storage Locations" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Where VoiceLite stores your data on your PC" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Settings File -->
-                                <TextBlock Text="Settings &amp; Preferences" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="%LOCALAPPDATA%\VoiceLite\settings.json"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Foreground="#666666"
-                                           Margin="0,0,0,4"/>
-                                <TextBlock Text="Stores your hotkey, model selection, and all app settings"
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,12"/>
-
-                                <!-- Transcription History -->
-                                <TextBlock Text="Transcription History" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="Saved in settings.json (max 50 items)"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Foreground="#666666"
-                                           Margin="0,0,0,4"/>
-                                <TextBlock Text="Recent transcriptions displayed in the history panel. Does NOT sync across PCs."
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,12"/>
-
-                                <!-- Error Logs -->
-                                <TextBlock Text="Error Logs" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="%LOCALAPPDATA%\VoiceLite\logs\voicelite.log"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Foreground="#666666"
-                                           Margin="0,0,0,4"/>
-                                <TextBlock Text="Debug information for troubleshooting. Does NOT contain transcription text."
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,12"/>
-
-                                <!-- Whisper Models -->
-                                <TextBlock Text="AI Models" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="[Installation Directory]\whisper\"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Foreground="#666666"
-                                           Margin="0,0,0,4"/>
-                                <TextBlock Text="OpenAI Whisper models (Pro: 466MB, Elite: 1.5GB, Ultra: 2.9GB)"
-                                           Style="{StaticResource SettingsHelperTextStyle}"/>
-
-                                <!-- Note -->
-                                <Border Style="{StaticResource InfoBoxStyle}">
-                                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#1976D2">
-                                        <Run Text="ℹ️ Privacy Note:" FontWeight="Bold"/>
-                                        <Run Text="Changed from Roaming to Local AppData (v1.0.19) to prevent transcription history from syncing across PCs via Microsoft account."/>
-                                    </TextBlock>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-
                         <!-- Analytics Settings -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="📊" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Anonymous Analytics" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Help us improve VoiceLite (completely optional)" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Enable/Disable -->
+                        <GroupBox Header="Anonymous Analytics" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
                                 <CheckBox Name="EnableAnalyticsCheckBox"
-                                          Margin="0,0,0,12"
+                                          Content="Send anonymous usage analytics"
+                                          FontSize="13"
+                                          Margin="0,0,0,10"
                                           Checked="EnableAnalyticsCheckBox_Changed"
-                                          Unchecked="EnableAnalyticsCheckBox_Changed">
-                                    <StackPanel>
-                                        <TextBlock Text="Send anonymous usage analytics" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Help us improve VoiceLite by sending anonymous usage data"
-                                                   Style="{StaticResource SettingsHelperTextStyle}"
-                                                   Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                </CheckBox>
+                                          Unchecked="EnableAnalyticsCheckBox_Changed"/>
 
-                                <!-- What We Track -->
-                                <TextBlock Text="What we track:" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,6"/>
-                                <TextBlock Text="• App version and operating system" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Model used (Lite, Pro, Elite, Ultra)" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Daily transcription count (aggregated, no content)" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Anonymous user ID (SHA256 hash, irreversible)" FontSize="11" Foreground="#666666" Margin="15,0,0,12"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Foreground="#666666"
+                                           Margin="0,0,0,10">
+                                    Help us improve VoiceLite by sending anonymous usage data. We track app version, model usage, and transcription counts.
+                                </TextBlock>
 
-                                <!-- What We DON'T Track -->
-                                <TextBlock Text="What we DON'T track:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6"/>
-                                <TextBlock Text="• Voice recordings or audio data" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Transcription text or content" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Personal information (name, email)" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• Keystrokes or screen content" FontSize="11" Foreground="#666666" Margin="15,0,0,3"/>
-                                <TextBlock Text="• IP addresses (not logged by backend)" FontSize="11" Foreground="#666666" Margin="15,0,0,0"/>
-                            </StackPanel>
-                        </Border>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="#333333"
+                                           Margin="0,10,0,5">
+                                    What we track:
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • App version and operating system
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • Model used (Lite, Pro, Elite, Ultra)
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • Daily transcription count (aggregated, no content)
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,15">
+                                    • Anonymous user ID (SHA256 hash, irreversible)
+                                </TextBlock>
 
-                        <!-- Permissions & Security -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🛡️" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Permissions &amp; Security" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Windows permissions required for core features" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="#333333"
+                                           Margin="0,0,0,5">
+                                    What we DON'T track:
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • Voice recordings or audio data
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • Transcription text or content
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,3">
+                                    • Personal information (name, email)
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="11"
+                                           Foreground="#666666"
+                                           Margin="15,0,0,0">
+                                    • Keystrokes or screen content
+                                </TextBlock>
 
-                                <!-- Permissions List -->
-                                <TextBlock Text="Microphone Access" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="Required to record your voice for transcription"
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,10"/>
-
-                                <TextBlock Text="Clipboard Access" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="Required to copy/paste transcribed text into applications"
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,10"/>
-
-                                <TextBlock Text="Global Keyboard Hooks" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="Required to detect your recording hotkey anywhere in Windows"
-                                           Style="{StaticResource SettingsHelperTextStyle}"
-                                           Margin="0,0,0,10"/>
-
-                                <TextBlock Text="Input Simulation" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
-                                <TextBlock Text="Required to auto-paste text into active application (when enabled)"
-                                           Style="{StaticResource SettingsHelperTextStyle}"/>
-
-                                <!-- Security Note -->
-                                <Border Style="{StaticResource WarningBoxStyle}">
-                                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#E65100">
-                                        <Run Text="⚠️ Antivirus Warning:" FontWeight="Bold"/>
-                                        <Run Text="Global hotkeys and input simulation may trigger false positives in antivirus software. VoiceLite is open source and safe."/>
+                                <Border Background="#E3F2FD"
+                                        BorderBrush="#2196F3"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="10"
+                                        Margin="0,15,0,0">
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="11"
+                                               Foreground="#1976D2">
+                                        <Run Text="🔒 Privacy First:" FontWeight="Bold"/>
+                                        <Run Text="Your voice data is always processed locally and never leaves your computer. Analytics are completely optional and anonymous."/>
                                     </TextBlock>
                                 </Border>
                             </StackPanel>
-                        </Border>
-
-                        <!-- Clear Data -->
-                        <Border Style="{StaticResource SettingsCardStyle}">
-                            <StackPanel>
-                                <!-- Section Header -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                    <TextBlock Text="🗑️" Style="{StaticResource SettingsIconStyle}"/>
-                                    <StackPanel>
-                                        <TextBlock Text="Clear Data" Style="{StaticResource SettingsSectionHeaderStyle}"/>
-                                        <TextBlock Text="Delete local data and reset settings" Style="{StaticResource SettingsSectionDescStyle}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- Clear History -->
-                                <Button Name="ClearHistoryButton"
-                                        Content="🗑️ Clear Transcription History"
-                                        Width="220"
-                                        HorizontalAlignment="Left"
-                                        Margin="0,0,0,10"
-                                        ToolTip="Delete all transcription history items (including pinned)"
-                                        Click="ClearHistoryButton_Click"/>
-
-                                <!-- Clear Logs -->
-                                <Button Name="ClearLogsButton"
-                                        Content="🗑️ Clear Error Logs"
-                                        Width="220"
-                                        HorizontalAlignment="Left"
-                                        Margin="0,0,0,10"
-                                        ToolTip="Delete voicelite.log file (error logs)"
-                                        Click="ClearLogsButton_Click"/>
-
-                                <!-- Reset Settings -->
-                                <Button Name="ResetSettingsButton"
-                                        Content="⚙️ Reset to Defaults"
-                                        Width="220"
-                                        HorizontalAlignment="Left"
-                                        ToolTip="Reset all settings to default values"
-                                        Click="ResetSettingsButton_Click"/>
-
-                                <!-- Warning -->
-                                <Border Style="{StaticResource WarningBoxStyle}">
-                                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#E65100">
-                                        <Run Text="⚠️ Warning:" FontWeight="Bold"/>
-                                        <Run Text="These actions cannot be undone. Your data will be permanently deleted."/>
-                                    </TextBlock>
-                                </Border>
-                            </StackPanel>
-                        </Border>
+                        </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
