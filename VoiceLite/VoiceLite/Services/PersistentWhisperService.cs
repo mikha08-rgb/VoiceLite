@@ -441,7 +441,7 @@ namespace VoiceLite.Services
 
                 // Post-process the transcription
                 var customDict = settings.EnableCustomDictionary ? settings.CustomDictionaryEntries : null;
-                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary, customDict);
+                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary, customDict, settings.PostProcessing);
 
                 var totalTime = DateTime.Now - startTime;
                 ErrorLogger.LogMessage($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms");
