@@ -15,6 +15,7 @@ namespace VoiceLite.Services
         private VorbisWaveReader? _audioFile;
         private readonly string _soundFilePath;
         private bool _disposed = false;
+        private readonly object _disposeLock = new object();
 
         public SoundService()
         {
@@ -28,6 +29,8 @@ namespace VoiceLite.Services
         /// </summary>
         public void PlaySound()
         {
+            if (_disposed) return;
+
             try
             {
                 if (!File.Exists(_soundFilePath))
@@ -37,23 +40,22 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                // Dispose previous instances if still playing
-                _outputDevice?.Stop();
-                _outputDevice?.Dispose();
-                _audioFile?.Dispose();
-
-                // Create new instances - use VorbisWaveReader for .ogg files
-                _audioFile = new VorbisWaveReader(_soundFilePath);
-                _outputDevice = new WaveOutEvent();
-
-                _outputDevice.Init(_audioFile);
-                _outputDevice.PlaybackStopped += (sender, args) =>
+                lock (_disposeLock)
                 {
-                    _outputDevice?.Dispose();
-                    _audioFile?.Dispose();
-                };
+                    if (_disposed) return;
 
-                _outputDevice.Play();
+                    // Dispose previous instances if still playing
+                    CleanupAudioResources();
+
+                    // Create new instances - use VorbisWaveReader for .ogg files
+                    _audioFile = new VorbisWaveReader(_soundFilePath);
+                    _outputDevice = new WaveOutEvent();
+
+                    _outputDevice.Init(_audioFile);
+                    _outputDevice.PlaybackStopped += OnPlaybackStopped;
+
+                    _outputDevice.Play();
+                }
             }
             catch (Exception)
             {
@@ -62,15 +64,51 @@ namespace VoiceLite.Services
             }
         }
 
+        private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
+        {
+            // Clean up resources after playback completes
+            lock (_disposeLock)
+            {
+                if (_disposed) return;
+                CleanupAudioResources();
+            }
+        }
+
+        private void CleanupAudioResources()
+        {
+            // IMPORTANT: No lock here - caller must hold _disposeLock
+            try
+            {
+                if (_outputDevice != null)
+                {
+                    _outputDevice.PlaybackStopped -= OnPlaybackStopped;
+                    _outputDevice.Stop();
+                    _outputDevice.Dispose();
+                    _outputDevice = null;
+                }
+            }
+            catch { /* Ignore disposal errors */ }
+
+            try
+            {
+                if (_audioFile != null)
+                {
+                    _audioFile.Dispose();
+                    _audioFile = null;
+                }
+            }
+            catch { /* Ignore disposal errors */ }
+        }
+
         public void Dispose()
         {
-            if (_disposed) return;
+            lock (_disposeLock)
+            {
+                if (_disposed) return;
 
-            _outputDevice?.Stop();
-            _outputDevice?.Dispose();
-            _audioFile?.Dispose();
-
-            _disposed = true;
+                CleanupAudioResources();
+                _disposed = true;
+            }
         }
     }
 }
