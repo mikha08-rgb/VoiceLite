@@ -133,21 +133,30 @@ namespace VoiceLite
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            if (EntriesDataGrid.SelectedItem is DictionaryEntry selected)
+            if (EntriesDataGrid.SelectedItems.Count > 0)
             {
-                var result = MessageBox.Show($"Are you sure you want to delete this entry?\n\nPattern: {selected.Pattern}\nReplacement: {selected.Replacement}",
-                    "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                var count = EntriesDataGrid.SelectedItems.Count;
+                var message = count == 1
+                    ? $"Are you sure you want to delete this entry?\n\nPattern: {(EntriesDataGrid.SelectedItem as DictionaryEntry)?.Pattern}\nReplacement: {(EntriesDataGrid.SelectedItem as DictionaryEntry)?.Replacement}"
+                    : $"Are you sure you want to delete {count} selected entries?";
+
+                var result = MessageBox.Show(message, "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    allEntries.Remove(selected);
-                    settings.CustomDictionaryEntries.Remove(selected);
+                    var toDelete = EntriesDataGrid.SelectedItems.Cast<DictionaryEntry>().ToList();
+                    foreach (var entry in toDelete)
+                    {
+                        allEntries.Remove(entry);
+                        settings.CustomDictionaryEntries.Remove(entry);
+                    }
                     RefreshFilter();
+                    ShowToast($"✓ Deleted {count} {(count == 1 ? "entry" : "entries")}");
                 }
             }
             else
             {
-                MessageBox.Show("Please select an entry to delete.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Please select one or more entries to delete.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 

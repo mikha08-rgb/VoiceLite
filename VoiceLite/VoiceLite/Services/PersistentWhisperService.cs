@@ -495,7 +495,21 @@ namespace VoiceLite.Services
         public void Dispose()
         {
             CleanupProcess();
-            transcriptionSemaphore?.Dispose();
+
+            // Dispose semaphore safely with a small delay to prevent race conditions
+            if (transcriptionSemaphore != null)
+            {
+                try
+                {
+                    // Brief wait to ensure any Release() calls have completed
+                    Thread.Sleep(100);
+                    transcriptionSemaphore.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already disposed, ignore
+                }
+            }
         }
     }
 }

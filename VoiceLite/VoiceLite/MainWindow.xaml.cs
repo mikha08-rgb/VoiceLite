@@ -256,7 +256,7 @@ namespace VoiceLite
                         // Delete old Roaming folder to prevent cloud sync (privacy)
                         try
                         {
-                            string roamingDir = Path.GetDirectoryName(oldRoamingPath);
+                            string? roamingDir = Path.GetDirectoryName(oldRoamingPath);
                             if (!string.IsNullOrEmpty(roamingDir) && Directory.Exists(roamingDir))
                             {
                                 Directory.Delete(roamingDir, recursive: true);

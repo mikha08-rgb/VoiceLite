@@ -132,7 +132,7 @@
                       Background="White"
                       RowBackground="White"
                       AlternatingRowBackground="#FAFAFA"
-                      SelectionMode="Single"
+                      SelectionMode="Extended"
                       SelectionUnit="FullRow"
                       MouseDoubleClick="EntriesDataGrid_MouseDoubleClick"
                       VerticalScrollBarVisibility="Auto"
