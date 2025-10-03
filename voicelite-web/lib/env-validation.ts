@@ -206,20 +206,36 @@ export function validateEnvironment() {
 }
 
 /**
- * Validate environment on module load in production (runtime only, not build time)
- * In development, we allow missing vars for flexibility
- * Skip validation during build to allow builds without production secrets
+ * Auto-validate environment in production at runtime (not build time)
  *
- * This only runs on Vercel in production at runtime, never during `next build`
+ * Note: During Next.js build (`next build`), this module is imported but validation
+ * should NOT run because:
+ * 1. Build happens before runtime - env vars may not be injected yet
+ * 2. Build workers use separate processes and env context
+ * 3. We only care about validation when the app actually starts serving requests
+ *
+ * Validation only runs when:
+ * - Running on Vercel (process.env.VERCEL is set)
+ * - NOT during build (check for Next.js build phase indicator)
+ * - Server-side only (typeof window === 'undefined')
  */
+
+// Detect if we're in a Next.js build phase (during `next build` command)
+const isNextBuild =
+  process.argv.includes('build') ||
+  process.env.NEXT_PHASE === 'phase-production-build';
+
 if (
   typeof window === 'undefined' && // Server-side only
-  process.env.VERCEL && // Only in Vercel production
+  process.env.VERCEL && // Only in Vercel
+  !isNextBuild && // Skip during `next build`
   !process.env.SKIP_ENV_VALIDATION // Allow manual skip
 ) {
   try {
     validateEnvironment();
+    console.log('✅ Environment variables validated successfully');
   } catch (error) {
+    console.error('❌ Environment validation failed at runtime');
     console.error(error);
     process.exit(1);
   }
