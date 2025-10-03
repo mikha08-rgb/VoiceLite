@@ -31,7 +31,9 @@
       "Bash(git commit:*)",
       "Bash(npx dotenv-cli:*)",
       "Bash(set DATABASE_URL=postgresql://postgres.kkjfmnwjchlugzxlqipw:jY%26%23DvbBo2a%25Oo%2Az@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true)",
-      "Bash(npx prisma db push:*)"
+      "Bash(npx prisma db push:*)",
+      "Read(//c/Users/mishk/AppData/Local/VoiceLite/logs/**)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []
