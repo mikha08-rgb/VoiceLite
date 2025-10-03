@@ -44,32 +44,6 @@ namespace VoiceLite.Models
             {
                 new WhisperModelInfo
                 {
-                    FileName = "ggml-tiny.bin",
-                    DisplayName = "Lite",
-                    FileSizeBytes = 75 * 1024 * 1024, // 75MB
-                    SpeedRating = 5,
-                    AccuracyRating = 1,
-                    TypicalProcessingTime = 0.1,
-                    RequiredRAMGB = 0.5,
-                    Description = "Fastest model, suitable for simple dictation",
-                    SupportsMultilingual = false,
-                    IsRecommended = Visibility.Collapsed,
-                    Pros = new List<string>
-                    {
-                        "Extremely fast processing",
-                        "Minimal RAM usage",
-                        "Low CPU requirements",
-                        "Good for real-time applications"
-                    },
-                    Cons = new List<string>
-                    {
-                        "Basic accuracy only",
-                        "Struggles with technical terms",
-                        "English only"
-                    }
-                },
-                new WhisperModelInfo
-                {
                     FileName = "ggml-base.bin",
                     DisplayName = "Swift",
                     FileSizeBytes = 142 * 1024 * 1024, // 142MB
@@ -190,9 +164,7 @@ namespace VoiceLite.Models
             if (prioritizeSpeed)
             {
                 // For speed priority, pick fastest model that fits in RAM
-                if (availableRAMGB < 1.0)
-                    return models.Find(m => m.FileName == "ggml-tiny.bin") ?? models.FirstOrDefault();
-                else if (availableRAMGB < 2.0)
+                if (availableRAMGB < 2.0)
                     return models.Find(m => m.FileName == "ggml-base.bin") ?? models.FirstOrDefault();
                 else
                     return models.Find(m => m.FileName == "ggml-small.bin") ?? models.FirstOrDefault();
@@ -206,10 +178,8 @@ namespace VoiceLite.Models
                     return models.Find(m => m.FileName == "ggml-medium.bin") ?? models.LastOrDefault();
                 else if (availableRAMGB >= 2.0)
                     return models.Find(m => m.FileName == "ggml-small.bin") ?? models.FirstOrDefault();
-                else if (availableRAMGB >= 1.0)
-                    return models.Find(m => m.FileName == "ggml-base.bin") ?? models.FirstOrDefault();
                 else
-                    return models.Find(m => m.FileName == "ggml-tiny.bin") ?? models.FirstOrDefault();
+                    return models.Find(m => m.FileName == "ggml-base.bin") ?? models.FirstOrDefault();
             }
         }
     }
