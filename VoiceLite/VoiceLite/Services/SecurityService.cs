@@ -17,6 +17,7 @@ namespace VoiceLite.Services
         private static readonly byte[] Salt = Encoding.UTF8.GetBytes("VL2024@Secure#");
         private static readonly string RegistryPath = @"SOFTWARE\VoiceLite\Security";
         private static bool isProtectionActive = false;
+        private static bool _integrityWarningLogged = false;
         // Anti-debugging thread is intentionally disabled for open-source build
         // This field exists for compatibility but is never used
         private static Thread? antiDebugThread = null;
@@ -63,10 +64,12 @@ namespace VoiceLite.Services
             // - No graceful shutdown
             // - Generates crash dumps unnecessarily
             // Instead, we log warnings and let the application continue
-            if (!VerifyIntegrity())
+            // Only log once per session to reduce log noise
+            if (!VerifyIntegrity() && !_integrityWarningLogged)
             {
                 ErrorLogger.LogMessage("WARNING: Application integrity check failed - binary may have been modified");
                 ErrorLogger.LogMessage("This is a warning only - application will continue to run");
+                _integrityWarningLogged = true;
             }
         }
 

@@ -21,6 +21,7 @@ namespace VoiceLite.Services
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private readonly CancellationTokenSource disposeCts = new();
         private volatile bool isDisposed = false;
+        private static bool _integrityWarningLogged = false;
 
         public PersistentWhisperService(Settings settings)
         {
@@ -86,15 +87,23 @@ namespace VoiceLite.Services
 
                 if (!hashString.Equals(EXPECTED_HASH, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Integrity check failed - log minimal warning without exposing file paths
-                    ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (fail-open mode).");
+                    // Integrity check failed - log warning only once per session to reduce log noise
+                    if (!_integrityWarningLogged)
+                    {
+                        ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (fail-open mode).");
+                        _integrityWarningLogged = true;
+                    }
 
                     // Log warning but allow execution - fail open to avoid breaking legitimate updates
                     // Users should verify they have the correct whisper.exe from official sources
                     return true; // Changed from false to true - warn but don't block
                 }
 
-                ErrorLogger.LogMessage("Whisper.exe integrity check passed");
+                // Only log success on first check to avoid spam
+                if (!_integrityWarningLogged)
+                {
+                    ErrorLogger.LogMessage("Whisper.exe integrity check passed");
+                }
                 return true;
             }
             catch (Exception ex)
