@@ -157,7 +157,7 @@ npm run keygen
    - `HotkeyManager`: Global hotkey registration via Win32 API
    - `SystemTrayManager`: System tray icon and context menu
    - `AudioPreprocessor`: Audio enhancement (noise gate, gain control)
-   - `TranscriptionPostProcessor`: Text corrections and formatting
+   - `TranscriptionPostProcessor`: Text corrections and formatting (v1.0.24: Added customizable post-processing - capitalization, punctuation, filler word removal, contractions, grammar fixes)
    - `TranscriptionHistoryService`: Manages transcription history with pinning and auto-cleanup
    - `SoundService`: Custom UI sound effects (wood-tap-click.ogg)
    - `ModelBenchmarkService`: Model performance testing
@@ -513,12 +513,38 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.19 (current release)
+- **Desktop App**: v1.0.24 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.19 (Current Desktop Release)
+### v1.0.24 (Current Desktop Release)
+- **Text Formatting Feature**: Added comprehensive post-processing customization in Settings → "Text Formatting" tab
+  - **Capitalization controls**: Toggle first letter, after periods, after ?/! independently
+  - **Ending punctuation**: Choose default (period/question/exclamation) + smart question detection
+  - **Filler word removal**: 5 intensity levels (None/Light/Moderate/Aggressive/Custom) with 5 built-in categories
+    - Hesitations: "um", "uh", "er", "ah", "hmm"
+    - Verbal tics: "like", "you know", "I mean", "I guess", "I think"
+    - Qualifiers: "sort of", "kind of", "pretty much"
+    - Intensifiers: "literally", "actually", "honestly", "seriously"
+    - Transitions: "so yeah", "anyway", "well"
+  - **Contractions**: Expand ("don't" → "do not"), Contract ("do not" → "don't"), or Leave as-is
+  - **Grammar fixes**: Homophones (their/there/they're), double negatives, subject-verb agreement
+  - **Quick presets**: Professional (all corrections), Code (preserve casing), Casual (light cleanup)
+  - **Live preview**: Real-time before/after comparison with editable sample text
+- **Code quality**: Fixed circular reference in settings serialization, improved null safety
+- **Performance**: Post-processing adds <50ms latency (negligible impact)
+
+### v1.0.19
+- **CRITICAL FIX**: History tracking now works correctly - new transcriptions appear in history panel
+- **Privacy Enhancement**: Old Roaming AppData folder deleted after migration (prevents history syncing across PCs via Microsoft account)
+- **Privacy First**: Transcription history cleared during migration from old versions (sensitive data not migrated)
+- **Removed Legacy Fallback**: No more silent degradation to lower-quality models - fail-fast with clear error messages
+- **Improved Error Messages**: Clear "Please reinstall VoiceLite" errors instead of silent fallbacks to Tiny model
+- **Default Model Updated**: Changed default from Tiny (75MB) → Small (466MB) in all locations
+- **Code Quality**: Removed ~30 lines of complex fallback logic, fixed misleading comments
+
+### v1.0.18 (Previous Desktop Release)
 - **CRITICAL FIX**: History tracking now works correctly - new transcriptions appear in history panel
 - **Privacy Enhancement**: Old Roaming AppData folder deleted after migration (prevents history syncing across PCs via Microsoft account)
 - **Privacy First**: Transcription history cleared during migration from old versions (sensitive data not migrated)

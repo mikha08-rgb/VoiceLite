@@ -180,7 +180,7 @@ namespace VoiceLite.Services
             };
         }
 
-        public static string ProcessTranscription(string transcription, bool useEnhancedDictionary = true, List<Models.DictionaryEntry>? customDictionary = null)
+        public static string ProcessTranscription(string transcription, bool useEnhancedDictionary = true, List<Models.DictionaryEntry>? customDictionary = null, Models.PostProcessingSettings? postProcessingSettings = null)
         {
             if (string.IsNullOrWhiteSpace(transcription))
                 return transcription;
@@ -191,6 +191,12 @@ namespace VoiceLite.Services
             if (customDictionary != null && customDictionary.Count > 0)
             {
                 processed = ApplyCustomDictionary(processed, customDictionary);
+            }
+
+            // Apply filler word removal BEFORE corrections (order matters!)
+            if (postProcessingSettings != null && postProcessingSettings.FillerRemovalIntensity != Models.FillerWordRemovalLevel.None)
+            {
+                processed = RemoveFillerWords(processed, postProcessingSettings);
             }
 
             // Apply technical corrections using pre-compiled regex
@@ -205,8 +211,31 @@ namespace VoiceLite.Services
                 processed = ApplyEnhancedCorrections(processed);
             }
 
+            // Handle contractions if configured
+            if (postProcessingSettings != null && postProcessingSettings.ContractionHandling != Models.ContractionMode.LeaveAsIs)
+            {
+                processed = HandleContractions(processed, postProcessingSettings.ContractionHandling);
+            }
+
+            // Apply grammar fixes if enabled
+            if (postProcessingSettings != null)
+            {
+                if (postProcessingSettings.FixHomophones)
+                {
+                    processed = FixHomophones(processed);
+                }
+                if (postProcessingSettings.FixDoubleNegatives)
+                {
+                    processed = FixDoubleNegatives(processed);
+                }
+                if (postProcessingSettings.FixSubjectVerbAgreement)
+                {
+                    processed = FixSubjectVerbAgreement(processed);
+                }
+            }
+
             // Fix common punctuation issues
-            processed = FixPunctuation(processed);
+            processed = FixPunctuation(processed, postProcessingSettings);
 
             // Fix spacing issues
             processed = FixSpacing(processed);
@@ -233,27 +262,85 @@ namespace VoiceLite.Services
             return text;
         }
 
-        private static string FixPunctuation(string text)
+        private static string FixPunctuation(string text, Models.PostProcessingSettings? settings)
         {
-            // Add period at the end if missing
-            if (!string.IsNullOrWhiteSpace(text) && !text.TrimEnd().EndsWith(".") && !text.TrimEnd().EndsWith("!") && !text.TrimEnd().EndsWith("?"))
+            var shouldCapitalize = settings?.EnableCapitalization ?? true;
+            var capitalizeFirstLetter = settings?.CapitalizeFirstLetter ?? true;
+            var capitalizeAfterPeriod = settings?.CapitalizeAfterPeriod ?? true;
+            var capitalizeAfterQuestionExclamation = settings?.CapitalizeAfterQuestionExclamation ?? true;
+            var shouldAddPeriod = settings?.EnableEndingPunctuation ?? true;
+            var onlyAddIfMissing = settings?.OnlyAddIfMissing ?? true;
+            var defaultPunctuation = settings?.DefaultPunctuation ?? Models.EndingPunctuationType.Period;
+            var useSmartPunctuation = settings?.UseSmartPunctuation ?? false;
+
+            // Add ending punctuation if enabled
+            if (shouldAddPeriod && !string.IsNullOrWhiteSpace(text))
             {
-                text = text.TrimEnd() + ".";
+                var trimmed = text.TrimEnd();
+                var hasPunctuation = trimmed.EndsWith(".") || trimmed.EndsWith("!") || trimmed.EndsWith("?");
+
+                if (!hasPunctuation || !onlyAddIfMissing)
+                {
+                    if (!hasPunctuation)
+                    {
+                        // Smart punctuation: detect if it looks like a question
+                        if (useSmartPunctuation && IsQuestion(trimmed))
+                        {
+                            text = trimmed + "?";
+                        }
+                        else
+                        {
+                            // Use default punctuation
+                            text = trimmed + GetPunctuationChar(defaultPunctuation);
+                        }
+                    }
+                }
             }
 
             // Fix multiple spaces using pre-compiled regex
             text = MultipleSpacesRegex.Replace(text, " ");
 
-            // Capitalize first letter
-            if (text.Length > 0 && char.IsLower(text[0]))
+            // Capitalization
+            if (shouldCapitalize)
             {
-                text = char.ToUpper(text[0]) + text.Substring(1);
+                // Capitalize first letter
+                if (capitalizeFirstLetter && text.Length > 0 && char.IsLower(text[0]))
+                {
+                    text = char.ToUpper(text[0]) + text.Substring(1);
+                }
+
+                // Capitalize after periods
+                if (capitalizeAfterPeriod)
+                {
+                    text = CapitalizeAfterPeriodRegex.Replace(text, m => m.Groups[1].Value + m.Groups[2].Value.ToUpper());
+                }
+
+                // Capitalize after question marks and exclamation points
+                if (capitalizeAfterQuestionExclamation)
+                {
+                    text = Regex.Replace(text, @"([?!]\s+)([a-z])", m => m.Groups[1].Value + m.Groups[2].Value.ToUpper());
+                }
             }
 
-            // Capitalize after periods using pre-compiled regex
-            text = CapitalizeAfterPeriodRegex.Replace(text, m => m.Groups[1].Value + m.Groups[2].Value.ToUpper());
-
             return text;
+        }
+
+        private static bool IsQuestion(string text)
+        {
+            var lowerText = text.ToLower();
+            var questionWords = new[] { "who", "what", "where", "when", "why", "how", "is", "are", "can", "could", "would", "should", "do", "does", "did" };
+            return questionWords.Any(word => lowerText.StartsWith(word + " "));
+        }
+
+        private static string GetPunctuationChar(Models.EndingPunctuationType type)
+        {
+            return type switch
+            {
+                Models.EndingPunctuationType.Period => ".",
+                Models.EndingPunctuationType.Question => "?",
+                Models.EndingPunctuationType.Exclamation => "!",
+                _ => ""
+            };
         }
 
         private static string FixSpacing(string text)
@@ -351,6 +438,212 @@ namespace VoiceLite.Services
         private static bool HasContext(string text, params string[] keywords)
         {
             return keywords.Any(keyword => text.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string RemoveFillerWords(string text, Models.PostProcessingSettings settings)
+        {
+            var wordsToRemove = new List<string>();
+
+            // Build list based on intensity level and enabled lists
+            if (settings.FillerRemovalIntensity == Models.FillerWordRemovalLevel.Custom)
+            {
+                // Custom mode: use only enabled lists + custom words
+                if (settings.EnabledLists.Hesitations) wordsToRemove.AddRange(settings.EnabledLists.HesitationWords);
+                if (settings.EnabledLists.VerbalTics) wordsToRemove.AddRange(settings.EnabledLists.VerbalTicWords);
+                if (settings.EnabledLists.Qualifiers) wordsToRemove.AddRange(settings.EnabledLists.QualifierWords);
+                if (settings.EnabledLists.Intensifiers) wordsToRemove.AddRange(settings.EnabledLists.IntensifierWords);
+                if (settings.EnabledLists.Transitions) wordsToRemove.AddRange(settings.EnabledLists.TransitionWords);
+                wordsToRemove.AddRange(settings.CustomFillerWords);
+            }
+            else
+            {
+                // Preset intensity levels
+                switch (settings.FillerRemovalIntensity)
+                {
+                    case Models.FillerWordRemovalLevel.Light:
+                        wordsToRemove.AddRange(settings.EnabledLists.HesitationWords);
+                        break;
+                    case Models.FillerWordRemovalLevel.Moderate:
+                        wordsToRemove.AddRange(settings.EnabledLists.HesitationWords);
+                        wordsToRemove.AddRange(settings.EnabledLists.VerbalTicWords);
+                        break;
+                    case Models.FillerWordRemovalLevel.Aggressive:
+                        wordsToRemove.AddRange(settings.EnabledLists.HesitationWords);
+                        wordsToRemove.AddRange(settings.EnabledLists.VerbalTicWords);
+                        wordsToRemove.AddRange(settings.EnabledLists.QualifierWords);
+                        wordsToRemove.AddRange(settings.EnabledLists.IntensifierWords);
+                        wordsToRemove.AddRange(settings.EnabledLists.TransitionWords);
+                        break;
+                }
+            }
+
+            // Remove filler words
+            foreach (var word in wordsToRemove.Distinct())
+            {
+                var pattern = $@"\b{Regex.Escape(word)}\b";
+                var options = settings.CaseSensitiveFillerRemoval ? RegexOptions.None : RegexOptions.IgnoreCase;
+                text = Regex.Replace(text, pattern, "", options);
+            }
+
+            // Clean up extra spaces and punctuation left by removal
+            text = Regex.Replace(text, @"\s*,\s*,", ","); // Double commas
+            text = Regex.Replace(text, @",\s*\.", "."); // Comma before period
+            text = Regex.Replace(text, @"\s{2,}", " "); // Multiple spaces
+            text = Regex.Replace(text, @"^\s*,\s*", ""); // Leading comma
+            text = Regex.Replace(text, @"\s*,\s*$", ""); // Trailing comma
+
+            return text.Trim();
+        }
+
+        private static string HandleContractions(string text, Models.ContractionMode mode)
+        {
+            if (mode == Models.ContractionMode.Expand)
+            {
+                // Expand contractions
+                var expansions = new Dictionary<string, string>
+                {
+                    { "don't", "do not" },
+                    { "doesn't", "does not" },
+                    { "didn't", "did not" },
+                    { "can't", "cannot" },
+                    { "couldn't", "could not" },
+                    { "won't", "will not" },
+                    { "wouldn't", "would not" },
+                    { "shouldn't", "should not" },
+                    { "isn't", "is not" },
+                    { "aren't", "are not" },
+                    { "wasn't", "was not" },
+                    { "weren't", "were not" },
+                    { "haven't", "have not" },
+                    { "hasn't", "has not" },
+                    { "hadn't", "had not" },
+                    { "I'm", "I am" },
+                    { "you're", "you are" },
+                    { "we're", "we are" },
+                    { "they're", "they are" },
+                    { "it's", "it is" },
+                    { "that's", "that is" },
+                    { "there's", "there is" },
+                    { "I've", "I have" },
+                    { "you've", "you have" },
+                    { "we've", "we have" },
+                    { "they've", "they have" },
+                    { "I'll", "I will" },
+                    { "you'll", "you will" },
+                    { "we'll", "we will" },
+                    { "they'll", "they will" },
+                    { "I'd", "I would" },
+                    { "you'd", "you would" },
+                    { "we'd", "we would" },
+                    { "they'd", "they would" }
+                };
+
+                foreach (var expansion in expansions)
+                {
+                    text = Regex.Replace(text, $@"\b{Regex.Escape(expansion.Key)}\b", expansion.Value, RegexOptions.IgnoreCase);
+                }
+            }
+            else if (mode == Models.ContractionMode.Contract)
+            {
+                // Contract phrases
+                var contractions = new Dictionary<string, string>
+                {
+                    { "do not", "don't" },
+                    { "does not", "doesn't" },
+                    { "did not", "didn't" },
+                    { "cannot", "can't" },
+                    { "could not", "couldn't" },
+                    { "will not", "won't" },
+                    { "would not", "wouldn't" },
+                    { "should not", "shouldn't" },
+                    { "is not", "isn't" },
+                    { "are not", "aren't" },
+                    { "was not", "wasn't" },
+                    { "were not", "weren't" },
+                    { "have not", "haven't" },
+                    { "has not", "hasn't" },
+                    { "had not", "hadn't" },
+                    { "I am", "I'm" },
+                    { "you are", "you're" },
+                    { "we are", "we're" },
+                    { "they are", "they're" },
+                    { "it is", "it's" },
+                    { "that is", "that's" },
+                    { "there is", "there's" },
+                    { "I have", "I've" },
+                    { "you have", "you've" },
+                    { "we have", "we've" },
+                    { "they have", "they've" },
+                    { "I will", "I'll" },
+                    { "you will", "you'll" },
+                    { "we will", "we'll" },
+                    { "they will", "they'll" },
+                    { "I would", "I'd" },
+                    { "you would", "you'd" },
+                    { "we would", "we'd" },
+                    { "they would", "they'd" }
+                };
+
+                foreach (var contraction in contractions)
+                {
+                    text = Regex.Replace(text, $@"\b{Regex.Escape(contraction.Key)}\b", contraction.Value, RegexOptions.IgnoreCase);
+                }
+            }
+
+            return text;
+        }
+
+        private static string FixHomophones(string text)
+        {
+            // Basic homophone fixes based on context
+            // their/there/they're
+            text = Regex.Replace(text, @"\bthey\'re\s+(\w+)", m =>
+            {
+                var nextWord = m.Groups[1].Value.ToLower();
+                if (nextWord == "is" || nextWord == "was" || nextWord == "are")
+                    return "there " + m.Groups[1].Value;
+                return m.Value;
+            }, RegexOptions.IgnoreCase);
+
+            // your/you're
+            text = Regex.Replace(text, @"\byour\s+(is|was|are|were)\b", "you're $1", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\byou\'re\s+(\w+)", m =>
+            {
+                var nextWord = m.Groups[1].Value.ToLower();
+                if (nextWord != "is" && nextWord != "was" && nextWord != "are" && nextWord != "were")
+                    return "your " + m.Groups[1].Value;
+                return m.Value;
+            }, RegexOptions.IgnoreCase);
+
+            // its/it's
+            text = Regex.Replace(text, @"\bits\s+(is|was)\b", "it's $1", RegexOptions.IgnoreCase);
+
+            return text;
+        }
+
+        private static string FixDoubleNegatives(string text)
+        {
+            // Basic double negative fixes
+            text = Regex.Replace(text, @"\bdon'?t\s+have\s+no\b", "don't have any", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bdon'?t\s+have\s+nothing\b", "don't have anything", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bcan'?t\s+find\s+no\b", "can't find any", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bcan'?t\s+see\s+no\b", "can't see any", RegexOptions.IgnoreCase);
+
+            return text;
+        }
+
+        private static string FixSubjectVerbAgreement(string text)
+        {
+            // Basic subject-verb agreement fixes
+            text = Regex.Replace(text, @"\bI\s+is\b", "I am", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bI\s+was\b", "I was", RegexOptions.IgnoreCase); // This is correct, no change needed
+            text = Regex.Replace(text, @"\bhe\s+are\b", "he is", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bshe\s+are\b", "she is", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bit\s+are\b", "it is", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bthey\s+is\b", "they are", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"\bwe\s+is\b", "we are", RegexOptions.IgnoreCase);
+
+            return text;
         }
     }
 }
