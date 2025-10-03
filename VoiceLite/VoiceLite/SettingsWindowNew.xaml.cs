@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,6 +39,7 @@ namespace VoiceLite
 
             LoadSettings();
             SetupModelComparison();
+            LoadVersionInfo();
         }
 
         private void LoadSettings()
@@ -475,6 +477,28 @@ namespace VoiceLite
 
             // Track settings save
             await analyticsService.TrackSettingsChangeAsync("settings_saved");
+        }
+
+        private void LoadVersionInfo()
+        {
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            VersionText.Text = $"v{version?.Major}.{version?.Minor}.{version?.Build}";
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+S to save and close
+            if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                SaveButton_Click(this, new RoutedEventArgs());
+            }
+            // Escape to cancel and close
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                CancelButton_Click(this, new RoutedEventArgs());
+            }
         }
     }
 }

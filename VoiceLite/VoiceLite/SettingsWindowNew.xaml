@@ -8,7 +8,8 @@
         Title="VoiceLite Settings" Height="650" Width="850"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        MinHeight="500" MinWidth="700">
+        MinHeight="500" MinWidth="700"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,7 +19,10 @@
 
         <!-- Header -->
         <Border Grid.Row="0" Background="#FAFAFA" Padding="20,15">
-            <TextBlock Text="VoiceLite Settings" FontSize="20" FontWeight="SemiBold" Foreground="#333333"/>
+            <Grid>
+                <TextBlock Text="VoiceLite Settings" FontSize="20" FontWeight="SemiBold" Foreground="#333333" HorizontalAlignment="Left"/>
+                <TextBlock Name="VersionText" Text="" FontSize="12" Foreground="#95A5A6" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            </Grid>
         </Border>
 
         <!-- Tabbed Content -->
@@ -504,13 +508,19 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Status Text -->
-                <TextBlock Grid.Column="0"
-                           Name="StatusText"
-                           Text=""
-                           FontSize="12"
-                           Foreground="#606060"
-                           VerticalAlignment="Center"/>
+                <!-- Status Text and Keyboard Shortcuts Hint -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Name="StatusText"
+                               Text=""
+                               FontSize="12"
+                               Foreground="#606060"
+                               VerticalAlignment="Center"
+                               Margin="0,0,15,0"/>
+                    <TextBlock Text="💡 Tip: Ctrl+S to save, Esc to cancel"
+                               FontSize="11"
+                               Foreground="#95A5A6"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
 
                 <!-- Action Buttons -->
                 <StackPanel Grid.Column="1"
