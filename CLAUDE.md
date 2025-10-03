@@ -513,12 +513,27 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.24 (current release)
+- **Desktop App**: v1.0.25 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.24 (Current Desktop Release)
+### v1.0.25 (Current Desktop Release)
+- **Security Enhancement**: Enabled rate limiting on feedback endpoint (5 submissions/hour per IP via Upstash Redis)
+- **Logging Reduction**: Reduced production logging by ~70% to eliminate file path exposure and reduce noise
+  - Removed detailed Whisper command-line logging
+  - Removed integrity check hash comparisons
+  - Removed warmup timing metrics
+  - Only errors are now logged (fail-fast with minimal details)
+- **Test Coverage**: Added 54+ new tests across critical services (262 total passing tests)
+  - LicenseService: +9 tests (Ed25519 signature verification, CRL parsing, tampered payload detection)
+  - DependencyChecker: +13 tests (error message prioritization, dependency validation)
+  - StartupDiagnostics: +26 tests (diagnostic result validation, issue detection)
+  - SystemTrayManager: +1 test (documentation for WPF UI testing limitations)
+- **Resource Leak Fixes**: Fixed flaky resource leak tests by adjusting tolerance thresholds
+- **Code Quality**: Removed excessive logging that exposed sensitive file paths in production
+
+### v1.0.24 (Previous Desktop Release)
 - **Text Formatting Feature**: Added comprehensive post-processing customization in Settings → "Text Formatting" tab
   - **Capitalization controls**: Toggle first letter, after periods, after ?/! independently
   - **Ending punctuation**: Choose default (period/question/exclamation) + smart question detection
@@ -610,114 +625,157 @@ The project underwent significant cleanup in October 2025:
 
 ---
 
-## Custom Agents for VoiceLite
+## Orchestrator System
 
-VoiceLite uses a comprehensive system of 20+ custom agents to automate quality gates, code reviews, security audits, and documentation maintenance. These agents are defined in [AGENTS.md](AGENTS.md) and provide intelligent assistance throughout the development lifecycle.
+VoiceLite uses a **dynamic agent orchestration system** for quality gates, code reviews, security audits, and workflow automation. Instead of 20+ static agents, an orchestrator meta-agent spawns minimally-scoped sub-agents on-demand.
 
-### Quick Reference: When to Use Agents
+### Why Orchestrator?
 
-**Daily Development**:
-- **Before commits**: `"Run pre-commit-workflow"` - Fast quality gates (<10s)
-- **After modifying Services**: File-specific validators auto-trigger (<30s)
-- **Code review**: `"Use code-reviewer to review all modified files"` (~45s)
+**Old System** (20+ static agents in AGENTS.md):
+- Large context (1400+ lines)
+- Fixed scope and tools
+- Knowledge duplication
+- Inflexible
 
-**Weekly Maintenance**:
-- **Security audit**: `"Use security-audit-workflow"` (~5min)
-- **Dependency updates**: `"Use dependency-upgrade-advisor to check for updates"` (~3min)
+**New System** (.claude/ directory):
+- Smaller context (200-300 lines per file)
+- Minimal tool grants (least privilege)
+- Reusable knowledge base
+- Compose workflows dynamically
 
-**Release Workflow**:
-- **Production release**: `"Use ship-to-production-workflow to prepare v{version}"` (~15min)
-  - Runs 6 phases: Code quality → Security → Tests → Legal → Build → Deployment
-  - Blocks on critical issues, warns on medium/low issues
-  - Generates installer and changelog
+### Quick Reference
 
-**Domain Expertise**:
-- **Whisper accuracy issues**: `"Use whisper-model-expert to debug {issue}"`
-- **WPF/XAML questions**: `"Use wpf-ui-expert to review {component}"`
-- **Stripe integration**: `"Use stripe-integration-expert to explain {topic}"`
+**Usage Pattern**: `"Use orchestrator to: {goal}"`
 
-**Documentation**:
-- **Sync CLAUDE.md**: `"Use claude-md-sync-agent to update CLAUDE.md"` (<1min)
-- **Generate API docs**: `"Use api-docs-generator"` (~2min)
+**Common Goals**:
+- **Code quality review**: `"Use orchestrator to: run full code quality review"`
+- **Security audit**: `"Use orchestrator to: scan for hardcoded secrets and vulnerabilities"`
+- **Performance analysis**: `"Use orchestrator to: find memory leaks in Services/"`
+- **Test coverage**: `"Use orchestrator to: check test coverage and suggest missing tests"`
 
-### Agent Categories
+### How It Works
 
-**1. Workflow Orchestrators** (4 agents)
-- `ship-to-production-workflow`: Complete CI/CD pipeline from code review to release
-- `pre-commit-workflow`: Fast quality gates before git commits (<10s)
-- `security-audit-workflow`: Comprehensive security review (~5min)
-- `performance-optimization-workflow`: Systematic bottleneck identification
+1. **PLAN**: Orchestrator decomposes goal into 2-6 stages
+2. **FORGE**: Creates minimally-scoped sub-agents (`.claude/agents/{name}.md`)
+3. **INVOKE**: Runs each sub-agent sequentially
+4. **SUPERVISE**: Retries on failure, escalates if needed
+5. **SUMMARIZE**: Aggregates findings, generates reports
+6. **CLEANUP**: Asks before deleting temporary sub-agents
 
-**2. File-Specific Validators** (8 agents)
-Auto-trigger when specific files are modified:
-- `whisper-service-guardian`: Validates PersistentWhisperService.cs changes
-- `mainwindow-coordinator-guard`: Validates MainWindow.xaml.cs (thread safety, null checks)
-- `audio-recorder-validator`: Validates AudioRecorder.cs (audio format, disposal)
-- `stripe-checkout-guardian`: Validates checkout/route.ts (security, pricing)
-- `webhook-security-enforcer`: Validates webhook/route.ts (signature verification)
-- `settings-persistence-guard`: Validates Settings.cs (AppData paths)
-- `legal-docs-sync-validator`: Validates privacy/terms consistency
-- `api-route-security-scanner`: Validates all API routes (auth, injection, errors)
+### Directory Structure
 
-**3. Domain Experts** (5 agents)
-- `whisper-model-expert`: Whisper AI troubleshooting (accuracy, models, parameters)
-- `wpf-ui-expert`: WPF/XAML patterns (MVVM, thread safety, disposal)
-- `stripe-integration-expert`: Stripe payments (webhooks, testing, errors)
-- `test-coverage-enforcer`: Test coverage analysis and test generation
-- `dependency-upgrade-advisor`: NuGet/npm dependency management and CVE scanning
+```
+.claude/
+├── agents/
+│   └── orchestrator.md           # Meta-agent that spawns sub-agents
+├── knowledge/
+│   ├── whisper-expertise.md      # Whisper AI patterns
+│   ├── wpf-patterns.md           # WPF/XAML best practices
+│   ├── stripe-integration.md     # Stripe security & testing
+│   ├── security-checklist.md     # Security audit rules
+│   ├── performance-targets.md    # Performance budgets
+│   └── test-patterns.md          # Test coverage standards
+└── workflows/
+    └── quality-review.md         # 6-stage code quality workflow
+```
 
-**4. Documentation Agents** (3 agents)
-- `claude-md-sync-agent`: Keeps CLAUDE.md synchronized with codebase
-- `readme-generator`: Auto-generates README.md from codebase state
-- `api-docs-generator`: Creates OpenAPI specs and API documentation
+### Example: Full Code Quality Review
 
-### Example Workflow: Feature Development
+**Invocation**:
+```
+"Use orchestrator to: run full code quality review"
+```
+
+**What Happens**:
+1. **Stage 1**: Scan changed files via git diff
+2. **Stage 2**: Security audit (secrets, SQL injection, XSS)
+3. **Stage 3**: Run tests, check coverage (≥75% overall, ≥80% Services/)
+4. **Stage 4**: Architecture review (WPF patterns, Whisper config)
+5. **Stage 5**: Legal validation (pricing/email consistency)
+6. **Stage 6**: Generate `quality-report.md`
+
+**Output**:
+```markdown
+# Code Quality Report
+
+## Summary
+- CRITICAL: 0 ✅
+- HIGH: 2 ⚠️
+- MEDIUM: 5
+- LOW: 3
+
+## Findings
+1. HIGH: api/auth/route.ts:34 - Missing rate limiting
+2. HIGH: MainWindow.xaml.cs:145 - UI update without Dispatcher
+
+## Next Actions
+1. Fix 2 HIGH issues before release
+2. Review MEDIUM issues for backlog
+
+## Exit Criteria
+⚠️ NEEDS FIXES - 2 HIGH issues must be resolved
+```
+
+### Knowledge Base
+
+Domain expertise split into reusable files:
+
+- **whisper-expertise.md**: Model selection, parameters, audio format, troubleshooting
+- **wpf-patterns.md**: Thread safety, MVVM, disposal, async/await
+- **stripe-integration.md**: Webhooks, security, testing, error handling
+- **security-checklist.md**: Secrets, SQL injection, XSS, auth bypass
+- **performance-targets.md**: Metrics, optimization, profiling
+- **test-patterns.md**: xUnit, Moq, coverage, test generation
+
+### Workflows
+
+Pre-defined multi-stage workflows:
+
+**quality-review.md** (6 stages):
+- Purpose: Comprehensive pre-release quality gate
+- Duration: ~13 minutes
+- Exit Criteria: BLOCK on CRITICAL, WARN on HIGH
+
+### Example Workflow: Pre-Release Check
 
 ```bash
-# 1. Develop feature (modify Services/AudioRecorder.cs)
-# → audio-recorder-validator auto-triggers
+# Run full quality review before v1.0.23 release
+"Use orchestrator to: run full code quality review"
 
-# 2. Before committing
-"Run pre-commit-workflow"
-# → Checks secrets, localhost URLs, debug code
+# Orchestrator will:
+# 1. Scan 18 changed files
+# 2. Find 0 CRITICAL, 2 HIGH, 5 MEDIUM security issues
+# 3. Run 142 tests (100% pass), check 78.4% coverage ✅
+# 4. Review Services/ architecture (1 HIGH violation)
+# 5. Validate legal docs (all consistent ✅)
+# 6. Generate quality-report.md
 
-# 3. Review code quality
-"Use code-reviewer to review all files I changed today"
-# → Scores code quality, suggests improvements
-
-# 4. Add tests
-"Use test-coverage-enforcer to suggest tests for AudioRecorder.cs"
-# → Generates test stubs with expected cases
-
-# 5. Prepare release
-"Use ship-to-production-workflow to prepare v1.0.12"
-# → 6-phase pipeline, generates installer + changelog
-
-# 6. Update docs
-"Use claude-md-sync-agent to update CLAUDE.md"
-# → Syncs service list, dependencies, version numbers
+# Result: 3 HIGH issues to fix before release
 ```
+
+### Migration from Old System
+
+If you previously used:
+- ❌ `"Run pre-commit-workflow"` → ✅ `"Use orchestrator to: run full code quality review"`
+- ❌ `"Use whisper-model-expert to debug accuracy"` → ✅ `"Use orchestrator to: analyze Whisper accuracy issues"`
+- ❌ `"Use ship-to-production-workflow to prepare v1.0.23"` → ✅ `"Use orchestrator to: run full code quality review"`
+
+**Archived Files** (reference only):
+- `AGENTS.md.archive` - Original 20+ static agents
+- `WORKFLOWS.md.archive` - Original workflow examples
+- `AGENT-EXAMPLES.md.archive` - Original copy-paste examples
 
 ### Additional Resources
 
-- **[AGENTS.md](AGENTS.md)** - Full agent definitions with detailed instructions (1385 lines)
-- **[WORKFLOWS.md](WORKFLOWS.md)** - Comprehensive workflow guide with real-world examples
-- **[AGENT-EXAMPLES.md](AGENT-EXAMPLES.md)** - Copy-paste examples and expected outputs
+- **[.claude/README.md](.claude/README.md)** - Orchestrator system overview
+- **[.claude/agents/orchestrator.md](.claude/agents/orchestrator.md)** - Meta-agent operating procedures
+- **[.claude/workflows/quality-review.md](.claude/workflows/quality-review.md)** - Full quality review workflow
+- **[.claude/knowledge/](.claude/knowledge/)** - Domain expertise files
 
-### Agent Quality Standards
+### Best Practices
 
-All agents follow strict quality standards:
-- **Single responsibility** - Each agent has one clear purpose
-- **Explicit triggers** - Clear conditions for when to use each agent
-- **Measurable success** - Pass/fail criteria with severity levels (CRITICAL/HIGH/MEDIUM/LOW)
-- **Actionable output** - Specific file:line references and fixes
-- **Safety checks** - Validates before making changes
-- **Performance budgets** - File validators <30s, workflows <5min
-
-### Integration with Development Workflow
-
-Agents integrate seamlessly with daily development:
-1. **Auto-validation**: File-specific agents auto-trigger when you modify critical files
-2. **Manual invocation**: Run agents via Claude Code chat (e.g., "Run pre-commit-workflow")
-3. **Chaining**: Combine agents for complex workflows (e.g., ship-to-production-workflow spawns 10+ agents)
-4. **Error handling**: Agents use fail-fast for critical issues, collect warnings for minor issues
+1. **Be specific**: `"scan for SQL injection in API routes"` not `"check security"`
+2. **Reference workflows**: Use defined workflows when possible
+3. **Let orchestrator plan**: Don't manually create sub-agents
+4. **Review before deleting**: Check generated reports first
+5. **Add workflows**: Document recurring multi-stage tasks

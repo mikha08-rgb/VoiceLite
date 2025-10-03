@@ -19,6 +19,8 @@ namespace VoiceLite.Services
         private string? dummyAudioPath;
         private volatile bool isWarmedUp = false;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
+        private readonly CancellationTokenSource disposeCts = new();
+        private volatile bool isDisposed = false;
 
         public PersistentWhisperService(Settings settings)
         {
@@ -34,14 +36,17 @@ namespace VoiceLite.Services
             {
                 try
                 {
-                    CreateDummyAudioFile();
-                    await WarmUpWhisperAsync();
+                    if (!disposeCts.IsCancellationRequested)
+                    {
+                        CreateDummyAudioFile();
+                        await WarmUpWhisperAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
                 }
-            });
+            }, disposeCts.Token);
         }
 
         private string ResolveWhisperExePath()
@@ -81,11 +86,8 @@ namespace VoiceLite.Services
 
                 if (!hashString.Equals(EXPECTED_HASH, StringComparison.OrdinalIgnoreCase))
                 {
-                    ErrorLogger.LogMessage($"WARNING: Whisper.exe integrity check failed!");
-                    ErrorLogger.LogMessage($"Expected: {EXPECTED_HASH}");
-                    ErrorLogger.LogMessage($"Got:      {hashString}");
-                    ErrorLogger.LogMessage($"This may indicate a modified or corrupted binary.");
-                    ErrorLogger.LogMessage($"File: {path}");
+                    // Integrity check failed - log minimal warning without exposing file paths
+                    ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (fail-open mode).");
 
                     // Log warning but allow execution - fail open to avoid breaking legitimate updates
                     // Users should verify they have the correct whisper.exe from official sources
@@ -155,7 +157,7 @@ namespace VoiceLite.Services
                 // silenceBuffer is already initialized to zeros (silence)
                 writer.WriteSamples(silenceBuffer, 0, silenceBuffer.Length);
 
-                ErrorLogger.LogMessage($"Created dummy audio file: {dummyAudioPath}");
+                // Dummy audio file created successfully (no logging to reduce noise)
             }
             catch (Exception ex)
             {
@@ -174,7 +176,7 @@ namespace VoiceLite.Services
 
             try
             {
-                ErrorLogger.LogMessage("Starting Whisper warmup process...");
+                // Warmup process starting (no logging to reduce noise)
                 var startTime = DateTime.Now;
 
                 // Use the fastest possible settings for warmup
@@ -213,9 +215,7 @@ namespace VoiceLite.Services
 
                 await process.WaitForExitAsync();
 
-                var warmupTime = DateTime.Now - startTime;
-                ErrorLogger.LogMessage($"Whisper warmup completed in {warmupTime.TotalMilliseconds:F0}ms");
-
+                // Warmup completed successfully (no timing logs to reduce noise)
                 isWarmedUp = true;
             }
             catch (Exception ex)
@@ -250,6 +250,9 @@ namespace VoiceLite.Services
 
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
+            if (isDisposed)
+                throw new ObjectDisposedException(nameof(PersistentWhisperService));
+
             if (!File.Exists(audioFilePath))
                 throw new FileNotFoundException($"Audio file not found: {audioFilePath}");
 
@@ -295,7 +298,7 @@ namespace VoiceLite.Services
                               $"--beam-size {settings.BeamSize} " +
                               $"--best-of {settings.BestOf}";
 
-                ErrorLogger.LogMessage($"Whisper command: {whisperExePath} {arguments}");
+                // Command prepared (no logging to reduce noise and avoid exposing file paths)
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -371,9 +374,13 @@ namespace VoiceLite.Services
 
                     timeoutSeconds = Math.Max(10, (int)(estimatedAudioSeconds * processingMultiplier) + 5);
                     timeoutSeconds = Math.Min(timeoutSeconds, 120); // Cap at 2 minutes
+
+                    // Apply user-configurable timeout multiplier
+                    timeoutSeconds = (int)(timeoutSeconds * settings.WhisperTimeoutMultiplier);
+                    timeoutSeconds = Math.Max(1, timeoutSeconds); // Minimum 1 second
                 }
 
-                ErrorLogger.LogMessage($"Timeout set to {timeoutSeconds}s for {audioInfo.Length} byte file");
+                ErrorLogger.LogMessage($"Timeout set to {timeoutSeconds}s for {audioInfo.Length} byte file (multiplier: {settings.WhisperTimeoutMultiplier})");
 
                 bool exited = await Task.Run(() => process.WaitForExit(timeoutSeconds * 1000));
 
@@ -409,16 +416,15 @@ namespace VoiceLite.Services
                     }
                 }
 
-                ErrorLogger.LogMessage($"Whisper exit code: {process.ExitCode}");
-                ErrorLogger.LogMessage($"Whisper stdout: {outputBuilder}");
-                ErrorLogger.LogMessage($"Whisper stderr: {errorBuilder}");
-
+                // Only log errors, not successful transcriptions (reduce noise)
                 if (process.ExitCode != 0)
                 {
+                    ErrorLogger.LogMessage($"Whisper process failed with exit code: {process.ExitCode}");
                     var error = errorBuilder.ToString();
-                    if (!string.IsNullOrEmpty(error))
+                    if (!string.IsNullOrEmpty(error) && error.Length < 500)
                     {
-                        ErrorLogger.LogMessage($"Whisper error: {error}");
+                        // Log truncated error to avoid excessive log sizes
+                        ErrorLogger.LogMessage($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
                     }
                     throw new Exception($"Whisper process failed with exit code {process.ExitCode}");
                 }
@@ -451,11 +457,21 @@ namespace VoiceLite.Services
                 {
                     try
                     {
-                        await Task.Delay(100); // Small delay
-                        await WarmUpWhisperAsync(); // Keep system warm
+                        if (!disposeCts.IsCancellationRequested)
+                        {
+                            await Task.Delay(100, disposeCts.Token); // Small delay
+                            if (!disposeCts.IsCancellationRequested)
+                            {
+                                await WarmUpWhisperAsync(); // Keep system warm
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected during disposal
                     }
                     catch { /* Ignore warmup errors */ }
-                });
+                }, disposeCts.Token);
 
                 return result;
             }
@@ -494,6 +510,21 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
+            if (isDisposed)
+                return;
+
+            isDisposed = true;
+
+            // Cancel all background tasks (warmup tasks)
+            try
+            {
+                disposeCts.Cancel();
+            }
+            catch { /* Ignore cancellation errors */ }
+
+            // Wait briefly for background tasks to complete
+            Thread.Sleep(200);
+
             CleanupProcess();
 
             // Dispose semaphore safely with a small delay to prevent race conditions
@@ -509,6 +540,16 @@ namespace VoiceLite.Services
                 {
                     // Already disposed, ignore
                 }
+            }
+
+            // Dispose cancellation token source
+            try
+            {
+                disposeCts.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed, ignore
             }
         }
     }

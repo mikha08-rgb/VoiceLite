@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-// import { Ratelimit } from '@upstash/ratelimit';
-// import { Redis } from '@upstash/redis';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 import { headers } from 'next/headers';
 
 // Rate limiting: 5 feedback submissions per hour per IP
-// TODO: Uncomment when Upstash Redis is configured
-// const ratelimit = new Ratelimit({
-//   redis: Redis.fromEnv(),
-//   limiter: Ratelimit.slidingWindow(5, '1 h'),
-//   analytics: true,
-// });
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  analytics: true,
+});
 
 const feedbackSchema = z.object({
   type: z.enum(['BUG', 'FEATURE_REQUEST', 'GENERAL', 'QUESTION']),
@@ -28,24 +27,23 @@ const feedbackSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting (disabled - enable when Upstash Redis is configured)
+    // Rate limiting: 5 feedback submissions per hour per IP
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
 
-    // TODO: Uncomment when Upstash Redis is configured
-    // const { success, limit, remaining, reset } = await ratelimit.limit(`feedback:${ip}`);
-    // if (!success) {
-    //   return NextResponse.json(
-    //     { error: 'Rate limit exceeded. Please try again later.' },
-    //     {
-    //       status: 429,
-    //       headers: {
-    //         'X-RateLimit-Limit': limit.toString(),
-    //         'X-RateLimit-Remaining': remaining.toString(),
-    //         'X-RateLimit-Reset': reset.toString(),
-    //       },
-    //     }
-    //   );
-    // }
+    const { success, limit, remaining, reset } = await ratelimit.limit(`feedback:${ip}`);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limit.toString(),
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-RateLimit-Reset': reset.toString(),
+          },
+        }
+      );
+    }
 
     // Parse and validate request body
     const body = await req.json();

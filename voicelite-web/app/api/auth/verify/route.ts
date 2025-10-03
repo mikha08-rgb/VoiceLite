@@ -3,7 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { hashToken } from '@/lib/crypto';
 import { createSession, setSessionCookie } from '@/lib/auth/session';
 
-const DEFAULT_REDIRECT = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+const DEFAULT_REDIRECT = process.env.NEXT_PUBLIC_APP_URL;
+if (!DEFAULT_REDIRECT) {
+  throw new Error('NEXT_PUBLIC_APP_URL environment variable is required');
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
