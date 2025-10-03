@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // Enhanced error handling with specific messages for different error types
     if (error instanceof z.ZodError) {
-      console.error('Checkout validation error:', error.errors);
+      console.error('Checkout validation error:', error.issues);
       return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
     }
 
