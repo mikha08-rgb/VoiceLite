@@ -149,7 +149,7 @@ namespace VoiceLite.Services
             {
                 // Use AppData temp directory instead of Program Files (avoid permission issues)
                 var appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "VoiceLite",
                     "temp");
                 Directory.CreateDirectory(appDataDir);

@@ -9,12 +9,12 @@ namespace VoiceLite.Services.Licensing
 {
     /// <summary>
     /// Handles secure storage and retrieval of license files using Windows DPAPI encryption.
-    /// License files are stored in %APPDATA%\VoiceLite\license.dat
+    /// License files are stored in %LOCALAPPDATA%\VoiceLite\license.dat (local machine only, does not sync)
     /// </summary>
     public sealed class LicenseStorage
     {
         private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite"
         );
 

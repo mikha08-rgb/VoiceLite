@@ -15,7 +15,7 @@ namespace VoiceLite.Services
     public static class ErrorLogger
     {
         private static readonly string LogDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite",
             "logs");
 

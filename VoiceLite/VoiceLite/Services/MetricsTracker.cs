@@ -20,7 +20,7 @@ namespace VoiceLite.Services
         {
             this.settings = settings;
             metricsDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VoiceLite");
             metricsPath = Path.Combine(metricsDirectory, "metrics.json");
 

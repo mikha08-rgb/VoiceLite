@@ -122,6 +122,7 @@ npm run keygen
    - `MetricsTracker`: Performance metrics collection
    - `SecurityService`: Security and obfuscation helpers
    - `DependencyChecker`: Verify runtime dependencies
+   - `AnalyticsService`: Privacy-first opt-in analytics with SHA256 anonymous user IDs (v1.0.17+)
 
 3. **Models** (`Models/`): Data structures and configuration
    - `Settings`: User preferences with validation
@@ -140,6 +141,7 @@ npm run keygen
    - `SettingsWindow.xaml` / `SettingsWindowNew.xaml`: Settings UI with model selection
    - `DictionaryManagerWindow.xaml`: VoiceShortcuts manager with template presets
    - `LoginWindow.xaml`: Pro license activation window
+   - `AnalyticsConsentWindow.xaml`: First-run analytics opt-in dialog (v1.0.17+)
    - `Controls/SimpleModelSelector`: Model selection control
    - `Controls/ModelComparisonControl`: Model comparison and selection UI
    - `Resources/ModernStyles.xaml`: WPF styling resources
@@ -224,8 +226,10 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temper
 - VAD (Voice Activity Detection) for silence trimming
 
 ### Settings & Configuration
-- **Settings stored in `%APPDATA%\VoiceLite\settings.json`** (NOT in Program Files)
+- **Settings stored in `%LOCALAPPDATA%\VoiceLite\settings.json`** (Local machine only, does NOT sync)
+- **Privacy Note**: Changed from Roaming to Local AppData to prevent transcription history from syncing across PCs
 - AppData directory created automatically on first run
+- Automatic migration from old Roaming AppData location (one-time, transparent)
 - Settings migration from old Program Files location (if exists)
 - Default hotkey: Left Alt (customizable)
 - Default mode: Push-to-talk (not toggle)
@@ -234,10 +238,11 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temper
 - Sound feedback disabled by default (wood-tap-click.ogg via NAudio.Vorbis)
 - **Transcription history**: Configurable max items (default 50), supports pinning, auto-cleanup
 - **VoiceShortcuts**: Pattern-based replacements with templates (Medical, Legal, Tech)
+- **Analytics**: Opt-in privacy-first analytics with SHA256 anonymous IDs (v1.0.17+), no PII collected
 
 ### Error Handling & Logging
 - Comprehensive error logging via `ErrorLogger` service
-- **Logs stored in `%APPDATA%\VoiceLite\logs\voicelite.log`** (NOT in Program Files)
+- **Logs stored in `%LOCALAPPDATA%\VoiceLite\logs\voicelite.log`** (Local machine only, does NOT sync)
 - Log directory created automatically on first write
 - Log rotation at 10MB max size
 - Graceful fallbacks for missing models or whisper.exe
@@ -324,6 +329,9 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 - `POST /api/licenses/issue` - Issue cryptographically signed license file
 - `GET /api/licenses/crl` - Fetch Certificate Revocation List (CRL)
 
+**Analytics Endpoints** (Privacy-first opt-in):
+- `POST /api/analytics/event` - Submit anonymous analytics events (v1.0.17+)
+
 ### Backend Technology Stack
 - **Framework**: Next.js 15 (App Router) with React 19
 - **Database**: PostgreSQL (Supabase) with Prisma ORM
@@ -341,6 +349,33 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 4. **Desktop App** → Checks CRL for revoked licenses via `GET /api/licenses/crl`
 5. **Desktop App** → Validates device fingerprint, expiry, grace period locally
 6. **Result** → License valid/invalid/expired/revoked (fully offline validation after initial fetch)
+
+### Analytics System (v1.0.17+)
+
+VoiceLite includes a **privacy-first, opt-in analytics system** that respects user privacy while providing insights into app usage.
+
+**Privacy Features**:
+- **Opt-in only**: Users see consent dialog on first launch, must explicitly agree
+- **Anonymous IDs**: SHA256-hashed machine ID + timestamp (irreversible, no PII)
+- **No IP logging**: Backend does not store IP addresses
+- **No sensitive data**: No recording content, no file paths, no user names
+- **Local control**: Settings stored in `settings.json`, can be disabled anytime
+- **Fail-safe**: Analytics failures never break app functionality (silent failures)
+
+**Events Tracked**:
+- `APP_LAUNCHED`: App start events (tier, version, OS)
+- `TRANSCRIPTION_COMPLETED`: Aggregated daily (count, total words, model used)
+- `MODEL_CHANGED`: Model switches (old model → new model)
+- `SETTINGS_CHANGED`: Settings modifications (setting name only)
+- `ERROR_OCCURRED`: Error types for debugging (no stack traces or paths)
+- `PRO_UPGRADE`: Pro tier activations
+
+**Implementation**:
+- **Desktop**: `AnalyticsService.cs` sends events to backend API
+- **Backend**: `POST /api/analytics/event` stores in PostgreSQL via Prisma
+- **UI**: `AnalyticsConsentWindow.xaml` shows transparent consent dialog
+- **Settings**: `EnableAnalytics` property (null = not asked, false = opted out, true = opted in)
+- **Aggregation**: Transcriptions logged once per day, then every 10 transcriptions to reduce noise
 
 ## Deployment & Distribution
 
