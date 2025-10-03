@@ -69,7 +69,17 @@ jobs:
     - name: Build Release
       run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 
+    - name: Restore Whisper models cache
+      id: cache-whisper
+      uses: actions/cache@v4
+      with:
+        path: VoiceLite/whisper_installer
+        key: whisper-models-v1-${{ hashFiles('VoiceLite/whisper/**') }}
+        restore-keys: |
+          whisper-models-v1-
+
     - name: Download Whisper models
+      if: steps.cache-whisper.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         echo "Downloading Whisper models for installer..."
@@ -86,10 +96,26 @@ jobs:
         echo "Downloading ggml-tiny.bin (75MB)..."
         Invoke-WebRequest -Uri $tinyModelUrl -OutFile "VoiceLite/whisper_installer/ggml-tiny.bin"
 
-        # Copy whisper.exe to installer directory
-        Copy-Item -Path "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper/whisper.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
-
         echo "Models downloaded successfully"
+
+    - name: Copy whisper.exe to installer directory
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
+
+        # Copy whisper.exe from published build output
+        $whisperExe = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper/whisper.exe"
+
+        if (Test-Path $whisperExe) {
+          Copy-Item -Path $whisperExe -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
+          echo "Copied whisper.exe from build output"
+        } else {
+          echo "ERROR: whisper.exe not found at $whisperExe"
+          Get-ChildItem "VoiceLite/VoiceLite/bin/Release" -Recurse -Filter "whisper.exe" | Select-Object FullName
+          exit 1
+        }
+
+        echo "Installer directory contents:"
         Get-ChildItem "VoiceLite/whisper_installer" | ForEach-Object {
           $sizeInMB = [math]::Round($_.Length / 1MB, 2)
           echo "  - $($_.Name) ($sizeInMB MB)"
