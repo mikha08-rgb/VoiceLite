@@ -94,6 +94,82 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Settings Card Style (no hover effect) -->
+    <Style x:Key="SettingsCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="18"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+
+    <!-- Settings Section Header Style -->
+    <Style x:Key="SettingsSectionHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <!-- Settings Section Description Style -->
+    <Style x:Key="SettingsSectionDescStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <!-- Settings Helper Text Style -->
+    <Style x:Key="SettingsHelperTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+    </Style>
+
+    <!-- Icon Text Style (for emoji icons) -->
+    <Style x:Key="SettingsIconStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+    </Style>
+
+    <!-- Info Box Style (for tips/warnings) -->
+    <Style x:Key="InfoBoxStyle" TargetType="Border">
+        <Setter Property="Background" Value="#E3F2FD"/>
+        <Setter Property="BorderBrush" Value="#2196F3"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,12,0,0"/>
+    </Style>
+
+    <!-- Warning Box Style -->
+    <Style x:Key="WarningBoxStyle" TargetType="Border">
+        <Setter Property="Background" Value="#FFF3E0"/>
+        <Setter Property="BorderBrush" Value="#FF9800"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,12,0,0"/>
+    </Style>
+
+    <!-- Success Box Style -->
+    <Style x:Key="SuccessBoxStyle" TargetType="Border">
+        <Setter Property="Background" Value="#E8F5E9"/>
+        <Setter Property="BorderBrush" Value="#4CAF50"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,12,0,0"/>
+    </Style>
+
     <!-- Modern Button Style with Depth -->
     <Style x:Key="ModernButtonStyle" TargetType="Button">
         <Setter Property="FontFamily" Value="Segoe UI"/>

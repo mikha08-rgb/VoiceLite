@@ -485,6 +485,80 @@ namespace VoiceLite
             VersionText.Text = $"v{version?.Major}.{version?.Minor}.{version?.Build}";
         }
 
+        // Privacy Tab - Clear Data Handlers
+        private void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Are you sure you want to delete all transcription history?\n\nThis action cannot be undone.",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning
+            );
+
+            if (result == MessageBoxResult.Yes)
+            {
+                settings.TranscriptionHistory?.Clear();
+                MessageBox.Show("Transcription history cleared successfully.\n\nClick Save to persist changes.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void ClearLogsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Are you sure you want to delete all error logs?\n\nThis action cannot be undone.",
+                "Clear Logs",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning
+            );
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceLite", "logs", "voicelite.log");
+                    if (File.Exists(logPath))
+                    {
+                        File.Delete(logPath);
+                        MessageBox.Show("Error logs cleared successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("No log file found.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to clear logs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void ResetSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Are you sure you want to reset all settings to default values?\n\nThis will reset:\n• Hotkey settings\n• Audio settings\n• Whisper parameters\n• All other preferences\n\nThis action cannot be undone.",
+                "Reset to Defaults",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning
+            );
+
+            if (result == MessageBoxResult.Yes)
+            {
+                // Reset to defaults but keep model and analytics preference
+                var currentModel = settings.WhisperModel;
+                var currentAnalytics = settings.EnableAnalytics;
+
+                settings = new Settings
+                {
+                    WhisperModel = currentModel,
+                    EnableAnalytics = currentAnalytics
+                };
+
+                LoadSettings();
+                MessageBox.Show("Settings reset to default values successfully.\n\nClick Save to persist changes.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             // Ctrl+S to save and close
