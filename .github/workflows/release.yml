@@ -78,13 +78,22 @@ jobs:
         restore-keys: |
           whisper-models-v1-
 
-    - name: Download Whisper models
+    - name: Download Whisper models and executable
       if: steps.cache-whisper.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        echo "Downloading Whisper models for installer..."
+        echo "Downloading Whisper models and executable for installer..."
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
+
+        # Download whisper.exe (Windows binary from whisper.cpp releases)
+        $whisperExeUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
+        echo "Downloading whisper.exe..."
+        Invoke-WebRequest -Uri $whisperExeUrl -OutFile "whisper-temp.zip"
+        Expand-Archive -Path "whisper-temp.zip" -DestinationPath "whisper-temp" -Force
+        Copy-Item -Path "whisper-temp/main.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
+        Remove-Item "whisper-temp.zip" -Force
+        Remove-Item "whisper-temp" -Recurse -Force
 
         # Download Small model (Pro - 466MB)
         $smallModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
@@ -96,26 +105,7 @@ jobs:
         echo "Downloading ggml-tiny.bin (75MB)..."
         Invoke-WebRequest -Uri $tinyModelUrl -OutFile "VoiceLite/whisper_installer/ggml-tiny.bin"
 
-        echo "Models downloaded successfully"
-
-    - name: Copy whisper.exe to installer directory
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
-
-        # Copy whisper.exe from published build output
-        $whisperExe = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper/whisper.exe"
-
-        if (Test-Path $whisperExe) {
-          Copy-Item -Path $whisperExe -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
-          echo "Copied whisper.exe from build output"
-        } else {
-          echo "ERROR: whisper.exe not found at $whisperExe"
-          Get-ChildItem "VoiceLite/VoiceLite/bin/Release" -Recurse -Filter "whisper.exe" | Select-Object FullName
-          exit 1
-        }
-
-        echo "Installer directory contents:"
+        echo "Downloads complete. Installer directory contents:"
         Get-ChildItem "VoiceLite/whisper_installer" | ForEach-Object {
           $sizeInMB = [math]::Round($_.Length / 1MB, 2)
           echo "  - $($_.Name) ($sizeInMB MB)"
