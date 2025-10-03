@@ -60,7 +60,7 @@ export default function TermsOfService() {
               <li>No credit card required</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.2 Pro Version ($7/month)</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.2 Pro Version ($20 / 3 months or $99 one-time)</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
               <li>Access to all 5 AI models (Tiny, Base, Small, Medium, Large)</li>
               <li>Unlimited usage</li>

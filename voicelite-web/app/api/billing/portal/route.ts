@@ -39,7 +39,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: 'Server configuration error: NEXT_PUBLIC_APP_URL is required' },
+        { status: 500 }
+      );
+    }
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: license.stripeCustomerId,

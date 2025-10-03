@@ -32,7 +32,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { plan, successUrl, cancelUrl } = bodySchema.parse(body);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: 'Server configuration error: NEXT_PUBLIC_APP_URL is required' },
+        { status: 500 }
+      );
+    }
     const success = successUrl ?? `${baseUrl}/checkout/success`;
     const cancel = cancelUrl ?? `${baseUrl}/checkout/cancel`;
 
