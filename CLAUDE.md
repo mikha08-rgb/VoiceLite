@@ -52,6 +52,27 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup_Simple.iss
 ```
 
+### CI/CD (GitHub Actions)
+```bash
+# Automated PR testing (runs on every PR to master)
+# - Tests desktop app (106 tests)
+# - Validates web app build and types
+# Workflow: .github/workflows/pr-tests.yml
+
+# Automated release build (run via git tag)
+git tag v1.0.22
+git push --tags
+# This triggers .github/workflows/release.yml which:
+# - Auto-updates version in .csproj and .iss files
+# - Builds Release with dotnet publish
+# - Compiles installer with Inno Setup
+# - Creates GitHub release with installer upload
+
+# Manual release trigger (via GitHub UI)
+# Go to Actions → Build and Release → Run workflow
+# Enter version number (e.g., 1.0.22)
+```
+
 ### Web Application (Next.js Backend)
 ```bash
 # Navigate to web directory
@@ -405,12 +426,42 @@ VoiceLite includes a **privacy-first, opt-in analytics system** that respects us
 
 ## Deployment & Distribution
 
-### Installer Creation
+### Automated Release Process (Recommended)
+**Using GitHub Actions** (preferred method as of v1.0.22):
+
+```bash
+# 1. Tag the release
+git tag v1.0.22
+git push --tags
+
+# 2. GitHub Actions automatically:
+#    - Updates version in .csproj and .iss files
+#    - Builds Release with dotnet publish
+#    - Compiles installer with Inno Setup
+#    - Creates GitHub release with installer upload
+#    - Takes ~5-7 minutes total
+
+# 3. Release is published at:
+#    https://github.com/mikha08-rgb/VoiceLite/releases/tag/v1.0.22
+
+# 4. Update website download link (manual step):
+#    Edit voicelite-web/app/page.tsx to point to new version
+#    git commit && git push (Vercel auto-deploys)
+```
+
+**Workflow file**: `.github/workflows/release.yml`
+
+### Manual Release Process (Legacy)
+If GitHub Actions is unavailable:
+
 1. Build Release version: `dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained`
 2. Published files appear in `VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/`
-3. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
-4. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory (current version: v1.0.19)
-5. Installer script expects published files in specific location - verify paths in `.iss` file
+3. Update version in `VoiceLite/VoiceLite/VoiceLite.csproj` (Version, AssemblyVersion, FileVersion)
+4. Update version in `VoiceLite/Installer/VoiceLiteSetup_Simple.iss` (AppVersion, OutputBaseFilename)
+5. Run Inno Setup compiler: `"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite\Installer\VoiceLiteSetup_Simple.iss`
+6. Output: `VoiceLite-Setup-{VERSION}.exe` in root directory
+7. Create GitHub release manually with `gh release create`
+8. Upload installer to release
 
 ### Installer Features
 - **Includes Pro model (466MB) + Lite model (75MB)** - temporary growth promotion (v1.0.14+)
