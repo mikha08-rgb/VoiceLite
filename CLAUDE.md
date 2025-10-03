@@ -94,6 +94,31 @@ npm run db:studio
 npm run keygen
 ```
 
+### API Documentation
+```bash
+# View interactive API documentation
+# Start dev server: npm run dev (in voicelite-web/)
+# Then visit: http://localhost:3000/docs
+
+# API specification is also available at:
+# http://localhost:3000/api/docs (OpenAPI 3.0 JSON)
+```
+
+**Available API Routes** (22 total):
+- **Authentication**: Magic link login, OTP verification, logout
+- **Payments**: Stripe checkout, customer portal
+- **Licenses**: Activation, deactivation, validation, CRL
+- **Analytics**: Privacy-first event tracking (opt-in)
+- **Admin**: Dashboard stats, feedback management
+- **User**: Profile and license retrieval
+
+**Key Features**:
+- OpenAPI 3.0 specification auto-generated from Zod schemas
+- Interactive Swagger UI at `/docs`
+- Type-safe request/response validation
+- Comprehensive error handling
+- Rate limiting (via Upstash Redis)
+
 ## Architecture Overview
 
 ### Core Components
