@@ -184,7 +184,7 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public async Task MultipleDisposeCalls_DoesNotThrow()
+        public void MultipleDisposeCalls_DoesNotThrow()
         {
             // Arrange
             _service = new PersistentWhisperService(_settings);
@@ -257,7 +257,7 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public async Task MissingWhisperModel_ShowsClearError()
+        public void MissingWhisperModel_ShowsClearError()
         {
             // Arrange: Try to use a model that doesn't exist
             var settingsWithMissingModel = new Settings
