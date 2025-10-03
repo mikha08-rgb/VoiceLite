@@ -1,10 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.25: Quality & Security - Rate limiting, reduced logging, test coverage improvements
+; v1.0.26: Codebase Cleanup - Removed 14MB test artifacts, backup files, commented code
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.25
+AppVersion=1.0.26
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -12,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.25
+OutputBaseFilename=VoiceLite-Setup-1.0.26
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
