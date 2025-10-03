@@ -25,44 +25,6 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel Name="ModelsPanel">
 
-                    <!-- Lite Model -->
-                    <RadioButton Name="TinyRadio"
-                                 GroupName="ModelSelection"
-                                 Margin="0,5"
-                                 Checked="ModelRadio_Checked"
-                                 Tag="ggml-tiny.bin">
-                        <StackPanel Orientation="Horizontal">
-                            <Grid Width="350">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Lite"
-                                               FontWeight="Bold"
-                                               FontSize="14"/>
-                                    <TextBlock Text="75 MB"
-                                               FontSize="11"
-                                               Foreground="Gray"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Basic accuracy, instant response"
-                                               FontSize="12"
-                                               Foreground="#606060"
-                                               TextWrapping="Wrap"/>
-                                    <ProgressBar Height="4"
-                                                 Value="20"
-                                                 Maximum="100"
-                                                 Foreground="#FFC107"
-                                                 Background="#E0E0E0"
-                                                 Margin="0,3,50,0"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </RadioButton>
-
                     <!-- Swift Model -->
                     <RadioButton Name="BaseRadio"
                                  GroupName="ModelSelection"

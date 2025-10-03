@@ -8,7 +8,7 @@ namespace VoiceLite.Controls
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-tiny.bin";
+        private string selectedModel = "ggml-small.bin";
 
         public string SelectedModel
         {
@@ -30,7 +30,6 @@ namespace VoiceLite.Controls
         {
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
 
-            CheckAndUpdateRadio(TinyRadio, Path.Combine(whisperPath, "ggml-tiny.bin"));
             CheckAndUpdateRadio(BaseRadio, Path.Combine(whisperPath, "ggml-base.bin"));
             CheckAndUpdateRadio(SmallRadio, Path.Combine(whisperPath, "ggml-small.bin"));
             CheckAndUpdateRadio(MediumRadio, Path.Combine(whisperPath, "ggml-medium.bin"));
@@ -70,14 +69,11 @@ namespace VoiceLite.Controls
         {
             switch (modelFile)
             {
-                case "ggml-tiny.bin":
-                    TipText.Text = "Fastest option but may struggle with technical terms";
-                    break;
                 case "ggml-base.bin":
                     TipText.Text = "Good for simple dictation and casual use";
                     break;
                 case "ggml-small.bin":
-                    TipText.Text = "'Balanced' offers the best experience for most users";
+                    TipText.Text = "'Pro' offers the best experience for most users";
                     break;
                 case "ggml-medium.bin":
                     TipText.Text = "Great for professional use when accuracy matters";
@@ -92,9 +88,6 @@ namespace VoiceLite.Controls
         {
             switch (selectedModel)
             {
-                case "ggml-tiny.bin":
-                    TinyRadio.IsChecked = true;
-                    break;
                 case "ggml-base.bin":
                     BaseRadio.IsChecked = true;
                     break;
