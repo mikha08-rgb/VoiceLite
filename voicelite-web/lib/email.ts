@@ -42,6 +42,23 @@ export async function sendMagicLinkEmail({
   `;
 
   if (!resend) {
+    // Development mode: Log email to console instead of throwing error
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[DEV MODE] Email service not configured - logging to console instead');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 MAGIC LINK EMAIL (Development Mode)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('To:', email);
+      console.log('Subject: Your VoiceLite sign-in link');
+      console.log('');
+      console.log('Magic Link:', magicLinkUrl);
+      console.log('Desktop Deep Link:', deepLinkUrl);
+      console.log('OTP Code:', otpCode);
+      console.log('Expires in:', expiresInMinutes, 'minutes');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return; // Success in dev mode
+    }
+
     console.error('CRITICAL: RESEND_API_KEY not configured - cannot send magic link emails');
     console.log('[Email stub] Magic link for %s', email, { magicLinkUrl, deepLinkUrl, otpCode });
     throw new Error('Email service not configured. RESEND_API_KEY is required.');
@@ -82,6 +99,21 @@ export async function sendLicenseEmail({ email, licenseKey, plan }: LicenseEmail
   `;
 
   if (!resend) {
+    // Development mode: Log email to console instead of throwing error
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[DEV MODE] Email service not configured - logging to console instead');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 LICENSE EMAIL (Development Mode)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('To:', email);
+      console.log('Subject: Your VoiceLite license');
+      console.log('Plan:', planLabel);
+      console.log('');
+      console.log('🔑 LICENSE KEY:', licenseKey);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return; // Success in dev mode
+    }
+
     console.error('CRITICAL: RESEND_API_KEY not configured - cannot send license emails');
     console.log('[Email stub] License key for %s: %s (%s)', email, licenseKey, planLabel);
     throw new Error('Email service not configured. RESEND_API_KEY is required.');
