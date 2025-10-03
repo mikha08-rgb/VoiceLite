@@ -209,21 +209,19 @@ export function validateEnvironment() {
  * Validate environment on module load in production (runtime only, not build time)
  * In development, we allow missing vars for flexibility
  * Skip validation during build to allow builds without production secrets
+ *
+ * This only runs on Vercel in production at runtime, never during `next build`
  */
 if (
-  process.env.NODE_ENV === 'production' &&
   typeof window === 'undefined' && // Server-side only
-  !process.argv.includes('build') && // Skip during `next build`
+  process.env.VERCEL && // Only in Vercel production
   !process.env.SKIP_ENV_VALIDATION // Allow manual skip
 ) {
-  // Validate at runtime (not build time)
-  if (process.env.VERCEL || process.argv.includes('start')) {
-    try {
-      validateEnvironment();
-    } catch (error) {
-      console.error(error);
-      process.exit(1);
-    }
+  try {
+    validateEnvironment();
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
   }
 }
 
