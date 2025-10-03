@@ -1,10 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.20: Remove Lite model from UI, ensure history tracking works
+; v1.0.21: Multi-language support (99 languages), error recovery tests, integrated feedback system
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.20
+AppVersion=1.0.21
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -12,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.20
+OutputBaseFilename=VoiceLite-Setup-1.0.21
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
