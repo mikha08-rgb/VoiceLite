@@ -1,33 +1,23 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Desktop source lives in `VoiceLite/VoiceLite`; WPF views sit in `Views/`, services in `Services/`, and utilities in `Helpers/`.
-- Automated checks reside in `VoiceLite/VoiceLite.Tests` with coverage output in `VoiceLite/VoiceLite.Tests/TestResults/`.
-- Web and marketing work is in `voicelite-web/`; static promo assets remain in `landing-page/`, while licensing logic is isolated in `license-server/`.
-- Operational docs and workflow playbooks are collected in `docs/` plus top-level guides like `WORKFLOWS.md` and `CLAUDE.md`.
+VoiceLite/VoiceLite hosts the desktop WPF app; keep XAML views in Views/, long-running services in Services/, and shared helpers in Helpers/. Automated checks live in VoiceLite/VoiceLite.Tests with artifacts under VoiceLite/VoiceLite.Tests/TestResults/. Web and marketing work sits in voicelite-web/, promo assets stay in landing-page/, and licensing logic resides in license-server/. Process docs belong in docs/ alongside top-level guides such as WORKFLOWS.md.
 
 ## Build, Test, and Development Commands
-- `dotnet build VoiceLite/VoiceLite/VoiceLite.csproj` - compile the Windows client.
-- `dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj -c Debug` - launch the app with live logging.
-- `dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect "XPlat Code Coverage"` - run the xUnit suite and export Cobertura coverage.
-- `pwsh VoiceLite/build-installer.ps1` - generate the self-contained installer and bundle whisper models.
-- `npm install && npm run dev` in `voicelite-web/` - start the Next.js site locally; finish with `npm run build` before shipping.
+- `dotnet build VoiceLite/VoiceLite/VoiceLite.csproj` compiles the Windows client for smoke checks.
+- `dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj -c Debug` launches the app with live logging.
+- `dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect "XPlat Code Coverage"` runs the xUnit suite and saves Cobertura output to TestResults/.
+- `pwsh VoiceLite/build-installer.ps1` bundles a signed installer with Whisper models.
+- In `voicelite-web/`, run `npm install && npm run dev` during feature work, then `npm run build` before shipping.
 
 ## Coding Style & Naming Conventions
-- C# uses 4-space indents, `PascalCase` types/methods, `camelCase` locals, and `I`-prefixed interfaces; keep namespaces aligned with folders.
-- Favor guard clauses for null checks and route logging through `ErrorLogger` instead of console writes.
-- TypeScript and React code keeps 2-space indents, `const` or `let`, kebab-case route folders (for example `/app/api/checkout`), and should pass `npx next lint`.
+Use 4-space indents in C#. Stick to PascalCase for types and methods, camelCase for locals, and prefix interfaces with I. Align namespaces with folders, prefer guard clauses for null checks, and route diagnostics through ErrorLogger. For TypeScript and React, keep 2-space indents, rely on const or let, and name route directories in kebab-case. Lint web code with `npx next lint`.
 
 ## Testing Guidelines
-- Follow xUnit naming like `MethodName_ShouldExpectedBehavior`; store fixtures under `VoiceLite.Tests/TestData` for repeatability.
-- Maintain at least 75 percent line coverage on modified files and commit the coverage summary from the command above.
-- Web features should include component or API route tests where practical and must succeed with `npm run build`.
+Follow xUnit naming like `MethodName_ShouldExpectedBehavior`, and keep reusable fixtures in VoiceLite.Tests/TestData. Maintain >= 75% line coverage on touched C# files and commit the coverage summary produced by the test command. Web changes should include component or API tests where practical and must pass `npm run build`.
 
 ## Commit & Pull Request Guidelines
-- Commits mirror the existing history: concise, imperative, and scoped (for example `Polish frontend design`).
-- Run desktop and web test commands before every PR, note installer status if touched, and attach coverage figures.
-- PR templates should list the change summary, verification steps, linked issues, and screenshots or screen recordings for UI updates.
+Author concise, imperative commits (for example `Polish frontend design`). Pull requests should summarize changes, enumerate verification steps, link relevant issues, and attach screenshots or recordings for UI updates. Note installer status when `build-installer.ps1` runs and call out any security or licensing impacts.
 
 ## Security & Configuration Tips
-- Keep secrets outside the repo using `.env.local` (web) and `appsettings.Development.json` (desktop); rotate them with `pwsh tools/generate-secure-keys.ps1`.
-- Review `SECURITY.md` and the `voicelite-security-auditor` checklist whenever payment flows, licensing, or logging changes.
+Store secrets in `.env.local` for web and `appsettings.Development.json` for desktop builds; rotate them using `pwsh tools/generate-secure-keys.ps1`. Review SECURITY.md and the voicelite-security-auditor checklist before modifying payments, licensing, or logging.
