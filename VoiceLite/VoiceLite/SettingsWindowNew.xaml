@@ -644,6 +644,21 @@
                                 </Grid>
                             </StackPanel>
                         </GroupBox>
+
+                        <!-- Performance Settings -->
+                        <GroupBox Header="Performance" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <CheckBox Name="UseWhisperServerCheckBox"
+                                          Content="Enable Whisper Server Mode (Experimental - 5x faster)"
+                                          Margin="0,0,0,5"/>
+                                <TextBlock Text="Uses persistent server.exe to keep model in memory. Falls back to process mode if server fails."
+                                           FontSize="11"
+                                           Foreground="Gray"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

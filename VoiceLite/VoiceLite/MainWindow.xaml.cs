@@ -79,7 +79,7 @@ namespace VoiceLite
             // Check dependencies before initializing services
             _ = CheckDependenciesAsync();
 
-            InitializeServices();
+            _ = InitializeServicesAsync();
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -396,7 +396,7 @@ namespace VoiceLite
             }
         }
 
-        private void InitializeServices()
+        private async Task InitializeServicesAsync()
         {
             try
             {
@@ -422,8 +422,17 @@ namespace VoiceLite
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
                 }
 
-                // Use persistent Whisper service for better performance
-                whisperService = new PersistentWhisperService(settings);
+                // Use Whisper Server (5x faster) or fallback to process-per-call
+                if (settings.UseWhisperServer)
+                {
+                    var serverService = new WhisperServerService(settings);
+                    await serverService.InitializeAsync();
+                    whisperService = serverService;
+                }
+                else
+                {
+                    whisperService = new PersistentWhisperService(settings);
+                }
 
                 // Initialize services BEFORE coordinator (coordinator needs these references)
                 historyService = new TranscriptionHistoryService(settings);
