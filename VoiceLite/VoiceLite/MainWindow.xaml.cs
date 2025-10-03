@@ -20,6 +20,9 @@ namespace VoiceLite
 {
     public partial class MainWindow : Window
     {
+        #region Fields & Properties
+
+        // Service dependencies
         private AudioRecorder? audioRecorder;
         private ITranscriber? whisperService;
         private HotkeyManager? hotkeyManager;
@@ -30,13 +33,9 @@ namespace VoiceLite
         private SoundService? soundService;
         private AnalyticsService? analyticsService;
         private RecordingCoordinator? recordingCoordinator;
+
+        // Recording state
         private DateTime recordingStartTime;
-        private Settings settings = new();
-        private AuthenticationService authenticationService = new();
-        private AuthenticationCoordinator? authenticationCoordinator;
-        private LicenseService licenseService = new();
-        private UserSession? currentSession;
-        private LicenseStatus currentLicenseStatus = LicenseStatus.Unknown;
         private bool _isRecording = false;
         private bool isRecording
         {
@@ -54,9 +53,23 @@ namespace VoiceLite
         private readonly object recordingLock = new object();
         private DateTime lastClickTime = DateTime.MinValue;
         private DateTime lastHotkeyPressTime = DateTime.MinValue;
+
+        // Authentication & Licensing
+        private Settings settings = new();
+        private AuthenticationService authenticationService = new();
+        private AuthenticationCoordinator? authenticationCoordinator;
+        private LicenseService licenseService = new();
+        private UserSession? currentSession;
+        private LicenseStatus currentLicenseStatus = LicenseStatus.Unknown;
+
+        // Timers
         private System.Timers.Timer? autoTimeoutTimer;
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
+
+        #endregion
+
+        #region Initialization & Lifecycle
 
         public MainWindow()
         {
@@ -587,6 +600,10 @@ namespace VoiceLite
                 }
             }
         }
+
+        #endregion
+
+        #region Recording Control
 
         private void TestButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1154,6 +1171,10 @@ namespace VoiceLite
             }
         }
 
+        #endregion
+
+        #region UI Event Handlers & Settings
+
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             if (MinimizeCheckBox.IsChecked == true)
@@ -1637,7 +1658,9 @@ namespace VoiceLite
             Activate();
         }
 
-        // ===== TRANSCRIPTION HISTORY METHODS =====
+        #endregion
+
+        #region Transcription History Management
 
         /// <summary>
         /// Updates the history panel UI with current history items.
@@ -2178,6 +2201,8 @@ namespace VoiceLite
                     MessageBoxImage.Error);
             }
         }
+
+        #endregion
     }
 }
 
