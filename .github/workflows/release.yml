@@ -1,0 +1,155 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.22)'
+        required: true
+        type: string
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Extract version from tag or input
+      id: version
+      shell: pwsh
+      run: |
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Building version: $version"
+
+    - name: Update version in project file
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $csprojPath = "VoiceLite/VoiceLite/VoiceLite.csproj"
+
+        $content = Get-Content $csprojPath -Raw
+        $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+        Set-Content $csprojPath -Value $content
+
+        echo "Updated version to $version in $csprojPath"
+
+    - name: Update version in installer script
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $issPath = "VoiceLite/Installer/VoiceLiteSetup_Simple.iss"
+
+        $content = Get-Content $issPath -Raw
+        $content = $content -replace 'AppVersion=[\d\.]+', "AppVersion=$version"
+        $content = $content -replace 'OutputBaseFilename=VoiceLite-Setup-[\d\.]+', "OutputBaseFilename=VoiceLite-Setup-$version"
+        Set-Content $issPath -Value $content
+
+        echo "Updated version to $version in $issPath"
+
+    - name: Restore dependencies
+      run: dotnet restore VoiceLite/VoiceLite.sln
+
+    - name: Build Release
+      run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
+
+    - name: Download Inno Setup
+      shell: pwsh
+      run: |
+        $innoSetupUrl = "https://jrsoftware.org/download.php/is.exe"
+        $installerPath = "$env:TEMP\innosetup.exe"
+
+        echo "Downloading Inno Setup..."
+        Invoke-WebRequest -Uri $innoSetupUrl -OutFile $installerPath
+
+        echo "Installing Inno Setup..."
+        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+
+        echo "Inno Setup installed"
+
+    - name: Compile installer
+      shell: pwsh
+      run: |
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+        if (-not (Test-Path $isccPath)) {
+          echo "ERROR: Inno Setup not found at $isccPath"
+          exit 1
+        }
+
+        echo "Compiling installer with Inno Setup..."
+        & $isccPath "VoiceLite\Installer\VoiceLiteSetup_Simple.iss"
+
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: Installer compilation failed"
+          exit 1
+        }
+
+        echo "Installer compiled successfully"
+
+    - name: List installer files
+      shell: pwsh
+      run: |
+        echo "Installer files created:"
+        Get-ChildItem -Path . -Filter "VoiceLite-Setup-*.exe" -Recurse | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.FullName) ($sizeInMB MB)"
+        }
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: VoiceLite v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        files: |
+          VoiceLite-Setup-*.exe
+        body: |
+          ## VoiceLite v${{ steps.version.outputs.VERSION }}
+
+          ### Download
+          - **Windows Installer**: `VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe` (~543 MB)
+
+          ### Installation
+          1. Download the installer above
+          2. Run `VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe`
+          3. Follow the installation wizard
+          4. Launch VoiceLite from Start Menu or Desktop shortcut
+
+          ### System Requirements
+          - Windows 10/11 (64-bit)
+          - Visual C++ Runtime 2015-2022 (auto-installed if missing)
+          - ~1 GB free disk space
+
+          ### What's New
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for full release notes.
+
+          ---
+
+          🤖 Auto-generated release via GitHub Actions
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VoiceLite-Installer-v${{ steps.version.outputs.VERSION }}
+        path: VoiceLite-Setup-*.exe
+        retention-days: 90
