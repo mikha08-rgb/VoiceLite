@@ -1,0 +1,271 @@
+END-USER LICENSE AGREEMENT (EULA) FOR VOICELITE
+Version 2.0
+Last Updated: January 2025
+
+IMPORTANT: PLEASE READ THIS END-USER LICENSE AGREEMENT ("EULA") CAREFULLY BEFORE DOWNLOADING, INSTALLING, OR USING VOICELITE SOFTWARE.
+
+BY DOWNLOADING, INSTALLING, OR USING VOICELITE ("THE SOFTWARE"), YOU AGREE TO BE BOUND BY THE TERMS OF THIS EULA. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT DOWNLOAD, INSTALL, OR USE THE SOFTWARE.
+
+1. DUAL LICENSING MODEL
+
+VoiceLite is distributed under a dual licensing model:
+
+a) SOURCE CODE LICENSE (MIT License): The VoiceLite source code repository is licensed under the MIT License (see full text at bottom of this document). This means you may freely view, modify, fork, and distribute the source code subject to the terms of the MIT License.
+
+b) BINARY/EXECUTABLE LICENSE (This EULA): Pre-compiled binaries, installers, and Pro tier features are governed by this EULA. This includes:
+   - Desktop application executables (.exe files)
+   - Official installers
+   - Pro tier AI models and features
+   - Web-based subscription services
+
+The MIT License allows source code modification, but distribution of modified binaries must comply with this EULA and may not use VoiceLite branding or backend services without authorization.
+
+2. LICENSE GRANT
+
+Subject to the terms of this EULA, VoiceLite grants you a limited, non-exclusive, non-transferable, revocable license to:
+
+a) Install and use the Software on devices you own or control
+b) Use the Software for personal or commercial purposes
+c) Modify the source code under the terms of the MIT License
+
+You may NOT:
+- Redistribute modified binaries under the VoiceLite name without permission
+- Reverse engineer compiled binaries to circumvent license validation
+- Use VoiceLite backend services with unauthorized clients
+- Sublicense, rent, lease, or lend the Software to third parties
+
+3. OWNERSHIP
+
+VoiceLite retains all rights, title, and interest in and to the Software, including all intellectual property rights. This EULA does not grant you ownership of the Software, only a license to use it.
+
+4. SUBSCRIPTION TIERS AND PRICING
+
+VoiceLite offers two subscription tiers:
+
+a) FREE TIER (Limited-Time Promotion):
+   - Includes Pro AI model (466MB, ~90-93% accuracy) as a temporary growth promotion
+   - Lite model (75MB, ~80-85% accuracy) available as legacy fallback
+   - Full offline functionality
+   - No usage caps or time limits
+   - No license validation required
+   - All core features (hotkeys, text injection, settings)
+   - Note: Pro model may revert to paid tier in future updates
+
+b) PRO TIER:
+   - Subscription Options:
+     * $20 USD per 3 months (quarterly subscription)
+     * $99 USD lifetime (one-time payment, permanent access)
+   - Unlocks premium AI models (Swift 142MB, Elite 1.5GB, Ultra 2.9GB)
+   - Accuracy improvements (93-97% with premium models)
+   - Device limit: 3 simultaneous activations per license
+   - Priority support and early access to new features
+   - Managed via cryptographically signed licenses (Ed25519)
+   - Requires one-time online activation per device
+
+All prices are in USD and subject to change with 30 days notice. Existing subscribers will maintain their original pricing for the duration of their subscription term.
+
+5. DATA COLLECTION AND PRIVACY
+
+a) VOICE RECORDINGS:
+   - Audio recordings are processed locally on your device
+   - Recordings are NEVER uploaded to VoiceLite servers
+   - Audio files are automatically deleted after transcription
+   - No third-party services process your voice data
+
+b) SUBSCRIPTION DATA (Pro Tier Only):
+   - Email address (for account management and license delivery)
+   - Payment information (processed securely via Stripe, not stored by VoiceLite)
+   - License activation data (device count, activation timestamps)
+
+c) DEVICE FINGERPRINTING (Pro Tier Only):
+   - Device fingerprints are generated using: CPU ID + Machine GUID (both values hashed using SHA-256)
+   - Used solely for license activation and device limit enforcement (3 devices per Pro license)
+   - Fingerprints are stored in encrypted form on VoiceLite servers
+   - Cannot be reverse-engineered to identify individual users or machines
+
+d) ANALYTICS DATA (Opt-In Only):
+   - VoiceLite includes privacy-first analytics that require explicit user consent
+   - You will see a consent dialog on first launch - analytics are DISABLED by default
+   - Anonymous User ID: SHA-256 hash of (Machine ID + Timestamp) - irreversible, no PII
+   - Events tracked (if you opt in):
+     * APP_LAUNCHED: App starts (tier, version, OS version)
+     * TRANSCRIPTION_COMPLETED: Aggregated daily counts (total words, model used, no content)
+     * MODEL_CHANGED: Model switches (old model → new model)
+     * SETTINGS_CHANGED: Setting name only (no values)
+     * ERROR_OCCURRED: Error types for debugging (no stack traces, no file paths)
+     * PRO_UPGRADE: Pro tier activation events
+   - What is NOT collected:
+     * No recording content or transcription text
+     * No file paths or directory structures
+     * No IP addresses (backend does not log IPs)
+     * No personally identifiable information (PII)
+     * No sensitive user data
+   - You can disable analytics anytime in Settings
+   - Analytics failures never break app functionality (silent failures)
+   - Data retention: 2 years, then automatically deleted
+
+e) CRASH REPORTS:
+   - Error logs are stored locally in %LOCALAPPDATA%\VoiceLite\logs\
+   - Logs are NEVER automatically uploaded
+   - You may voluntarily submit logs for support via contact@voicelite.app
+
+For full privacy details, see our Privacy Policy at: https://voicelite.app/privacy
+
+6. INTERNET CONNECTION
+
+- FREE TIER: No internet connection required (100% offline operation)
+- PRO TIER: Internet required only for:
+  * Initial license activation (one-time per device)
+  * License validation checks (periodic, with 7-day grace period)
+  * Downloading premium AI models
+  * Optional analytics event submission (if opted in)
+
+Once activated, Pro tier operates offline with a 7-day grace period before re-validation.
+
+7. REFUNDS
+
+a) QUARTERLY SUBSCRIPTIONS ($20/3mo):
+   - 14-day money-back guarantee from initial purchase date
+   - Refunds processed via original payment method within 7 business days
+   - Cancellations do not provide refunds; service continues until end of billing period
+
+b) LIFETIME LICENSES ($99 one-time):
+   - 30-day money-back guarantee from purchase date
+   - No refunds after 30 days or if license has been activated on 3+ devices
+   - Refunds processed via original payment method within 7 business days
+
+c) PRO MODEL PROMOTION (Free Tier):
+   - No refunds applicable (free service)
+   - VoiceLite reserves the right to change free tier model in future updates
+
+To request a refund, contact: contact@voicelite.app with your license key and reason.
+
+8. TERMINATION
+
+a) BY YOU: You may uninstall the Software at any time. Pro subscriptions can be canceled via customer portal.
+
+b) BY VOICELITE: We may terminate your license if you:
+   - Violate this EULA
+   - Engage in fraudulent activity
+   - Abuse the Software or backend services
+   - Chargeback a legitimate payment
+
+Upon termination:
+- Your license will be revoked immediately
+- You must uninstall the Software
+- No refunds will be issued for violations
+
+9. WARRANTY DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. VOICELITE DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO:
+
+- Merchantability
+- Fitness for a particular purpose
+- Non-infringement
+- Accuracy of transcriptions
+- Uninterrupted or error-free operation
+
+VOICELITE DOES NOT GUARANTEE 100% TRANSCRIPTION ACCURACY. Accuracy varies based on:
+- Audio quality
+- Speaker accent and clarity
+- Background noise
+- AI model used
+- Language and terminology
+
+10. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, VOICELITE SHALL NOT BE LIABLE FOR:
+
+- Indirect, incidental, special, or consequential damages
+- Loss of profits, data, or business opportunities
+- Damages arising from use or inability to use the Software
+- Damages exceeding the amount you paid for the Software in the last 12 months
+
+Some jurisdictions do not allow limitation of liability, so this may not apply to you.
+
+11. THIRD-PARTY COMPONENTS
+
+VoiceLite includes the following third-party components:
+
+a) OpenAI Whisper (MIT License): AI model for speech recognition
+b) NAudio (MIT License): Audio recording and processing library
+c) NAudio.Vorbis (MIT License): OGG audio file support
+d) H.InputSimulator (MIT License): Keyboard/mouse simulation
+e) Hardcodet.NotifyIcon.Wpf (CPOL License): System tray integration
+f) BouncyCastle.Cryptography (MIT License): Cryptographic operations for license signing
+g) System.Text.Json (MIT License): JSON serialization
+h) System.Management (MIT License): System information retrieval
+
+Full license texts for these components are available in the Software's installation directory or at: https://github.com/mikha08-rgb/VoiceLite
+
+12. DATA RETENTION
+
+VoiceLite retains different types of data for varying periods:
+
+a) VOICE RECORDINGS: Deleted immediately after transcription (never stored beyond processing)
+b) TRANSCRIPTION HISTORY: Stored locally on your device only (you control retention in settings)
+c) SUBSCRIPTION DATA: Retained for 7 years after account closure (tax/legal compliance)
+d) ANALYTICS DATA: Retained for 2 years, then automatically deleted (if opted in)
+e) ERROR LOGS: Stored locally indefinitely until you delete %LOCALAPPDATA%\VoiceLite\logs\
+
+You may request deletion of server-side data by contacting: contact@voicelite.app
+
+13. UPDATES AND MODIFICATIONS
+
+VoiceLite may update the Software to:
+- Fix bugs and security vulnerabilities
+- Improve performance
+- Add new features
+- Update AI models
+
+Updates may be installed automatically. You may disable auto-updates in settings, but this may impact security and functionality.
+
+We reserve the right to modify this EULA with 30 days notice via email or in-app notification.
+
+14. EXPORT COMPLIANCE
+
+You agree to comply with all applicable export and import laws. You may not use or export the Software in violation of U.S. export laws and regulations.
+
+15. GOVERNING LAW
+
+This EULA is governed by the laws of the State of Illinois, United States of America, without regard to conflict of law principles. Any disputes shall be resolved in the courts of Illinois.
+
+16. CONTACT INFORMATION
+
+For questions about this EULA, contact:
+
+Email: contact@voicelite.app
+Website: https://voicelite.app
+GitHub: https://github.com/mikha08-rgb/VoiceLite
+
+17. ENTIRE AGREEMENT
+
+This EULA constitutes the entire agreement between you and VoiceLite regarding the Software and supersedes all prior agreements.
+
+---
+
+MIT LICENSE (for VoiceLite source code)
+
+Copyright (c) 2025 VoiceLite
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+BY USING VOICELITE, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS EULA, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS.
