@@ -485,7 +485,7 @@ If GitHub Actions is unavailable:
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
-- Current installer: `VoiceLite-Setup-1.0.26.exe`
+- Current installer: `VoiceLite-Setup-1.0.27.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -528,12 +528,34 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.26 (current release)
+- **Desktop App**: v1.0.27 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.26 (Current Desktop Release)
+### v1.0.27 (Current Desktop Release)
+- **🚀 Whisper Server Mode (Experimental)**: 5x faster transcription via persistent HTTP server
+  - New WhisperServerService keeps model in memory, eliminating 2-second reload overhead
+  - Opt-in via Settings → Advanced → "Enable Whisper Server Mode"
+  - Graceful fallback to process mode if server fails
+  - Performance: ~2.5s → ~0.5s per transcription
+- **📜 Legal Updates**: Comprehensive dual-license EULA v2
+  - Clear separation: MIT License for source code, EULA for binaries/Pro features
+  - Updated Privacy Policy (GDPR/CCPA compliant)
+  - Updated Terms of Service
+- **🐛 Critical Bug Fixes**:
+  - Fixed temp directory deletion causing "stuck in processing" hang
+  - Fixed SoundService disposal race condition (test flakiness eliminated)
+  - Fixed all compiler warnings (3 → 0, clean build)
+- **⚡ Performance Improvements**:
+  - Optimized filler word removal (5-10x faster via combined regex)
+  - Reduced integrity check log spam by 95% (one warning per session)
+- **🏗️ Code Quality**:
+  - Added #region organization to MainWindow.xaml.cs (2183 lines → navigable sections)
+  - All 262 tests passing (100% pass rate)
+  - Zero build warnings, zero errors
+
+### v1.0.26
 - **Codebase Cleanup**: Autonomous cleanup using 4 specialized agents (dead-code-cleaner, unused-dependency-finder, test-file-cleanup, code-duplication-detector)
 - **Disk Space**: Removed 14+ MB of test artifacts (TestResults/ directories with coverage reports)
 - **Code Quality**: Deleted backup files (.bak), removed commented code in StartupDiagnostics.cs
