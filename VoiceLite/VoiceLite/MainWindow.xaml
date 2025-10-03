@@ -284,7 +284,7 @@
                         FontSize="13"
                         Cursor="Hand"
                         Click="DictionaryButton_Click"
-                        ToolTip="Manage voice shortcuts and custom word replacements"/>
+                        ToolTip="Manage voice shortcuts and custom word replacements (Ctrl+D)"/>
 
                 <Button x:Name="SettingsButton"
                         Grid.Column="2"
@@ -297,7 +297,8 @@
                         FontWeight="SemiBold"
                         FontSize="13"
                         Cursor="Hand"
-                        Click="SettingsButton_Click"/>
+                        Click="SettingsButton_Click"
+                        ToolTip="Open settings (Ctrl+,)"/>
 
                 <!-- Account button removed - access via system tray menu -->
             </Grid>
