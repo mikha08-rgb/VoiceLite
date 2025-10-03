@@ -69,6 +69,32 @@ jobs:
     - name: Build Release
       run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 
+    - name: Download Whisper models
+      shell: pwsh
+      run: |
+        echo "Downloading Whisper models for installer..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
+
+        # Download Small model (Pro - 466MB)
+        $smallModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+        echo "Downloading ggml-small.bin (466MB)..."
+        Invoke-WebRequest -Uri $smallModelUrl -OutFile "VoiceLite/whisper_installer/ggml-small.bin"
+
+        # Download Tiny model (Lite - 75MB)
+        $tinyModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+        echo "Downloading ggml-tiny.bin (75MB)..."
+        Invoke-WebRequest -Uri $tinyModelUrl -OutFile "VoiceLite/whisper_installer/ggml-tiny.bin"
+
+        # Copy whisper.exe to installer directory
+        Copy-Item -Path "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper/whisper.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
+
+        echo "Models downloaded successfully"
+        Get-ChildItem "VoiceLite/whisper_installer" | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
     - name: Download Inno Setup
       shell: pwsh
       run: |
