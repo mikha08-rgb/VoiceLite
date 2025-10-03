@@ -335,7 +335,7 @@ namespace VoiceLite
             {
                 settingsSaveTimer = new System.Windows.Threading.DispatcherTimer
                 {
-                    Interval = TimeSpan.FromMilliseconds(500)
+                    Interval = TimeSpan.FromMilliseconds(TimingConstants.SettingsSaveDebounceMs)
                 };
                 settingsSaveTimer.Tick += (s, e) =>
                 {
@@ -412,6 +412,11 @@ namespace VoiceLite
                 // Use persistent Whisper service for better performance
                 whisperService = new PersistentWhisperService(settings);
 
+                // Initialize services BEFORE coordinator (coordinator needs these references)
+                historyService = new TranscriptionHistoryService(settings);
+                soundService = new SoundService();
+                analyticsService = new AnalyticsService(settings);
+
                 // Initialize recording coordinator (handles recording pipeline)
                 recordingCoordinator = new RecordingCoordinator(
                     audioRecorder,
@@ -437,15 +442,6 @@ namespace VoiceLite
                 // Initialize memory monitoring
                 memoryMonitor = new MemoryMonitor();
                 memoryMonitor.MemoryAlert += OnMemoryAlert;
-
-                // Initialize transcription history service
-                historyService = new TranscriptionHistoryService(settings);
-
-                // Initialize sound service
-                soundService = new SoundService();
-
-                // Initialize analytics service
-                analyticsService = new AnalyticsService(settings);
 
                 // Load and display existing history
                 UpdateHistoryUI();
@@ -596,9 +592,9 @@ namespace VoiceLite
         {
             ErrorLogger.LogDebug($"TestButton_Click: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
-            // Prevent rapid clicking (debounce to 300ms)
+            // Prevent rapid clicking (debounce)
             var now = DateTime.Now;
-            if ((now - lastClickTime).TotalMilliseconds < 300)
+            if ((now - lastClickTime).TotalMilliseconds < TimingConstants.ClickDebounceMs)
             {
                 ErrorLogger.LogDebug("TestButton_Click: Debounced - too rapid clicking");
                 return;
@@ -718,7 +714,7 @@ namespace VoiceLite
             recordingElapsedTimer.Tick += (s, e) =>
             {
                 var elapsed = recordingCoordinator?.GetRecordingDuration() ?? TimeSpan.Zero;
-                UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
+                UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush(StatusColors.Recording));
             };
             recordingElapsedTimer.Start();
 
@@ -755,9 +751,9 @@ namespace VoiceLite
             }
             else
             {
-                UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
+                UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
                 TranscriptionText.Text = "Processing audio...";
-                TranscriptionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
+                TranscriptionText.Foreground = new SolidColorBrush(StatusColors.Processing);
             }
         }
 
@@ -765,9 +761,9 @@ namespace VoiceLite
         {
             ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
-            // Debounce protection - ignore rapid key presses (stronger protection)
+            // Debounce protection - ignore rapid key presses
             var now = DateTime.Now;
-            if ((now - lastHotkeyPressTime).TotalMilliseconds < 250)
+            if ((now - lastHotkeyPressTime).TotalMilliseconds < TimingConstants.HotkeyDebounceMs)
             {
                 ErrorLogger.LogMessage("OnHotkeyPressed: Debounced - too rapid key press");
                 return;
@@ -991,13 +987,13 @@ namespace VoiceLite
                 switch (e.Status)
                 {
                     case "Recording":
-                        UpdateStatus("Recording 0:00", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
-                        this.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+                        UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
+                        this.BorderBrush = new SolidColorBrush(StatusColors.Recording);
                         this.BorderThickness = new Thickness(3);
                         break;
 
                     case "Transcribing":
-                        UpdateStatus("Transcribing...", Brushes.Blue);
+                        UpdateStatus("Transcribing...", new SolidColorBrush(StatusColors.Info));
                         break;
 
                     case "Pasting":
@@ -1005,15 +1001,15 @@ namespace VoiceLite
                         break;
 
                     case "Copied to clipboard":
-                        UpdateStatus("Copied to clipboard", Brushes.Blue);
+                        UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Info));
                         break;
 
                     case "Cancelled":
-                        UpdateStatus("Cancelled", Brushes.Gray);
+                        UpdateStatus("Cancelled", new SolidColorBrush(StatusColors.Inactive));
                         break;
 
                     case "Processing":
-                        UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
+                        UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
                         break;
                 }
             });
@@ -1046,15 +1042,15 @@ namespace VoiceLite
                     }
 
                     // Final UI update
-                    UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                    UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
 
                     // Remove window border when done recording
                     this.BorderThickness = new Thickness(0);
 
-                    // Reset TranscriptionText to ready state after 3 seconds
+                    // Reset TranscriptionText to ready state after delay
                     if (!string.IsNullOrWhiteSpace(e.Transcription))
                     {
-                        Task.Delay(3000).ContinueWith(_ => Dispatcher.Invoke(() =>
+                        Task.Delay(TimingConstants.TranscriptionTextResetDelayMs).ContinueWith(_ => Dispatcher.Invoke(() =>
                         {
                             if (!isRecording) // Only reset if not currently recording again
                             {
@@ -1732,13 +1728,13 @@ namespace VoiceLite
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
 
                     // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
                     timer.Tick += (ts, te) =>
                     {
-                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                     };
                     timer.Start();
@@ -1758,13 +1754,13 @@ namespace VoiceLite
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
 
                     // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
                     timer.Tick += (ts, te) =>
                     {
-                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                     };
                     timer.Start();
@@ -1863,13 +1859,13 @@ namespace VoiceLite
                 try
                 {
                     System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
 
                     // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
                     timer.Tick += (ts, te) =>
                     {
-                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                     };
                     timer.Start();
