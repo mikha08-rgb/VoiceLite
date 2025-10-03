@@ -180,7 +180,7 @@ namespace VoiceLite.Services
 
                 // Check if we can write to AppData
                 var appDataPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "VoiceLite"
                 );
 
@@ -505,7 +505,7 @@ namespace VoiceLite.Services
 
             // Create required directories
             var appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VoiceLite"
             );
 

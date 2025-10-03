@@ -12,7 +12,7 @@ namespace VoiceLite.Services.Auth
     internal static class ApiClient
     {
         private static readonly string AppDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite"
         );
 

@@ -29,6 +29,7 @@ namespace VoiceLite
         private TranscriptionHistoryService? historyService;
         private SoundService? soundService;
         private AnalyticsService? analyticsService;
+        private RecordingCoordinator? recordingCoordinator;
         private DateTime recordingStartTime;
         private Settings settings = new();
         private AuthenticationService authenticationService = new();
@@ -54,7 +55,6 @@ namespace VoiceLite
         private DateTime lastClickTime = DateTime.MinValue;
         private DateTime lastHotkeyPressTime = DateTime.MinValue;
         private System.Timers.Timer? autoTimeoutTimer;
-        private bool isCancelled = false; // Track if recording was cancelled
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
 
@@ -184,7 +184,7 @@ namespace VoiceLite
         private string GetAppDataDirectory()
         {
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VoiceLite");
         }
 
@@ -220,7 +220,38 @@ namespace VoiceLite
 
                 string settingsPath = GetSettingsPath();
 
-                // Try to migrate old settings from Program Files if they exist
+                // MIGRATION 1: Migrate from old Roaming AppData to new Local AppData (privacy fix)
+                string oldRoamingPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "VoiceLite", "settings.json");
+
+                if (!File.Exists(settingsPath) && File.Exists(oldRoamingPath))
+                {
+                    try
+                    {
+                        // Create Local AppData directory if needed
+                        EnsureAppDataDirectoryExists();
+
+                        File.Copy(oldRoamingPath, settingsPath);
+                        ErrorLogger.LogMessage("✅ Migrated settings from Roaming to Local AppData (privacy fix)");
+
+                        // Optionally inform user about the change
+                        MessageBox.Show(
+                            "VoiceLite has moved your settings to Local AppData.\n\n" +
+                            "This ensures your transcription history stays private and doesn't sync to other PCs.\n\n" +
+                            "Old location (Roaming): Synced across PCs\n" +
+                            "New location (Local): Stays on this PC only",
+                            "Privacy Improvement",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    catch (Exception migrationEx)
+                    {
+                        ErrorLogger.LogError("Failed to migrate settings from Roaming to Local AppData", migrationEx);
+                    }
+                }
+
+                // MIGRATION 2: Try to migrate old settings from Program Files if they exist
                 string oldSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
                 if (!File.Exists(settingsPath) && File.Exists(oldSettingsPath))
                 {
@@ -345,10 +376,23 @@ namespace VoiceLite
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
                 }
 
-                audioRecorder.AudioFileReady += OnAudioFileReady;
-
                 // Use persistent Whisper service for better performance
                 whisperService = new PersistentWhisperService(settings);
+
+                // Initialize recording coordinator (handles recording pipeline)
+                recordingCoordinator = new RecordingCoordinator(
+                    audioRecorder,
+                    whisperService,
+                    textInjector,
+                    historyService,
+                    analyticsService,
+                    soundService,
+                    settings);
+
+                // Wire up coordinator events
+                recordingCoordinator.StatusChanged += OnRecordingStatusChanged;
+                recordingCoordinator.TranscriptionCompleted += OnTranscriptionCompleted;
+                recordingCoordinator.ErrorOccurred += OnRecordingError;
 
                 hotkeyManager.HotkeyPressed += OnHotkeyPressed;
                 hotkeyManager.HotkeyReleased += OnHotkeyReleased;
@@ -625,77 +669,28 @@ namespace VoiceLite
                 return;
             }
 
-            try
+            // Set state BEFORE attempting to start (defensive)
+            isRecording = true;
+            recordingStartTime = DateTime.Now;
+
+            // Delegate to coordinator
+            recordingCoordinator?.StartRecording();
+
+            // Start elapsed time timer for UI updates
+            recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
             {
-                // Set state BEFORE attempting to start (defensive)
-                isRecording = true;
-                isCancelled = false; // Reset cancel flag when starting
-                recordingStartTime = DateTime.Now;
-
-                audioRecorder?.StartRecording();
-
-                // Only update UI if we get here successfully
-                UpdateStatus("Recording 0:00", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
-
-                // Add red border for visual recording indicator
-                this.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
-                this.BorderThickness = new Thickness(3);
-
-                // Start elapsed time timer
-                recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(1)
-                };
-                recordingElapsedTimer.Tick += (s, e) =>
-                {
-                    var elapsed = DateTime.Now - recordingStartTime;
-                    UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
-                };
-                recordingElapsedTimer.Start();
-
-                // Update button and text based on mode
-                // Recording started - mode-specific handling in hotkey manager
-
-                UpdateUIForCurrentMode();
-                TranscriptionText.Foreground = Brushes.Gray;
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("No microphone"))
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            recordingElapsedTimer.Tick += (s, e) =>
             {
-                ErrorLogger.LogWarning($"StartRecording failed: No microphone - {ex.Message}");
-                isRecording = false; // Reset on failure
-                UpdateStatus("No microphone!", Brushes.Red);
+                var elapsed = recordingCoordinator?.GetRecordingDuration() ?? TimeSpan.Zero;
+                UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
+            };
+            recordingElapsedTimer.Start();
 
-                // Reset TranscriptionText to ready state
-                UpdateUIForCurrentMode();
-                TranscriptionText.Foreground = Brushes.Black;
-
-                MessageBox.Show(ex.Message, "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("Failed to access"))
-            {
-                ErrorLogger.LogWarning($"StartRecording failed: Microphone busy - {ex.Message}");
-                isRecording = false; // Reset on failure
-                UpdateStatus("Microphone busy", Brushes.Red);
-
-                // Reset TranscriptionText to ready state
-                UpdateUIForCurrentMode();
-                TranscriptionText.Foreground = Brushes.Black;
-
-                MessageBox.Show(ex.Message, "Microphone Access Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("StartRecording failed", ex);
-                isRecording = false; // Reset on failure
-                UpdateStatus("Error", Brushes.Red);
-
-                // Reset TranscriptionText to ready state
-                UpdateUIForCurrentMode();
-                TranscriptionText.Foreground = Brushes.Black;
-
-                MessageBox.Show($"Failed to start recording: {ex.Message}",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // Update UI
+            UpdateUIForCurrentMode();
+            TranscriptionText.Foreground = Brushes.Gray;
         }
 
         private void StopRecording(bool cancel = false)
@@ -709,42 +704,26 @@ namespace VoiceLite
                 return;
             }
 
-            try
+            // Stop elapsed time timer
+            recordingElapsedTimer?.Stop();
+            recordingElapsedTimer = null;
+
+            // Delegate to coordinator
+            recordingCoordinator?.StopRecording(cancel);
+
+            isRecording = false;
+
+            // Update UI immediately
+            if (cancel)
             {
-                if (cancel)
-                {
-                    isCancelled = true;
-                    ErrorLogger.LogInfo("Recording cancelled by user");
-                }
-
-                audioRecorder?.StopRecording();
-                isRecording = false;
-
-                if (cancel)
-                {
-                    UpdateStatus("Cancelled", Brushes.Gray);
-                    UpdateUIForCurrentMode();
-                }
-                else
-                {
-                    UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
-
-                    // Reset TranscriptionText to show processing state
-                    TranscriptionText.Text = "Processing audio...";
-                    TranscriptionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
-                }
+                UpdateStatus("Cancelled", Brushes.Gray);
+                UpdateUIForCurrentMode();
             }
-            catch (Exception ex)
+            else
             {
-                ErrorLogger.LogError("StopRecording failed", ex);
-                // Even if stop fails, reset our state
-                isRecording = false;
-                UpdateStatus("Error stopping", Brushes.Red);
-
-                // Reset UI to ready state on error
-                string hotkeyDisplay = GetHotkeyDisplayString();
-                TranscriptionText.Text = $"Ready! Press and hold {hotkeyDisplay} to record, release to transcribe and type.";
-                TranscriptionText.Foreground = Brushes.Black;
+                UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
+                TranscriptionText.Text = "Processing audio...";
+                TranscriptionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
             }
         }
 
@@ -820,10 +799,7 @@ namespace VoiceLite
                 isHotkeyMode = true;
 
                 // Audio feedback for push-to-talk start
-                if (settings.PlaySoundFeedback)
-                {
-                    soundService?.PlaySound();
-                }
+                recordingCoordinator?.PlaySoundFeedback();
 
                 StartRecording();
             }
@@ -856,10 +832,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandlePushToTalkReleased: Stopping recording");
 
                 // Audio feedback for push-to-talk stop
-                if (settings.PlaySoundFeedback)
-                {
-                    soundService?.PlaySound();
-                }
+                recordingCoordinator?.PlaySoundFeedback();
 
                 StopRecording(false);
                 isHotkeyMode = false;
@@ -902,10 +875,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE ON - Starting continuous recording");
 
                 // Audio feedback for toggle start
-                if (settings.PlaySoundFeedback)
-                {
-                    soundService?.PlaySound();
-                }
+                recordingCoordinator?.PlaySoundFeedback();
 
                 StartRecording();
                 StartAutoTimeoutTimer();
@@ -916,10 +886,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE OFF - Stopping recording");
 
                 // Audio feedback for toggle stop
-                if (settings.PlaySoundFeedback)
-                {
-                    soundService?.PlaySound();
-                }
+                recordingCoordinator?.PlaySoundFeedback();
 
                 StopRecording(false);
                 StopAutoTimeoutTimer();
@@ -967,10 +934,7 @@ namespace VoiceLite
                         UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
 
                         // Audio feedback for timeout
-                        if (settings.PlaySoundFeedback)
-                        {
-                            soundService?.PlaySound();
-                        }
+                        recordingCoordinator?.PlaySoundFeedback();
 
                         StopRecording(false);
                         StopAutoTimeoutTimer();
@@ -983,297 +947,162 @@ namespace VoiceLite
             });
         }
 
-        private async void OnAudioFileReady(object? sender, string audioFilePath)
+        /// <summary>
+        /// Handle recording status changes from coordinator
+        /// </summary>
+        private void OnRecordingStatusChanged(object? sender, RecordingStatusEventArgs e)
         {
-            ErrorLogger.LogMessage($"OnAudioFileReady: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}, isCancelled={isCancelled}, file={audioFilePath}");
-
-            // Track usage for free users
+            Dispatcher.Invoke(() =>
             {
-                var duration = (DateTime.Now - recordingStartTime).TotalSeconds;
-
-                // Update status to show remaining time
-            }
-
-            // If recording was cancelled, just clean up and return
-            if (isCancelled)
-            {
-                ErrorLogger.LogMessage("OnAudioFileReady: Recording was cancelled, skipping transcription");
-                isCancelled = false; // Reset flag
-
-                // Clean up the audio file
-                // Retry file deletion with delay to handle file locks
-                _ = Task.Run(async () =>
+                switch (e.Status)
                 {
-                    for (int i = 0; i < 3; i++)
-                    {
-                        try
-                        {
-                            if (File.Exists(audioFilePath))
-                            {
-                                File.Delete(audioFilePath);
-                                break;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            if (i == 2) // Last attempt
-                                ErrorLogger.LogError("OnAudioFileReady.DeleteCancelledAudio", ex);
-                            await Task.Delay(100); // Wait before retry
-                        }
-                    }
-                });
+                    case "Recording":
+                        UpdateStatus("Recording 0:00", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C")));
+                        this.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+                        this.BorderThickness = new Thickness(3);
+                        break;
 
-                return;
-            }
+                    case "Transcribing":
+                        UpdateStatus("Transcribing...", Brushes.Blue);
+                        break;
 
-            string workingAudioPath = audioFilePath;
-            bool createdCopy = false;
+                    case "Pasting":
+                        UpdateStatus("Pasting...", Brushes.Purple);
+                        break;
 
-            try
-            {
-                if (File.Exists(audioFilePath))
-                {
-                    var audioDirectory = Path.GetDirectoryName(audioFilePath);
-                    if (!string.IsNullOrEmpty(audioDirectory))
-                    {
-                        var uniqueFileName = $"audio_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.wav";
-                        var tempCopyPath = Path.Combine(audioDirectory, uniqueFileName);
-                        File.Copy(audioFilePath, tempCopyPath);
-                        workingAudioPath = tempCopyPath;
-                        createdCopy = true;
-                        ErrorLogger.LogMessage($"OnAudioFileReady: Using isolated copy {workingAudioPath}");
-                    }
+                    case "Copied to clipboard":
+                        UpdateStatus("Copied to clipboard", Brushes.Blue);
+                        break;
+
+                    case "Cancelled":
+                        UpdateStatus("Cancelled", Brushes.Gray);
+                        break;
+
+                    case "Processing":
+                        UpdateStatus("Processing...", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")));
+                        break;
                 }
-            }
-            catch (Exception copyEx)
+            });
+        }
+
+        /// <summary>
+        /// Handle transcription completion from coordinator
+        /// </summary>
+        private void OnTranscriptionCompleted(object? sender, TranscriptionCompleteEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
             {
-                ErrorLogger.LogError("OnAudioFileReady.CopyAudio", copyEx);
-                workingAudioPath = audioFilePath;
-            }
-
-            // Stop elapsed time timer
-            recordingElapsedTimer?.Stop();
-            recordingElapsedTimer = null;
-
-            // Update UI immediately on UI thread
-            Dispatcher.Invoke(() => UpdateStatus("Transcribing...", Brushes.Blue));
-
-            try
-            {
-                if (whisperService != null)
+                if (e.Success)
                 {
-                    // Run transcription on background thread
-                    var transcription = await Task.Run(async () =>
-                        await whisperService.TranscribeAsync(workingAudioPath));
-
-                    ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
-
-                    // Track analytics for successful transcription
-                    if (!string.IsNullOrWhiteSpace(transcription) && analyticsService != null)
+                    // Display transcription result
+                    if (!string.IsNullOrWhiteSpace(e.Transcription))
                     {
-                        var wordCount = transcription.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
-                        _ = analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount);
+                        TranscriptionText.Text = e.Transcription;
+                        TranscriptionText.Foreground = Brushes.Black;
+
+                        // Update history UI
+                        UpdateHistoryUI();
+                        SaveSettings(); // Persist history to disk
+                    }
+                    else
+                    {
+                        TranscriptionText.Text = "(No speech detected)";
+                        TranscriptionText.Foreground = Brushes.Gray;
                     }
 
-                    // Update UI on UI thread after transcription completes
-                    await Dispatcher.InvokeAsync(() =>
+                    // Final UI update
+                    UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
+
+                    // Remove window border when done recording
+                    this.BorderThickness = new Thickness(0);
+
+                    // Reset TranscriptionText to ready state after 3 seconds
+                    if (!string.IsNullOrWhiteSpace(e.Transcription))
                     {
-                        if (!string.IsNullOrWhiteSpace(transcription))
+                        Task.Delay(3000).ContinueWith(_ => Dispatcher.Invoke(() =>
                         {
-                            TranscriptionText.Text = transcription;
-                            TranscriptionText.Foreground = Brushes.Black;
-
-                            // Add to history
-                            var historyItem = new TranscriptionHistoryItem
+                            if (!isRecording) // Only reset if not currently recording again
                             {
-                                Timestamp = DateTime.Now,
-                                Text = transcription,
-                                WordCount = transcription.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length,
-                                DurationSeconds = (DateTime.Now - recordingStartTime).TotalSeconds,
-                                ModelUsed = settings.WhisperModel
-                            };
+                                UpdateUIForCurrentMode();
+                            }
+                        }));
+                    }
 
-                            historyService?.AddToHistory(historyItem);
-                            UpdateHistoryUI(); // Refresh the history panel
-                            SaveSettings(); // Persist history to disk
+                    // Reset state if needed
+                    lock (recordingLock)
+                    {
+                        // In push-to-talk mode, only reset if the key is not currently held down
+                        if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
+                        {
+                            ErrorLogger.LogMessage("OnTranscriptionCompleted: Push-to-talk mode - keeping state (key still held)");
                         }
                         else
                         {
-                            TranscriptionText.Text = "(No speech detected)";
-                            TranscriptionText.Foreground = Brushes.Gray;
+                            ErrorLogger.LogMessage($"OnTranscriptionCompleted: Resetting state");
+                            isRecording = false;
+                            isHotkeyMode = false;
+                            StopAutoTimeoutTimer();
                         }
-                    });
-
-                    // Handle text injection on background thread if we have text
-                    if (!string.IsNullOrWhiteSpace(transcription) && textInjector != null)
-                    {
-                        textInjector.AutoPaste = settings.AutoPaste;
-
-                        if (settings.AutoPaste)
-                        {
-                            ErrorLogger.LogMessage("Auto-pasting text via Ctrl+V simulation");
-                            Dispatcher.Invoke(() => UpdateStatus("Pasting...", Brushes.Purple));
-                        }
-                        else
-                        {
-                            ErrorLogger.LogMessage("Copying text to clipboard (manual paste required)");
-                            Dispatcher.Invoke(() => UpdateStatus("Copied to clipboard", Brushes.Blue));
-                        }
-
-                        // Run text injection on background thread
-                        await Task.Run(() => textInjector.InjectText(transcription));
                     }
-                    else if (textInjector == null)
-                    {
-                        ErrorLogger.LogMessage("TextInjector is null, cannot inject text");
-                    }
-
-                    // Final UI update with thread-safe state reset
-                    Dispatcher.Invoke(() =>
-                    {
-                        ErrorLogger.LogMessage($"OnAudioFileReady: Final UI update - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#27AE60")));
-
-                        // Remove window border when done recording
-                        this.BorderThickness = new Thickness(0);
-
-                        // Reset TranscriptionText to ready state after successful completion
-                        string hotkeyDisplay = GetHotkeyDisplayString();
-                        if (!string.IsNullOrWhiteSpace(transcription)) // Only schedule reset if we actually have transcription to show
-                        {
-                            Task.Delay(3000).ContinueWith(_ => Dispatcher.Invoke(() =>
-                            {
-                                if (!isRecording) // Only reset if not currently recording again
-                                {
-                                    UpdateUIForCurrentMode();
-                                }
-                            }));
-                        }
-
-                        // Only reset state if we're not currently in an active recording session
-                        lock (recordingLock)
-                        {
-                            // In push-to-talk mode, only reset if the key is not currently held down
-                            // In toggle mode, the recording should already be stopped by user action
-                            if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
-                            {
-                                ErrorLogger.LogMessage("OnAudioFileReady: Push-to-talk mode - keeping state (key still held)");
-                                // Don't reset state - user is still holding the key
-                            }
-                            else
-                            {
-                                ErrorLogger.LogMessage($"OnAudioFileReady: Resetting state - isRecording from {isRecording} to false, isHotkeyMode from {isHotkeyMode} to false");
-                                isRecording = false;
-                                isHotkeyMode = false;
-                                StopAutoTimeoutTimer();
-                            }
-                        }
-                        ErrorLogger.LogMessage($"OnAudioFileReady: After state reset - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                    });
                 }
                 else
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        TranscriptionText.Text = "Whisper service not initialized";
-                        TranscriptionText.Foreground = Brushes.Red;
-                        UpdateStatus("Error", Brushes.Red);
-
-                        // Reset to ready state after error
-                        Task.Delay(3000).ContinueWith(_ => Dispatcher.Invoke(() =>
-                        {
-                            if (!isRecording)
-                            {
-                                UpdateUIForCurrentMode();
-                                UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
-                            }
-                        }));
-
-                        // Reset state when whisper service is null, but respect push-to-talk mode
-                        lock (recordingLock)
-                        {
-                            if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
-                            {
-                                ErrorLogger.LogMessage("OnAudioFileReady: Whisper null - keeping push-to-talk state (key still held)");
-                            }
-                            else
-                            {
-                                ErrorLogger.LogMessage($"OnAudioFileReady: Whisper null - resetting state - isRecording from {isRecording} to false, isHotkeyMode from {isHotkeyMode} to false");
-                                isRecording = false;
-                                isHotkeyMode = false;
-                            }
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("OnAudioFileReady", ex);
-                ErrorLogger.LogMessage($"OnAudioFileReady: Exception - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                Dispatcher.Invoke(() =>
-                {
-                    TranscriptionText.Text = $"Transcription error: {ex.Message}";
+                    // Handle error
+                    TranscriptionText.Text = e.ErrorMessage ?? "Transcription error";
                     TranscriptionText.Foreground = Brushes.Red;
                     UpdateStatus("Error", Brushes.Red);
 
-                    // Reset to ready state after error
+                    // Reset to ready state after 3 seconds
                     Task.Delay(3000).ContinueWith(_ =>
                     {
-                        try { Dispatcher.Invoke(() =>
+                        try
                         {
-                            if (!isRecording)
+                            Dispatcher.Invoke(() =>
                             {
-                                UpdateUIForCurrentMode();
-                                UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
-                            }
-                        }); } catch { /* Dispatcher might be shut down */ }
+                                if (!isRecording)
+                                {
+                                    UpdateUIForCurrentMode();
+                                    UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
+                                }
+                            });
+                        }
+                        catch { /* Dispatcher might be shut down */ }
                     });
 
-                    // Reset state on error, but respect push-to-talk mode
+                    // Reset state on error
                     lock (recordingLock)
                     {
                         if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
                         {
-                            ErrorLogger.LogMessage("OnAudioFileReady: Exception - keeping push-to-talk state (key still held)");
+                            ErrorLogger.LogMessage("OnTranscriptionCompleted: Error - keeping push-to-talk state (key still held)");
                         }
                         else
                         {
-                            ErrorLogger.LogMessage($"OnAudioFileReady: Exception - resetting state - isRecording from {isRecording} to false, isHotkeyMode from {isHotkeyMode} to false");
+                            ErrorLogger.LogMessage($"OnTranscriptionCompleted: Error - resetting state");
                             isRecording = false;
                             isHotkeyMode = false;
                         }
                     }
-                });
-            }
-            finally
-            {
-                if (createdCopy && workingAudioPath != audioFilePath)
-                {
-                    // Retry file deletion with delay to handle file locks
-                    _ = Task.Run(async () =>
-                    {
-                        for (int i = 0; i < 3; i++)
-                        {
-                            try
-                            {
-                                await Task.Delay(50); // Small delay to ensure file is released
-                                File.Delete(workingAudioPath);
-                                ErrorLogger.LogMessage($"OnAudioFileReady: Deleted isolated copy {workingAudioPath}");
-                                break;
-                            }
-                            catch (Exception deleteEx)
-                            {
-                                if (i == 2) // Last attempt
-                                    ErrorLogger.LogError("OnAudioFileReady.CleanupTempAudio", deleteEx);
-                                await Task.Delay(100); // Wait before retry
-                            }
-                        }
-                    });
                 }
-            }
-
-            ErrorLogger.LogMessage($"OnAudioFileReady: Exit - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            });
         }
+
+        /// <summary>
+        /// Handle recording errors from coordinator
+        /// </summary>
+        private void OnRecordingError(object? sender, string errorMessage)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                isRecording = false;
+                UpdateStatus("Error", Brushes.Red);
+                UpdateUIForCurrentMode();
+                TranscriptionText.Foreground = Brushes.Black;
+
+                MessageBox.Show(errorMessage, "Recording Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            });
+        }
+
         private void Window_StateChanged(object sender, EventArgs e)
         {
             if (WindowState == WindowState.Minimized)
@@ -1677,6 +1506,9 @@ namespace VoiceLite
 
                 hotkeyManager?.Dispose();
                 hotkeyManager = null;
+
+                recordingCoordinator?.Dispose();
+                recordingCoordinator = null;
 
                 whisperService?.Dispose();
                 whisperService = null;
