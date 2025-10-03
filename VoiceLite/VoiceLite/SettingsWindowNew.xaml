@@ -33,11 +33,7 @@
                     BorderThickness="0"
                     Background="White">
             <TabControl.Resources>
-                <Style TargetType="TabItem">
-                    <Setter Property="Padding" Value="15,8"/>
-                    <Setter Property="FontSize" Value="13"/>
-                    <Setter Property="Cursor" Value="Hand"/>
-                </Style>
+                <Style TargetType="TabItem" BasedOn="{StaticResource ModernSettingsTabStyle}"/>
             </TabControl.Resources>
 
             <!-- General Settings Tab -->
