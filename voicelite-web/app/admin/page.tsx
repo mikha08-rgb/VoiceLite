@@ -211,9 +211,17 @@ export default function AdminDashboard() {
 
         {/* Recent Activity */}
         <div className="rounded-2xl border border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-900">
-          <h3 className="mb-4 text-lg font-bold text-stone-900 dark:text-stone-50">
-            Activity Breakdown (Last 30 Days)
-          </h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-stone-900 dark:text-stone-50">
+              Activity Breakdown (Last 30 Days)
+            </h3>
+            <Link
+              href="/admin/analytics"
+              className="rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+            >
+              View Analytics Dashboard
+            </Link>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(stats.activity.breakdown).map(([activityType, count]) => (
               <div
