@@ -572,6 +572,13 @@ namespace VoiceLite.Services
         {
             try
             {
+                // Ensure temp directory exists (Windows temp cleanup might delete it while app is running)
+                if (!Directory.Exists(tempDirectory))
+                {
+                    ErrorLogger.LogMessage($"SaveMemoryBufferToTempFile: Temp directory was deleted, recreating: {tempDirectory}");
+                    Directory.CreateDirectory(tempDirectory);
+                }
+
                 string guidPart = Guid.NewGuid().ToString("N")[..8];
                 currentAudioFilePath = Path.Combine(tempDirectory, $"recording_{DateTime.Now:yyyyMMddHHmmssfff}_{guidPart}.wav");
 
