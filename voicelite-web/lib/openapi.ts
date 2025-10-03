@@ -135,7 +135,7 @@ const AnalyticsEventSchema = registry.register(
     appVersion: z.string().optional().describe('App version (e.g., "1.0.19")'),
     osVersion: z.string().optional().describe('OS version (e.g., "Windows 10")'),
     modelUsed: z.string().optional().describe('Whisper model used (e.g., "ggml-small.bin")'),
-    metadata: z.record(z.unknown()).optional().describe('Additional event metadata'),
+    metadata: z.record(z.string(), z.unknown()).optional().describe('Additional event metadata'),
   })
 );
 
@@ -149,10 +149,10 @@ const AdminAnalyticsResponseSchema = registry.register(
       dau_mau_ratio: z.string(),
     }),
     events: z.object({
-      byType: z.record(z.number()),
+      byType: z.record(z.string(), z.number()),
     }),
     users: z.object({
-      tierDistribution: z.record(z.number()),
+      tierDistribution: z.record(z.string(), z.number()),
     }),
     versions: z.object({
       distribution: z.array(

@@ -185,7 +185,7 @@ export function validateEnvironment() {
     }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      error.errors.forEach((err) => {
+      error.issues.forEach((err) => {
         const path = err.path.join('.');
         errors.push(`${path}: ${err.message}`);
       });

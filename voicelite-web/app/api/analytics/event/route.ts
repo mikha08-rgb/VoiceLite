@@ -28,7 +28,7 @@ const analyticsEventSchema = z.object({
   appVersion: z.string().max(20).optional(),
   osVersion: z.string().max(50).optional(),
   modelUsed: z.string().max(50).optional(),
-  metadata: z.record(z.any()).optional(), // JSON object
+  metadata: z.record(z.string(), z.any()).optional(), // JSON object
 });
 
 export async function POST(req: NextRequest) {
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: 'Invalid request body',
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );
