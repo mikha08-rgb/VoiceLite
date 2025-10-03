@@ -44,7 +44,7 @@ namespace VoiceLite.Tests.Services
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void InjectText_WithNullOrWhitespace_DoesNotThrow(string text)
+        public void InjectText_WithNullOrWhitespace_DoesNotThrow(string? text)
         {
             // Arrange
             var injector = new TextInjector(_settings);
