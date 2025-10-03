@@ -113,7 +113,7 @@ namespace VoiceLite.Services
                 "small" => "ggml-small.bin",
                 "medium" => "ggml-medium.bin",
                 "large" => "ggml-large-v3.bin",
-                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
+                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
             };
 
             // Check standard model locations
@@ -125,22 +125,12 @@ namespace VoiceLite.Services
             if (File.Exists(modelPath))
                 return modelPath;
 
-            // Fallback: if requested model not found, try Small (current free tier) then Tiny (legacy fallback)
-            var smallPath = Path.Combine(baseDir, "whisper", "ggml-small.bin");
-            if (File.Exists(smallPath))
-            {
-                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-small.bin (Free tier default)");
-                return smallPath;
-            }
-
-            var tinyPath = Path.Combine(baseDir, "whisper", "ggml-tiny.bin");
-            if (File.Exists(tinyPath))
-            {
-                ErrorLogger.LogMessage($"Model {modelFile} not found, falling back to ggml-tiny.bin (Legacy free tier)");
-                return tinyPath;
-            }
-
-            throw new FileNotFoundException($"Model {modelFile} not found. Searched in: {Path.Combine(baseDir, "whisper")} and {baseDir}");
+            // No fallback - fail fast with clear error message
+            // Exception is caught by MainWindow and shown to user with reinstall instructions
+            throw new FileNotFoundException(
+                $"Whisper model '{modelFile}' not found.\n\n" +
+                $"Please reinstall VoiceLite to restore missing files.\n\n" +
+                $"Expected location: {modelPath}");
         }
 
         private void CreateDummyAudioFile()
