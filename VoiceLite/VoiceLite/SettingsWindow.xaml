@@ -149,32 +149,113 @@
                                   Margin="0,0,0,5"
                                   SelectedValuePath="Tag"
                                   SelectionChanged="LanguageComboBox_SelectionChanged">
-                            <!-- Top 20 most requested languages -->
+                            <!-- Auto-detect (Whisper AI chooses language) -->
+                            <ComboBoxItem Content="🌐 Auto-detect" Tag="auto"/>
+
+                            <!-- Most Popular Languages (Top 10) -->
                             <ComboBoxItem Content="English" Tag="en" IsSelected="True"/>
                             <ComboBoxItem Content="Spanish (Español)" Tag="es"/>
+                            <ComboBoxItem Content="Chinese (中文)" Tag="zh"/>
                             <ComboBoxItem Content="French (Français)" Tag="fr"/>
                             <ComboBoxItem Content="German (Deutsch)" Tag="de"/>
-                            <ComboBoxItem Content="Italian (Italiano)" Tag="it"/>
-                            <ComboBoxItem Content="Portuguese (Português)" Tag="pt"/>
-                            <ComboBoxItem Content="Chinese (中文)" Tag="zh"/>
                             <ComboBoxItem Content="Japanese (日本語)" Tag="ja"/>
-                            <ComboBoxItem Content="Korean (한국어)" Tag="ko"/>
+                            <ComboBoxItem Content="Portuguese (Português)" Tag="pt"/>
                             <ComboBoxItem Content="Russian (Русский)" Tag="ru"/>
+                            <ComboBoxItem Content="Italian (Italiano)" Tag="it"/>
                             <ComboBoxItem Content="Arabic (العربية)" Tag="ar"/>
+
+                            <!-- European Languages (A-Z) -->
+                            <ComboBoxItem Content="Albanian (Shqip)" Tag="sq"/>
+                            <ComboBoxItem Content="Basque (Euskara)" Tag="eu"/>
+                            <ComboBoxItem Content="Belarusian (Беларуская)" Tag="be"/>
+                            <ComboBoxItem Content="Bosnian (Bosanski)" Tag="bs"/>
+                            <ComboBoxItem Content="Bulgarian (Български)" Tag="bg"/>
+                            <ComboBoxItem Content="Catalan (Català)" Tag="ca"/>
+                            <ComboBoxItem Content="Croatian (Hrvatski)" Tag="hr"/>
+                            <ComboBoxItem Content="Czech (Čeština)" Tag="cs"/>
+                            <ComboBoxItem Content="Danish (Dansk)" Tag="da"/>
                             <ComboBoxItem Content="Dutch (Nederlands)" Tag="nl"/>
-                            <ComboBoxItem Content="Polish (Polski)" Tag="pl"/>
-                            <ComboBoxItem Content="Turkish (Türkçe)" Tag="tr"/>
-                            <ComboBoxItem Content="Hindi (हिन्दी)" Tag="hi"/>
-                            <ComboBoxItem Content="Swedish (Svenska)" Tag="sv"/>
-                            <ComboBoxItem Content="Indonesian (Bahasa Indonesia)" Tag="id"/>
+                            <ComboBoxItem Content="Estonian (Eesti)" Tag="et"/>
                             <ComboBoxItem Content="Finnish (Suomi)" Tag="fi"/>
-                            <ComboBoxItem Content="Vietnamese (Tiếng Việt)" Tag="vi"/>
+                            <ComboBoxItem Content="Galician (Galego)" Tag="gl"/>
+                            <ComboBoxItem Content="Greek (Ελληνικά)" Tag="el"/>
+                            <ComboBoxItem Content="Hungarian (Magyar)" Tag="hu"/>
+                            <ComboBoxItem Content="Icelandic (Íslenska)" Tag="is"/>
+                            <ComboBoxItem Content="Irish (Gaeilge)" Tag="ga"/>
+                            <ComboBoxItem Content="Latvian (Latviešu)" Tag="lv"/>
+                            <ComboBoxItem Content="Lithuanian (Lietuvių)" Tag="lt"/>
+                            <ComboBoxItem Content="Macedonian (Македонски)" Tag="mk"/>
+                            <ComboBoxItem Content="Maltese (Malti)" Tag="mt"/>
+                            <ComboBoxItem Content="Norwegian (Norsk)" Tag="no"/>
+                            <ComboBoxItem Content="Polish (Polski)" Tag="pl"/>
+                            <ComboBoxItem Content="Romanian (Română)" Tag="ro"/>
+                            <ComboBoxItem Content="Serbian (Српски)" Tag="sr"/>
+                            <ComboBoxItem Content="Slovak (Slovenčina)" Tag="sk"/>
+                            <ComboBoxItem Content="Slovenian (Slovenščina)" Tag="sl"/>
+                            <ComboBoxItem Content="Swedish (Svenska)" Tag="sv"/>
+                            <ComboBoxItem Content="Turkish (Türkçe)" Tag="tr"/>
+                            <ComboBoxItem Content="Ukrainian (Українська)" Tag="uk"/>
+                            <ComboBoxItem Content="Welsh (Cymraeg)" Tag="cy"/>
+
+                            <!-- Asian Languages -->
+                            <ComboBoxItem Content="Afrikaans" Tag="af"/>
+                            <ComboBoxItem Content="Armenian (Հայերեն)" Tag="hy"/>
+                            <ComboBoxItem Content="Azerbaijani (Azərbaycan)" Tag="az"/>
+                            <ComboBoxItem Content="Bengali (বাংলা)" Tag="bn"/>
+                            <ComboBoxItem Content="Burmese (မြန်မာ)" Tag="my"/>
+                            <ComboBoxItem Content="Georgian (ქართული)" Tag="ka"/>
+                            <ComboBoxItem Content="Gujarati (ગુજરાતી)" Tag="gu"/>
                             <ComboBoxItem Content="Hebrew (עברית)" Tag="he"/>
+                            <ComboBoxItem Content="Hindi (हिन्दी)" Tag="hi"/>
+                            <ComboBoxItem Content="Indonesian (Bahasa Indonesia)" Tag="id"/>
+                            <ComboBoxItem Content="Javanese (Basa Jawa)" Tag="jw"/>
+                            <ComboBoxItem Content="Kannada (ಕನ್ನಡ)" Tag="kn"/>
+                            <ComboBoxItem Content="Kazakh (Қазақ)" Tag="kk"/>
+                            <ComboBoxItem Content="Khmer (ខ្មែរ)" Tag="km"/>
+                            <ComboBoxItem Content="Korean (한국어)" Tag="ko"/>
+                            <ComboBoxItem Content="Lao (ລາວ)" Tag="lo"/>
+                            <ComboBoxItem Content="Malayalam (മലയാളം)" Tag="ml"/>
+                            <ComboBoxItem Content="Marathi (मराठी)" Tag="mr"/>
+                            <ComboBoxItem Content="Mongolian (Монгол)" Tag="mn"/>
+                            <ComboBoxItem Content="Nepali (नेपाली)" Tag="ne"/>
+                            <ComboBoxItem Content="Persian (فارسی)" Tag="fa"/>
+                            <ComboBoxItem Content="Punjabi (ਪੰਜਾਬੀ)" Tag="pa"/>
+                            <ComboBoxItem Content="Sinhala (සිංහල)" Tag="si"/>
+                            <ComboBoxItem Content="Sundanese (Basa Sunda)" Tag="su"/>
+                            <ComboBoxItem Content="Tagalog (Filipino)" Tag="tl"/>
+                            <ComboBoxItem Content="Tamil (தமிழ்)" Tag="ta"/>
+                            <ComboBoxItem Content="Telugu (తెలుగు)" Tag="te"/>
+                            <ComboBoxItem Content="Thai (ไทย)" Tag="th"/>
+                            <ComboBoxItem Content="Urdu (اردو)" Tag="ur"/>
+                            <ComboBoxItem Content="Uzbek (Oʻzbek)" Tag="uz"/>
+                            <ComboBoxItem Content="Vietnamese (Tiếng Việt)" Tag="vi"/>
+
+                            <!-- African & Other Languages -->
+                            <ComboBoxItem Content="Amharic (አማርኛ)" Tag="am"/>
+                            <ComboBoxItem Content="Breton (Brezhoneg)" Tag="br"/>
+                            <ComboBoxItem Content="Haitian Creole (Kreyòl)" Tag="ht"/>
+                            <ComboBoxItem Content="Hausa (Hausa)" Tag="ha"/>
+                            <ComboBoxItem Content="Luxembourgish (Lëtzebuergesch)" Tag="lb"/>
+                            <ComboBoxItem Content="Malagasy (Malagasy)" Tag="mg"/>
+                            <ComboBoxItem Content="Malay (Bahasa Melayu)" Tag="ms"/>
+                            <ComboBoxItem Content="Maori (Te Reo Māori)" Tag="mi"/>
+                            <ComboBoxItem Content="Occitan (Occitan)" Tag="oc"/>
+                            <ComboBoxItem Content="Pashto (پښتو)" Tag="ps"/>
+                            <ComboBoxItem Content="Shona (Shona)" Tag="sn"/>
+                            <ComboBoxItem Content="Somali (Soomaali)" Tag="so"/>
+                            <ComboBoxItem Content="Swahili (Kiswahili)" Tag="sw"/>
+                            <ComboBoxItem Content="Yiddish (ייִדיש)" Tag="yi"/>
+                            <ComboBoxItem Content="Yoruba (Yorùbá)" Tag="yo"/>
+
+                            <!-- Latin & Sanskrit -->
+                            <ComboBoxItem Content="Latin (Latina)" Tag="la"/>
+                            <ComboBoxItem Content="Sanskrit (संस्कृतम्)" Tag="sa"/>
                         </ComboBox>
-                        <TextBlock Text="Select the language you'll be speaking"
+                        <TextBlock Text="Select the language you'll be speaking. Use Auto-detect if you speak multiple languages."
                                    FontSize="11"
                                    Foreground="Gray"
-                                   Margin="0,5,0,0"/>
+                                   Margin="0,5,0,0"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
                 </GroupBox>
 
