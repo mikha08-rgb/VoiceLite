@@ -470,7 +470,7 @@ If GitHub Actions is unavailable:
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
-- Current installer: `VoiceLite-Setup-1.0.19.exe`
+- Current installer: `VoiceLite-Setup-1.0.26.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -513,12 +513,20 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.25 (current release)
+- **Desktop App**: v1.0.26 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.25 (Current Desktop Release)
+### v1.0.26 (Current Desktop Release)
+- **Codebase Cleanup**: Autonomous cleanup using 4 specialized agents (dead-code-cleaner, unused-dependency-finder, test-file-cleanup, code-duplication-detector)
+- **Disk Space**: Removed 14+ MB of test artifacts (TestResults/ directories with coverage reports)
+- **Code Quality**: Deleted backup files (.bak), removed commented code in StartupDiagnostics.cs
+- **Dependency Audit**: Verified all 7 NuGet packages in active use (NAudio, BouncyCastle, H.InputSimulator, System.Text.Json, Hardcodet.NotifyIcon.Wpf, System.Management)
+- **Zero Regressions**: All 262 tests passing, builds successful (0 warnings, 0 errors)
+- **Agent Framework**: Created reusable cleanup automation for future maintenance
+
+### v1.0.25
 - **Security Enhancement**: Enabled rate limiting on feedback endpoint (5 submissions/hour per IP via Upstash Redis)
 - **Logging Reduction**: Reduced production logging by ~70% to eliminate file path exposure and reduce noise
   - Removed detailed Whisper command-line logging
