@@ -23,6 +23,7 @@ namespace VoiceLite
         private Action? testRecordingCallback;
         private AnalyticsService? analyticsService;
         private string? originalModel;
+        private bool originalUseWhisperServer;
 
         public Settings Settings => settings;
 
@@ -33,6 +34,7 @@ namespace VoiceLite
             analyticsService = analytics;
             testRecordingCallback = onTestRecording;
             originalModel = settings.WhisperModel;
+            originalUseWhisperServer = settings.UseWhisperServer;
 
             DownloadModelsButton.Visibility = Visibility.Visible;
             UpdateModelDownloadButton();
@@ -80,6 +82,9 @@ namespace VoiceLite
 
             // Analytics (Privacy)
             EnableAnalyticsCheckBox.IsChecked = settings.EnableAnalytics ?? false;
+
+            // Performance Settings
+            UseWhisperServerCheckBox.IsChecked = settings.UseWhisperServer;
 
             // Text Formatting (Post-Processing)
             LoadTextFormattingSettings();
@@ -272,6 +277,16 @@ namespace VoiceLite
         {
             SaveSettings();
 
+            // Check if UseWhisperServer changed - requires restart
+            if (settings.UseWhisperServer != originalUseWhisperServer)
+            {
+                MessageBox.Show(
+                    "Whisper Server mode change requires an app restart to take effect.",
+                    "Restart Required",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
             // Track analytics if enabled
             TrackAnalyticsChangesAsync();
 
@@ -339,6 +354,9 @@ namespace VoiceLite
 
             if (double.TryParse(NoiseThresholdTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double noiseThreshold))
                 settings.NoiseGateThreshold = Math.Max(0.0, Math.Min(0.5, noiseThreshold));
+
+            // Performance Settings
+            settings.UseWhisperServer = UseWhisperServerCheckBox.IsChecked ?? false;
 
             // Hotkey (already saved on change)
         }

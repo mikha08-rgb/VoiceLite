@@ -190,6 +190,9 @@ namespace VoiceLite.Models
 
         public bool RememberLastSession { get; set; } = false;
 
+        // Whisper Server Mode (Experimental - 5x faster transcription)
+        public bool UseWhisperServer { get; set; } = false; // Use persistent server.exe for faster transcription
+
         // Accuracy Improvement Features - ALWAYS ON for best experience
         public bool UseTemperatureOptimization { get; set; } = true; // Use temperature 0.2 for better accuracy
         private float _whisperTemperature = 0.2f;

@@ -153,6 +153,7 @@ npm run keygen
 2. **Service Layer** (`Services/`): Modular, single-responsibility services
    - `AudioRecorder`: NAudio-based recording with noise suppression
    - `PersistentWhisperService`: Main Whisper.cpp subprocess manager with warmup and process pooling
+   - `WhisperServerService`: Persistent HTTP server mode (5x faster, experimental) - uses server.exe with fallback to PersistentWhisperService
    - `TextInjector`: Text injection using InputSimulator (supports multiple modes)
    - `HotkeyManager`: Global hotkey registration via Win32 API
    - `SystemTrayManager`: System tray icon and context menu
@@ -214,6 +215,19 @@ npm run keygen
 - Beam search parameters (beam_size=5, best_of=5)
 - Path caching for whisper.exe and model files
 
+### Whisper Server Mode (Experimental)
+- **WhisperServerService**: Optional 5x performance boost via persistent HTTP server
+- Uses whisper.cpp's server.exe (342KB, ships with installer)
+- Keeps model loaded in memory, eliminating 2-second reload overhead per transcription
+- Enabled via Settings → Advanced → "Enable Whisper Server Mode"
+- Default: OFF (requires manual opt-in)
+- HTTP endpoint: POST /inference (multipart/form-data)
+- Port auto-detection (8080-8090 range)
+- Graceful fallback to PersistentWhisperService on failure
+- Requires app restart when toggled
+- Process lifecycle: Start on app launch, kill on app exit
+- Health check: Simple GET / request (3-second timeout)
+
 ### Whisper Command Format
 ```bash
 whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temperature 0.2 --beam-size 5 --best-of 5
@@ -274,6 +288,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temper
 
 ### Settings & Configuration
 - **Settings stored in `%LOCALAPPDATA%\VoiceLite\settings.json`** (Local machine only, does NOT sync)
+- **WhisperServerService toggle**: `UseWhisperServer` (default: false) - requires app restart
 - **Privacy Note**: Changed from Roaming to Local AppData to prevent transcription history from syncing across PCs
 - AppData directory created automatically on first run
 - Automatic migration from old Roaming AppData location (one-time, transparent)
