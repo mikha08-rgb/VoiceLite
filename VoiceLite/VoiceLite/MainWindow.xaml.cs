@@ -432,6 +432,7 @@ namespace VoiceLite
 
                 systemTrayManager = new SystemTrayManager(this);
                 systemTrayManager.AccountMenuClicked += OnTrayAccountMenuClicked;
+                systemTrayManager.ReportBugMenuClicked += OnTrayReportBugMenuClicked;
 
                 // Initialize memory monitoring
                 memoryMonitor = new MemoryMonitor();
@@ -1563,6 +1564,48 @@ namespace VoiceLite
             ShowMainWindow();
             // Call the account button logic directly
             await Dispatcher.InvokeAsync(() => AccountButton_Click(sender ?? this, new RoutedEventArgs()));
+        }
+
+        private void OnTrayReportBugMenuClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                // Get last error from ErrorLogger if available
+                string? lastError = null;
+                try
+                {
+                    var logPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "VoiceLite", "logs", "voicelite.log");
+
+                    if (File.Exists(logPath))
+                    {
+                        // Read last 500 characters of log file to get recent errors
+                        using var stream = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        if (stream.Length > 500)
+                        {
+                            stream.Seek(-500, SeekOrigin.End);
+                        }
+                        using var reader = new StreamReader(stream);
+                        lastError = reader.ReadToEnd();
+                    }
+                }
+                catch
+                {
+                    // Ignore errors reading log file
+                }
+
+                // Show feedback window
+                var feedbackWindow = new FeedbackWindow(settings, lastError);
+                feedbackWindow.Owner = this;
+                feedbackWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnTrayReportBugMenuClicked", ex);
+                MessageBox.Show("Failed to open feedback window. Please try again.",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task SignOutAsync()

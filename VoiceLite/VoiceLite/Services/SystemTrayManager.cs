@@ -13,6 +13,7 @@ namespace VoiceLite.Services
         private System.Windows.Controls.MenuItem? accountMenuItem;
 
         public event EventHandler? AccountMenuClicked;
+        public event EventHandler? ReportBugMenuClicked;
 
         public SystemTrayManager(Window window)
         {
@@ -60,6 +61,12 @@ namespace VoiceLite.Services
             };
             accountMenuItem.Click += (s, e) => AccountMenuClicked?.Invoke(this, EventArgs.Empty);
 
+            var reportBugItem = new System.Windows.Controls.MenuItem
+            {
+                Header = "Report Bug / Feedback"
+            };
+            reportBugItem.Click += (s, e) => ReportBugMenuClicked?.Invoke(this, EventArgs.Empty);
+
             var separator = new System.Windows.Controls.Separator();
 
             var exitItem = new System.Windows.Controls.MenuItem
@@ -74,6 +81,7 @@ namespace VoiceLite.Services
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(settingsItem);
             contextMenu.Items.Add(accountMenuItem);
+            contextMenu.Items.Add(reportBugItem);
             contextMenu.Items.Add(separator);
             contextMenu.Items.Add(exitItem);
 
