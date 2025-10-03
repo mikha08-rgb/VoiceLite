@@ -181,19 +181,83 @@ namespace VoiceLite.Controls
             }
         }
 
-        private void DownloadModel(WhisperModelInfo model)
+        private async void DownloadModel(WhisperModelInfo model)
         {
-            MessageBox.Show($"Model download functionality would be implemented here.\n\n" +
-                $"Model: {model.DisplayName}\n" +
+            var result = MessageBox.Show(
+                $"Download {model.DisplayName} model?\n\n" +
                 $"Size: {model.FileSizeDisplay}\n" +
-                $"Download URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{model.FileName}",
-                "Download Model", MessageBoxButton.OK, MessageBoxImage.Information);
+                $"Source: GitHub Releases\n\n" +
+                $"This may take several minutes depending on your connection.",
+                "Download Model",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
 
-            // TODO: Implement actual download functionality
-            // This would download from Hugging Face and show progress
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                // Determine download URL based on model
+                string? downloadUrl = model.FileName switch
+                {
+                    "ggml-medium.bin" => "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin",
+                    // Large model (2.9GB) exceeds GitHub's 2GB limit - fallback to Hugging Face
+                    "ggml-large-v3.bin" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+                    _ => null
+                };
+
+                if (downloadUrl == null)
+                {
+                    MessageBox.Show($"Download not available for {model.DisplayName}.\n\nPlease download manually from Hugging Face.",
+                        "Download Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var targetPath = Path.Combine(whisperPath, model.FileName);
+                if (File.Exists(targetPath))
+                {
+                    MessageBox.Show($"{model.DisplayName} is already downloaded.",
+                        "Already Downloaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                    LoadModels(); // Refresh UI
+                    return;
+                }
+
+                // Create progress window or disable UI during download
+                IsEnabled = false;
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromMinutes(30);
+
+                    using (var response = await client.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        response.EnsureSuccessStatusCode();
+                        await using var sourceStream = await response.Content.ReadAsStreamAsync();
+                        await using var targetStream = File.Create(targetPath);
+                        await sourceStream.CopyToAsync(targetStream);
+                    }
+                }
+
+                MessageBox.Show($"{model.DisplayName} downloaded successfully!\n\nThe model is now available for use.",
+                    "Download Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Refresh model list to show newly downloaded model
+                LoadModels();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Download failed: {ex.Message}\n\nPlease try again or download manually.",
+                    "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsEnabled = true;
+                Mouse.OverrideCursor = null;
+            }
         }
 
-        private void TestModel_Click(object sender, RoutedEventArgs e)
+        private async void TestModel_Click(object sender, RoutedEventArgs e)
         {
             if (selectedModel == null)
             {
@@ -202,14 +266,78 @@ namespace VoiceLite.Controls
                 return;
             }
 
-            // TODO: Implement model testing functionality
-            MessageBox.Show($"Model testing would be implemented here.\n\n" +
-                $"Selected Model: {selectedModel.DisplayName}\n" +
-                $"This would:\n" +
-                $"1. Record a sample audio\n" +
-                $"2. Transcribe with selected model\n" +
-                $"3. Show timing and accuracy metrics",
-                "Test Model", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!selectedModel.IsInstalled)
+            {
+                MessageBox.Show($"Please download {selectedModel.DisplayName} before testing.",
+                    "Model Not Installed", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Test {selectedModel.DisplayName} model?\n\n" +
+                $"This will:\n" +
+                $"1. Generate a test audio file\n" +
+                $"2. Transcribe with the selected model\n" +
+                $"3. Show performance metrics\n\n" +
+                $"This may take a few seconds.",
+                "Test Model",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                IsEnabled = false;
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                var benchmarkService = new ModelBenchmarkService();
+                var benchmarkResult = await benchmarkService.BenchmarkModelAsync(selectedModel);
+
+                if (benchmarkResult.Success)
+                {
+                    var metrics = $"✅ {selectedModel.DisplayName} Test Results\n\n" +
+                                 $"⏱️ Transcription Time: {benchmarkResult.TranscriptionTime:F2}s\n" +
+                                 $"🎵 Audio Duration: {benchmarkResult.AudioDuration:F2}s\n" +
+                                 $"📊 Processing Ratio: {benchmarkResult.ProcessingRatio:F2}x realtime\n" +
+                                 $"💾 Peak Memory: {FormatMemory(benchmarkResult.PeakMemoryUsage)}\n\n" +
+                                 $"📝 Transcription:\n{benchmarkResult.TranscribedText}";
+
+                    MessageBox.Show(metrics, "Model Test Complete",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"❌ Test Failed\n\n{benchmarkResult.ErrorMessage}",
+                        "Test Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+
+                benchmarkService.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Test failed: {ex.Message}\n\nPlease check that the model is properly installed.",
+                    "Test Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsEnabled = true;
+                Mouse.OverrideCursor = null;
+            }
+        }
+
+        private string FormatMemory(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len /= 1024;
+            }
+            return $"{len:0.#} {sizes[order]}";
         }
 
         private void PriorityChanged(object sender, RoutedEventArgs e)
