@@ -330,6 +330,15 @@ namespace VoiceLite
                     settings = SettingsValidator.ValidateAndRepair(loadedSettings) ?? new Settings();
                     ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
 
+                    // MIGRATION 2: Upgrade Default UI preset to Compact (v1.0.38+)
+                    // New users get Compact by default, migrate existing users to Compact for consistency
+                    if (settings.UIPreset == UIPreset.Default)
+                    {
+                        settings.UIPreset = UIPreset.Compact;
+                        ErrorLogger.LogMessage("✅ Migrated UI preset from Default to Compact (cleaner single-line history)");
+                        SaveSettingsInternal(); // Save immediately
+                    }
+
                     // Verify whisper model exists
                     ValidateWhisperModel();
                 }
@@ -652,6 +661,13 @@ namespace VoiceLite
 
         private void UpdateConfigDisplay()
         {
+            // Update instruction text with actual hotkey
+            if (InstructionText != null)
+            {
+                string hotkeyHint = GetHotkeyDisplayString();
+                InstructionText.Text = $"Press {hotkeyHint} to record";
+            }
+
             // Update hotkey display
             HotkeyText.Text = GetHotkeyDisplayString();
 
@@ -1617,6 +1633,16 @@ namespace VoiceLite
         }
 
         private void DictionaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new DictionaryManagerWindow(settings);
+            dialog.Owner = this;
+            if (dialog.ShowDialog() == true)
+            {
+                SaveSettings();
+            }
+        }
+
+        private void VoiceShortcutsButton_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new DictionaryManagerWindow(settings);
             dialog.Owner = this;
