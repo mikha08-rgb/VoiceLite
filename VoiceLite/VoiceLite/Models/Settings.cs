@@ -271,7 +271,7 @@ namespace VoiceLite.Models
         public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
 
         // UI Preset (Appearance)
-        public UIPreset UIPreset { get; set; } = UIPreset.Default;
+        public UIPreset UIPreset { get; set; } = UIPreset.Compact;
 
         /// <summary>
         /// Apply an audio preset to configure all audio enhancement settings.
