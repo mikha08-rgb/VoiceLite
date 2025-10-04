@@ -2302,6 +2302,34 @@ namespace VoiceLite
                 border.Background = Brushes.White;
             };
 
+            // CRITICAL FIX: Click to copy (was missing in compact mode!)
+            border.MouseLeftButtonDown += (s, e) =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
+
+                    // Revert to "Ready" after 1.5 seconds
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    EventHandler? handler = null;
+                    handler = (ts, te) =>
+                    {
+                        var hotkeyHint = GetHotkeyDisplayString();
+                        var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+                        UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", new SolidColorBrush(StatusColors.Ready));
+                        timer.Stop();
+                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                    };
+                    timer.Tick += handler;
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy history item", ex);
+                }
+            };
+
             // Single grid with columns for timestamp and text
             var grid = new System.Windows.Controls.Grid();
             grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(70, GridUnitType.Pixel) }); // Timestamp
