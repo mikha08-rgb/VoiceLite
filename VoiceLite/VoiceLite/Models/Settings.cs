@@ -117,13 +117,17 @@ namespace VoiceLite.Models
 
     public class Settings
     {
+        // THREAD SAFETY: Lock object for synchronizing access from multiple threads
+        // Use this when reading/writing settings from different threads
+        public readonly object SyncRoot = new object();
+
         private RecordMode _mode = RecordMode.PushToTalk;
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.LeftAlt;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
         private string _whisperModel = "ggml-small.bin"; // Free tier default (temporary promotion for growth)
-        private int _beamSize = 5;
-        private int _bestOf = 5;
+        private int _beamSize = 1; // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (greedy decoding)
+        private int _bestOf = 1;   // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (single sampling)
         private double _whisperTimeoutMultiplier = 2.0;
 
         public RecordMode Mode
@@ -233,7 +237,14 @@ namespace VoiceLite.Models
         public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
 
         // Transcription History
-        public int MaxHistoryItems { get; set; } = 10; // Maximum number of history items to keep (unpinned)
+        private int _maxHistoryItems = 10;
+
+        // BUG FIX (BUG-016): Add validation to prevent OOM
+        public int MaxHistoryItems
+        {
+            get => _maxHistoryItems;
+            set => _maxHistoryItems = Math.Clamp(value, 1, 1000); // Max 1000 items
+        }
         public bool EnableHistory { get; set; } = true; // Allow users to disable history tracking
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
 

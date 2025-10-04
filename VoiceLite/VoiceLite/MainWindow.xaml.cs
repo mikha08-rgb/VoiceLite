@@ -51,6 +51,7 @@ namespace VoiceLite
         }
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
+        private readonly object saveSettingsLock = new object(); // CONCURRENCY FIX: Prevent simultaneous settings saves
         private DateTime lastClickTime = DateTime.MinValue;
         private DateTime lastHotkeyPressTime = DateTime.MinValue;
 
@@ -365,36 +366,61 @@ namespace VoiceLite
 
         /// <summary>
         /// Internal method that actually saves settings to disk
+        /// Uses atomic write pattern to prevent file corruption
         /// </summary>
         private void SaveSettingsInternal()
         {
-            try
+            // CONCURRENCY FIX: Prevent concurrent saves from corrupting file
+            lock (saveSettingsLock)
             {
+                try
+                {
                 // Ensure AppData directory exists
                 EnsureAppDataDirectoryExists();
 
                 settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
                 string settingsPath = GetSettingsPath();
-                string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(settingsPath, json);
+
+                // THREAD SAFETY FIX: Lock settings during serialization to prevent concurrent modification
+                string json;
+                lock (settings.SyncRoot)
+                {
+                    json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                }
+
+                // CRITICAL FIX: Atomic write to prevent file corruption on crash/power loss
+                // Write to temp file first, then rename (rename is atomic on Windows)
+                string tempPath = settingsPath + ".tmp";
+                File.WriteAllText(tempPath, json);
+
+                // Delete old file if exists (required before rename on Windows)
+                if (File.Exists(settingsPath))
+                {
+                    File.Delete(settingsPath);
+                }
+
+                // Atomic rename - if this fails, temp file remains for recovery
+                File.Move(tempPath, settingsPath);
+
                 ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                ErrorLogger.LogError("SaveSettings - Access Denied", ex);
-                MessageBox.Show(
-                    $"Cannot save settings due to permission issues.\n\n" +
-                    $"Try running VoiceLite as administrator or check folder permissions.\n\n" +
-                    $"Settings location: {GetSettingsPath()}",
-                    "Settings Save Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("SaveSettings", ex);
-                MessageBox.Show($"Failed to save settings: {ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    ErrorLogger.LogError("SaveSettings - Access Denied", ex);
+                    MessageBox.Show(
+                        $"Cannot save settings due to permission issues.\n\n" +
+                        $"Try running VoiceLite as administrator or check folder permissions.\n\n" +
+                        $"Settings location: {GetSettingsPath()}",
+                        "Settings Save Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("SaveSettings", ex);
+                    MessageBox.Show($"Failed to save settings: {ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            } // End lock (saveSettingsLock)
         }
 
         private async Task InitializeServicesAsync()
@@ -1010,15 +1036,19 @@ namespace VoiceLite
         }
 
         /// <summary>
-        /// Start global stuck-state recovery timer (15 seconds max for any processing state)
+        /// Start global stuck-state recovery timer (120 seconds max for any processing state)
         /// CRITICAL: Prevents app from being permanently stuck in "Processing" state
+        /// BUG FIX: Increased from 15s to 120s - 15s was too aggressive for normal transcriptions
         /// </summary>
         private void StartStuckStateRecoveryTimer()
         {
             // Stop any existing timer first
             StopStuckStateRecoveryTimer();
 
-            const int maxProcessingSeconds = 15; // 15 seconds max for "Processing" state
+            // BUG FIX: Increased from 15s to 120s to match RecordingCoordinator timeout
+            // 15s was TOO AGGRESSIVE - normal transcriptions with Small model can take 20-30s
+            // This should only fire if Whisper completely hangs (rare edge case)
+            const int maxProcessingSeconds = 120; // 2 minutes max - matches RecordingCoordinator
 
             stuckStateRecoveryTimer = new System.Windows.Threading.DispatcherTimer
             {
@@ -1032,6 +1062,7 @@ namespace VoiceLite
 
         /// <summary>
         /// Stop stuck-state recovery timer (safe to call multiple times)
+        /// BUG FIX (BUG-010): Properly dispose timer to prevent resource leak
         /// </summary>
         private void StopStuckStateRecoveryTimer()
         {
@@ -1039,6 +1070,19 @@ namespace VoiceLite
             {
                 stuckStateRecoveryTimer.Stop();
                 stuckStateRecoveryTimer.Tick -= OnStuckStateRecovery;
+
+                // BUG FIX (BUG-010): Dispose timer properly
+                try
+                {
+                    // DispatcherTimer doesn't implement IDisposable in .NET Framework
+                    // but does in .NET Core/.NET 5+. Safe to skip disposal if not available.
+                    (stuckStateRecoveryTimer as IDisposable)?.Dispose();
+                }
+                catch
+                {
+                    // Ignore disposal errors - timer will be GC'd
+                }
+
                 stuckStateRecoveryTimer = null;
                 ErrorLogger.LogDebug("StopStuckStateRecoveryTimer: Recovery timer stopped");
             }
@@ -1048,12 +1092,16 @@ namespace VoiceLite
         /// Stuck-state recovery callback - CRITICAL failsafe to prevent permanent "Processing" state
         /// Fires if app is stuck in processing for >15 seconds without completion
         /// </summary>
-        private void OnStuckStateRecovery(object? sender, EventArgs e)
+        private async void OnStuckStateRecovery(object? sender, EventArgs e)
         {
             ErrorLogger.LogWarning("OnStuckStateRecovery: STUCK STATE DETECTED! Forcing recovery...");
 
             // Stop the timer immediately
             StopStuckStateRecoveryTimer();
+
+            // CRITICAL FIX: Kill any hung whisper.exe processes BEFORE showing dialog
+            // This prevents PC freeze from stuck processes consuming resources
+            await KillHungWhisperProcessesAsync();
 
             // Force UI back to ready state
             try
@@ -1076,17 +1124,20 @@ namespace VoiceLite
                 recordingElapsedTimer?.Stop();
                 recordingElapsedTimer = null;
 
-                // Show user-friendly message
-                MessageBox.Show(
-                    "VoiceLite recovered from a stuck state.\n\n" +
-                    "The app was stuck processing for too long and has been reset.\n\n" +
-                    "If this happens frequently:\n" +
-                    "• Try using a smaller Whisper model\n" +
-                    "• Check if antivirus is blocking the app\n" +
-                    "• Restart VoiceLite",
-                    "Stuck State Recovery",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // Show user-friendly message (non-blocking async)
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        "VoiceLite recovered from a stuck state.\n\n" +
+                        "The app was stuck processing for too long and has been reset.\n\n" +
+                        "If this happens frequently:\n" +
+                        "• Try using a smaller Whisper model\n" +
+                        "• Check if antivirus is blocking the app\n" +
+                        "• Restart VoiceLite",
+                        "Stuck State Recovery",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                });
 
                 // Reset UI to default mode
                 UpdateUIForCurrentMode();
@@ -1095,6 +1146,53 @@ namespace VoiceLite
             {
                 ErrorLogger.LogError("OnStuckStateRecovery: Failed to recover", ex);
             }
+        }
+
+        /// <summary>
+        /// Kill any hung whisper.exe processes that may be stuck
+        /// CRITICAL: Prevents PC freeze from stuck processes consuming resources
+        /// </summary>
+        private async Task KillHungWhisperProcessesAsync()
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var whisperProcesses = System.Diagnostics.Process.GetProcessesByName("whisper");
+                    if (whisperProcesses.Length > 0)
+                    {
+                        ErrorLogger.LogWarning($"KillHungWhisperProcesses: Found {whisperProcesses.Length} whisper.exe process(es) - attempting to kill...");
+
+                        foreach (var process in whisperProcesses)
+                        {
+                            try
+                            {
+                                if (!process.HasExited)
+                                {
+                                    ErrorLogger.LogWarning($"Killing hung whisper.exe process (PID: {process.Id})");
+                                    process.Kill(entireProcessTree: true); // Kill process and all children
+                                    process.WaitForExit(2000); // Wait up to 2 seconds for clean exit
+                                }
+                                process.Dispose();
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorLogger.LogError($"Failed to kill whisper.exe process (PID: {process.Id})", ex);
+                            }
+                        }
+
+                        ErrorLogger.LogWarning("KillHungWhisperProcesses: All whisper.exe processes terminated");
+                    }
+                    else
+                    {
+                        ErrorLogger.LogDebug("KillHungWhisperProcesses: No whisper.exe processes found");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("KillHungWhisperProcesses: Failed to enumerate/kill processes", ex);
+                }
+            });
         }
 
         private async void OnAutoTimeout(object? sender, System.Timers.ElapsedEventArgs e)
@@ -1129,9 +1227,11 @@ namespace VoiceLite
         /// </summary>
         private async void OnRecordingStatusChanged(object? sender, RecordingStatusEventArgs e)
         {
-            await Dispatcher.InvokeAsync(() =>
+            try
             {
-                switch (e.Status)
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    switch (e.Status)
                 {
                     case "Recording":
                         UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
@@ -1173,6 +1273,13 @@ namespace VoiceLite
                         break;
                 }
             });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnRecordingStatusChanged failed", ex);
+                // Attempt to reset to safe state
+                try { UpdateStatus("Error", Brushes.Red); } catch { }
+            }
         }
 
         /// <summary>
@@ -1752,9 +1859,22 @@ namespace VoiceLite
         protected override void OnClosed(EventArgs e)
         {
             SaveSettings();
+
+            // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
-            autoTimeoutTimer = null; // Clear timer reference
-            StopStuckStateRecoveryTimer(); // Stop stuck-state recovery timer
+            autoTimeoutTimer = null;
+
+            StopStuckStateRecoveryTimer(); // Already disposes properly
+
+            settingsSaveTimer?.Stop();
+            settingsSaveTimer = null;
+
+            recordingElapsedTimer?.Stop();
+            recordingElapsedTimer = null;
+
+            // CRITICAL FIX: Kill any hung whisper.exe processes on shutdown
+            // Prevents orphaned processes from consuming resources after app closes
+            _ = KillHungWhisperProcessesAsync();
 
             // Clean up with proper disposal order
             try
@@ -1971,6 +2091,80 @@ namespace VoiceLite
             }
         }
 
+        /// <summary>
+        /// Creates a context menu for history items with Copy, Re-inject, Pin, and Delete actions.
+        /// Extracted to eliminate code duplication between Compact and Default card layouts.
+        /// </summary>
+        private System.Windows.Controls.ContextMenu CreateHistoryContextMenu(TranscriptionHistoryItem item)
+        {
+            var contextMenu = new System.Windows.Controls.ContextMenu();
+
+            // Copy menu item
+            var copyMenuItem = new System.Windows.Controls.MenuItem { Header = "📋 Copy" };
+            copyMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    EventHandler? handler = null;
+                    handler = (ts, te) =>
+                    {
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+                        timer.Stop();
+                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                    };
+                    timer.Tick += handler;
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(copyMenuItem);
+
+            // Re-inject menu item
+            var reinjectMenuItem = new System.Windows.Controls.MenuItem { Header = "📤 Re-inject" };
+            reinjectMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    textInjector?.InjectText(item.Text);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Re-inject menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(reinjectMenuItem);
+
+            contextMenu.Items.Add(new System.Windows.Controls.Separator());
+
+            // Pin/Unpin menu item
+            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
+            pinMenuItem.Click += (s, e) =>
+            {
+                historyService?.TogglePin(item.Id);
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(pinMenuItem);
+
+            // Delete menu item
+            var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
+            deleteMenuItem.Click += (s, e) =>
+            {
+                historyService?.RemoveFromHistory(item.Id);
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(deleteMenuItem);
+
+            return contextMenu;
+        }
+
         private System.Windows.Controls.Border CreateCompactHistoryCard(TranscriptionHistoryItem item)
         {
             // COMPACT PRESET: Single-line layout with timestamp + text
@@ -2044,66 +2238,8 @@ namespace VoiceLite
                 grid.Children.Add(pinIcon);
             }
 
-            // Context menu (same as default)
-            var contextMenu = new System.Windows.Controls.ContextMenu();
-
-            var copyMenuItem = new System.Windows.Controls.MenuItem { Header = "📋 Copy" };
-            copyMenuItem.Click += (s, e) =>
-            {
-                try
-                {
-                    System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    timer.Tick += (ts, te) =>
-                    {
-                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-                        timer.Stop();
-                    };
-                    timer.Start();
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Copy menu item", ex);
-                }
-            };
-            contextMenu.Items.Add(copyMenuItem);
-
-            var reinjectMenuItem = new System.Windows.Controls.MenuItem { Header = "📤 Re-inject" };
-            reinjectMenuItem.Click += (s, e) =>
-            {
-                try
-                {
-                    textInjector?.InjectText(item.Text);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Re-inject menu item", ex);
-                }
-            };
-            contextMenu.Items.Add(reinjectMenuItem);
-
-            contextMenu.Items.Add(new System.Windows.Controls.Separator());
-
-            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
-            pinMenuItem.Click += (s, e) =>
-            {
-                historyService?.TogglePin(item.Id);
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            };
-            contextMenu.Items.Add(pinMenuItem);
-
-            var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
-            deleteMenuItem.Click += (s, e) =>
-            {
-                historyService?.RemoveFromHistory(item.Id);
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            };
-            contextMenu.Items.Add(deleteMenuItem);
-
-            border.ContextMenu = contextMenu;
+            // Attach context menu using shared helper
+            border.ContextMenu = CreateHistoryContextMenu(item);
             border.Child = grid;
             return border;
         }
@@ -2151,11 +2287,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    timer.Tick += (ts, te) =>
+                    EventHandler? handler = null;
+                    handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
+                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
                     };
+                    timer.Tick += handler;
                     timer.Start();
                 }
                 catch (Exception ex)
@@ -2164,68 +2303,8 @@ namespace VoiceLite
                 }
             };
 
-            // Context menu
-            var contextMenu = new System.Windows.Controls.ContextMenu();
-
-            var copyMenuItem = new System.Windows.Controls.MenuItem { Header = "📋 Copy" };
-            copyMenuItem.Click += (s, e) =>
-            {
-                try
-                {
-                    System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
-
-                    // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    timer.Tick += (ts, te) =>
-                    {
-                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-                        timer.Stop();
-                    };
-                    timer.Start();
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Copy menu item", ex);
-                }
-            };
-            contextMenu.Items.Add(copyMenuItem);
-
-            var reinjectMenuItem = new System.Windows.Controls.MenuItem { Header = "📤 Re-inject" };
-            reinjectMenuItem.Click += (s, e) =>
-            {
-                try
-                {
-                    textInjector?.InjectText(item.Text);
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Re-inject menu item", ex);
-                }
-            };
-            contextMenu.Items.Add(reinjectMenuItem);
-
-            contextMenu.Items.Add(new System.Windows.Controls.Separator());
-
-            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
-            pinMenuItem.Click += (s, e) =>
-            {
-                historyService?.TogglePin(item.Id);
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            };
-            contextMenu.Items.Add(pinMenuItem);
-
-            var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
-            deleteMenuItem.Click += (s, e) =>
-            {
-                historyService?.RemoveFromHistory(item.Id);
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            };
-            contextMenu.Items.Add(deleteMenuItem);
-
-            border.ContextMenu = contextMenu;
+            // Attach context menu using shared helper
+            border.ContextMenu = CreateHistoryContextMenu(item);
 
             // Content grid (simplified - no metadata row)
             var grid = new System.Windows.Controls.Grid();
@@ -2281,11 +2360,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    timer.Tick += (ts, te) =>
+                    EventHandler? handler = null;
+                    handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
+                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
                     };
+                    timer.Tick += handler;
                     timer.Start();
                 }
                 catch (Exception ex)

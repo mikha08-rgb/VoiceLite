@@ -28,6 +28,7 @@ namespace VoiceLite.Services
         private System.Threading.Timer? transcriptionWatchdog;
         private volatile bool isTranscribing = false;
         private volatile bool transcriptionCompleted = false; // Prevents duplicate completion events
+        private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
         private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
 
@@ -186,6 +187,14 @@ namespace VoiceLite.Services
         /// </summary>
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
+            // DISPOSAL SAFETY: Early exit if disposed
+            if (isDisposed)
+            {
+                ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Disposed, skipping transcription");
+                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                return;
+            }
+
             ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - isCancelled={isCancelled}, file={audioFilePath}");
 
             // If recording was cancelled, just clean up and return
@@ -213,17 +222,15 @@ namespace VoiceLite.Services
             // Start watchdog timer to detect stuck transcriptions
             StartTranscriptionWatchdog();
 
+            // BUG FIX (BUG-007): Move completion flag and event firing logic to prevent double-fire
+            // If event handler throws exception, catch block would fire event again
+            TranscriptionCompleteEventArgs? eventArgs = null;
+
             try
             {
                 // Run transcription on background thread
                 var transcription = await Task.Run(async () =>
                     await whisperService.TranscribeAsync(workingAudioPath).ConfigureAwait(false)).ConfigureAwait(false);
-
-                // Mark as completed FIRST to prevent watchdog from firing duplicate event
-                transcriptionCompleted = true;
-
-                // Stop watchdog timer - transcription completed successfully
-                StopTranscriptionWatchdog();
 
                 ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
 
@@ -231,12 +238,23 @@ namespace VoiceLite.Services
                 if (!string.IsNullOrWhiteSpace(transcription) && analyticsService != null)
                 {
                     var wordCount = TextAnalyzer.CountWords(transcription);
-                    _ = analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            // BUG FIX (BUG-013): Log analytics failures, don't let them crash transcription
+                            ErrorLogger.LogError("Analytics tracking failed (non-fatal)", ex);
+                        }
+                    });
                 }
 
                 // Create history item
                 TranscriptionHistoryItem? historyItem = null;
-                if (!string.IsNullOrWhiteSpace(transcription))
+                if (!string.IsNullOrWhiteSpace(transcription) && !isDisposed)
                 {
                     historyItem = new TranscriptionHistoryItem
                     {
@@ -247,8 +265,10 @@ namespace VoiceLite.Services
                         ModelUsed = settings.WhisperModel
                     };
 
-                    // Add to history service
-                    historyService?.AddToHistory(historyItem);
+                    if (!isDisposed)
+                    {
+                        historyService?.AddToHistory(historyItem);
+                    }
                 }
 
                 // Handle text injection on background thread if we have text
@@ -268,39 +288,53 @@ namespace VoiceLite.Services
                         StatusChanged?.Invoke(this, new RecordingStatusEventArgs { Status = "Copied to clipboard" });
                     }
 
-                    // Run text injection on background thread
                     await Task.Run(() => textInjector.InjectText(transcription)).ConfigureAwait(false);
                     textInjected = true;
                 }
 
-                // Notify UI that transcription is complete
-                TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
+                // Prepare event args (don't fire yet)
+                eventArgs = new TranscriptionCompleteEventArgs
                 {
                     Transcription = transcription ?? string.Empty,
                     HistoryItem = historyItem,
                     TextWasInjected = textInjected,
                     Success = true
-                });
+                };
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("RecordingCoordinator.OnAudioFileReady", ex);
 
-                // Mark as completed to prevent watchdog from firing
-                transcriptionCompleted = true;
-                StopTranscriptionWatchdog();
-
-                TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
+                // Prepare error event args (don't fire yet)
+                eventArgs = new TranscriptionCompleteEventArgs
                 {
                     Transcription = string.Empty,
                     ErrorMessage = $"Transcription error: {ex.Message}",
                     Success = false
-                });
+                };
             }
             finally
             {
-                // Always stop watchdog and cleanup (idempotent - safe to call multiple times)
+                // Mark as completed in finally block (always executes)
+                transcriptionCompleted = true;
                 StopTranscriptionWatchdog();
+
+                // Fire event outside try-catch to prevent double-fire if handler throws
+                if (eventArgs != null)
+                {
+                    try
+                    {
+                        TranscriptionCompleted?.Invoke(this, eventArgs);
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("TranscriptionCompleted event handler threw exception", ex);
+                    }
+                }
+
+                // RACE CONDITION FIX: Wait briefly to ensure Whisper process has closed file handle
+                // Whisper process might still be reading the file, give it time to release handle
+                await Task.Delay(300).ConfigureAwait(false);
 
                 // CLEANUP: Always delete the original audio file from AudioRecorder
                 // This prevents temp files from accumulating in AppData
@@ -434,12 +468,26 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
-            StopTranscriptionWatchdog();
+            // DISPOSAL SAFETY: Set flag first to prevent new operations
+            isDisposed = true;
 
+            // BUG FIX (BUG-001): Unsubscribe FIRST to prevent new events from firing
+            // This ensures no new OnAudioFileReady events can be queued after this point
             if (audioRecorder != null)
             {
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
             }
+
+            // Wait for any in-flight OnAudioFileReady handlers to complete with timeout
+            // SpinWait is more reliable than Thread.Sleep for synchronization
+            var spinWait = new System.Threading.SpinWait();
+            var deadline = DateTime.Now.AddSeconds(2);
+            while (isTranscribing && DateTime.Now < deadline)
+            {
+                spinWait.SpinOnce();
+            }
+
+            StopTranscriptionWatchdog();
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -219,7 +220,10 @@ namespace VoiceLite.Services
                 {
                     process.PriorityClass = ProcessPriorityClass.AboveNormal;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogMessage($"Failed to set Whisper warmup process priority: {ex.Message}");
+                }
 
                 await process.WaitForExitAsync();
 
@@ -272,8 +276,12 @@ namespace VoiceLite.Services
                 return string.Empty;
             }
 
+            // BUG FIX (BUG-003): Track semaphore acquisition to prevent double-release
+            bool semaphoreAcquired = false;
+
             // Use semaphore to ensure only one transcription at a time
             await transcriptionSemaphore.WaitAsync();
+            semaphoreAcquired = true;
 
             try
             {
@@ -381,10 +389,13 @@ namespace VoiceLite.Services
                     };
 
                     timeoutSeconds = Math.Max(10, (int)(estimatedAudioSeconds * processingMultiplier) + 5);
-                    timeoutSeconds = Math.Min(timeoutSeconds, 120); // Cap at 2 minutes
 
-                    // Apply user-configurable timeout multiplier
+                    // BUG FIX: Apply user multiplier BEFORE capping, not after
+                    // This allows users to increase timeout for large models/files
                     timeoutSeconds = (int)(timeoutSeconds * settings.WhisperTimeoutMultiplier);
+
+                    // Cap at reasonable max (10 minutes) to prevent infinite waits
+                    timeoutSeconds = Math.Min(timeoutSeconds, 600); // 10 minutes max
                     timeoutSeconds = Math.Max(1, timeoutSeconds); // Minimum 1 second
                 }
 
@@ -400,6 +411,30 @@ namespace VoiceLite.Services
                     {
                         process.Kill(entireProcessTree: true);
                         ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
+
+                        // RESOURCE LEAK FIX: Verify process actually died
+                        if (!process.WaitForExit(5000)) // Wait up to 5 seconds
+                        {
+                            ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
+
+                            // Last resort: Use taskkill /F
+                            try
+                            {
+                                var taskkill = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "taskkill",
+                                    Arguments = $"/F /PID {process.Id}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                                taskkill?.WaitForExit(2000);
+                                taskkill?.Dispose();
+                            }
+                            catch (Exception taskkillEx)
+                            {
+                                ErrorLogger.LogError("taskkill also failed", taskkillEx);
+                            }
+                        }
                     }
                     catch (Exception killEx)
                     {
@@ -434,7 +469,7 @@ namespace VoiceLite.Services
                         // Log truncated error to avoid excessive log sizes
                         ErrorLogger.LogMessage($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
                     }
-                    throw new Exception($"Whisper process failed with exit code {process.ExitCode}");
+                    throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
                 }
 
                 var result = outputBuilder.ToString();
@@ -473,8 +508,9 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // Prevent ObjectDisposedException during shutdown
-                if (!isDisposed)
+                // BUG FIX (BUG-003): Only release semaphore if we successfully acquired it
+                // This prevents SemaphoreFullException if exception occurred before WaitAsync
+                if (!isDisposed && semaphoreAcquired)
                 {
                     transcriptionSemaphore.Release();
                 }

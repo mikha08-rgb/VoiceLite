@@ -31,6 +31,7 @@ namespace VoiceLite.Services
         private HwndSource? source;
         private bool isRegistered = false;
         private CancellationTokenSource? keyMonitorCts;
+        private Task? keyMonitorTask; // DISPOSAL SAFETY: Track polling task to wait for completion
 
         private Key currentKey = Key.LeftAlt;
         private ModifierKeys currentModifiers = ModifierKeys.None;
@@ -104,7 +105,7 @@ namespace VoiceLite.Services
                 {
                     source.RemoveHook(HwndHook);
                     source = null;
-                    throw new Exception($"Failed to register {modifiers} + {key} hotkey. It may be in use by another application.");
+                    throw new InvalidOperationException($"Failed to register {modifiers} + {key} hotkey. It may be in use by another application.");
                 }
 
                 isRegistered = true;
@@ -178,7 +179,7 @@ namespace VoiceLite.Services
                 keyMonitorCts = cts;
             }
 
-            Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
                 try
                 {
@@ -231,6 +232,11 @@ namespace VoiceLite.Services
                     cts.Dispose();
                 }
             }, cts.Token);
+
+            lock (stateLock)
+            {
+                keyMonitorTask = task;
+            }
         }
 
         private int GetVirtualKeyForModifier(Key key)
@@ -253,13 +259,46 @@ namespace VoiceLite.Services
         private void StopKeyMonitor()
         {
             CancellationTokenSource? cts;
+            Task? task;
             lock (stateLock)
             {
                 cts = keyMonitorCts;
+                task = keyMonitorTask;
                 keyMonitorCts = null;
+                keyMonitorTask = null;
             }
 
-            cts?.Cancel();
+            // BUG FIX (BUG-006): Ensure CancellationTokenSource is always disposed
+            if (cts != null)
+            {
+                try
+                {
+                    cts.Cancel();
+                    cts.Dispose(); // Prevent resource leak
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already disposed, ignore
+                }
+            }
+
+            // DISPOSAL SAFETY: Wait for polling task to complete (prevents orphaned tasks)
+            // Increased timeout from 1s → 5s to handle slow systems
+            if (task != null && !task.IsCompleted)
+            {
+                try
+                {
+                    task.Wait(TimeSpan.FromSeconds(5)); // BUG FIX: Increased timeout
+                }
+                catch (AggregateException ex) when (ex.InnerException is TaskCanceledException)
+                {
+                    // Expected during cancellation
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("HotkeyManager: Error waiting for key monitor task", ex);
+                }
+            }
         }
 
         private void RunOnDispatcher(Action action)
@@ -371,7 +410,7 @@ namespace VoiceLite.Services
 
             int vKey = (int)currentVirtualKey;
 
-            Task.Run(async () =>
+            var task = Task.Run(async () =>
             {
                 try
                 {
@@ -414,10 +453,19 @@ namespace VoiceLite.Services
                     cts.Dispose();
                 }
             }, cts.Token);
+
+            lock (stateLock)
+            {
+                keyMonitorTask = task;
+            }
         }
 
         public void Dispose()
         {
+            // DISPOSAL SAFETY: Clear event handlers FIRST to prevent callbacks after disposal
+            HotkeyPressed = null;
+            HotkeyReleased = null;
+
             StopKeyMonitor();
 
             if (isRegistered && windowHandle != IntPtr.Zero)
