@@ -72,151 +72,94 @@
 
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Compact header -->
+                    <RowDefinition Height="Auto"/> <!-- Search box (hidden by default) -->
                     <RowDefinition Height="*"/>    <!-- Scrollable list -->
                 </Grid.RowDefinitions>
 
-                <!-- Enhanced Header with Search -->
-                <Border Grid.Row="0"
-                        Background="#FAFAFA"
-                        BorderBrush="#E0E0E0"
-                        BorderThickness="0,0,0,1"
-                        CornerRadius="8,8,0,0"
-                        Padding="16,12">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                <!-- Hidden search box (accessible via Ctrl+F) -->
+                <Grid x:Name="SearchBoxRow" Grid.Row="0" Visibility="Collapsed" Margin="12,8,12,8">
+                    <Border Background="White"
+                            BorderBrush="#E0E0E0"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                        <!-- Top row: Title and Count -->
-                        <Grid Grid.Row="0" Margin="0,0,0,8">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Recent Transcriptions"
-                                           FontWeight="SemiBold"
-                                           FontSize="14"
-                                           Foreground="#2C3E50"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock x:Name="HistoryCountText"
-                                           Text="• 0 items"
-                                           FontSize="12"
-                                           Foreground="#95A5A6"
-                                           Margin="8,0,0,0"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
+                            <!-- Search icon -->
+                            <TextBlock Grid.Column="0"
+                                      Text="🔍"
+                                      FontSize="12"
+                                      Foreground="#95A5A6"
+                                      Margin="0,0,6,0"
+                                      VerticalAlignment="Center"/>
 
-                            <!-- Compact action buttons (ghost style) -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button x:Name="ToggleSearchButton"
-                                        Content="🔍"
-                                        Height="28"
-                                        Width="28"
-                                        Background="Transparent"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="0"
-                                        Foreground="#7A8899"
-                                        FontSize="14"
-                                        Cursor="Hand"
-                                        Click="ToggleSearchButton_Click"
-                                        ToolTip="Toggle search box (Ctrl+F)"
-                                        Margin="0,0,8,0"/>
-                                <Button x:Name="HistoryMenuButton"
-                                        Content="•••"
-                                        Height="28"
-                                        Width="32"
-                                        Background="Transparent"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="0"
-                                        Foreground="#7A8899"
-                                        FontSize="16"
-                                        FontWeight="Bold"
-                                        Cursor="Hand"
-                                        Click="HistoryMenuButton_Click"
-                                        ToolTip="History actions">
-                                    <Button.ContextMenu>
-                                        <ContextMenu x:Name="HistoryActionsMenu">
-                                            <MenuItem Header="Clear" Click="ClearHistory_Click" ToolTip="Clear all unpinned items"/>
-                                            <MenuItem Header="Clear All" Click="ClearAllHistory_Click" ToolTip="Delete all items including pinned"/>
-                                            <Separator/>
-                                            <MenuItem Header="Export..." Click="ExportHistory_Click" ToolTip="Export history to text file"/>
-                                        </ContextMenu>
-                                    </Button.ContextMenu>
-                                </Button>
-                            </StackPanel>
+                            <!-- Search textbox -->
+                            <TextBox x:Name="HistorySearchBox"
+                                    Grid.Column="1"
+                                    BorderThickness="0"
+                                    Background="Transparent"
+                                    FontSize="12"
+                                    VerticalAlignment="Center"
+                                    TextChanged="HistorySearchBox_TextChanged"
+                                    KeyDown="HistorySearchBox_KeyDown">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TextBox">
+                                                    <Grid>
+                                                        <TextBlock Text="Search transcriptions... (Ctrl+F)"
+                                                                  FontSize="12"
+                                                                  Foreground="#95A5A6"
+                                                                  VerticalAlignment="Center"
+                                                                  Visibility="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                                        <ScrollViewer x:Name="PART_ContentHost"/>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+
+                            <!-- Clear search button -->
+                            <Button x:Name="ClearSearchButton"
+                                   Grid.Column="2"
+                                   Content="✕"
+                                   Width="20"
+                                   Height="20"
+                                   Background="Transparent"
+                                   BorderThickness="0"
+                                   Foreground="#95A5A6"
+                                   FontSize="14"
+                                   Cursor="Hand"
+                                   Click="ClearSearchButton_Click"
+                                   Visibility="Collapsed"
+                                   ToolTip="Clear search (Esc)"/>
                         </Grid>
+                    </Border>
+                </Grid>
 
-                        <!-- Bottom row: Search box (hidden by default) -->
-                        <Grid x:Name="SearchBoxRow" Grid.Row="1" Visibility="Collapsed">
-                            <Border Background="White"
-                                    BorderBrush="#E0E0E0"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="8,4">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                <!-- Hidden elements for reference in code -->
+                <TextBlock x:Name="HistoryCountText" Visibility="Collapsed" Text="0 items"/>
+                <Button x:Name="ToggleSearchButton" Visibility="Collapsed" Click="ToggleSearchButton_Click"/>
+                <Button x:Name="HistoryMenuButton" Visibility="Collapsed" Click="HistoryMenuButton_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu x:Name="HistoryActionsMenu">
+                            <MenuItem Header="Clear" Click="ClearHistory_Click"/>
+                            <MenuItem Header="Clear All" Click="ClearAllHistory_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Export..." Click="ExportHistory_Click"/>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
 
-                                    <!-- Search icon -->
-                                    <TextBlock Grid.Column="0"
-                                              Text="🔍"
-                                              FontSize="12"
-                                              Foreground="#95A5A6"
-                                              Margin="0,0,6,0"
-                                              VerticalAlignment="Center"/>
-
-                                    <!-- Search textbox -->
-                                    <TextBox x:Name="HistorySearchBox"
-                                            Grid.Column="1"
-                                            BorderThickness="0"
-                                            Background="Transparent"
-                                            FontSize="12"
-                                            VerticalAlignment="Center"
-                                            TextChanged="HistorySearchBox_TextChanged"
-                                            KeyDown="HistorySearchBox_KeyDown">
-                                        <TextBox.Style>
-                                            <Style TargetType="TextBox">
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="TextBox">
-                                                            <Grid>
-                                                                <TextBlock Text="Search transcriptions... (Ctrl+F)"
-                                                                          FontSize="12"
-                                                                          Foreground="#95A5A6"
-                                                                          VerticalAlignment="Center"
-                                                                          Visibility="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
-                                                                <ScrollViewer x:Name="PART_ContentHost"/>
-                                                            </Grid>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
-
-                                    <!-- Clear search button -->
-                                    <Button x:Name="ClearSearchButton"
-                                           Grid.Column="2"
-                                           Content="✕"
-                                           Width="20"
-                                           Height="20"
-                                           Background="Transparent"
-                                           BorderThickness="0"
-                                           Foreground="#95A5A6"
-                                           FontSize="14"
-                                           Cursor="Hand"
-                                           Click="ClearSearchButton_Click"
-                                           Visibility="Collapsed"
-                                           ToolTip="Clear search (Esc)"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Grid>
-                </Border>
-
-                <!-- Scrollable History List -->
+                <!-- Scrollable History List (clean, no header) -->
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
