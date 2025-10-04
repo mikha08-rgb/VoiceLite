@@ -147,6 +147,100 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Appearance Tab -->
+            <TabItem Header="Appearance" Name="AppearanceTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <GroupBox Header="UI Preset" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Choose your preferred UI layout:"
+                                           FontSize="13"
+                                           Foreground="#666"
+                                           Margin="0,0,0,15"/>
+
+                                <!-- Default Preset -->
+                                <RadioButton Name="PresetDefaultRadio"
+                                             GroupName="UIPreset"
+                                             IsChecked="True"
+                                             Margin="0,0,0,15"
+                                             Checked="UIPreset_Changed">
+                                    <StackPanel>
+                                        <TextBlock Text="Default (Balanced)"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="13"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="Clean and simple - perfect for most users"
+                                                   FontSize="11"
+                                                   Foreground="#7A7A7A"
+                                                   Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <!-- Compact Preset -->
+                                <RadioButton Name="PresetCompactRadio"
+                                             GroupName="UIPreset"
+                                             Margin="0,0,0,15"
+                                             Checked="UIPreset_Changed">
+                                    <StackPanel>
+                                        <TextBlock Text="Compact (Power User)"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="13"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="Maximum density - see more at a glance"
+                                                   FontSize="11"
+                                                   Foreground="#7A7A7A"
+                                                   Margin="0,0,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <!-- Status Hero Preset - DISABLED (Coming Soon) -->
+                                <RadioButton Name="PresetStatusHeroRadio"
+                                             GroupName="UIPreset"
+                                             Margin="0,0,0,0"
+                                             IsEnabled="False"
+                                             Checked="UIPreset_Changed">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Status Hero (Clear Feedback)"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="13"
+                                                       Margin="0,0,5,0"/>
+                                            <TextBlock Text="- Coming Soon"
+                                                       FontSize="11"
+                                                       Foreground="#F39C12"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Large status indicator - never miss recording state"
+                                                   FontSize="11"
+                                                   Foreground="#7A7A7A"
+                                                   Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <Border Background="#FFF9E6"
+                                        BorderBrush="#F39C12"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="10"
+                                        Margin="0,20,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚠"
+                                                   FontSize="16"
+                                                   Margin="0,0,8,0"
+                                                   VerticalAlignment="Top"/>
+                                        <TextBlock Text="Changing UI preset requires restarting VoiceLite to take effect."
+                                                   FontSize="11"
+                                                   Foreground="#856404"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="16"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- Whisper Model Tab -->
             <TabItem Header="AI Model" Name="ModelTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
@@ -603,45 +697,253 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <!-- Audio Preprocessing -->
-                        <GroupBox Header="Audio Preprocessing" Margin="0,0,0,15">
+                        <!-- Audio Enhancement -->
+                        <GroupBox Header="🎙️ Audio Enhancement" Margin="0,0,0,15">
                             <StackPanel Margin="10">
-                                <CheckBox Name="NoiseSuppressionCheckBox"
-                                          Content="Enable noise suppression"
-                                          Margin="0,0,0,5"/>
-                                <CheckBox Name="AutoGainCheckBox"
-                                          Content="Enable automatic gain control"
-                                          Margin="0,0,0,10"/>
 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150"/>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                                <!-- Quick Presets -->
+                                <Border Background="#F8F9FA" Padding="15" CornerRadius="6" Margin="0,0,0,20">
+                                    <StackPanel>
+                                        <TextBlock Text="Quick Presets" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Name="StudioPresetButton"
+                                                    Content="🎤 Studio"
+                                                    Width="140"
+                                                    Height="60"
+                                                    Margin="0,0,10,0"
+                                                    Click="StudioPreset_Click"
+                                                    ToolTip="Clear mic, quiet room">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                BorderBrush="#DDDDDD"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Padding="10">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{TemplateBinding Content}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Clear mic, quiet room" FontSize="10" Foreground="#666666" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#E8E8E8"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                            <Button Name="OfficePresetButton"
+                                                    Content="🏢 Office"
+                                                    Width="140"
+                                                    Height="60"
+                                                    Margin="0,0,10,0"
+                                                    Click="OfficePreset_Click"
+                                                    ToolTip="Noisy, fans, typing">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                BorderBrush="#DDDDDD"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Padding="10">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{TemplateBinding Content}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Noisy, fans, typing" FontSize="10" Foreground="#666666" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#E8E8E8"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                            <Button Name="DefaultPresetButton"
+                                                    Content="🎧 Default"
+                                                    Width="140"
+                                                    Height="60"
+                                                    Click="DefaultPreset_Click"
+                                                    ToolTip="Balanced settings">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                BorderBrush="#DDDDDD"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Padding="10">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{TemplateBinding Content}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="Balanced settings" FontSize="10" Foreground="#666666" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#E8E8E8"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0"
-                                               Text="Target RMS level:"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,0,10"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1"
-                                             Name="TargetRmsTextBox"
-                                             Width="60"
-                                             HorizontalAlignment="Left"
-                                             Margin="0,0,0,10"/>
+                                <!-- Volume and Clarity -->
+                                <GroupBox Header="Volume and Clarity" Margin="0,0,0,15">
+                                    <StackPanel Margin="10">
+                                        <CheckBox Name="AutoGainCheckBox"
+                                                  Content="Auto-adjust volume (recommended for quiet speech)"
+                                                  Margin="0,0,0,10"
+                                                  Checked="AudioSetting_Changed"
+                                                  Unchecked="AudioSetting_Changed"/>
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0"
-                                               Text="Noise gate threshold:"
-                                               VerticalAlignment="Center"/>
-                                    <TextBox Grid.Row="1" Grid.Column="1"
-                                             Name="NoiseThresholdTextBox"
-                                             Width="60"
-                                             HorizontalAlignment="Left"/>
-                                </Grid>
+                                        <Grid IsEnabled="{Binding IsChecked, ElementName=AutoGainCheckBox}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" Text="Volume boost:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <Slider Grid.Column="1"
+                                                    Name="VolumeBoostSlider"
+                                                    Minimum="0.05"
+                                                    Maximum="0.90"
+                                                    Value="0.2"
+                                                    TickFrequency="0.05"
+                                                    IsSnapToTickEnabled="True"
+                                                    ValueChanged="VolumeBoost_Changed"
+                                                    Margin="0,0,10,0"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Name="VolumeBoostLabel"
+                                                       Text="Light"
+                                                       Width="60"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+
+                                        <TextBlock Text="💡 Tip: Increase if Whisper says 'inaudible'"
+                                                   FontSize="11"
+                                                   Foreground="#666666"
+                                                   Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- Noise Reduction -->
+                                <GroupBox Header="Noise Reduction" Margin="0,0,0,15">
+                                    <StackPanel Margin="10">
+                                        <CheckBox Name="NoiseSuppressionCheckBox"
+                                                  Content="Remove background noise (fans, AC, keyboard)"
+                                                  Margin="0,0,0,10"
+                                                  Checked="AudioSetting_Changed"
+                                                  Unchecked="AudioSetting_Changed"/>
+
+                                        <Grid IsEnabled="{Binding IsChecked, ElementName=NoiseSuppressionCheckBox}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0" Text="Noise gate:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <Slider Grid.Column="1"
+                                                    Name="NoiseGateSlider"
+                                                    Minimum="0.001"
+                                                    Maximum="0.20"
+                                                    Value="0.02"
+                                                    TickFrequency="0.005"
+                                                    IsSnapToTickEnabled="True"
+                                                    ValueChanged="NoiseGate_Changed"
+                                                    Margin="0,0,10,0"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Name="NoiseGateLabel"
+                                                       Text="Light"
+                                                       Width="80"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+
+                                        <TextBlock Text="💡 Tip: Increase if picking up distant sounds"
+                                                   FontSize="11"
+                                                   Foreground="#666666"
+                                                   Margin="0,5,0,10"/>
+
+                                        <CheckBox Name="VADCheckBox"
+                                                  Content="Trim silence from start/end of recordings"
+                                                  IsChecked="True"
+                                                  Checked="AudioSetting_Changed"
+                                                  Unchecked="AudioSetting_Changed"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- Test Section -->
+                                <Border Background="#E3F2FD"
+                                        BorderBrush="#2196F3"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="10"
+                                        Margin="0,0,0,15">
+                                    <StackPanel>
+                                        <Button Name="TestAudioButton"
+                                                Content="🎙️ Test Microphone with Current Settings"
+                                                Height="35"
+                                                Click="TestAudio_Click"
+                                                HorizontalAlignment="Stretch"
+                                                Margin="0,0,0,10"/>
+                                        <TextBlock Name="TestResultText"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="11"
+                                                   Foreground="#1976D2"
+                                                   Visibility="Collapsed"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Advanced Options -->
+                                <Expander Header="⚙️ Advanced Options" IsExpanded="False" Margin="0,0,0,0">
+                                    <Grid Margin="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="180"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   Text="Target RMS level:"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,0,10"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1"
+                                                 Name="TargetRmsTextBox"
+                                                 Width="80"
+                                                 HorizontalAlignment="Left"
+                                                 Margin="0,0,0,10"
+                                                 TextChanged="AdvancedAudioSetting_Changed"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="2"
+                                                   Text="(0.05-0.95)"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="#666666"
+                                                   Margin="5,0,0,10"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="Noise gate threshold:"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Name="NoiseThresholdTextBox"
+                                                 Width="80"
+                                                 HorizontalAlignment="Left"
+                                                 TextChanged="AdvancedAudioSetting_Changed"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="2"
+                                                   Text="(0.001-0.20)"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="10"
+                                                   Foreground="#666666"
+                                                   Margin="5,0,0,0"/>
+                                    </Grid>
+                                </Expander>
                             </StackPanel>
                         </GroupBox>
 

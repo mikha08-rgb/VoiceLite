@@ -1960,6 +1960,156 @@ namespace VoiceLite
         /// </summary>
         private System.Windows.Controls.Border CreateHistoryCard(TranscriptionHistoryItem item)
         {
+            // Check UI preset and create appropriate card layout
+            if (settings.UIPreset == UIPreset.Compact)
+            {
+                return CreateCompactHistoryCard(item);
+            }
+            else
+            {
+                return CreateDefaultHistoryCard(item);
+            }
+        }
+
+        private System.Windows.Controls.Border CreateCompactHistoryCard(TranscriptionHistoryItem item)
+        {
+            // COMPACT PRESET: Single-line layout with timestamp + text
+            var border = new System.Windows.Controls.Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(240, 240, 240)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(0, 6, 0, 6), // Reduced padding for compact
+                Cursor = Cursors.Hand,
+                Tag = item,
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true
+            };
+
+            // Hover effects
+            border.MouseEnter += (s, e) =>
+            {
+                border.Background = new SolidColorBrush(Color.FromRgb(248, 249, 250));
+            };
+            border.MouseLeave += (s, e) =>
+            {
+                border.Background = Brushes.White;
+            };
+
+            // Single grid with columns for timestamp and text
+            var grid = new System.Windows.Controls.Grid();
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(70, GridUnitType.Pixel) }); // Timestamp
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Text
+
+            // Timestamp (left column)
+            var relativeConverter = new Utilities.RelativeTimeConverter();
+            var timeText = new System.Windows.Controls.TextBlock
+            {
+                Text = (string)relativeConverter.Convert(item.Timestamp, null!, null!, null!),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166)),
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 2, 8, 0),
+                ToolTip = item.Timestamp.ToString("MMM d, yyyy h:mm tt")
+            };
+            System.Windows.Controls.Grid.SetColumn(timeText, 0);
+            grid.Children.Add(timeText);
+
+            // Transcription text (right column) - single line with ellipsis
+            var textBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = item.Text,
+                FontSize = 13,
+                Foreground = new SolidColorBrush(Color.FromRgb(44, 62, 80)),
+                TextWrapping = TextWrapping.NoWrap, // Compact = no wrap
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Top,
+                ToolTip = item.Text
+            };
+            System.Windows.Controls.Grid.SetColumn(textBlock, 1);
+            grid.Children.Add(textBlock);
+
+            // Pin indicator if pinned (overlays on text)
+            if (item.IsPinned)
+            {
+                var pinIcon = new System.Windows.Controls.TextBlock
+                {
+                    Text = "📌",
+                    FontSize = 11,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 0, 5, 0)
+                };
+                System.Windows.Controls.Grid.SetColumn(pinIcon, 1);
+                grid.Children.Add(pinIcon);
+            }
+
+            // Context menu (same as default)
+            var contextMenu = new System.Windows.Controls.ContextMenu();
+
+            var copyMenuItem = new System.Windows.Controls.MenuItem { Header = "📋 Copy" };
+            copyMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(item.Text);
+                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    timer.Tick += (ts, te) =>
+                    {
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Copy menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(copyMenuItem);
+
+            var reinjectMenuItem = new System.Windows.Controls.MenuItem { Header = "📤 Re-inject" };
+            reinjectMenuItem.Click += (s, e) =>
+            {
+                try
+                {
+                    textInjector?.InjectText(item.Text);
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Re-inject menu item", ex);
+                }
+            };
+            contextMenu.Items.Add(reinjectMenuItem);
+
+            contextMenu.Items.Add(new System.Windows.Controls.Separator());
+
+            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
+            pinMenuItem.Click += (s, e) =>
+            {
+                historyService?.TogglePin(item.Id);
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(pinMenuItem);
+
+            var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
+            deleteMenuItem.Click += (s, e) =>
+            {
+                historyService?.RemoveFromHistory(item.Id);
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            };
+            contextMenu.Items.Add(deleteMenuItem);
+
+            border.ContextMenu = contextMenu;
+            border.Child = grid;
+            return border;
+        }
+
+        private System.Windows.Controls.Border CreateDefaultHistoryCard(TranscriptionHistoryItem item)
+        {
             // Main container
             var border = new System.Windows.Controls.Border
             {

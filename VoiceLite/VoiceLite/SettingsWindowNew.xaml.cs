@@ -44,6 +44,8 @@ namespace VoiceLite
             LoadVersionInfo();
         }
 
+        private bool isInitialized = false;
+
         private void LoadSettings()
         {
             // Hotkey Settings
@@ -70,11 +72,8 @@ namespace VoiceLite
             BestOfTextBox.Text = settings.BestOf.ToString(CultureInfo.InvariantCulture);
             TimeoutMultiplierTextBox.Text = settings.WhisperTimeoutMultiplier.ToString("0.##", CultureInfo.InvariantCulture);
 
-            // Audio Preprocessing
-            NoiseSuppressionCheckBox.IsChecked = settings.EnableNoiseSuppression;
-            AutoGainCheckBox.IsChecked = settings.EnableAutomaticGain;
-            TargetRmsTextBox.Text = settings.TargetRmsLevel.ToString("0.###", CultureInfo.InvariantCulture);
-            NoiseThresholdTextBox.Text = settings.NoiseGateThreshold.ToString("0.###", CultureInfo.InvariantCulture);
+            // Audio Enhancement - sync UI from settings
+            SyncAudioUIFromSettings();
 
             // Custom Dictionary
             EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
@@ -89,7 +88,32 @@ namespace VoiceLite
             // Text Formatting (Post-Processing)
             LoadTextFormattingSettings();
 
+            // UI Preset (Appearance)
+            LoadUIPresetSettings();
+
             // Current Model is set in SetupModelComparison
+
+            isInitialized = true;
+        }
+
+        private void LoadUIPresetSettings()
+        {
+            // Set radio button based on current UI preset
+            switch (settings.UIPreset)
+            {
+                case UIPreset.Default:
+                    PresetDefaultRadio.IsChecked = true;
+                    break;
+                case UIPreset.Compact:
+                    PresetCompactRadio.IsChecked = true;
+                    break;
+                case UIPreset.StatusHero:
+                    PresetStatusHeroRadio.IsChecked = true;
+                    break;
+                default:
+                    PresetDefaultRadio.IsChecked = true;
+                    break;
+            }
         }
 
         private void UpdateDictionaryCount()
@@ -288,7 +312,7 @@ namespace VoiceLite
             }
 
             // Track analytics if enabled
-            TrackAnalyticsChangesAsync();
+            _ = TrackAnalyticsChangesAsync();
 
             DialogResult = true;
             Close();
@@ -345,15 +369,7 @@ namespace VoiceLite
             if (double.TryParse(TimeoutMultiplierTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double timeout))
                 settings.WhisperTimeoutMultiplier = Math.Max(0.5, Math.Min(10.0, timeout));
 
-            // Audio Preprocessing
-            settings.EnableNoiseSuppression = NoiseSuppressionCheckBox.IsChecked ?? false;
-            settings.EnableAutomaticGain = AutoGainCheckBox.IsChecked ?? false;
-
-            if (float.TryParse(TargetRmsTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float targetRms))
-                settings.TargetRmsLevel = Math.Max(0.01f, Math.Min(1.0f, targetRms));
-
-            if (double.TryParse(NoiseThresholdTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double noiseThreshold))
-                settings.NoiseGateThreshold = Math.Max(0.0, Math.Min(0.5, noiseThreshold));
+            // Audio Enhancement - already saved via event handlers, no need to duplicate
 
             // Performance Settings
             settings.UseWhisperServer = UseWhisperServerCheckBox.IsChecked ?? false;
@@ -488,7 +504,7 @@ namespace VoiceLite
             // The actual save happens in SaveSettings() when they click Save/Apply
         }
 
-        private async void TrackAnalyticsChangesAsync()
+        private async Task TrackAnalyticsChangesAsync()
         {
             if (analyticsService == null)
                 return;
@@ -524,6 +540,223 @@ namespace VoiceLite
                 CancelButton_Click(this, new RoutedEventArgs());
             }
         }
+
+        #region Audio Enhancement
+
+        private void SyncAudioUIFromSettings()
+        {
+            // Sync checkboxes
+            NoiseSuppressionCheckBox.IsChecked = settings.EnableNoiseSuppression;
+            AutoGainCheckBox.IsChecked = settings.EnableAutomaticGain;
+            VADCheckBox.IsChecked = settings.UseVAD;
+
+            // Sync sliders
+            VolumeBoostSlider.Value = settings.TargetRmsLevel;
+            NoiseGateSlider.Value = settings.NoiseGateThreshold;
+
+            // Sync textboxes
+            TargetRmsTextBox.Text = settings.TargetRmsLevel.ToString("0.##", CultureInfo.InvariantCulture);
+            NoiseThresholdTextBox.Text = settings.NoiseGateThreshold.ToString("0.###", CultureInfo.InvariantCulture);
+
+            // Update labels
+            VolumeBoostLabel.Text = GetVolumeBoostLabel(settings.TargetRmsLevel);
+            NoiseGateLabel.Text = GetNoiseGateLabel(settings.NoiseGateThreshold);
+
+            // Highlight active preset button
+            HighlightPresetButton(settings.CurrentAudioPreset);
+        }
+
+        private void HighlightPresetButton(AudioPreset preset)
+        {
+            // Reset all buttons to normal weight
+            StudioPresetButton.FontWeight = FontWeights.Normal;
+            OfficePresetButton.FontWeight = FontWeights.Normal;
+            DefaultPresetButton.FontWeight = FontWeights.Normal;
+
+            // Highlight active button
+            switch (preset)
+            {
+                case AudioPreset.StudioQuality:
+                    StudioPresetButton.FontWeight = FontWeights.Bold;
+                    break;
+                case AudioPreset.OfficeNoisy:
+                    OfficePresetButton.FontWeight = FontWeights.Bold;
+                    break;
+                case AudioPreset.Default:
+                    DefaultPresetButton.FontWeight = FontWeights.Bold;
+                    break;
+                case AudioPreset.Custom:
+                    // No button highlighted for custom
+                    break;
+            }
+        }
+
+        private void StudioPreset_Click(object sender, RoutedEventArgs e)
+        {
+            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
+            SyncAudioUIFromSettings();
+            StatusText.Text = "Studio Quality preset applied";
+        }
+
+        private void OfficePreset_Click(object sender, RoutedEventArgs e)
+        {
+            settings.ApplyAudioPreset(AudioPreset.OfficeNoisy);
+            SyncAudioUIFromSettings();
+            StatusText.Text = "Office/Noisy preset applied";
+        }
+
+        private void DefaultPreset_Click(object sender, RoutedEventArgs e)
+        {
+            settings.ApplyAudioPreset(AudioPreset.Default);
+            SyncAudioUIFromSettings();
+            StatusText.Text = "Default preset applied";
+        }
+
+        private void VolumeBoost_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (VolumeBoostLabel == null || !isInitialized) return; // Not initialized
+
+            var value = (float)VolumeBoostSlider.Value;
+            settings.TargetRmsLevel = value; // Automatically clamped
+            settings.CurrentAudioPreset = AudioPreset.Custom;
+
+            // Update label text based on value ranges
+            VolumeBoostLabel.Text = GetVolumeBoostLabel(value);
+
+            // Sync advanced textbox
+            TargetRmsTextBox.Text = value.ToString("F2", CultureInfo.InvariantCulture);
+
+            // Update preset button highlighting
+            HighlightPresetButton(AudioPreset.Custom);
+        }
+
+        private string GetVolumeBoostLabel(float value)
+        {
+            if (value < 0.15f) return "Very Light";
+            if (value < 0.25f) return "Light";
+            if (value < 0.35f) return "Medium";
+            if (value < 0.50f) return "Strong";
+            return "Maximum";
+        }
+
+        private void NoiseGate_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (NoiseGateLabel == null || !isInitialized) return; // Not initialized
+
+            var value = NoiseGateSlider.Value;
+            settings.NoiseGateThreshold = value; // Automatically clamped
+            settings.CurrentAudioPreset = AudioPreset.Custom;
+
+            // Update label text based on value ranges
+            NoiseGateLabel.Text = GetNoiseGateLabel(value);
+
+            // Sync advanced textbox
+            NoiseThresholdTextBox.Text = value.ToString("F3", CultureInfo.InvariantCulture);
+
+            // Update preset button highlighting
+            HighlightPresetButton(AudioPreset.Custom);
+        }
+
+        private string GetNoiseGateLabel(double value)
+        {
+            if (value < 0.01) return "Silent";
+            if (value < 0.03) return "Light";
+            if (value < 0.06) return "Medium";
+            if (value < 0.10) return "Aggressive";
+            return "Maximum";
+        }
+
+        private void AudioSetting_Changed(object sender, RoutedEventArgs e)
+        {
+            if (settings == null || !isInitialized) return;
+
+            settings.EnableAutomaticGain = AutoGainCheckBox.IsChecked ?? false;
+            settings.EnableNoiseSuppression = NoiseSuppressionCheckBox.IsChecked ?? false;
+            settings.UseVAD = VADCheckBox.IsChecked ?? true;
+            settings.CurrentAudioPreset = AudioPreset.Custom;
+
+            // Update preset button highlighting
+            HighlightPresetButton(AudioPreset.Custom);
+        }
+
+        private async void TestAudio_Click(object sender, RoutedEventArgs e)
+        {
+            TestAudioButton.IsEnabled = false;
+            TestResultText.Visibility = Visibility.Visible;
+            TestResultText.Text = "Recording 3 seconds... Speak now!";
+
+            try
+            {
+                var tempFile = Path.Combine(Path.GetTempPath(), $"voicelite_test_{Guid.NewGuid()}.wav");
+
+                // Record 3 seconds
+                using (var recorder = new AudioRecorder())
+                {
+                    recorder.StartRecording();
+                    await Task.Delay(3000);
+                    recorder.StopRecording();
+                    await Task.Delay(500); // Wait for file write
+                }
+
+                // Process with current settings (if file exists)
+                if (File.Exists(tempFile))
+                {
+                    var stats = AudioPreprocessor.ProcessAudioFileWithStats(tempFile, settings);
+
+                    // Display results
+                    var result = "✅ Test complete!\n";
+                    result += $"Duration: {stats.OriginalDurationSeconds:F2}s";
+                    if (stats.TrimmedSilenceMs > 0)
+                        result += $" → {stats.ProcessedDurationSeconds:F2}s (trimmed {stats.TrimmedSilenceMs:F0}ms)";
+                    result += $"\nPeak: {stats.OriginalPeakLevel:F2}";
+                    if (stats.AutoGainApplied)
+                        result += $" → {stats.ProcessedPeakLevel:F2}";
+                    if (stats.NoiseSuppressionApplied)
+                        result += "\nNoise reduction: ✅ Applied";
+
+                    TestResultText.Text = result;
+
+                    // Cleanup
+                    try { File.Delete(tempFile); } catch { }
+                }
+                else
+                {
+                    TestResultText.Text = "❌ No audio file created";
+                }
+            }
+            catch (Exception ex)
+            {
+                TestResultText.Text = $"❌ Test failed: {ex.Message}";
+                ErrorLogger.LogError("AudioTest", ex);
+            }
+            finally
+            {
+                TestAudioButton.IsEnabled = true;
+            }
+        }
+
+        private void AdvancedAudioSetting_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (settings == null || !isInitialized) return;
+
+            // Parse and clamp, sync with sliders
+            if (float.TryParse(TargetRmsTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float rms))
+            {
+                settings.TargetRmsLevel = rms; // Auto-clamped by Settings.cs
+                VolumeBoostSlider.Value = settings.TargetRmsLevel;
+            }
+
+            if (double.TryParse(NoiseThresholdTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double threshold))
+            {
+                settings.NoiseGateThreshold = threshold; // Auto-clamped
+                NoiseGateSlider.Value = settings.NoiseGateThreshold;
+            }
+
+            settings.CurrentAudioPreset = AudioPreset.Custom;
+            HighlightPresetButton(AudioPreset.Custom);
+        }
+
+        #endregion
 
         #region Text Formatting Tab
 
@@ -807,7 +1040,25 @@ namespace VoiceLite
         private void ManageCustomFillerWords_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("Custom filler words management coming soon!", "Feature In Development", MessageBoxButton.OK, MessageBoxImage.Information);
-            // TODO: Open FillerWordListEditor dialog
+        }
+
+        private void UIPreset_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!isInitialized) return;
+
+            // Update settings based on selected radio button
+            if (PresetDefaultRadio.IsChecked == true)
+            {
+                settings.UIPreset = UIPreset.Default;
+            }
+            else if (PresetCompactRadio.IsChecked == true)
+            {
+                settings.UIPreset = UIPreset.Compact;
+            }
+            else if (PresetStatusHeroRadio.IsChecked == true)
+            {
+                settings.UIPreset = UIPreset.StatusHero;
+            }
         }
 
         #endregion
