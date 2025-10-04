@@ -388,7 +388,8 @@ namespace VoiceLite
             {
                 // Refresh the count display
                 UpdateDictionaryCount();
-                StatusText.Text = "Dictionary updated";
+                saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist dictionary changes immediately
+                StatusText.Text = "Dictionary updated and saved";
             }
         }
 
@@ -428,7 +429,8 @@ namespace VoiceLite
                     }
                 }
                 UpdateDictionaryCount();
-                StatusText.Text = $"Loaded {added} {templateName} entries";
+                saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist template entries immediately
+                StatusText.Text = $"Loaded {added} {templateName} entries and saved";
             }
         }
 
