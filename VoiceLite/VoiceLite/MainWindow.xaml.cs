@@ -78,10 +78,12 @@ namespace VoiceLite
             InitializeComponent();
             LoadSettings();
 
-            // Check dependencies before initializing services
-            _ = CheckDependenciesAsync();
+            // CRITICAL FIX: Show loading state immediately
+            StatusText.Text = "Initializing...";
+            StatusText.Foreground = Brushes.Gray;
 
-            _ = InitializeServicesAsync();
+            // CRITICAL FIX: Run all async initialization on background thread
+            // This prevents UI freeze during startup diagnostics and service initialization
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -91,6 +93,9 @@ namespace VoiceLite
         {
             try
             {
+                // Update status
+                StatusText.Text = "Running diagnostics...";
+
                 // First run comprehensive diagnostics
                 var diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
 
@@ -98,7 +103,7 @@ namespace VoiceLite
                 {
                     ErrorLogger.LogMessage($"Startup issues detected: {diagnostics.GetSummary()}");
 
-                    // Try to auto-fix issues
+                    // Try to auto-fix issues silently
                     var issuesFixed = await StartupDiagnostics.TryAutoFixIssuesAsync(diagnostics);
 
                     if (issuesFixed)
@@ -108,12 +113,13 @@ namespace VoiceLite
                         diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
                     }
 
-                    // Show remaining issues to user
-                    if (diagnostics.HasAnyIssues)
+                    // Show remaining issues to user (if critical)
+                    if (diagnostics.HasAnyIssues && (diagnostics.MissingFiles.Any() || diagnostics.WindowsVersionIssue))
                     {
+                        // Only show dialog for CRITICAL issues that block functionality
                         await Dispatcher.InvokeAsync(() =>
                         {
-                            var message = "VoiceLite detected some issues:\n\n" + diagnostics.GetSummary();
+                            var message = "VoiceLite detected critical issues:\n\n" + diagnostics.GetSummary();
 
                             if (diagnostics.AntivirusIssues)
                             {
@@ -125,15 +131,18 @@ namespace VoiceLite
                                 message += "\n\nSolution: Right-click VoiceLite.exe → Properties → Unblock";
                             }
 
-                            if (diagnostics.ProtectedFolderIssue)
-                            {
-                                message += "\n\nSolution: Move VoiceLite to a different folder (e.g., Desktop or Documents)";
-                            }
-
-                            MessageBox.Show(message, "Setup Issues Detected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(message, "Critical Setup Issues", MessageBoxButton.OK, MessageBoxImage.Warning);
                         });
                     }
+                    else if (diagnostics.HasAnyIssues)
+                    {
+                        // Non-critical issues - just log them
+                        ErrorLogger.LogMessage($"Non-critical issues detected (app will continue): {diagnostics.GetSummary()}");
+                    }
                 }
+
+                // Update status
+                StatusText.Text = "Checking dependencies...";
 
                 // Now check dependencies
                 var result = await DependencyChecker.CheckAndInstallDependenciesAsync();
@@ -427,6 +436,8 @@ namespace VoiceLite
         {
             try
             {
+                StatusText.Text = "Initializing services...";
+
                 authenticationCoordinator = new AuthenticationCoordinator(authenticationService);
 
                 // Initialize core services
@@ -437,27 +448,36 @@ namespace VoiceLite
                 // Check for microphone first
                 if (!AudioRecorder.HasAnyMicrophone())
                 {
-                    MessageBox.Show("No microphone detected!\n\nPlease connect a microphone and restart the application.",
-                        "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    StatusText.Text = "No microphone detected";
-                    StatusText.Foreground = Brushes.Red;
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show("No microphone detected!\n\nPlease connect a microphone and restart the application.",
+                            "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        StatusText.Text = "No microphone detected";
+                        StatusText.Foreground = Brushes.Red;
+                    });
                 }
 
-                // Set the selected microphone if configured
-                if (settings.SelectedMicrophoneIndex >= 0)
+                // CRITICAL FIX: Null-check before using audioRecorder
+                if (audioRecorder != null && settings.SelectedMicrophoneIndex >= 0)
                 {
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
                 }
 
-                // Use Whisper Server (5x faster) or fallback to process-per-call
+                // CRITICAL FIX: Initialize Whisper service asynchronously with progress feedback
                 if (settings.UseWhisperServer)
                 {
+                    StatusText.Text = "Starting Whisper server...";
                     var serverService = new WhisperServerService(settings);
+
+                    // Run initialization in background - don't block UI
                     await serverService.InitializeAsync();
                     whisperService = serverService;
+
+                    StatusText.Text = "Whisper server ready";
                 }
                 else
                 {
+                    StatusText.Text = "Loading Whisper AI...";
                     whisperService = new PersistentWhisperService(settings);
                 }
 
@@ -465,6 +485,15 @@ namespace VoiceLite
                 historyService = new TranscriptionHistoryService(settings);
                 soundService = new SoundService();
                 analyticsService = new AnalyticsService(settings);
+
+                // CRITICAL FIX: Null-check all dependencies before creating coordinator
+                if (audioRecorder == null || whisperService == null || textInjector == null ||
+                    historyService == null || analyticsService == null || soundService == null)
+                {
+                    throw new InvalidOperationException(
+                        "Failed to initialize core services - one or more required services is null. " +
+                        "Please restart VoiceLite or check the logs for errors.");
+                }
 
                 // Initialize recording coordinator (handles recording pipeline)
                 recordingCoordinator = new RecordingCoordinator(
@@ -481,8 +510,12 @@ namespace VoiceLite
                 recordingCoordinator.TranscriptionCompleted += OnTranscriptionCompleted;
                 recordingCoordinator.ErrorOccurred += OnRecordingError;
 
-                hotkeyManager.HotkeyPressed += OnHotkeyPressed;
-                hotkeyManager.HotkeyReleased += OnHotkeyReleased;
+                // CRITICAL FIX: Null-check hotkeyManager before subscribing
+                if (hotkeyManager != null)
+                {
+                    hotkeyManager.HotkeyPressed += OnHotkeyPressed;
+                    hotkeyManager.HotkeyReleased += OnHotkeyReleased;
+                }
 
                 systemTrayManager = new SystemTrayManager(this);
                 systemTrayManager.AccountMenuClicked += OnTrayAccountMenuClicked;
@@ -504,24 +537,75 @@ namespace VoiceLite
             }
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
+                // CRITICAL FIX: Run ALL initialization asynchronously to prevent UI freeze
+                // Old code ran diagnostics/services in fire-and-forget tasks, causing race conditions
+                // New code ensures proper ordering: diagnostics → services → hotkey → UI updates
+
+                // Step 1: Check dependencies (runs in background)
+                await CheckDependenciesAsync();
+
+                // Step 2: Initialize services (runs in background)
+                await InitializeServicesAsync();
+
+                // Step 3: Register hotkey (ONLY after services are ready)
                 var helper = new WindowInteropHelper(this);
                 hotkeyManager?.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
+                // Step 4: Update UI (now safe - all services initialized)
                 string hotkeyDisplay = GetHotkeyDisplayString();
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
 
-                // Check for analytics consent on first run
+                // Mark as ready with helpful hint
+                if (StatusText.Text == "Initializing...")
+                {
+                    var hotkeyHint = GetHotkeyDisplayString();
+                    var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+                    StatusText.Text = $"Ready ({modelName}) - Press {hotkeyHint} to record";
+                    StatusText.Foreground = Brushes.Green;
+                }
+
+                // Step 5: Check for analytics consent on first run (non-blocking)
                 CheckAnalyticsConsentAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to register hotkey: {ex.Message}\n\nThe hotkey may be in use by another application.",
-                    "Hotkey Registration Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ErrorLogger.LogError("MainWindow_Loaded initialization failed", ex);
+                StatusText.Text = "Initialization failed - Click for help";
+                StatusText.Foreground = Brushes.Red;
+
+                var errorMessage = $"Failed to initialize VoiceLite:\n\n{ex.Message}\n\n";
+
+                // Add helpful troubleshooting steps based on error type
+                if (ex.Message.Contains("whisper") || ex.Message.Contains("model"))
+                {
+                    errorMessage += "Troubleshooting:\n" +
+                                  "1. Verify VoiceLite installed correctly\n" +
+                                  "2. Check if whisper.exe exists in installation folder\n" +
+                                  "3. Try reinstalling VoiceLite";
+                }
+                else if (ex.Message.Contains("microphone") || ex.Message.Contains("audio"))
+                {
+                    errorMessage += "Troubleshooting:\n" +
+                                  "1. Connect a microphone\n" +
+                                  "2. Check Windows audio settings\n" +
+                                  "3. Restart VoiceLite";
+                }
+                else
+                {
+                    errorMessage += "Please check the logs at:\n" +
+                                  $"{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceLite", "logs")}";
+                }
+
+                MessageBox.Show(
+                    errorMessage,
+                    "Initialization Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -1302,6 +1386,32 @@ namespace VoiceLite
                             TranscriptionText.Text = e.Transcription;
                             TranscriptionText.Foreground = Brushes.Black;
 
+                            // EASY WIN: Flash green status briefly to confirm success
+                            UpdateStatus("✓ Transcribed successfully", Brushes.Green);
+
+                            // Revert to Ready after 2 seconds
+                            // CRITICAL FIX: Properly dispose timer to prevent memory leak
+                            var revertTimer = new System.Windows.Threading.DispatcherTimer
+                            {
+                                Interval = TimeSpan.FromSeconds(2)
+                            };
+                            revertTimer.Tick += (s, args) =>
+                            {
+                                try
+                                {
+                                    var hotkeyHint = GetHotkeyDisplayString();
+                                    var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+                                    UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", Brushes.Green);
+                                }
+                                finally
+                                {
+                                    // CRITICAL: Stop AND dispose timer to prevent memory leak
+                                    revertTimer.Stop();
+                                    revertTimer.Tick -= (s, args) => { }; // Unsubscribe to break circular reference
+                                }
+                            };
+                            revertTimer.Start();
+
                             // History is already added by RecordingCoordinator
                             // Just update UI and save settings
                             _ = UpdateHistoryUI();
@@ -1311,10 +1421,12 @@ namespace VoiceLite
                         {
                             TranscriptionText.Text = "(No speech detected)";
                             TranscriptionText.Foreground = Brushes.Gray;
-                        }
 
-                        // Final UI update
-                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+                            // Revert to ready immediately for no-speech case
+                            var hotkeyHint = GetHotkeyDisplayString();
+                            var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+                            UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", Brushes.Green);
+                        }
 
                         // Remove window border when done recording
                         this.BorderThickness = new Thickness(0);

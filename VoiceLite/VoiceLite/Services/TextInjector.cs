@@ -245,25 +245,51 @@ namespace VoiceLite.Services
                             // This gives paste operation more time to complete on slow systems
                             await Task.Delay(300);
 
-                            // ALWAYS restore original clipboard after delay
-                            // We assume paste operation completed successfully
-                            // If user copied something new during this window, that's their intent
-                            for (int attempt = 0; attempt < 3; attempt++)
+                            // CRITICAL FIX: Check if clipboard was modified by user before restoring
+                            // Only restore if clipboard still contains our transcription text
+                            // This prevents overwriting user's new clipboard content during the 300ms window
+                            string? currentClipboard = null;
+                            try
                             {
-                                try
+                                if (Clipboard.ContainsText())
                                 {
-                                    SetClipboardText(clipboardToRestore);
-                                    ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
-                                    break;
+                                    currentClipboard = Clipboard.GetText();
                                 }
-                                catch (Exception ex)
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorLogger.LogMessage($"Failed to check current clipboard: {ex.Message}");
+                                // Can't check clipboard state - skip restoration to be safe
+                                return;
+                            }
+
+                            // Only restore if clipboard is unchanged (still has our transcription)
+                            // or is empty (paste completed and cleared it)
+                            if (string.IsNullOrEmpty(currentClipboard) || currentClipboard == text)
+                            {
+                                // Safe to restore - clipboard hasn't been modified by user
+                                for (int attempt = 0; attempt < 3; attempt++)
                                 {
-                                    ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
-                                    if (attempt < 2)
-                                        await Task.Delay(50);
-                                    else
-                                        ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                                    try
+                                    {
+                                        SetClipboardText(clipboardToRestore);
+                                        ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
+                                        break;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
+                                        if (attempt < 2)
+                                            await Task.Delay(50);
+                                        else
+                                            ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                                    }
                                 }
+                            }
+                            else
+                            {
+                                // User copied something new - don't overwrite it!
+                                ErrorLogger.LogMessage("Clipboard was modified by user - skipping restoration to preserve user's clipboard");
                             }
                         }
                         catch (Exception ex)

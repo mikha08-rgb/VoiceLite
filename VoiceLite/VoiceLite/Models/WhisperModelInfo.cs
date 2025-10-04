@@ -38,6 +38,22 @@ namespace VoiceLite.Models
             return $"{len:0.#} {sizes[order]}";
         }
 
+        /// <summary>
+        /// Gets the display name for a model file name (e.g., "ggml-small.bin" → "Pro")
+        /// </summary>
+        public static string GetDisplayName(string fileName)
+        {
+            return fileName?.ToLower() switch
+            {
+                "ggml-tiny.bin" => "Lite",
+                "ggml-base.bin" => "Swift",
+                "ggml-small.bin" => "Pro",
+                "ggml-medium.bin" => "Elite",
+                "ggml-large-v3.bin" => "Ultra",
+                _ => "Unknown"
+            };
+        }
+
         public static List<WhisperModelInfo> GetAvailableModels(string whisperPath)
         {
             var models = new List<WhisperModelInfo>
