@@ -348,5 +348,16 @@ namespace VoiceLite.Tests.Services
             // Assert
             coordinator.IsRecording.Should().BeFalse();
         }
+
+        // NOTE: Watchdog timer test is omitted because:
+        // 1. It requires waiting 2 minutes (120 seconds) which makes tests too slow
+        // 2. AudioFileReady is an internal event that's hard to trigger via reflection
+        // 3. The watchdog is tested manually during development and integration testing
+        //
+        // The watchdog timer implementation in RecordingCoordinator:
+        // - Starts when transcription begins (OnAudioFileReady)
+        // - Checks every 10 seconds if transcription has been running > 120 seconds
+        // - Fires TranscriptionCompleted with error if timeout is detected
+        // - Stops when transcription completes or errors out
     }
 }

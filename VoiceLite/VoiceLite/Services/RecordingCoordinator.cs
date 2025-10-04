@@ -25,6 +25,11 @@ namespace VoiceLite.Services
         private bool isCancelled = false;
         private DateTime recordingStartTime;
         private readonly object recordingLock = new object();
+        private System.Threading.Timer? transcriptionWatchdog;
+        private volatile bool isTranscribing = false;
+        private volatile bool transcriptionCompleted = false; // Prevents duplicate completion events
+        private DateTime transcriptionStartTime;
+        private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
 
         // Events for MainWindow to subscribe to
         public event EventHandler<RecordingStatusEventArgs>? StatusChanged;
@@ -188,35 +193,15 @@ namespace VoiceLite.Services
             {
                 ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
                 isCancelled = false;
-                await CleanupAudioFileAsync(audioFilePath);
+                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                 return;
             }
 
+            // PERFORMANCE: Use original audio file directly (no copy needed)
+            // AudioRecorder already creates unique temp files per recording
+            // Semaphore in WhisperService prevents concurrent access
+            // We still need to clean up the original file after transcription
             string workingAudioPath = audioFilePath;
-            bool createdCopy = false;
-
-            try
-            {
-                // Create isolated copy of audio file to avoid race conditions
-                if (File.Exists(audioFilePath))
-                {
-                    var audioDirectory = Path.GetDirectoryName(audioFilePath);
-                    if (!string.IsNullOrEmpty(audioDirectory))
-                    {
-                        var uniqueFileName = $"audio_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.wav";
-                        var tempCopyPath = Path.Combine(audioDirectory, uniqueFileName);
-                        File.Copy(audioFilePath, tempCopyPath);
-                        workingAudioPath = tempCopyPath;
-                        createdCopy = true;
-                        ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Using isolated copy {workingAudioPath}");
-                    }
-                }
-            }
-            catch (Exception copyEx)
-            {
-                ErrorLogger.LogError("RecordingCoordinator.OnAudioFileReady.CopyAudio", copyEx);
-                workingAudioPath = audioFilePath;
-            }
 
             // Notify UI that transcription is starting
             StatusChanged?.Invoke(this, new RecordingStatusEventArgs
@@ -225,11 +210,20 @@ namespace VoiceLite.Services
                 IsRecording = false
             });
 
+            // Start watchdog timer to detect stuck transcriptions
+            StartTranscriptionWatchdog();
+
             try
             {
                 // Run transcription on background thread
                 var transcription = await Task.Run(async () =>
-                    await whisperService.TranscribeAsync(workingAudioPath));
+                    await whisperService.TranscribeAsync(workingAudioPath).ConfigureAwait(false)).ConfigureAwait(false);
+
+                // Mark as completed FIRST to prevent watchdog from firing duplicate event
+                transcriptionCompleted = true;
+
+                // Stop watchdog timer - transcription completed successfully
+                StopTranscriptionWatchdog();
 
                 ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
 
@@ -275,7 +269,7 @@ namespace VoiceLite.Services
                     }
 
                     // Run text injection on background thread
-                    await Task.Run(() => textInjector.InjectText(transcription));
+                    await Task.Run(() => textInjector.InjectText(transcription)).ConfigureAwait(false);
                     textInjected = true;
                 }
 
@@ -291,6 +285,11 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("RecordingCoordinator.OnAudioFileReady", ex);
+
+                // Mark as completed to prevent watchdog from firing
+                transcriptionCompleted = true;
+                StopTranscriptionWatchdog();
+
                 TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
                 {
                     Transcription = string.Empty,
@@ -300,11 +299,112 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // Clean up working audio file
-                if (createdCopy && File.Exists(workingAudioPath))
+                // Always stop watchdog and cleanup (idempotent - safe to call multiple times)
+                StopTranscriptionWatchdog();
+
+                // CLEANUP: Always delete the original audio file from AudioRecorder
+                // This prevents temp files from accumulating in AppData
+                if (File.Exists(workingAudioPath))
                 {
-                    await CleanupAudioFileAsync(workingAudioPath);
+                    await CleanupAudioFileAsync(workingAudioPath).ConfigureAwait(false);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Start watchdog timer to detect stuck transcriptions
+        /// </summary>
+        private void StartTranscriptionWatchdog()
+        {
+            isTranscribing = true;
+            transcriptionCompleted = false; // Reset completion flag
+            transcriptionStartTime = DateTime.Now;
+
+            // Create watchdog timer that checks every 10 seconds
+            transcriptionWatchdog = new System.Threading.Timer(
+                callback: WatchdogCallback,
+                state: null,
+                dueTime: TimeSpan.FromSeconds(10),
+                period: TimeSpan.FromSeconds(10)
+            );
+
+            ErrorLogger.LogDebug($"RecordingCoordinator: Watchdog started - timeout={TRANSCRIPTION_TIMEOUT_SECONDS}s");
+        }
+
+        /// <summary>
+        /// Stop watchdog timer - safe to call multiple times
+        /// </summary>
+        private void StopTranscriptionWatchdog()
+        {
+            isTranscribing = false;
+
+            var watchdog = transcriptionWatchdog;
+            transcriptionWatchdog = null; // Clear reference first to prevent double-dispose
+
+            if (watchdog != null)
+            {
+                try
+                {
+                    watchdog.Dispose();
+                    ErrorLogger.LogDebug("RecordingCoordinator: Watchdog stopped");
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already disposed, ignore
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("RecordingCoordinator: Error stopping watchdog", ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Watchdog callback - detects if transcription has been stuck too long
+        /// CRITICAL: Must never throw exceptions (runs on timer thread)
+        /// </summary>
+        private void WatchdogCallback(object? state)
+        {
+            try
+            {
+                // CRITICAL: Check if already completed to prevent duplicate events
+                if (!isTranscribing || transcriptionCompleted)
+                    return;
+
+                var elapsed = DateTime.Now - transcriptionStartTime;
+                ErrorLogger.LogDebug($"RecordingCoordinator: Watchdog check - elapsed={elapsed.TotalSeconds:F0}s");
+
+                if (elapsed.TotalSeconds > TRANSCRIPTION_TIMEOUT_SECONDS)
+                {
+                    ErrorLogger.LogWarning($"RecordingCoordinator: Watchdog TIMEOUT! Transcription stuck for {elapsed.TotalSeconds:F0}s");
+
+                    // Mark as completed FIRST to prevent race condition with normal completion
+                    transcriptionCompleted = true;
+
+                    // Stop the watchdog
+                    StopTranscriptionWatchdog();
+
+                    // Fire error event to reset UI state (only if not already completed)
+                    TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
+                    {
+                        Transcription = string.Empty,
+                        ErrorMessage = $"Transcription timed out after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds.\n\n" +
+                                     "This may be caused by:\n" +
+                                     "• Whisper process hung or crashed\n" +
+                                     "• System running low on memory\n" +
+                                     "• Antivirus blocking the process\n\n" +
+                                     "Try restarting the application or using a smaller model.",
+                        Success = false
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // CRITICAL: Watchdog runs on timer thread - exceptions must not escape
+                ErrorLogger.LogError("RecordingCoordinator: Watchdog callback exception", ex);
+
+                // Try to stop watchdog even if error occurred
+                try { StopTranscriptionWatchdog(); } catch { /* ignore */ }
             }
         }
 
@@ -334,6 +434,8 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
+            StopTranscriptionWatchdog();
+
             if (audioRecorder != null)
             {
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
