@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:VoiceLite.Utilities"
-        Title="VoiceLite" Height="500" Width="620"
+        Title="VoiceLite" Height="440" Width="520"
         Icon="VoiceLite.ico"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
@@ -23,49 +23,49 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Window.Resources>
 
-    <Grid Margin="20">
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- Title bar -->
-            <RowDefinition Height="Auto"/>   <!-- Config info -->
-            <RowDefinition Height="*"/>      <!-- History panel (fills ALL space) -->
+            <RowDefinition Height="*"/>      <!-- History panel -->
             <RowDefinition Height="Auto"/>   <!-- Buttons -->
         </Grid.RowDefinitions>
 
         <!-- Title bar with status -->
-        <Grid Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="VoiceLite"
-                       FontSize="16" FontWeight="SemiBold"
-                       Foreground="#4A4A4A"
-                       HorizontalAlignment="Left"/>
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="VoiceLite"
+                          FontSize="15" FontWeight="SemiBold"
+                          Foreground="#4A4A4A"
+                          Margin="0,0,8,0"/>
+                <TextBlock Text="•"
+                          FontSize="15"
+                          Foreground="#D0D0D0"
+                          Margin="0,0,8,0"/>
+                <TextBlock x:Name="InstructionText"
+                          Text="Press Left Alt to record"
+                          FontSize="13"
+                          Foreground="#7A7A7A"/>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Fill="#C8E6C9" Margin="0,0,6,0"/>
+                <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="#C8E6C9" Margin="0,0,5,0"/>
                 <TextBlock x:Name="StatusText" Text="Ready"
-                          Foreground="#7A7A7A" FontWeight="Normal" FontSize="14"/>
+                          Foreground="#7A7A7A" FontWeight="Normal" FontSize="12"/>
             </StackPanel>
         </Grid>
 
-        <!-- Configuration information (simplified) -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,8" Orientation="Horizontal">
-            <TextBlock Text="Hotkey: " Foreground="#7A7A7A" FontSize="13"/>
-            <TextBlock x:Name="HotkeyText" Text="F1" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
-
-            <TextBlock Text="  •  " Foreground="#E0E0E0" FontSize="13" VerticalAlignment="Center"/>
-
-            <TextBlock Text="Model: " Foreground="#7A7A7A" FontSize="13"/>
-            <TextBlock x:Name="ModelText" Text="Lite (Free)" Foreground="#4A4A4A" FontWeight="SemiBold" FontSize="13"/>
-
-            <!-- Hidden UI elements used for state storage (not displayed but referenced in MainWindow.xaml.cs) -->
-            <TextBlock x:Name="MicrophoneText" Text="Default" Visibility="Collapsed"/>
-            <TextBlock x:Name="AccountStatusText" Text="Not signed in" Visibility="Collapsed"/>
-        </StackPanel>
+        <!-- Hidden UI elements used for state storage (not displayed but referenced in MainWindow.xaml.cs) -->
+        <TextBlock x:Name="HotkeyText" Text="F1" Visibility="Collapsed"/>
+        <TextBlock x:Name="ModelText" Text="Lite (Free)" Visibility="Collapsed"/>
+        <TextBlock x:Name="MicrophoneText" Text="Default" Visibility="Collapsed"/>
+        <TextBlock x:Name="AccountStatusText" Text="Not signed in" Visibility="Collapsed"/>
 
         <!-- HISTORY PANEL (replaces transcription box - fills all remaining space) -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="1"
                 BorderBrush="#E0E0E0"
                 BorderThickness="1"
                 Background="White"
-                CornerRadius="8"
-                Margin="0,0,0,12">
+                CornerRadius="6"
+                Margin="0,0,0,10">
             <Border.Effect>
                 <DropShadowEffect Color="#000000" BlurRadius="6" ShadowDepth="1" Opacity="0.06" Direction="270"/>
             </Border.Effect>
@@ -201,64 +201,97 @@
             </Grid>
         </Border>
 
-        <!-- Buttons -->
-        <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <!-- Two Buttons (VoiceShortcuts + Settings) -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="VoiceShortcutsButton"
+                    Content="VoiceShortcuts"
+                    Height="36"
+                    Width="155"
+                    Margin="0,0,10,0"
+                    Background="White"
+                    Foreground="#4A4A4A"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    FontWeight="SemiBold"
+                    FontSize="13"
+                    Cursor="Hand"
+                    Click="VoiceShortcutsButton_Click"
+                    ToolTip="Manage custom word replacements">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F5F5F5"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#E8E8E8"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
 
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="8"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <Button x:Name="SettingsButton"
+                    Content="Settings"
+                    Height="36"
+                    Width="155"
+                    Background="#4169E1"
+                    Foreground="White"
+                    BorderBrush="#4169E1"
+                    BorderThickness="0"
+                    FontWeight="SemiBold"
+                    FontSize="13"
+                    Cursor="Hand"
+                    Click="SettingsButton_Click"
+                    ToolTip="Open settings (Ctrl+,)">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#5383EC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#2952CC"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
 
-                <Button x:Name="DictionaryButton"
-                        Grid.Column="0"
-                        Content="VoiceShortcuts"
-                        Height="40"
-                        Background="#F5F5F5"
-                        Foreground="#2C3E50"
-                        BorderBrush="#E0E0E0"
-                        BorderThickness="1"
-                        FontWeight="SemiBold"
-                        FontSize="13"
-                        Cursor="Hand"
-                        Click="DictionaryButton_Click"
-                        ToolTip="Manage voice shortcuts and custom word replacements (Ctrl+D)"/>
-
-                <Button x:Name="SettingsButton"
-                        Grid.Column="2"
-                        Content="Settings"
-                        Height="40"
-                        Background="#4169E1"
-                        Foreground="White"
-                        BorderBrush="#4169E1"
-                        BorderThickness="1"
-                        FontWeight="SemiBold"
-                        FontSize="13"
-                        Cursor="Hand"
-                        Click="SettingsButton_Click"
-                        ToolTip="Open settings (Ctrl+,)"/>
-
-                <!-- Account button removed - access via system tray menu -->
-            </Grid>
-
-            <CheckBox Grid.Row="1"
-                     x:Name="MinimizeCheckBox"
-                     Content="Minimize to system tray on close"
-                     Foreground="#7A7A7A"
-                     FontSize="12"
-                     IsChecked="True"
-                     HorizontalAlignment="Left"
-                     Margin="0,16,0,0"/>
-        </Grid>
+        <!-- Hidden minimize checkbox (still functional via code-behind) -->
+        <CheckBox x:Name="MinimizeCheckBox"
+                 Content="Minimize to system tray on close"
+                 IsChecked="True"
+                 Visibility="Collapsed"/>
 
         <!-- Hidden transcription text box for state storage (referenced in MainWindow.xaml.cs) -->
         <TextBox x:Name="TranscriptionText"
-                 Grid.Row="2"
+                 Grid.Row="1"
                  Visibility="Collapsed"
                  Text="Ready to transcribe"/>
     </Grid>
