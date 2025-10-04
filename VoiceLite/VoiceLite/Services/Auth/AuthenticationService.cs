@@ -114,7 +114,7 @@ namespace VoiceLite.Services.Auth
         {
             try
             {
-            var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     return response.ReasonPhrase;

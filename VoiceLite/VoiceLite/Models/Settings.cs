@@ -51,6 +51,21 @@ namespace VoiceLite.Models
         Casual
     }
 
+    public enum AudioPreset
+    {
+        Default,
+        StudioQuality,
+        OfficeNoisy,
+        Custom
+    }
+
+    public enum UIPreset
+    {
+        Default,        // Hybrid baseline - clean and balanced
+        Compact,        // Power user - maximum density
+        StatusHero      // Large status banner - clear visual feedback
+    }
+
     public class FillerWordLists
     {
         public bool Hesitations { get; set; } = false;  // um, uh, er, ah
@@ -158,21 +173,23 @@ namespace VoiceLite.Models
             get => _whisperTimeoutMultiplier;
             set => _whisperTimeoutMultiplier = Math.Clamp(value, 0.5, 10.0);
         }
+        // Audio Enhancement Settings
         public bool EnableNoiseSuppression { get; set; } = false;
         public bool EnableAutomaticGain { get; set; } = false;
         private float _targetRmsLevel = 0.2f;
         private double _noiseGateThreshold = 0.02;
+        public AudioPreset CurrentAudioPreset { get; set; } = AudioPreset.Default;
 
         public float TargetRmsLevel
         {
             get => _targetRmsLevel;
-            set => _targetRmsLevel = Math.Clamp(value, 0.0f, 1.0f);
+            set => _targetRmsLevel = Math.Clamp(value, 0.05f, 0.95f); // Prevent clipping/silence
         }
 
         public double NoiseGateThreshold
         {
             get => _noiseGateThreshold;
-            set => _noiseGateThreshold = Math.Clamp(value, 0.0, 1.0);
+            set => _noiseGateThreshold = Math.Clamp(value, 0.001, 0.5); // Prevent over-gating
         }
 
         public bool StartWithWindows { get; set; } = false;
@@ -239,6 +256,50 @@ namespace VoiceLite.Models
         // Post-Processing Settings
         public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
 
+        // UI Preset (Appearance)
+        public UIPreset UIPreset { get; set; } = UIPreset.Default;
+
+        /// <summary>
+        /// Apply an audio preset to configure all audio enhancement settings.
+        /// </summary>
+        public void ApplyAudioPreset(AudioPreset preset)
+        {
+            CurrentAudioPreset = preset;
+
+            switch (preset)
+            {
+                case AudioPreset.StudioQuality:
+                    // Clear mic, quiet room - optimize for clarity
+                    EnableNoiseSuppression = true;
+                    EnableAutomaticGain = true;
+                    TargetRmsLevel = 0.25f;
+                    NoiseGateThreshold = 0.01;
+                    UseVAD = true;
+                    break;
+
+                case AudioPreset.OfficeNoisy:
+                    // Background noise, fans, typing - aggressive noise reduction
+                    EnableNoiseSuppression = true;
+                    EnableAutomaticGain = true;
+                    TargetRmsLevel = 0.3f;
+                    NoiseGateThreshold = 0.04;
+                    UseVAD = true;
+                    break;
+
+                case AudioPreset.Default:
+                    // Balanced settings - good for most scenarios
+                    EnableNoiseSuppression = false;
+                    EnableAutomaticGain = false;
+                    TargetRmsLevel = 0.2f;
+                    NoiseGateThreshold = 0.02;
+                    UseVAD = true;
+                    break;
+
+                case AudioPreset.Custom:
+                    // Do nothing - user has customized settings
+                    break;
+            }
+        }
     }
 
     public class ModelBenchmarkCache

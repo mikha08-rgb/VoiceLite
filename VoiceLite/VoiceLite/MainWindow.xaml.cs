@@ -66,6 +66,7 @@ namespace VoiceLite
         private System.Timers.Timer? autoTimeoutTimer;
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
+        private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
 
         #endregion
 
@@ -466,7 +467,7 @@ namespace VoiceLite
                 memoryMonitor.MemoryAlert += OnMemoryAlert;
 
                 // Load and display existing history
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
 
                 _ = RestoreAccountAsync();
             }
@@ -718,12 +719,29 @@ namespace VoiceLite
         {
             ErrorLogger.LogDebug($"StartRecording: Entry - isRecording={isRecording}");
 
+            // CRITICAL FIX: Validate AudioRecorder is not already recording (prevents race conditions)
+            var recorder = audioRecorder;
+            if (recorder == null)
+            {
+                ErrorLogger.LogWarning("StartRecording: AudioRecorder is null, cannot start");
+                return;
+            }
+
+            if (recorder.IsRecording)
+            {
+                ErrorLogger.LogWarning("StartRecording: AudioRecorder is already recording, aborting");
+                return;
+            }
+
             // Pre-check: if already recording, do nothing
             if (isRecording)
             {
                 ErrorLogger.LogDebug("StartRecording: Already recording, returning early");
                 return;
             }
+
+            // CRITICAL FIX: Stop stuck-state recovery timer if somehow still running
+            StopStuckStateRecoveryTimer();
 
             // Set state BEFORE attempting to start (defensive)
             isRecording = true;
@@ -732,21 +750,32 @@ namespace VoiceLite
             // Delegate to coordinator
             recordingCoordinator?.StartRecording();
 
-            // Start elapsed time timer for UI updates
-            recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
+            // CRITICAL FIX: Verify recording actually started, otherwise rollback state
+            if (recorder.IsRecording)
             {
-                Interval = TimeSpan.FromSeconds(1)
-            };
-            recordingElapsedTimer.Tick += (s, e) =>
-            {
-                var elapsed = recordingCoordinator?.GetRecordingDuration() ?? TimeSpan.Zero;
-                UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush(StatusColors.Recording));
-            };
-            recordingElapsedTimer.Start();
+                // Start elapsed time timer for UI updates
+                recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                recordingElapsedTimer.Tick += (s, e) =>
+                {
+                    var elapsed = recordingCoordinator?.GetRecordingDuration() ?? TimeSpan.Zero;
+                    UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush(StatusColors.Recording));
+                };
+                recordingElapsedTimer.Start();
 
-            // Update UI
-            UpdateUIForCurrentMode();
-            TranscriptionText.Foreground = Brushes.Gray;
+                // Update UI
+                UpdateUIForCurrentMode();
+                TranscriptionText.Foreground = Brushes.Gray;
+            }
+            else
+            {
+                // Recording failed to start - rollback state
+                ErrorLogger.LogWarning("StartRecording: Recording failed to start, rolling back state");
+                isRecording = false;
+                UpdateStatus("Failed to start recording", Brushes.Red);
+            }
         }
 
         private void StopRecording(bool cancel = false)
@@ -780,6 +809,10 @@ namespace VoiceLite
                 UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
                 TranscriptionText.Text = "Processing audio...";
                 TranscriptionText.Foreground = new SolidColorBrush(StatusColors.Processing);
+
+                // CRITICAL FIX: Start stuck-state recovery timer when entering "Processing" state
+                // This ensures the app NEVER stays stuck in processing for >15 seconds
+                StartStuckStateRecoveryTimer();
             }
         }
 
@@ -976,11 +1009,99 @@ namespace VoiceLite
             }
         }
 
-        private void OnAutoTimeout(object? sender, System.Timers.ElapsedEventArgs e)
+        /// <summary>
+        /// Start global stuck-state recovery timer (15 seconds max for any processing state)
+        /// CRITICAL: Prevents app from being permanently stuck in "Processing" state
+        /// </summary>
+        private void StartStuckStateRecoveryTimer()
+        {
+            // Stop any existing timer first
+            StopStuckStateRecoveryTimer();
+
+            const int maxProcessingSeconds = 15; // 15 seconds max for "Processing" state
+
+            stuckStateRecoveryTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(maxProcessingSeconds)
+            };
+            stuckStateRecoveryTimer.Tick += OnStuckStateRecovery;
+            stuckStateRecoveryTimer.Start();
+
+            ErrorLogger.LogDebug($"StartStuckStateRecoveryTimer: Recovery timer set for {maxProcessingSeconds}s");
+        }
+
+        /// <summary>
+        /// Stop stuck-state recovery timer (safe to call multiple times)
+        /// </summary>
+        private void StopStuckStateRecoveryTimer()
+        {
+            if (stuckStateRecoveryTimer != null)
+            {
+                stuckStateRecoveryTimer.Stop();
+                stuckStateRecoveryTimer.Tick -= OnStuckStateRecovery;
+                stuckStateRecoveryTimer = null;
+                ErrorLogger.LogDebug("StopStuckStateRecoveryTimer: Recovery timer stopped");
+            }
+        }
+
+        /// <summary>
+        /// Stuck-state recovery callback - CRITICAL failsafe to prevent permanent "Processing" state
+        /// Fires if app is stuck in processing for >15 seconds without completion
+        /// </summary>
+        private void OnStuckStateRecovery(object? sender, EventArgs e)
+        {
+            ErrorLogger.LogWarning("OnStuckStateRecovery: STUCK STATE DETECTED! Forcing recovery...");
+
+            // Stop the timer immediately
+            StopStuckStateRecoveryTimer();
+
+            // Force UI back to ready state
+            try
+            {
+                TranscriptionText.Text = "Processing timed out - app recovered";
+                TranscriptionText.Foreground = Brushes.Orange;
+                UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+                this.BorderThickness = new Thickness(0);
+
+                // Reset all state flags
+                lock (recordingLock)
+                {
+                    ErrorLogger.LogWarning($"OnStuckStateRecovery: Force-resetting state - was isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                    isRecording = false;
+                    isHotkeyMode = false;
+                }
+
+                // Stop all timers
+                StopAutoTimeoutTimer();
+                recordingElapsedTimer?.Stop();
+                recordingElapsedTimer = null;
+
+                // Show user-friendly message
+                MessageBox.Show(
+                    "VoiceLite recovered from a stuck state.\n\n" +
+                    "The app was stuck processing for too long and has been reset.\n\n" +
+                    "If this happens frequently:\n" +
+                    "• Try using a smaller Whisper model\n" +
+                    "• Check if antivirus is blocking the app\n" +
+                    "• Restart VoiceLite",
+                    "Stuck State Recovery",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                // Reset UI to default mode
+                UpdateUIForCurrentMode();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnStuckStateRecovery: Failed to recover", ex);
+            }
+        }
+
+        private async void OnAutoTimeout(object? sender, System.Timers.ElapsedEventArgs e)
         {
             ErrorLogger.LogMessage("OnAutoTimeout: Auto-timeout triggered - stopping recording for safety");
 
-            Dispatcher.Invoke(() =>
+            await Dispatcher.InvokeAsync(() =>
             {
                 lock (recordingLock)
                 {
@@ -1006,9 +1127,9 @@ namespace VoiceLite
         /// <summary>
         /// Handle recording status changes from coordinator
         /// </summary>
-        private void OnRecordingStatusChanged(object? sender, RecordingStatusEventArgs e)
+        private async void OnRecordingStatusChanged(object? sender, RecordingStatusEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            await Dispatcher.InvokeAsync(() =>
             {
                 switch (e.Status)
                 {
@@ -1020,6 +1141,12 @@ namespace VoiceLite
 
                     case "Transcribing":
                         UpdateStatus("Transcribing...", new SolidColorBrush(StatusColors.Info));
+                        // CRITICAL FIX: Start recovery timer when entering transcribing state
+                        // This catches cases where StopRecording didn't start the timer
+                        if (stuckStateRecoveryTimer == null)
+                        {
+                            StartStuckStateRecoveryTimer();
+                        }
                         break;
 
                     case "Pasting":
@@ -1032,10 +1159,17 @@ namespace VoiceLite
 
                     case "Cancelled":
                         UpdateStatus("Cancelled", new SolidColorBrush(StatusColors.Inactive));
+                        // Stop recovery timer on cancel
+                        StopStuckStateRecoveryTimer();
                         break;
 
                     case "Processing":
                         UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
+                        // CRITICAL FIX: Ensure recovery timer is running when entering processing state
+                        if (stuckStateRecoveryTimer == null)
+                        {
+                            StartStuckStateRecoveryTimer();
+                        }
                         break;
                 }
             });
@@ -1044,120 +1178,190 @@ namespace VoiceLite
         /// <summary>
         /// Handle transcription completion from coordinator
         /// </summary>
-        private void OnTranscriptionCompleted(object? sender, TranscriptionCompleteEventArgs e)
+        private async void OnTranscriptionCompleted(object? sender, TranscriptionCompleteEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            try
             {
-                if (e.Success)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    // Display transcription result
-                    if (!string.IsNullOrWhiteSpace(e.Transcription))
+                    // CRITICAL FIX: Always stop the stuck-state recovery timer when transcription completes
+                    StopStuckStateRecoveryTimer();
+
+                    if (e.Success)
                     {
-                        TranscriptionText.Text = e.Transcription;
-                        TranscriptionText.Foreground = Brushes.Black;
-
-                        // History is already added by RecordingCoordinator
-                        // Just update UI and save settings
-                        UpdateHistoryUI();
-                        SaveSettings(); // Persist history to disk
-                    }
-                    else
-                    {
-                        TranscriptionText.Text = "(No speech detected)";
-                        TranscriptionText.Foreground = Brushes.Gray;
-                    }
-
-                    // Final UI update
-                    UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-
-                    // Remove window border when done recording
-                    this.BorderThickness = new Thickness(0);
-
-                    // Reset TranscriptionText to ready state after delay
-                    if (!string.IsNullOrWhiteSpace(e.Transcription))
-                    {
-                        Task.Delay(TimingConstants.TranscriptionTextResetDelayMs).ContinueWith(_ => Dispatcher.Invoke(() =>
+                        // Display transcription result
+                        if (!string.IsNullOrWhiteSpace(e.Transcription))
                         {
-                            if (!isRecording) // Only reset if not currently recording again
-                            {
-                                UpdateUIForCurrentMode();
-                            }
-                        }));
-                    }
+                            TranscriptionText.Text = e.Transcription;
+                            TranscriptionText.Foreground = Brushes.Black;
 
-                    // Reset state if needed
-                    lock (recordingLock)
-                    {
-                        // In push-to-talk mode, only reset if the key is not currently held down
-                        if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
-                        {
-                            ErrorLogger.LogMessage("OnTranscriptionCompleted: Push-to-talk mode - keeping state (key still held)");
+                            // History is already added by RecordingCoordinator
+                            // Just update UI and save settings
+                            _ = UpdateHistoryUI();
+                            SaveSettings(); // Persist history to disk
                         }
                         else
                         {
-                            ErrorLogger.LogMessage($"OnTranscriptionCompleted: Resetting state");
+                            TranscriptionText.Text = "(No speech detected)";
+                            TranscriptionText.Foreground = Brushes.Gray;
+                        }
+
+                        // Final UI update
+                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+
+                        // Remove window border when done recording
+                        this.BorderThickness = new Thickness(0);
+
+                        // Reset TranscriptionText to ready state after delay (fire-and-forget)
+                        if (!string.IsNullOrWhiteSpace(e.Transcription))
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
+                                await Dispatcher.InvokeAsync(() =>
+                                {
+                                    if (!isRecording) // Only reset if not currently recording again
+                                    {
+                                        UpdateUIForCurrentMode();
+                                    }
+                                });
+                            });
+                        }
+
+                        // Reset state if needed
+                        lock (recordingLock)
+                        {
+                            // CRITICAL FIX: Only reset state if not currently recording
+                            // This prevents old transcriptions from resetting state during new recordings
+                            var recorder = audioRecorder;
+                            bool actuallyRecording = recorder?.IsRecording ?? false;
+
+                            if (actuallyRecording)
+                            {
+                                ErrorLogger.LogMessage("OnTranscriptionCompleted: NEW recording in progress - skipping state reset");
+                                // Don't reset state, new recording is active
+                            }
+                            // In push-to-talk mode, only reset if the key is not currently held down
+                            else if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
+                            {
+                                ErrorLogger.LogMessage("OnTranscriptionCompleted: Push-to-talk mode - keeping state (key still held)");
+                            }
+                            else
+                            {
+                                ErrorLogger.LogMessage($"OnTranscriptionCompleted: Resetting state");
+                                isRecording = false;
+                                isHotkeyMode = false;
+                                StopAutoTimeoutTimer();
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // CRITICAL FIX: On error, ALWAYS force UI back to ready state
+                        // This prevents permanent "Processing" state when transcription fails
+                        ErrorLogger.LogWarning($"OnTranscriptionCompleted: Error occurred - {e.ErrorMessage}");
+
+                        TranscriptionText.Text = e.ErrorMessage ?? "Transcription error";
+                        TranscriptionText.Foreground = Brushes.Red;
+                        UpdateStatus("Error", Brushes.Red);
+
+                        // Remove window border
+                        this.BorderThickness = new Thickness(0);
+
+                        // Reset to ready state after 3 seconds (fire-and-forget)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await Task.Delay(3000);
+                                await Dispatcher.InvokeAsync(() =>
+                                {
+                                    if (!isRecording)
+                                    {
+                                        UpdateUIForCurrentMode();
+                                        UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
+                                    }
+                                });
+                            }
+                            catch { /* Dispatcher might be shut down */ }
+                        });
+
+                        // CRITICAL FIX: Only reset state on error if not currently recording
+                        lock (recordingLock)
+                        {
+                            var recorder = audioRecorder;
+                            bool actuallyRecording = recorder?.IsRecording ?? false;
+
+                            if (actuallyRecording)
+                            {
+                                ErrorLogger.LogMessage("OnTranscriptionCompleted: Error - NEW recording in progress, skipping state reset");
+                                // Don't reset state, new recording is active
+                            }
+                            else
+                            {
+                                ErrorLogger.LogMessage($"OnTranscriptionCompleted: Error - forcing state reset");
+                                isRecording = false;
+                                isHotkeyMode = false;
+                                StopAutoTimeoutTimer();
+                            }
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnTranscriptionCompleted", ex);
+                try
+                {
+                    // CRITICAL FIX: Force recovery even if exception occurs
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        StopStuckStateRecoveryTimer(); // Ensure timer is stopped
+                        TranscriptionText.Text = "Error displaying transcription";
+                        TranscriptionText.Foreground = Brushes.Red;
+                        UpdateStatus("Error", Brushes.Red);
+                        this.BorderThickness = new Thickness(0); // Remove border
+
+                        // CRITICAL FIX: Only reset state if not currently recording
+                        var recorder = audioRecorder;
+                        bool actuallyRecording = recorder?.IsRecording ?? false;
+
+                        if (!actuallyRecording)
+                        {
                             isRecording = false;
                             isHotkeyMode = false;
                             StopAutoTimeoutTimer();
                         }
-                    }
-                }
-                else
-                {
-                    // Handle error
-                    TranscriptionText.Text = e.ErrorMessage ?? "Transcription error";
-                    TranscriptionText.Foreground = Brushes.Red;
-                    UpdateStatus("Error", Brushes.Red);
-
-                    // Reset to ready state after 3 seconds
-                    Task.Delay(3000).ContinueWith(_ =>
-                    {
-                        try
-                        {
-                            Dispatcher.Invoke(() =>
-                            {
-                                if (!isRecording)
-                                {
-                                    UpdateUIForCurrentMode();
-                                    UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
-                                }
-                            });
-                        }
-                        catch { /* Dispatcher might be shut down */ }
                     });
-
-                    // Reset state on error
-                    lock (recordingLock)
-                    {
-                        if (settings.Mode == RecordMode.PushToTalk && isHotkeyMode)
-                        {
-                            ErrorLogger.LogMessage("OnTranscriptionCompleted: Error - keeping push-to-talk state (key still held)");
-                        }
-                        else
-                        {
-                            ErrorLogger.LogMessage($"OnTranscriptionCompleted: Error - resetting state");
-                            isRecording = false;
-                            isHotkeyMode = false;
-                        }
-                    }
                 }
-            });
+                catch
+                {
+                    // Dispatcher is unavailable, app is shutting down
+                }
+            }
         }
 
         /// <summary>
         /// Handle recording errors from coordinator
         /// </summary>
-        private void OnRecordingError(object? sender, string errorMessage)
+        private async void OnRecordingError(object? sender, string errorMessage)
         {
-            Dispatcher.Invoke(() =>
+            try
             {
-                isRecording = false;
-                UpdateStatus("Error", Brushes.Red);
-                UpdateUIForCurrentMode();
-                TranscriptionText.Foreground = Brushes.Black;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    isRecording = false;
+                    UpdateStatus("Error", Brushes.Red);
+                    UpdateUIForCurrentMode();
+                    TranscriptionText.Foreground = Brushes.Black;
 
-                MessageBox.Show(errorMessage, "Recording Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+                    MessageBox.Show(errorMessage, "Recording Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnRecordingError", ex);
+            }
         }
 
         private void Window_StateChanged(object sender, EventArgs e)
@@ -1168,11 +1372,11 @@ namespace VoiceLite
             }
         }
 
-        private void OnMemoryAlert(object? sender, MemoryAlertEventArgs e)
+        private async void OnMemoryAlert(object? sender, MemoryAlertEventArgs e)
         {
             if (e.Level == MemoryAlertLevel.Critical || e.Level == MemoryAlertLevel.PotentialLeak)
             {
-                Dispatcher.Invoke(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     ErrorLogger.LogMessage($"Memory alert: {e.Message}");
                     // Could show a warning to user if needed
@@ -1386,8 +1590,11 @@ namespace VoiceLite
         {
             if (authenticationCoordinator == null)
             {
-                UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                systemTrayManager?.UpdateAccountMenuText("Sign In");
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                    systemTrayManager?.UpdateAccountMenuText("Sign In");
+                });
                 return;
             }
 
@@ -1396,8 +1603,11 @@ namespace VoiceLite
                 var session = await authenticationCoordinator.TryRestoreSessionAsync().ConfigureAwait(false);
                 if (session == null)
                 {
-                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                    systemTrayManager?.UpdateAccountMenuText("Sign In");
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateAccountStatusUI("Not signed in", Brushes.Gray);
+                        systemTrayManager?.UpdateAccountMenuText("Sign In");
+                    });
                     return;
                 }
 
@@ -1433,10 +1643,13 @@ namespace VoiceLite
 
                     if (validationResult.IsInGracePeriod)
                     {
-                        var expiresAt = DateTime.Parse(validationResult.Payload!.ExpiresAt);
-                        var daysRemaining = (expiresAt - DateTime.UtcNow).Days;
-                        UpdateAccountStatusUI($"Pro license (expires in {daysRemaining} days)", Brushes.Orange);
-                        ErrorLogger.LogMessage($"License in grace period, expires in {daysRemaining} days");
+                        if (validationResult.Payload?.ExpiresAt != null)
+                        {
+                            var expiresAt = DateTime.Parse(validationResult.Payload.ExpiresAt);
+                            var daysRemaining = (expiresAt - DateTime.UtcNow).Days;
+                            UpdateAccountStatusUI($"Pro license (expires in {daysRemaining} days)", Brushes.Orange);
+                            ErrorLogger.LogMessage($"License in grace period, expires in {daysRemaining} days");
+                        }
                     }
                     else
                     {
@@ -1496,11 +1709,9 @@ namespace VoiceLite
 
         private void UpdateAccountStatusUI(string text, Brush brush)
         {
-            Dispatcher.Invoke(() =>
-            {
-                AccountStatusText.Text = text;
-                AccountStatusText.Foreground = brush;
-            });
+            // This method is always called from UI thread or inside Dispatcher.InvokeAsync
+            AccountStatusText.Text = text;
+            AccountStatusText.Foreground = brush;
         }
 
         private void ValidateWhisperModel()
@@ -1543,6 +1754,7 @@ namespace VoiceLite
             SaveSettings();
             StopAutoTimeoutTimer();
             autoTimeoutTimer = null; // Clear timer reference
+            StopStuckStateRecoveryTimer(); // Stop stuck-state recovery timer
 
             // Clean up with proper disposal order
             try
@@ -1553,7 +1765,32 @@ namespace VoiceLite
                     StopRecording(true);
                 }
 
-                // Dispose services in reverse order of creation
+                // MEMORY FIX: Unsubscribe event handlers BEFORE disposal to prevent leaks
+                if (recordingCoordinator != null)
+                {
+                    recordingCoordinator.StatusChanged -= OnRecordingStatusChanged;
+                    recordingCoordinator.TranscriptionCompleted -= OnTranscriptionCompleted;
+                    recordingCoordinator.ErrorOccurred -= OnRecordingError;
+                }
+
+                if (hotkeyManager != null)
+                {
+                    hotkeyManager.HotkeyPressed -= OnHotkeyPressed;
+                    hotkeyManager.HotkeyReleased -= OnHotkeyReleased;
+                }
+
+                if (systemTrayManager != null)
+                {
+                    systemTrayManager.AccountMenuClicked -= OnTrayAccountMenuClicked;
+                    systemTrayManager.ReportBugMenuClicked -= OnTrayReportBugMenuClicked;
+                }
+
+                if (memoryMonitor != null)
+                {
+                    memoryMonitor.MemoryAlert -= OnMemoryAlert;
+                }
+
+                // Now dispose services in reverse order of creation
                 memoryMonitor?.Dispose();
                 memoryMonitor = null;
 
@@ -1675,11 +1912,11 @@ namespace VoiceLite
         /// Updates the history panel UI with current history items.
         /// Creates visual cards for each transcription.
         /// </summary>
-        private void UpdateHistoryUI()
+        private async Task UpdateHistoryUI()
         {
             try
             {
-                Dispatcher.Invoke(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     // Update count
                     int count = settings.TranscriptionHistory?.Count ?? 0;
@@ -1824,7 +2061,7 @@ namespace VoiceLite
             pinMenuItem.Click += (s, e) =>
             {
                 historyService?.TogglePin(item.Id);
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
                 SaveSettings();
             };
             contextMenu.Items.Add(pinMenuItem);
@@ -1833,16 +2070,15 @@ namespace VoiceLite
             deleteMenuItem.Click += (s, e) =>
             {
                 historyService?.RemoveFromHistory(item.Id);
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
                 SaveSettings();
             };
             contextMenu.Items.Add(deleteMenuItem);
 
             border.ContextMenu = contextMenu;
 
-            // Content grid
+            // Content grid (simplified - no metadata row)
             var grid = new System.Windows.Controls.Grid();
-            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
 
@@ -1959,21 +2195,7 @@ namespace VoiceLite
             System.Windows.Controls.Grid.SetRow(textBlock, 1);
             grid.Children.Add(textBlock);
 
-            // Metadata
-            var metadataText = new System.Windows.Controls.TextBlock
-            {
-                FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166))
-            };
-
-            metadataText.Inlines.Add(new System.Windows.Documents.Run(item.WordCount.ToString()));
-            metadataText.Inlines.Add(new System.Windows.Documents.Run(" words • "));
-            metadataText.Inlines.Add(new System.Windows.Documents.Run($"{item.DurationSeconds:F1}s"));
-            metadataText.Inlines.Add(new System.Windows.Documents.Run(" • "));
-            metadataText.Inlines.Add(new System.Windows.Documents.Run(item.ModelUsed));
-
-            System.Windows.Controls.Grid.SetRow(metadataText, 2);
-            grid.Children.Add(metadataText);
+            // Metadata removed - cleaner UI with just timestamp + text
 
             border.Child = grid;
             return border;
@@ -1994,7 +2216,7 @@ namespace VoiceLite
             if (result == MessageBoxResult.Yes)
             {
                 int cleared = historyService?.ClearHistory() ?? 0;
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
                 SaveSettings();
 
                 MessageBox.Show(
@@ -2019,7 +2241,7 @@ namespace VoiceLite
             if (result == MessageBoxResult.Yes)
             {
                 int cleared = historyService?.ClearAllHistory() ?? 0;
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
                 SaveSettings();
 
                 MessageBox.Show(
@@ -2044,12 +2266,12 @@ namespace VoiceLite
             if (string.IsNullOrEmpty(searchText))
             {
                 // Show all items
-                UpdateHistoryUI();
+                _ = UpdateHistoryUI();
             }
             else
             {
                 // Show only matching items
-                FilterHistoryBySearch(searchText);
+                _ = FilterHistoryBySearch(searchText);
             }
         }
 
@@ -2107,11 +2329,11 @@ namespace VoiceLite
         /// <summary>
         /// Filters history items by search text.
         /// </summary>
-        private void FilterHistoryBySearch(string searchText)
+        private async Task FilterHistoryBySearch(string searchText)
         {
             try
             {
-                Dispatcher.Invoke(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     // Clear existing items
                     HistoryItemsPanel.Children.Clear();

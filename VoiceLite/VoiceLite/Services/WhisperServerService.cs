@@ -255,11 +255,11 @@ namespace VoiceLite.Services
         }
 
 
-    public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
-    {
-        // Delegate to fallback service (server.exe doesn't support in-memory transcription)
-        return await fallbackService.TranscribeFromMemoryAsync(audioData);
-    }
+        public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
+        {
+            // Delegate to fallback service (server.exe doesn't support in-memory transcription)
+            return await fallbackService.TranscribeFromMemoryAsync(audioData);
+        }
 
         public void Dispose()
         {
