@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:VoiceLite.Utilities"
-        Title="VoiceLite" Height="500" Width="620"
+        Title="VoiceLite" Height="500" Width="900"
         Icon="VoiceLite.ico"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
@@ -27,7 +27,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- Title bar -->
             <RowDefinition Height="Auto"/>   <!-- Config info -->
-            <RowDefinition Height="*"/>      <!-- History panel (fills ALL space) -->
+            <RowDefinition Height="*"/>      <!-- Main content: History + Quick Settings -->
             <RowDefinition Height="Auto"/>   <!-- Buttons -->
         </Grid.RowDefinitions>
 
@@ -59,13 +59,20 @@
             <TextBlock x:Name="AccountStatusText" Text="Not signed in" Visibility="Collapsed"/>
         </StackPanel>
 
-        <!-- HISTORY PANEL (replaces transcription box - fills all remaining space) -->
-        <Border Grid.Row="2"
+        <!-- Main Content: History + Quick Settings -->
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>      <!-- History panel -->
+                <ColumnDefinition Width="12"/>     <!-- Spacing -->
+                <ColumnDefinition Width="240"/>    <!-- Quick Settings panel -->
+            </Grid.ColumnDefinitions>
+
+        <!-- HISTORY PANEL (left side) -->
+        <Border Grid.Column="0"
                 BorderBrush="#E0E0E0"
                 BorderThickness="1"
                 Background="White"
-                CornerRadius="8"
-                Margin="0,0,0,12">
+                CornerRadius="8">
             <Border.Effect>
                 <DropShadowEffect Color="#000000" BlurRadius="6" ShadowDepth="1" Opacity="0.06" Direction="270"/>
             </Border.Effect>
@@ -200,6 +207,117 @@
                 </ScrollViewer>
             </Grid>
         </Border>
+
+        <!-- QUICK SETTINGS PANEL (right side) -->
+        <Border Grid.Column="2"
+                BorderBrush="#E0E0E0"
+                BorderThickness="1"
+                Background="White"
+                CornerRadius="8">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="6" ShadowDepth="1" Opacity="0.06" Direction="270"/>
+            </Border.Effect>
+
+            <StackPanel Margin="16">
+                <!-- Header -->
+                <TextBlock Text="⚙️ Quick Settings"
+                          FontSize="14"
+                          FontWeight="SemiBold"
+                          Foreground="#4A4A4A"
+                          Margin="0,0,0,16"/>
+
+                <!-- Fast Mode -->
+                <Border Background="#FFF9E6"
+                        BorderBrush="#FFE5B3"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="⚡ Fast Mode"
+                                  FontSize="13"
+                                  FontWeight="SemiBold"
+                                  Foreground="#8B6F00"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="QuickFastModeCheckBox"
+                                 Content="Enable (5x faster)"
+                                 FontSize="12"
+                                 Foreground="#8B6F00"
+                                 Checked="QuickFastMode_Changed"
+                                 Unchecked="QuickFastMode_Changed"/>
+                        <TextBlock x:Name="FastModeRestartHint"
+                                  Text="⚠️ Restart required"
+                                  FontSize="11"
+                                  Foreground="#D32F2F"
+                                  Margin="0,4,0,0"
+                                  Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Separator -->
+                <Border Height="1"
+                        Background="#E0E0E0"
+                        Margin="0,0,0,12"/>
+
+                <!-- VoiceShortcuts -->
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock Text="📝 VoiceShortcuts"
+                              FontSize="13"
+                              FontWeight="SemiBold"
+                              Foreground="#4A4A4A"
+                              Margin="0,0,0,6"/>
+                    <TextBlock x:Name="ShortcutsCountText"
+                              Text="0 shortcuts active"
+                              FontSize="11"
+                              Foreground="#7A7A7A"
+                              Margin="0,0,0,8"/>
+                    <Button x:Name="QuickManageShortcutsButton"
+                           Content="Manage Shortcuts..."
+                           FontSize="12"
+                           Padding="8,4"
+                           Click="QuickManageShortcuts_Click"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Border Height="1"
+                        Background="#E0E0E0"
+                        Margin="0,0,0,12"/>
+
+                <!-- Text Formatting -->
+                <StackPanel Margin="0,0,0,12">
+                    <TextBlock Text="✨ Text Formatting"
+                              FontSize="13"
+                              FontWeight="SemiBold"
+                              Foreground="#4A4A4A"
+                              Margin="0,0,0,6"/>
+                    <TextBlock x:Name="FormattingPresetText"
+                              Text="Preset: Professional"
+                              FontSize="11"
+                              Foreground="#7A7A7A"
+                              Margin="0,0,0,8"/>
+                    <Button x:Name="QuickChangeFormattingButton"
+                           Content="Change Preset..."
+                           FontSize="12"
+                           Padding="8,4"
+                           Click="QuickChangeFormatting_Click"/>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Border Height="1"
+                        Background="#E0E0E0"
+                        Margin="0,0,0,12"/>
+
+                <!-- Full Settings Link -->
+                <Button x:Name="QuickFullSettingsButton"
+                       Content="⚙️ Full Settings"
+                       FontSize="12"
+                       Padding="8,4"
+                       FontWeight="SemiBold"
+                       Click="SettingsButton_Click"/>
+            </StackPanel>
+        </Border>
+
+        </Grid> <!-- End of Main Content Grid -->
 
         <!-- Buttons -->
         <Grid Grid.Row="3">
