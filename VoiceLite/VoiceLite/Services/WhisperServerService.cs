@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using VoiceLite.Interfaces;
 using VoiceLite.Models;
@@ -46,7 +47,7 @@ namespace VoiceLite.Services
 
             try
             {
-                await StartServerAsync();
+                await StartServerAsync().ConfigureAwait(false);
                 isServerRunning = true;
                 ErrorLogger.LogMessage($"Whisper server started successfully on port {serverPort}");
             }
@@ -64,18 +65,18 @@ namespace VoiceLite.Services
             {
                 try
                 {
-                    return await TranscribeViaServerAsync(audioFilePath);
+                    return await TranscribeViaServerAsync(audioFilePath).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("Server transcription failed - falling back to process mode", ex);
                     isServerRunning = false;
-                    return await fallbackService.TranscribeAsync(audioFilePath);
+                    return await fallbackService.TranscribeAsync(audioFilePath).ConfigureAwait(false);
                 }
             }
             else
             {
-                return await fallbackService.TranscribeAsync(audioFilePath);
+                return await fallbackService.TranscribeAsync(audioFilePath).ConfigureAwait(false);
             }
         }
 
@@ -97,7 +98,8 @@ namespace VoiceLite.Services
                           $"--processors 1 " +
                           $"-l {settings.Language} " +
                           $"--beam-size {settings.BeamSize} " +
-                          $"--best-of {settings.BestOf}";
+                          $"--best-of {settings.BestOf} " +
+                          $"--no-fallback"; // Disable temperature fallback for ~10-15% speed boost
 
             var processStartInfo = new ProcessStartInfo
             {
@@ -117,36 +119,71 @@ namespace VoiceLite.Services
             {
                 serverProcess.PriorityClass = ProcessPriorityClass.High;
             }
-            catch { }
-
-            // Wait for server to be ready
-            httpClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{serverPort}") };
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
-
-            // Give server 3 seconds to start and bind port
-            for (int i = 0; i < 6; i++)
+            catch (Exception ex)
             {
-                await Task.Delay(500);
-
-                // Check if process crashed
-                if (serverProcess.HasExited)
-                    throw new InvalidOperationException($"Server process exited with code {serverProcess.ExitCode}");
-
-                // Try a simple GET request to root endpoint
-                try
-                {
-                    var response = await httpClient.GetAsync("/");
-                    // Any response (even 404) means server is listening
-                    ErrorLogger.LogMessage("Whisper server is ready");
-                    return;
-                }
-                catch (HttpRequestException)
-                {
-                    // Server not ready yet, continue waiting
-                }
+                ErrorLogger.LogMessage($"Failed to set Whisper server process priority: {ex.Message}");
             }
 
-            throw new TimeoutException("Server failed to respond within 3 seconds");
+            // Wait for server to be ready
+            // Use temporary HttpClient to avoid leak if initialization fails
+            HttpClient? tempClient = null;
+            try
+            {
+                tempClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{serverPort}") };
+                tempClient.Timeout = TimeSpan.FromSeconds(3); // Shorter timeout per request
+
+                // HIGH PRIORITY FIX: Add overall timeout to prevent infinite waiting
+                // If server never responds, fail fast instead of hanging forever
+                using var overallTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+                // Give server 3 seconds to start and bind port (6 retries × 500ms = 3s)
+                for (int i = 0; i < 6; i++)
+                {
+                    // Check overall timeout first
+                    if (overallTimeout.Token.IsCancellationRequested)
+                        throw new TimeoutException("Server startup exceeded 5 second hard limit");
+
+                    await Task.Delay(500, overallTimeout.Token).ConfigureAwait(false);
+
+                    // Check if process crashed
+                    if (serverProcess.HasExited)
+                        throw new InvalidOperationException($"Server process exited with code {serverProcess.ExitCode}");
+
+                    // Try a simple GET request to root endpoint
+                    try
+                    {
+                        using var requestTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                        var response = await tempClient!.GetAsync("/", requestTimeout.Token).ConfigureAwait(false);
+                        // Any response (even 404) means server is listening
+                        ErrorLogger.LogMessage("Whisper server is ready");
+
+                        // Success - transfer ownership to class field
+                        httpClient = tempClient;
+                        tempClient = null; // Prevent disposal in finally block
+                        return;
+                    }
+                    catch (HttpRequestException)
+                    {
+                        // Server not ready yet, continue waiting
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Request timeout, continue waiting
+                    }
+                }
+
+                throw new TimeoutException("Server failed to respond within 3 seconds");
+            }
+            catch (OperationCanceledException)
+            {
+                // Overall timeout reached
+                throw new TimeoutException("Server startup timed out after 5 seconds");
+            }
+            finally
+            {
+                // Clean up temporary client if initialization failed
+                tempClient?.Dispose();
+            }
         }
 
         private async Task<string> TranscribeViaServerAsync(string audioFilePath)
@@ -166,13 +203,24 @@ namespace VoiceLite.Services
             content.Add(new StringContent(settings.Language), "language");
             content.Add(new StringContent("json"), "response_format");
 
-            var response = await httpClient.PostAsync("/inference", content);
-            response.EnsureSuccessStatusCode();
+            // CRITICAL FIX: Add timeout to prevent infinite hang if server stops responding
+            // 120 seconds max (same as RecordingCoordinator watchdog timeout)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            try
+            {
+                var response = await httpClient.PostAsync("/inference", content, cts.Token).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<WhisperServerResponse>(jsonResponse);
+                var jsonResponse = await response.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+                var result = JsonSerializer.Deserialize<WhisperServerResponse>(jsonResponse);
 
-            return result?.text?.Trim() ?? string.Empty;
+                return result?.text?.Trim() ?? string.Empty;
+            }
+            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
+            {
+                ErrorLogger.LogWarning("WhisperServerService: HTTP request timed out after 120 seconds");
+                throw new TimeoutException("Server transcription timed out after 120 seconds. The server may be overloaded or unresponsive.");
+            }
         }
 
         private string ResolveModelPath()
@@ -187,16 +235,20 @@ namespace VoiceLite.Services
         {
             for (int port = startPort; port <= endPort; port++)
             {
+                System.Net.Sockets.TcpListener? listener = null;
                 try
                 {
-                    var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
+                    listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, port);
                     listener.Start();
-                    listener.Stop();
                     return port;
                 }
                 catch
                 {
                     // Port in use, try next
+                }
+                finally
+                {
+                    listener?.Stop();
                 }
             }
             return startPort; // Fallback
