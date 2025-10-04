@@ -21,18 +21,20 @@ namespace VoiceLite
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
         private Action? testRecordingCallback;
+        private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
         private AnalyticsService? analyticsService;
         private string? originalModel;
         private bool originalUseWhisperServer;
 
         public Settings Settings => settings;
 
-        public SettingsWindowNew(Settings currentSettings, AnalyticsService? analytics = null, Action? onTestRecording = null)
+        public SettingsWindowNew(Settings currentSettings, AnalyticsService? analytics = null, Action? onTestRecording = null, Action? onSaveSettings = null)
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
             analyticsService = analytics;
             testRecordingCallback = onTestRecording;
+            saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
             originalUseWhisperServer = settings.UseWhisperServer;
 
@@ -294,12 +296,14 @@ namespace VoiceLite
         private void ApplyButton_Click(object sender, RoutedEventArgs e)
         {
             SaveSettings();
+            saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
             StatusText.Text = "Settings applied successfully";
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             SaveSettings();
+            saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
 
             // Check if UseWhisperServer changed - requires restart
             if (settings.UseWhisperServer != originalUseWhisperServer)

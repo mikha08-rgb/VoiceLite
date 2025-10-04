@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
-  <!-- VoiceLite Logo - Minimalist Microphone -->
+  <!-- Mic with hole detail in lower part -->
   
-  <!-- Mic capsule -->
+  <!-- Mic capsule - longer and lower -->
   <rect x="70" y="35" width="60" height="90" rx="30" fill="#7c3aed"/>
   
-  <!-- Mic bracket -->
+  <!-- Small circular hole in lower part of mic -->
+  <circle cx="100" cy="105" r="8" fill="white"/>
+  
+  <!-- Mic bracket - tighter gap to capsule -->
   <path d="M 50 125 Q 50 155 100 155 Q 150 155 150 125" 
         stroke="#7c3aed" stroke-width="12" fill="none" stroke-linecap="round"/>
   

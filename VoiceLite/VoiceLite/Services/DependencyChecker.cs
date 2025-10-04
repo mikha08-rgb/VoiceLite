@@ -304,7 +304,8 @@ namespace VoiceLite.Services
                         progressWindow.Close();
                     }
 
-                    var installProcess = new Process
+                    // MEMORY FIX: Use using statement to ensure process disposal
+                    using var installProcess = new Process
                     {
                         StartInfo = new ProcessStartInfo
                         {
