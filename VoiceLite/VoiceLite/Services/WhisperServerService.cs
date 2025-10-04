@@ -60,12 +60,14 @@ namespace VoiceLite.Services
 
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
+            string result;
+
             // Use server if running, otherwise fallback
             if (isServerRunning)
             {
                 try
                 {
-                    return await TranscribeViaServerAsync(audioFilePath).ConfigureAwait(false);
+                    result = await TranscribeViaServerAsync(audioFilePath).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -78,6 +80,13 @@ namespace VoiceLite.Services
             {
                 return await fallbackService.TranscribeAsync(audioFilePath).ConfigureAwait(false);
             }
+
+            // CRITICAL FIX: Apply post-processing (VoiceShortcuts + Text Formatting)
+            // This was missing, causing all post-processing features to be skipped in server mode!
+            var customDict = settings.EnableCustomDictionary ? settings.CustomDictionaryEntries : null;
+            result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary, customDict, settings.PostProcessing);
+
+            return result;
         }
 
         private async Task StartServerAsync()
