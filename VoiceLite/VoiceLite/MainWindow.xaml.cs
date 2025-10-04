@@ -393,34 +393,34 @@ namespace VoiceLite
             {
                 try
                 {
-                // Ensure AppData directory exists
-                EnsureAppDataDirectoryExists();
+                    // Ensure AppData directory exists
+                    EnsureAppDataDirectoryExists();
 
-                settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
-                string settingsPath = GetSettingsPath();
+                    settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
+                    string settingsPath = GetSettingsPath();
 
-                // THREAD SAFETY FIX: Lock settings during serialization to prevent concurrent modification
-                string json;
-                lock (settings.SyncRoot)
-                {
-                    json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                }
+                    // THREAD SAFETY FIX: Lock settings during serialization to prevent concurrent modification
+                    string json;
+                    lock (settings.SyncRoot)
+                    {
+                        json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                    }
 
-                // CRITICAL FIX: Atomic write to prevent file corruption on crash/power loss
-                // Write to temp file first, then rename (rename is atomic on Windows)
-                string tempPath = settingsPath + ".tmp";
-                File.WriteAllText(tempPath, json);
+                    // CRITICAL FIX: Atomic write to prevent file corruption on crash/power loss
+                    // Write to temp file first, then rename (rename is atomic on Windows)
+                    string tempPath = settingsPath + ".tmp";
+                    File.WriteAllText(tempPath, json);
 
-                // Delete old file if exists (required before rename on Windows)
-                if (File.Exists(settingsPath))
-                {
-                    File.Delete(settingsPath);
-                }
+                    // Delete old file if exists (required before rename on Windows)
+                    if (File.Exists(settingsPath))
+                    {
+                        File.Delete(settingsPath);
+                    }
 
-                // Atomic rename - if this fails, temp file remains for recovery
-                File.Move(tempPath, settingsPath);
+                    // Atomic rename - if this fails, temp file remains for recovery
+                    File.Move(tempPath, settingsPath);
 
-                ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
+                    ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -1332,47 +1332,47 @@ namespace VoiceLite
                 await Dispatcher.InvokeAsync(() =>
                 {
                     switch (e.Status)
-                {
-                    case "Recording":
-                        UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
-                        this.BorderBrush = new SolidColorBrush(StatusColors.Recording);
-                        this.BorderThickness = new Thickness(3);
-                        break;
+                    {
+                        case "Recording":
+                            UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
+                            this.BorderBrush = new SolidColorBrush(StatusColors.Recording);
+                            this.BorderThickness = new Thickness(3);
+                            break;
 
-                    case "Transcribing":
-                        UpdateStatus("Transcribing...", new SolidColorBrush(StatusColors.Info));
-                        // CRITICAL FIX: Start recovery timer when entering transcribing state
-                        // This catches cases where StopRecording didn't start the timer
-                        if (stuckStateRecoveryTimer == null)
-                        {
-                            StartStuckStateRecoveryTimer();
-                        }
-                        break;
+                        case "Transcribing":
+                            UpdateStatus("Transcribing...", new SolidColorBrush(StatusColors.Info));
+                            // CRITICAL FIX: Start recovery timer when entering transcribing state
+                            // This catches cases where StopRecording didn't start the timer
+                            if (stuckStateRecoveryTimer == null)
+                            {
+                                StartStuckStateRecoveryTimer();
+                            }
+                            break;
 
-                    case "Pasting":
-                        UpdateStatus("Pasting...", Brushes.Purple);
-                        break;
+                        case "Pasting":
+                            UpdateStatus("Pasting...", Brushes.Purple);
+                            break;
 
-                    case "Copied to clipboard":
-                        UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Info));
-                        break;
+                        case "Copied to clipboard":
+                            UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Info));
+                            break;
 
-                    case "Cancelled":
-                        UpdateStatus("Cancelled", new SolidColorBrush(StatusColors.Inactive));
-                        // Stop recovery timer on cancel
-                        StopStuckStateRecoveryTimer();
-                        break;
+                        case "Cancelled":
+                            UpdateStatus("Cancelled", new SolidColorBrush(StatusColors.Inactive));
+                            // Stop recovery timer on cancel
+                            StopStuckStateRecoveryTimer();
+                            break;
 
-                    case "Processing":
-                        UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
-                        // CRITICAL FIX: Ensure recovery timer is running when entering processing state
-                        if (stuckStateRecoveryTimer == null)
-                        {
-                            StartStuckStateRecoveryTimer();
-                        }
-                        break;
-                }
-            });
+                        case "Processing":
+                            UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
+                            // CRITICAL FIX: Ensure recovery timer is running when entering processing state
+                            if (stuckStateRecoveryTimer == null)
+                            {
+                                StartStuckStateRecoveryTimer();
+                            }
+                            break;
+                    }
+                });
             }
             catch (Exception ex)
             {
