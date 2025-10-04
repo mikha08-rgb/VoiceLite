@@ -24,13 +24,16 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 
 ### Testing
 ```bash
-# Run all tests
+# Run all tests (292 total)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
 # Run specific test
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --filter "FullyQualifiedName~TestName"
 
-# Run tests with coverage
+# Run specific test class
+dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --filter "FullyQualifiedName~AudioRecorderTests"
+
+# Run tests with coverage (target: ≥75% overall, ≥80% Services/)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect:"XPlat Code Coverage" --settings VoiceLite/VoiceLite.Tests/coverlet.runsettings
 ```
 
@@ -55,7 +58,7 @@ dotnet build VoiceLite/VoiceLite.sln /p:RunAnalyzers=true
 ### CI/CD (GitHub Actions)
 ```bash
 # Automated PR testing (runs on every PR to master)
-# - Tests desktop app (106 tests)
+# - Tests desktop app (292 tests)
 # - Validates web app build and types
 # Workflow: .github/workflows/pr-tests.yml
 
@@ -485,7 +488,7 @@ If GitHub Actions is unavailable:
 - Creates desktop shortcut
 - Uninstaller removes AppData settings
 - Version tracking via AppId GUID
-- Current installer: `VoiceLite-Setup-1.0.27.exe`
+- Current installer: `VoiceLite-Setup-1.0.31.exe`
 
 ### Distribution Channels
 - GitHub Releases (primary)
@@ -528,12 +531,29 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.27 (current release)
+- **Desktop App**: v1.0.31 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.27 (Current Desktop Release)
+### v1.0.31 (Current Desktop Release)
+- **🎨 Compact UI Preset**: 70% more density with single-line history
+  - New `UIPreset` enum infrastructure (Default/Compact/StatusHero)
+  - Condensed history cards: timestamp + text only (metadata removed)
+  - All functionality preserved via keyboard shortcuts (Ctrl+F search, right-click menus)
+  - Toggle via Settings → Display → UI Layout
+- **Code Quality**: Whitespace cleanup, formatting fixes
+- **Test Coverage**: 292 tests passing (100% pass rate)
+
+### v1.0.30
+- **🧹 Clean UI Baseline**: Removed visual clutter (40% cleaner)
+  - Removed header clutter ("Recent Transcriptions" label, search/menu icons)
+  - Simplified history cards (timestamp + text only, no metadata)
+  - Zero functionality loss - all features accessible via keyboard shortcuts
+- **Code Quality**: 138 lines of UI clutter removed from MainWindow.xaml
+- **Test Coverage**: 281 tests passing
+
+### v1.0.27
 - **🚀 Whisper Server Mode (Experimental)**: 5x faster transcription via persistent HTTP server
   - New WhisperServerService keeps model in memory, eliminating 2-second reload overhead
   - Opt-in via Settings → Advanced → "Enable Whisper Server Mode"
@@ -552,7 +572,7 @@ The project underwent significant cleanup in October 2025:
   - Reduced integrity check log spam by 95% (one warning per session)
 - **🏗️ Code Quality**:
   - Added #region organization to MainWindow.xaml.cs (2183 lines → navigable sections)
-  - All 262 tests passing (100% pass rate)
+  - All 281 tests passing (100% pass rate)
   - Zero build warnings, zero errors
 
 ### v1.0.26
@@ -560,7 +580,7 @@ The project underwent significant cleanup in October 2025:
 - **Disk Space**: Removed 14+ MB of test artifacts (TestResults/ directories with coverage reports)
 - **Code Quality**: Deleted backup files (.bak), removed commented code in StartupDiagnostics.cs
 - **Dependency Audit**: Verified all 7 NuGet packages in active use (NAudio, BouncyCastle, H.InputSimulator, System.Text.Json, Hardcodet.NotifyIcon.Wpf, System.Management)
-- **Zero Regressions**: All 262 tests passing, builds successful (0 warnings, 0 errors)
+- **Zero Regressions**: All tests passing, builds successful (0 warnings, 0 errors)
 - **Agent Framework**: Created reusable cleanup automation for future maintenance
 
 ### v1.0.25
@@ -570,7 +590,7 @@ The project underwent significant cleanup in October 2025:
   - Removed integrity check hash comparisons
   - Removed warmup timing metrics
   - Only errors are now logged (fail-fast with minimal details)
-- **Test Coverage**: Added 54+ new tests across critical services (262 total passing tests)
+- **Test Coverage**: Added 54+ new tests across critical services
   - LicenseService: +9 tests (Ed25519 signature verification, CRL parsing, tampered payload detection)
   - DependencyChecker: +13 tests (error message prioritization, dependency validation)
   - StartupDiagnostics: +26 tests (diagnostic result validation, issue detection)

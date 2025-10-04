@@ -565,7 +565,8 @@ namespace VoiceLite.Services
                     CreateNoWindow = true
                 };
 
-                var process = Process.Start(psi);
+                // MEMORY FIX: Use using statement to ensure process disposal
+                using var process = Process.Start(psi);
                 if (process == null)
                 {
                     ErrorLogger.LogMessage("Failed to start PowerShell for Defender exclusion");

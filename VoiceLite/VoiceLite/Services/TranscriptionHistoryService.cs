@@ -127,15 +127,19 @@ namespace VoiceLite.Services
         /// </summary>
         private void ReorderHistory()
         {
-            var reordered = settings.TranscriptionHistory
-                .OrderByDescending(x => x.IsPinned) // Pinned first
-                .ThenByDescending(x => x.Timestamp) // Then by timestamp (newest first)
-                .ToList();
-
-            settings.TranscriptionHistory.Clear();
-            foreach (var item in reordered)
+            // THREAD SAFETY FIX: Lock settings to prevent race with serialization
+            lock (settings.SyncRoot)
             {
-                settings.TranscriptionHistory.Add(item);
+                var reordered = settings.TranscriptionHistory
+                    .OrderByDescending(x => x.IsPinned) // Pinned first
+                    .ThenByDescending(x => x.Timestamp) // Then by timestamp (newest first)
+                    .ToList();
+
+                settings.TranscriptionHistory.Clear();
+                foreach (var item in reordered)
+                {
+                    settings.TranscriptionHistory.Add(item);
+                }
             }
         }
 

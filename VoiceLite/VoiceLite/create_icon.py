@@ -2,67 +2,71 @@ from PIL import Image, ImageDraw
 import os
 
 def create_microphone_icon(size):
-    """Create a microphone icon at the specified size"""
+    """Create a minimalist microphone icon at the specified size (Apple-style)"""
     # Create a new image with transparency
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # Calculate proportions
-    center_x = size // 2
-    center_y = size // 2
-    scale = size / 256
+    # Calculate proportions based on 200x200 viewBox
+    scale = size / 200
 
-    # Background circle (blue)
-    padding = int(8 * scale)
-    draw.ellipse([padding, padding, size-padding, size-padding],
-                 fill=(52, 152, 219, 255))  # #3498DB
+    # VoiceLite purple color
+    purple = (124, 58, 237, 255)  # #7c3aed
 
-    # Microphone body (white rounded rectangle)
-    mic_width = int(40 * scale)
-    mic_height = int(60 * scale)
-    mic_x = center_x - mic_width // 2
-    mic_y = center_y - mic_height // 2 - int(10 * scale)
+    # Mic capsule - rounded rectangle at x=70, y=35, width=60, height=90, rx=30
+    mic_x = int(70 * scale)
+    mic_y = int(35 * scale)
+    mic_width = int(60 * scale)
+    mic_height = int(90 * scale)
+    mic_radius = int(30 * scale)
 
-    # Draw mic body
-    draw.rounded_rectangle([mic_x, mic_y, mic_x + mic_width, mic_y + mic_height],
-                           radius=int(mic_width//2), fill=(255, 255, 255, 255))
+    draw.rounded_rectangle(
+        [mic_x, mic_y, mic_x + mic_width, mic_y + mic_height],
+        radius=mic_radius,
+        fill=purple
+    )
 
-    # Mic grille (darker area)
-    grille_width = int(24 * scale)
-    grille_height = int(35 * scale)
-    grille_x = center_x - grille_width // 2
-    grille_y = mic_y + int(10 * scale)
-    draw.rounded_rectangle([grille_x, grille_y, grille_x + grille_width, grille_y + grille_height],
-                           radius=int(grille_width//2), fill=(52, 152, 219, 80))
+    # Mic bracket - U-shaped curve
+    # Path: M 50 125 Q 50 155 100 155 Q 150 155 150 125
+    # This creates a quadratic bezier curve
+    bracket_y1 = int(125 * scale)
+    bracket_y2 = int(155 * scale)
+    bracket_x_left = int(50 * scale)
+    bracket_x_center = int(100 * scale)
+    bracket_x_right = int(150 * scale)
+    bracket_width = max(2, int(12 * scale))
 
-    # Mic stand arc
-    stand_y = mic_y + mic_height + int(5 * scale)
-    stand_width = int(60 * scale)
-    stand_height = int(20 * scale)
-    stand_x = center_x - stand_width // 2
+    # Draw U-shape with arc (approximation)
+    draw.arc(
+        [bracket_x_left, bracket_y1, bracket_x_right, bracket_y2 + int(30 * scale)],
+        start=0, end=180,
+        fill=purple,
+        width=bracket_width
+    )
 
-    # Draw stand (arc)
-    for i in range(int(6 * scale)):
-        draw.arc([stand_x - i, stand_y - i, stand_x + stand_width + i, stand_y + stand_height * 2 + i],
-                 start=0, end=180, fill=(255, 255, 255, 255), width=1)
+    # Vertical stand - line from (100, 155) to (100, 172)
+    stand_x = int(100 * scale)
+    stand_y1 = int(155 * scale)
+    stand_y2 = int(172 * scale)
+    stand_width = max(2, int(12 * scale))
 
-    # Mic base stem
-    base_width = int(6 * scale)
-    base_height = int(25 * scale)
-    base_x = center_x - base_width // 2
-    base_y = stand_y + stand_height
-    draw.rectangle([base_x, base_y, base_x + base_width, base_y + base_height],
-                   fill=(255, 255, 255, 255))
+    draw.line(
+        [(stand_x, stand_y1), (stand_x, stand_y2)],
+        fill=purple,
+        width=stand_width
+    )
 
-    # Mic base
-    base_plate_width = int(30 * scale)
-    base_plate_height = int(6 * scale)
-    base_plate_x = center_x - base_plate_width // 2
-    base_plate_y = base_y + base_height
-    draw.rounded_rectangle([base_plate_x, base_plate_y,
-                            base_plate_x + base_plate_width,
-                            base_plate_y + base_plate_height],
-                           radius=int(3 * scale), fill=(255, 255, 255, 255))
+    # Base - horizontal line from (70, 172) to (130, 172)
+    base_x1 = int(70 * scale)
+    base_x2 = int(130 * scale)
+    base_y = int(172 * scale)
+    base_width = max(2, int(12 * scale))
+
+    draw.line(
+        [(base_x1, base_y), (base_x2, base_y)],
+        fill=purple,
+        width=base_width
+    )
 
     return img
 

@@ -8,9 +8,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
-    <Version>1.0.34</Version>
-    <AssemblyVersion>1.0.34.0</AssemblyVersion>
-    <FileVersion>1.0.34.0</FileVersion>
+    <Version>1.0.35</Version>
+    <AssemblyVersion>1.0.35.0</AssemblyVersion>
+    <FileVersion>1.0.35.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

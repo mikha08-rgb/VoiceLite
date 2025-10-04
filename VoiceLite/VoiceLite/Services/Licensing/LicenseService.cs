@@ -23,8 +23,8 @@ namespace VoiceLite.Services.Licensing
 
         private const string LicensePublicKeyEnvVar = "VOICELITE_LICENSE_PUBLIC_KEY";
         private const string CrlPublicKeyEnvVar = "VOICELITE_CRL_PUBLIC_KEY";
-        private const string LicensePublicKeyFallback = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
-        private const string CrlPublicKeyFallback = "_izLpBoUKYz9rwClq1WIJFz5DrmISEbyG1esLEwK-ms";
+        private const string LicensePublicKeyFallback = "fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc";
+        private const string CrlPublicKeyFallback = "19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M";
 
         private static string ResolvedLicensePublicKey => GetKeyOrFallback(LicensePublicKeyEnvVar, LicensePublicKeyFallback);
         private static string ResolvedCrlPublicKey => GetKeyOrFallback(CrlPublicKeyEnvVar, CrlPublicKeyFallback, LicensePublicKeyFallback);

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Logo centered-left -->
+  <g transform="translate(200, 165) scale(1.5)">
+    <rect x="70" y="35" width="60" height="90" rx="30" fill="white"/>
+    <path d="M 50 125 Q 50 155 100 155 Q 150 155 150 125" 
+          stroke="white" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <line x1="100" y1="155" x2="100" y2="172" 
+          stroke="white" stroke-width="12" stroke-linecap="round"/>
+    <line x1="70" y1="172" x2="130" y2="172" 
+          stroke="white" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Text content -->
+  <text x="550" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white">VoiceLite</text>
+  <text x="550" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="400" fill="white" opacity="0.9">Instant Offline Voice Typing for Windows</text>
+  <text x="550" y="430" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="400" fill="white" opacity="0.7">100% Private • &lt;200ms Latency • Works Everywhere</text>
+</svg>
