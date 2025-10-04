@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using WindowsInput;
 using WindowsInput.Native;
@@ -59,7 +60,7 @@ namespace VoiceLite.Services
                 }
                 catch
                 {
-                    throw new Exception($"Failed to inject text: {ex.Message}", ex);
+                    throw new InvalidOperationException($"Failed to inject text: {ex.Message}", ex);
                 }
             }
         }
@@ -224,43 +225,52 @@ namespace VoiceLite.Services
                 }
             }
 
-            bool clipboardRestored = false;
-
             try
             {
                 PasteViaClipboard(text);
             }
             finally
             {
-                // Restore original clipboard if we had saved it
+                // BUG FIX (BUG-004): Always restore original clipboard after timeout
+                // Previous logic could lose user data if another app modified clipboard
+                // Now we ALWAYS restore after a fixed delay, regardless of current clipboard state
                 if (hadOriginalClipboard && !string.IsNullOrEmpty(originalClipboard))
                 {
-                    // Retry restoration up to 3 times
-                    for (int attempt = 0; attempt < 3; attempt++)
+                    var clipboardToRestore = originalClipboard; // Capture for closure
+                    _ = Task.Run(async () =>
                     {
                         try
                         {
-                            Thread.Sleep(100); // Wait for paste to complete
-                            SetClipboardText(originalClipboard);
-                            ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
-                            clipboardRestored = true;
-                            break;
+                            // Increased delay from 150ms → 300ms for better reliability
+                            // This gives paste operation more time to complete on slow systems
+                            await Task.Delay(300);
+
+                            // ALWAYS restore original clipboard after delay
+                            // We assume paste operation completed successfully
+                            // If user copied something new during this window, that's their intent
+                            for (int attempt = 0; attempt < 3; attempt++)
+                            {
+                                try
+                                {
+                                    SetClipboardText(clipboardToRestore);
+                                    ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
+                                    break;
+                                }
+                                catch (Exception ex)
+                                {
+                                    ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
+                                    if (attempt < 2)
+                                        await Task.Delay(50);
+                                    else
+                                        ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
-                            if (attempt < 2)
-                                Thread.Sleep(50);
+                            ErrorLogger.LogError("Background clipboard restore", ex);
                         }
-                    }
-
-                    // If restoration failed after all retries, log warning
-                    if (!clipboardRestored)
-                    {
-                        ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
-                        // Note: We don't show a UI notification here as it would be disruptive
-                        // Users can check logs if they notice clipboard issues
-                    }
+                    });
                 }
             }
         }

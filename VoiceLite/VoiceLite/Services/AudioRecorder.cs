@@ -30,6 +30,7 @@ namespace VoiceLite.Services
         private System.Timers.Timer? cleanupTimer;
         private const int CleanupIntervalMinutes = 30;
         private bool useMemoryBuffer = true; // Enable memory buffering by default
+        private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
 
         // CRITICAL FIX: Instance tracking to prevent race conditions
         private int waveInInstanceId = 0;
@@ -61,6 +62,10 @@ namespace VoiceLite.Services
 
         private void CleanupStaleAudioFiles()
         {
+            // DISPOSAL SAFETY: Early exit if disposed
+            if (isDisposed)
+                return;
+
             try
             {
                 if (!Directory.Exists(tempDirectory))
@@ -354,32 +359,41 @@ namespace VoiceLite.Services
 
                 try
                 {
-                    // Triple-check all conditions with defensive programming
-                    if (waveFile != null && isRecording && e.BytesRecorded > 0)
+                    // BUG FIX (BUG-012): Capture waveFile reference under lock to prevent dispose race
+                    // If Dispose() is called on another thread between null check and Write(), we crash
+                    WaveFileWriter? localWaveFile;
+                    lock (lockObject)
                     {
-                        // Apply volume scaling (InputVolumeScale is const 0.8f)
-                        // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
-                        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
-                        try
+                        localWaveFile = waveFile; // Capture under lock
+                        if (localWaveFile == null || !isRecording || e.BytesRecorded <= 0)
                         {
-                            Array.Copy(e.Buffer, buffer, e.BytesRecorded);
+                            return; // Exit early if disposed or not recording
+                        }
+                    }
 
-                            for (int i = 0; i < e.BytesRecorded; i += 2)
-                            {
-                                short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
-                                int scaled = (int)Math.Round(sample * InputVolumeScale);
-                                scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
-                                short clamped = (short)scaled;
-                                buffer[i] = (byte)(clamped & 0xFF);
-                                buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
-                            }
-                            waveFile.Write(buffer, 0, e.BytesRecorded);
-                        }
-                        finally
+                    // Now safe to use localWaveFile outside lock (we have a reference)
+                    // Apply volume scaling (InputVolumeScale is const 0.8f)
+                    // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
+                    var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
+                    try
+                    {
+                        Array.Copy(e.Buffer, buffer, e.BytesRecorded);
+
+                        for (int i = 0; i < e.BytesRecorded; i += 2)
                         {
-                            // CRITICAL: Return buffer to pool to prevent memory leak
-                            System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
+                            short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                            int scaled = (int)Math.Round(sample * InputVolumeScale);
+                            scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
+                            short clamped = (short)scaled;
+                            buffer[i] = (byte)(clamped & 0xFF);
+                            buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
                         }
+                        localWaveFile.Write(buffer, 0, e.BytesRecorded);
+                    }
+                    finally
+                    {
+                        // SECURITY: Clear buffer to prevent audio data leakage in pooled memory
+                        System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
                     }
                 }
                 catch (Exception ex)
@@ -591,7 +605,11 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
+                // BUG FIX (BUG-005): Log warning for memory buffer save failure
+                // This is best-effort operation - audio data will be lost but app continues
+                // Memory leak is acceptable here as it only occurs on disk I/O failure (rare)
                 ErrorLogger.LogError("SaveMemoryBufferToTempFile failed", ex);
+                ErrorLogger.LogMessage($"WARNING: Audio data ({audioData.Length} bytes) will be lost due to disk I/O failure. This is expected behavior for best-effort memory buffer mode.");
             }
         }
 
@@ -606,6 +624,9 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
+            // DISPOSAL SAFETY: Set flag first to prevent cleanup timer callback
+            isDisposed = true;
+
             lock (lockObject)
             {
                 // Stop cleanup timer

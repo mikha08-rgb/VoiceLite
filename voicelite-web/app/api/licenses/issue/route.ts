@@ -4,6 +4,7 @@ import { getSessionTokenFromRequest, getSessionFromToken } from '@/lib/auth/sess
 import { generateSignedLicense, recordLicenseEvent } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, licenseRateLimit } from '@/lib/ratelimit';
+import { validateOrigin, getCsrfErrorResponse } from '@/lib/csrf';
 
 const bodySchema = z.object({
   deviceFingerprint: z.string().min(6),
@@ -13,8 +14,14 @@ const bodySchema = z.object({
  * POST /api/licenses/issue
  * Generate a signed license file for the authenticated user's active license.
  * Requires user to have an active purchase/license.
+ * BUG FIX (BUG-024): Added CSRF protection
  */
 export async function POST(request: NextRequest) {
+  // BUG FIX (BUG-024): CSRF protection to prevent cross-site attacks
+  if (!validateOrigin(request)) {
+    return NextResponse.json(getCsrfErrorResponse(), { status: 403 });
+  }
+
   try {
     const sessionToken = getSessionTokenFromRequest(request);
     if (!sessionToken) {

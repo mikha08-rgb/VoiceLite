@@ -124,16 +124,17 @@ namespace VoiceLite.Services
                 ErrorLogger.LogMessage($"Failed to set Whisper server process priority: {ex.Message}");
             }
 
-            // Wait for server to be ready
-            // Use temporary HttpClient to avoid leak if initialization fails
+            // BUG FIX (BUG-002): Ensure HttpClient is always disposed on failure
+            // Use explicit disposal pattern to prevent resource leaks
             HttpClient? tempClient = null;
+            bool clientOwnershipTransferred = false;
+
             try
             {
                 tempClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{serverPort}") };
-                tempClient.Timeout = TimeSpan.FromSeconds(3); // Shorter timeout per request
+                tempClient.Timeout = TimeSpan.FromSeconds(3);
 
-                // HIGH PRIORITY FIX: Add overall timeout to prevent infinite waiting
-                // If server never responds, fail fast instead of hanging forever
+                // Overall timeout to prevent infinite waiting
                 using var overallTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                 // Give server 3 seconds to start and bind port (6 retries × 500ms = 3s)
@@ -153,13 +154,13 @@ namespace VoiceLite.Services
                     try
                     {
                         using var requestTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                        var response = await tempClient!.GetAsync("/", requestTimeout.Token).ConfigureAwait(false);
+                        var response = await tempClient.GetAsync("/", requestTimeout.Token).ConfigureAwait(false);
                         // Any response (even 404) means server is listening
                         ErrorLogger.LogMessage("Whisper server is ready");
 
                         // Success - transfer ownership to class field
                         httpClient = tempClient;
-                        tempClient = null; // Prevent disposal in finally block
+                        clientOwnershipTransferred = true;
                         return;
                     }
                     catch (HttpRequestException)
@@ -181,8 +182,18 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // Clean up temporary client if initialization failed
-                tempClient?.Dispose();
+                // Clean up temporary client only if ownership was NOT transferred
+                if (!clientOwnershipTransferred && tempClient != null)
+                {
+                    try
+                    {
+                        tempClient.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("Failed to dispose temporary HttpClient", ex);
+                    }
+                }
             }
         }
 
