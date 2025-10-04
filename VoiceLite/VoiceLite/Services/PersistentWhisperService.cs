@@ -473,7 +473,11 @@ namespace VoiceLite.Services
             }
             finally
             {
-                transcriptionSemaphore.Release();
+                // Prevent ObjectDisposedException during shutdown
+                if (!isDisposed)
+                {
+                    transcriptionSemaphore.Release();
+                }
             }
         }
 
