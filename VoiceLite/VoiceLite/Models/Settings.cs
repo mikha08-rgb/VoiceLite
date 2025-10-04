@@ -264,6 +264,9 @@ namespace VoiceLite.Models
         public string? AnonymousUserId { get; set; } // SHA256 hash for anonymous tracking
         public DateTime? AnalyticsConsentDate { get; set; } // When user consented (or declined)
 
+        // First-Run Experience
+        public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
+
         // Post-Processing Settings
         public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
 
