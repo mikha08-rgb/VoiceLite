@@ -569,7 +569,10 @@ namespace VoiceLite
                     StatusText.Foreground = Brushes.Green;
                 }
 
-                // Step 5: Check for analytics consent on first run (non-blocking)
+                // Step 5: Update Quick Settings Panel
+                UpdateQuickSettingsPanel();
+
+                // Step 6: Check for analytics consent on first run (non-blocking)
                 CheckAnalyticsConsentAsync();
             }
             catch (Exception ex)
@@ -2806,6 +2809,93 @@ namespace VoiceLite
         }
 
         #endregion
+
+        #region Quick Settings Panel Event Handlers
+
+        private void QuickFastMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (QuickFastModeCheckBox == null || settings == null) return;
+
+            bool wasEnabled = settings.UseWhisperServer;
+            bool nowEnabled = QuickFastModeCheckBox.IsChecked == true;
+
+            settings.UseWhisperServer = nowEnabled;
+            SaveSettings();
+
+            // Show restart hint if changed
+            if (wasEnabled != nowEnabled)
+            {
+                FastModeRestartHint.Visibility = Visibility.Visible;
+
+                MessageBox.Show(
+                    "Fast Mode change requires an app restart to take effect.\n\n" +
+                    "Please restart VoiceLite to apply this change.",
+                    "Restart Required",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private void QuickManageShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            // Open Dictionary Manager
+            var dialog = new DictionaryManagerWindow(settings);
+            dialog.Owner = this;
+            if (dialog.ShowDialog() == true)
+            {
+                SaveSettings();
+                UpdateQuickSettingsPanel(); // Refresh count
+            }
+        }
+
+        private void QuickChangeFormatting_Click(object sender, RoutedEventArgs e)
+        {
+            // Open Settings directly to Text Formatting tab
+            var settingsWindow = new SettingsWindowNew(settings, analyticsService, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+            settingsWindow.Owner = this;
+
+            // Try to switch to Text Formatting tab (index 5 in old layout)
+            // This will be updated when we reorganize tabs in Phase 4
+            settingsWindow.ShowDialog();
+
+            if (settingsWindow.DialogResult == true)
+            {
+                settings = SettingsValidator.ValidateAndRepair(settingsWindow.Settings);
+                SaveSettings();
+                UpdateQuickSettingsPanel(); // Refresh preset display
+            }
+        }
+
+        private void UpdateQuickSettingsPanel()
+        {
+            if (QuickFastModeCheckBox == null || ShortcutsCountText == null || FormattingPresetText == null)
+                return;
+
+            // Update Fast Mode checkbox
+            QuickFastModeCheckBox.IsChecked = settings.UseWhisperServer;
+
+            // Update VoiceShortcuts count
+            int activeShortcuts = settings.CustomDictionaryEntries?.Count(e => e.IsEnabled) ?? 0;
+            ShortcutsCountText.Text = activeShortcuts == 0
+                ? "No shortcuts active"
+                : activeShortcuts == 1
+                    ? "1 shortcut active"
+                    : $"{activeShortcuts} shortcuts active";
+
+            // Update Text Formatting preset
+            var preset = settings.PostProcessing?.ActivePreset ?? PostProcessingPreset.Custom;
+            string presetName = preset switch
+            {
+                PostProcessingPreset.Casual => "Casual",
+                PostProcessingPreset.Professional => "Professional",
+                PostProcessingPreset.Code => "Code",
+                _ => "Custom"
+            };
+            FormattingPresetText.Text = $"Preset: {presetName}";
+        }
+
+        #endregion
+
     }
 }
 
