@@ -1,44 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyAdmin } from '@/lib/admin-auth';
+import { checkRateLimit, profileRateLimit } from '@/lib/ratelimit';
 
-// Admin authentication helper (reuse from feedback route)
-async function verifyAdmin(req: NextRequest): Promise<{ isAdmin: boolean; userId?: string }> {
-  const sessionCookie = req.cookies.get('session');
+/**
+ * Admin Stats API Endpoint
+ *
+ * GET /api/admin/stats
+ *
+ * Returns aggregated stats for licenses, users, purchases, and feedback.
+ * Requires admin authentication via session cookie.
+ */
 
-  if (!sessionCookie) {
-    return { isAdmin: false };
-  }
+// Force dynamic rendering (uses cookies for auth)
+export const dynamic = 'force-dynamic';
 
-  try {
-    const session = await prisma.session.findUnique({
-      where: { sessionHash: sessionCookie.value },
-      select: { userId: true, expiresAt: true, revokedAt: true, user: { select: { email: true } } },
-    });
-
-    if (!session || session.expiresAt < new Date() || session.revokedAt) {
-      return { isAdmin: false };
-    }
-
-    // Check if user is admin
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
-    const isAdmin = adminEmails.includes(session.user.email);
-
-    return { isAdmin, userId: session.userId };
-  } catch (error) {
-    console.error('Admin verification error:', error);
-    return { isAdmin: false };
-  }
-}
+// Cache stats for 5 minutes
+export const revalidate = 300;
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
-    // Verify admin access
-    const { isAdmin } = await verifyAdmin(req);
+    // 1. Verify admin access
+    const { isAdmin, userId, email, error: authError } = await verifyAdmin(req);
 
     if (!isAdmin) {
+      console.warn(`[Stats] Unauthorized access attempt: ${authError}`);
       return NextResponse.json(
         { error: 'Unauthorized. Admin access required.' },
         { status: 401 }
+      );
+    }
+
+    console.log(`[Stats] Admin access granted: ${email} (${userId})`);
+
+    // 2. Rate limiting (100 requests/hour per admin)
+    const rateLimitResult = await checkRateLimit(userId!, profileRateLimit);
+    if (!rateLimitResult.allowed) {
+      console.warn(`[Stats] Rate limit exceeded for admin ${email}`);
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please try again later.',
+          retryAfter: Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)),
+            'X-RateLimit-Limit': String(rateLimitResult.limit),
+            'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+            'X-RateLimit-Reset': rateLimitResult.reset.toISOString(),
+          },
+        }
       );
     }
 
@@ -174,7 +188,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Format response
-    return NextResponse.json({
+    const response = {
       users: {
         total: totalUsers,
         new7d: newUsers7d,
@@ -218,11 +232,40 @@ export async function GET(req: NextRequest) {
         ),
       },
       generatedAt: new Date().toISOString(),
+      queryTimeMs: Date.now() - startTime,
+    };
+
+    console.log(`[Stats] Query completed in ${Date.now() - startTime}ms`);
+
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'private, max-age=300', // 5 minutes
+        'X-Query-Time': String(Date.now() - startTime),
+      },
     });
   } catch (error) {
-    console.error('Admin stats error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const queryTime = Date.now() - startTime;
+
+    console.error(`[Stats] Error after ${queryTime}ms:`, error);
+
+    // Different error responses based on error type
+    if (errorMessage.includes('database') || errorMessage.includes('Prisma')) {
+      return NextResponse.json(
+        {
+          error: 'Database error. Please try again later.',
+          retryAfter: 60,
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+
+    // Generic error response (don't expose internal details)
     return NextResponse.json(
-      { error: 'Failed to fetch stats' },
+      {
+        error: 'Failed to fetch stats. Please try again later.',
+        errorId: `stats_${Date.now()}`,
+      },
       { status: 500 }
     );
   }

@@ -1,10 +1,10 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.27: Major Update - Whisper Server Mode (5x faster), EULA v2, bug fixes, performance improvements
+; v1.0.28: Critical race condition fix, Tailwind CSS v4 migration, analytics dashboard, production ready
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.27
+AppVersion=1.0.28
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -12,7 +12,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.27
+OutputBaseFilename=VoiceLite-Setup-1.0.28
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes

@@ -1,70 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyAdmin } from '@/lib/admin-auth';
+import { checkRateLimit, profileRateLimit } from '@/lib/ratelimit';
 
-// Admin authentication helper
-async function verifyAdmin(req: NextRequest): Promise<{ isAdmin: boolean; userId?: string }> {
-  const sessionCookie = req.cookies.get('session');
+/**
+ * Admin Analytics API Endpoint
+ *
+ * GET /api/admin/analytics?days=30
+ *
+ * Returns aggregated usage analytics for VoiceLite app.
+ * Requires admin authentication via session cookie.
+ *
+ * Security features:
+ * - Session-based admin authentication
+ * - Rate limiting (100 requests/hour per admin)
+ * - Input validation and sanitization
+ * - SQL injection prevention (parameterized queries)
+ * - Comprehensive error handling
+ * - Privacy-first (only aggregated data, no PII)
+ *
+ * Performance optimizations:
+ * - 5-minute server-side caching
+ * - Parallel query execution (Promise.all)
+ * - Database-level aggregations
+ * - Indexed queries
+ */
 
-  if (!sessionCookie) {
-    return { isAdmin: false };
-  }
+// Force dynamic rendering (uses cookies for auth)
+export const dynamic = 'force-dynamic';
 
-  try {
-    const session = await prisma.session.findUnique({
-      where: { sessionHash: sessionCookie.value },
-      select: { userId: true, expiresAt: true, revokedAt: true, user: { select: { email: true } } },
-    });
+// Cache analytics data for 5 minutes (reduces DB load)
+export const revalidate = 300; // 5 minutes
 
-    if (!session || session.expiresAt < new Date() || session.revokedAt) {
-      return { isAdmin: false };
-    }
+// Maximum allowed date range (prevent DB overload)
+const MAX_DAYS = 365;
+const MIN_DAYS = 1;
+const DEFAULT_DAYS = 30;
 
-    // Check if user is admin
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
-    const isAdmin = adminEmails.includes(session.user.email);
-
-    return { isAdmin, userId: session.userId };
-  } catch (error) {
-    console.error('Admin verification error:', error);
-    return { isAdmin: false };
-  }
-}
+// Query timeout (prevent long-running queries)
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds
 
 export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
-    // Verify admin access
-    const { isAdmin } = await verifyAdmin(req);
+    // 1. Verify admin access
+    const { isAdmin, userId, email, error: authError } = await verifyAdmin(req);
 
     if (!isAdmin) {
+      console.warn(`[Analytics] Unauthorized access attempt: ${authError}`);
       return NextResponse.json(
         { error: 'Unauthorized. Admin access required.' },
         { status: 401 }
       );
     }
 
-    // Parse query parameters for date range
-    const { searchParams } = new URL(req.url);
-    const daysParam = searchParams.get('days') || '30';
-    const days = Math.min(Math.max(parseInt(daysParam, 10) || 30, 1), 365);
+    console.log(`[Analytics] Admin access granted: ${email} (${userId})`);
 
-    // Calculate date ranges
+    // 2. Rate limiting (100 requests/hour per admin)
+    const rateLimitResult = await checkRateLimit(userId!, profileRateLimit);
+    if (!rateLimitResult.allowed) {
+      console.warn(`[Analytics] Rate limit exceeded for admin ${email}`);
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please try again later.',
+          retryAfter: Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)),
+            'X-RateLimit-Limit': String(rateLimitResult.limit),
+            'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+            'X-RateLimit-Reset': rateLimitResult.reset.toISOString(),
+          },
+        }
+      );
+    }
+
+    // 3. Parse and validate query parameters
+    const { searchParams } = new URL(req.url);
+    const daysParam = searchParams.get('days');
+
+    // Validate 'days' parameter
+    let days = DEFAULT_DAYS;
+    if (daysParam) {
+      const parsedDays = parseInt(daysParam, 10);
+
+      if (isNaN(parsedDays)) {
+        return NextResponse.json(
+          { error: 'Invalid "days" parameter. Must be a number.' },
+          { status: 400 }
+        );
+      }
+
+      if (parsedDays < MIN_DAYS || parsedDays > MAX_DAYS) {
+        return NextResponse.json(
+          { error: `Invalid "days" parameter. Must be between ${MIN_DAYS} and ${MAX_DAYS}.` },
+          { status: 400 }
+        );
+      }
+
+      days = parsedDays;
+    }
+
+    console.log(`[Analytics] Fetching analytics for last ${days} days`);
+
+    // 4. Calculate date ranges (UTC for consistency)
     const now = new Date();
     const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Run analytics queries in parallel
-    const [
-      totalEvents,
-      dailyActiveUsers,
-      monthlyActiveUsers,
-      eventsByType,
-      tierDistribution,
-      versionDistribution,
-      modelDistribution,
-      osDistribution,
-      dailyTimeSeries,
-    ] = await Promise.all([
-      // Total events
+    // 5. Run analytics queries in parallel with timeout protection
+    const analyticsPromise = Promise.all([
+      // Total events in date range
       prisma.analyticsEvent.count({
         where: {
           createdAt: {
@@ -73,7 +123,7 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // Daily Active Users (last 7 days)
+      // Daily Active Users (last 7 days) - unique anonymousUserId
       prisma.analyticsEvent.groupBy({
         by: ['anonymousUserId'],
         where: {
@@ -86,12 +136,12 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // Monthly Active Users (last 30 days)
+      // Monthly Active Users (last 30 days) - unique anonymousUserId
       prisma.analyticsEvent.groupBy({
         by: ['anonymousUserId'],
         where: {
           createdAt: {
-            gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+            gte: last30Days,
           },
         },
         _count: {
@@ -99,7 +149,7 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // Events by type
+      // Events by type (APP_LAUNCHED, TRANSCRIPTION_COMPLETED, etc.)
       prisma.analyticsEvent.groupBy({
         by: ['eventType'],
         where: {
@@ -112,7 +162,7 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // Tier distribution (Free vs Pro)
+      // Tier distribution (FREE vs PRO)
       prisma.analyticsEvent.groupBy({
         by: ['tier'],
         where: {
@@ -125,7 +175,7 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // Version distribution
+      // App version distribution (top 10)
       prisma.analyticsEvent.groupBy({
         by: ['appVersion'],
         where: {
@@ -147,7 +197,7 @@ export async function GET(req: NextRequest) {
         take: 10,
       }),
 
-      // Model usage distribution
+      // Model usage distribution (ggml-small.bin, ggml-tiny.bin, etc.)
       prisma.analyticsEvent.groupBy({
         by: ['modelUsed'],
         where: {
@@ -168,7 +218,7 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // OS distribution
+      // OS distribution (Windows 11, Windows 10, etc.) - top 10
       prisma.analyticsEvent.groupBy({
         by: ['osVersion'],
         where: {
@@ -190,7 +240,8 @@ export async function GET(req: NextRequest) {
         take: 10,
       }),
 
-      // Daily time series (for charts)
+      // Daily time series (for line chart)
+      // Using parameterized query to prevent SQL injection
       prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
         SELECT
           DATE("createdAt") as date,
@@ -202,17 +253,35 @@ export async function GET(req: NextRequest) {
       `,
     ]);
 
-    // Calculate unique users for DAU/MAU
+    // Add timeout protection
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout')), QUERY_TIMEOUT_MS)
+    );
+
+    const [
+      totalEvents,
+      dailyActiveUsers,
+      monthlyActiveUsers,
+      eventsByType,
+      tierDistribution,
+      versionDistribution,
+      modelDistribution,
+      osDistribution,
+      dailyTimeSeries,
+    ] = await Promise.race([analyticsPromise, timeoutPromise]);
+
+    // 6. Calculate derived metrics
     const dau = dailyActiveUsers.length;
     const mau = monthlyActiveUsers.length;
+    const dauMauRatio = mau > 0 ? (dau / mau).toFixed(2) : '0.00';
 
-    // Format response
-    return NextResponse.json({
+    // 7. Format response (sanitize and structure data)
+    const response = {
       overview: {
         totalEvents,
         dailyActiveUsers: dau,
         monthlyActiveUsers: mau,
-        dau_mau_ratio: mau > 0 ? (dau / mau).toFixed(2) : '0.00',
+        dau_mau_ratio: dauMauRatio,
       },
       events: {
         byType: eventsByType.reduce(
@@ -250,17 +319,57 @@ export async function GET(req: NextRequest) {
           count: Number(d.count),
         })),
       },
-      generatedAt: new Date().toISOString(),
       dateRange: {
         start: startDate.toISOString(),
         end: now.toISOString(),
         days,
       },
+      generatedAt: new Date().toISOString(),
+      queryTimeMs: Date.now() - startTime,
+    };
+
+    console.log(`[Analytics] Query completed in ${Date.now() - startTime}ms`);
+
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'private, max-age=300', // 5 minutes
+        'X-Query-Time': String(Date.now() - startTime),
+      },
     });
+
   } catch (error) {
-    console.error('Admin analytics error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const queryTime = Date.now() - startTime;
+
+    console.error(`[Analytics] Error after ${queryTime}ms:`, error);
+
+    // Different error responses based on error type
+    if (errorMessage.includes('timeout')) {
+      return NextResponse.json(
+        {
+          error: 'Query timeout. Please try a smaller date range.',
+          suggestion: 'Reduce the "days" parameter (e.g., ?days=30)',
+        },
+        { status: 504 } // Gateway Timeout
+      );
+    }
+
+    if (errorMessage.includes('database') || errorMessage.includes('Prisma')) {
+      return NextResponse.json(
+        {
+          error: 'Database error. Please try again later.',
+          retryAfter: 60, // Suggest retry after 60 seconds
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+
+    // Generic error response (don't expose internal details)
     return NextResponse.json(
-      { error: 'Failed to fetch analytics' },
+      {
+        error: 'Failed to fetch analytics. Please try again later.',
+        errorId: `analytics_${Date.now()}`, // For support/debugging
+      },
       { status: 500 }
     );
   }
