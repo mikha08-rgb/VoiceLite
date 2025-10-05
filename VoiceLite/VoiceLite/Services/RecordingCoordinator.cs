@@ -38,6 +38,7 @@ namespace VoiceLite.Services
         public event EventHandler<string>? ErrorOccurred;
 
         public bool IsRecording => _isRecording;
+        public bool IsTranscribing => isTranscribing; // PERFORMANCE FIX: Expose for busy state check
 
         public RecordingCoordinator(
             AudioRecorder audioRecorder,
@@ -443,27 +444,41 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Clean up audio file with retry logic
+        /// Clean up audio file with retry logic (fire-and-forget to prevent UI blocking)
         /// </summary>
         private async Task CleanupAudioFileAsync(string audioFilePath)
         {
-            for (int i = 0; i < TimingConstants.FileCleanupMaxRetries; i++)
+            // PERFORMANCE FIX: Run cleanup on background thread pool to prevent UI blocking
+            // File.Delete() can block for 50-200ms with antivirus scanning
+            await Task.Run(async () =>
             {
-                try
+                // Small delay to let file handles close
+                await Task.Delay(100).ConfigureAwait(false);
+
+                for (int i = 0; i < TimingConstants.FileCleanupMaxRetries; i++)
                 {
-                    if (File.Exists(audioFilePath))
+                    try
                     {
-                        File.Delete(audioFilePath);
-                        break;
+                        if (File.Exists(audioFilePath))
+                        {
+                            File.Delete(audioFilePath);
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (i == TimingConstants.FileCleanupMaxRetries - 1) // Last attempt
+                        {
+                            // Don't block on logging either - fire and forget
+                            _ = Task.Run(() => ErrorLogger.LogError("RecordingCoordinator.CleanupAudioFile", ex));
+                        }
+
+                        // Exponential backoff: 50ms, 100ms, 200ms, 400ms
+                        int delayMs = 50 * (int)Math.Pow(2, i);
+                        await Task.Delay(delayMs).ConfigureAwait(false);
                     }
                 }
-                catch (Exception ex)
-                {
-                    if (i == TimingConstants.FileCleanupMaxRetries - 1) // Last attempt
-                        ErrorLogger.LogError("RecordingCoordinator.CleanupAudioFile", ex);
-                    await Task.Delay(TimingConstants.FileCleanupRetryDelayMs);
-                }
-            }
+            }).ConfigureAwait(false);
         }
 
         public void Dispose()
