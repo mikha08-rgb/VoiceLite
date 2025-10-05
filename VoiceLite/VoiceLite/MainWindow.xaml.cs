@@ -1175,24 +1175,29 @@ namespace VoiceLite
         /// </summary>
         private void StopStuckStateRecoveryTimer()
         {
-            if (stuckStateRecoveryTimer != null)
+            // BUG FIX (BUG-001): Thread-safe timer disposal to prevent race condition
+            // Use local variable to prevent null reference if timer is set to null by another thread
+            var timer = stuckStateRecoveryTimer;
+            if (timer != null)
             {
-                stuckStateRecoveryTimer.Stop();
-                stuckStateRecoveryTimer.Tick -= OnStuckStateRecovery;
+                timer.Stop();
+                timer.Tick -= OnStuckStateRecovery;
+
+                // Clear reference BEFORE disposal to prevent re-entry
+                stuckStateRecoveryTimer = null;
 
                 // BUG FIX (BUG-010): Dispose timer properly
                 try
                 {
                     // DispatcherTimer doesn't implement IDisposable in .NET Framework
                     // but does in .NET Core/.NET 5+. Safe to skip disposal if not available.
-                    (stuckStateRecoveryTimer as IDisposable)?.Dispose();
+                    (timer as IDisposable)?.Dispose();
                 }
                 catch
                 {
                     // Ignore disposal errors - timer will be GC'd
                 }
 
-                stuckStateRecoveryTimer = null;
                 ErrorLogger.LogDebug("StopStuckStateRecoveryTimer: Recovery timer stopped");
             }
         }
@@ -2013,11 +2018,21 @@ namespace VoiceLite
 
             StopStuckStateRecoveryTimer(); // Already disposes properly
 
-            settingsSaveTimer?.Stop();
-            settingsSaveTimer = null;
+            // BUG FIX (BUG-014): Dispose settingsSaveTimer to prevent settings corruption
+            if (settingsSaveTimer != null)
+            {
+                settingsSaveTimer.Stop();
+                try { (settingsSaveTimer as IDisposable)?.Dispose(); } catch { }
+                settingsSaveTimer = null;
+            }
 
-            recordingElapsedTimer?.Stop();
-            recordingElapsedTimer = null;
+            // Dispose recording elapsed timer
+            if (recordingElapsedTimer != null)
+            {
+                recordingElapsedTimer.Stop();
+                try { (recordingElapsedTimer as IDisposable)?.Dispose(); } catch { }
+                recordingElapsedTimer = null;
+            }
 
             // CRITICAL FIX: Kill any hung whisper.exe processes on shutdown
             // Prevents orphaned processes from consuming resources after app closes
