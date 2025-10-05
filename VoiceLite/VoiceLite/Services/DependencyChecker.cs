@@ -54,9 +54,29 @@ namespace VoiceLite.Services
                 if (response == MessageBoxResult.Yes)
                 {
                     result.VCRuntimeInstalled = await InstallVCRuntimeAsync();
+
+                    // Re-verify installation was successful
                     if (result.VCRuntimeInstalled)
                     {
-                        result.WhisperCanRun = await TestWhisperExecutableAsync();
+                        // Wait for installer to finish registering DLLs
+                        await Task.Delay(2000);
+
+                        // Re-check if runtime is actually loadable
+                        result.VCRuntimeInstalled = CheckVCRuntime();
+
+                        if (!result.VCRuntimeInstalled)
+                        {
+                            MessageBox.Show(
+                                "VC++ Runtime installation completed, but DLLs are not yet loaded.\n\n" +
+                                "Please restart your computer and try again.",
+                                "Restart Required",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                        }
+                        else
+                        {
+                            result.WhisperCanRun = await TestWhisperExecutableAsync();
+                        }
                     }
                 }
             }

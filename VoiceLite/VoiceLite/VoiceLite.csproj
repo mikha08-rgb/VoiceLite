@@ -8,6 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Version>1.0.43</Version>
     <AssemblyVersion>1.0.43.0</AssemblyVersion>
     <FileVersion>1.0.43.0</FileVersion>
@@ -24,10 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\whisper\**\*">
+    <Content Include="..\whisper\**\*">
       <Link>whisper\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

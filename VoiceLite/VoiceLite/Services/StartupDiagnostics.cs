@@ -380,15 +380,21 @@ namespace VoiceLite.Services
             {
                 var os = Environment.OSVersion;
 
-                // Windows 10 is version 10.0
+                // Windows 10 is version 10.0.xxxxx
+                // Windows 11 is version 10.0.22000+ (build number distinguishes Win11)
                 if (os.Platform == PlatformID.Win32NT)
                 {
-                    // Check for Windows 10 or later (version 10.0)
+                    // Check for Windows 10 or later (version 10.0+)
                     if (os.Version.Major < 10)
                     {
                         ErrorLogger.LogMessage($"Unsupported Windows version: {os.Version}");
                         return true; // Issue detected
                     }
+
+                    // Windows 11 detection: build 22000+
+                    var isWindows11 = os.Version.Major == 10 && os.Version.Build >= 22000;
+                    var windowsName = isWindows11 ? "Windows 11" : "Windows 10";
+                    ErrorLogger.LogMessage($"Running on {windowsName} (Build {os.Version.Build})");
                 }
 
                 return false;
@@ -642,7 +648,7 @@ namespace VoiceLite.Services
                 issues.Add($"Missing files: {string.Join(", ", MissingFiles)}");
 
             if (WindowsVersionIssue)
-                issues.Add("Windows version not supported (need Windows 10+)");
+                issues.Add("Windows version not supported (need Windows 10 or Windows 11)");
 
             if (TempFolderIssue)
                 issues.Add("Cannot access temp folder");

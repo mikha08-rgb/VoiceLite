@@ -43,3 +43,6 @@ PRODUCTION_KEYS.txt
 secrets.txt
 api-keys.txt
 .vercel
+
+# VC++ redistributable (downloaded during GitHub Actions build)
+VoiceLite/dependencies/
