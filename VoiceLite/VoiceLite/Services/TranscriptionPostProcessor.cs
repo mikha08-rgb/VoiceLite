@@ -187,7 +187,12 @@ namespace VoiceLite.Services
 
             var processed = transcription;
 
-            // Apply custom dictionary FIRST (user overrides defaults)
+            // VOICESHORTCUTS FIX: Normalize spaced acronyms BEFORE custom dictionary
+            // Whisper often transcribes "llm" as "L L M", breaking pattern matching
+            // This normalizes "L L M" → "LLM", "A I" → "AI" so patterns match reliably
+            processed = NormalizeSpacedAcronyms(processed);
+
+            // Apply custom dictionary (now more reliable with normalized acronyms)
             if (customDictionary != null && customDictionary.Count > 0)
             {
                 processed = ApplyCustomDictionary(processed, customDictionary);
@@ -241,6 +246,25 @@ namespace VoiceLite.Services
             processed = FixSpacing(processed);
 
             return processed;
+        }
+
+        /// <summary>
+        /// Normalize spaced acronyms to improve VoiceShortcuts reliability
+        /// Whisper often transcribes "llm" as "L L M", which breaks pattern matching
+        /// This fixes: "L L M" → "LLM", "A I" → "AI", "G P T" → "GPT"
+        /// </summary>
+        private static string NormalizeSpacedAcronyms(string text)
+        {
+            // Fix 4-letter spaced acronyms: "H T M L" → "HTML"
+            text = Regex.Replace(text, @"\b([A-Za-z])\s+([A-Za-z])\s+([A-Za-z])\s+([A-Za-z])\b", "$1$2$3$4");
+
+            // Fix 3-letter spaced acronyms: "L L M" → "LLM", "G P T" → "GPT"
+            text = Regex.Replace(text, @"\b([A-Za-z])\s+([A-Za-z])\s+([A-Za-z])\b", "$1$2$3");
+
+            // Fix 2-letter spaced acronyms: "A I" → "AI", "M L" → "ML"
+            text = Regex.Replace(text, @"\b([A-Za-z])\s+([A-Za-z])\b", "$1$2");
+
+            return text;
         }
 
         private static string ApplyCustomDictionary(string text, List<Models.DictionaryEntry> entries)
