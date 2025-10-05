@@ -84,16 +84,21 @@ jobs:
       if: steps.cache-whisper.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        echo "Downloading Whisper models and executable for installer..."
+        echo "Downloading Whisper models and executables for installer..."
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
 
-        # Download whisper.exe (Windows binary from whisper.cpp releases)
-        $whisperExeUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
-        echo "Downloading whisper.exe..."
-        Invoke-WebRequest -Uri $whisperExeUrl -OutFile "whisper-temp.zip"
+        # Download whisper.cpp binaries (includes all DLLs + executables)
+        $whisperBinUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
+        echo "Downloading whisper.cpp binaries (whisper.exe, whisper.dll, server.exe, DLLs)..."
+        Invoke-WebRequest -Uri $whisperBinUrl -OutFile "whisper-temp.zip"
         Expand-Archive -Path "whisper-temp.zip" -DestinationPath "whisper-temp" -Force
+
+        # Copy all required files
         Copy-Item -Path "whisper-temp/main.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
+        Copy-Item -Path "whisper-temp/server.exe" -Destination "VoiceLite/whisper_installer/server.exe" -Force
+        Copy-Item -Path "whisper-temp/*.dll" -Destination "VoiceLite/whisper_installer/" -Force
+
         Remove-Item "whisper-temp.zip" -Force
         Remove-Item "whisper-temp" -Recurse -Force
 
