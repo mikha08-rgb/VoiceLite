@@ -350,10 +350,12 @@ namespace VoiceLite.Services
 
                 process.Start();
 
-                // Set highest priority for fastest processing (warmed system)
+                // PERFORMANCE FIX: Use Normal priority instead of High to prevent UI thread starvation
+                // On systems with limited cores (2-4), HIGH priority Whisper can starve the UI thread
+                // causing the app to appear frozen during transcription
                 try
                 {
-                    process.PriorityClass = ProcessPriorityClass.High;
+                    process.PriorityClass = ProcessPriorityClass.Normal;
                 }
                 catch { }
 
