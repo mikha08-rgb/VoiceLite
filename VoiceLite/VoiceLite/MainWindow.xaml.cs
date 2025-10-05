@@ -866,6 +866,15 @@ namespace VoiceLite
                 return;
             }
 
+            // PERFORMANCE FIX: Check if coordinator is busy (transcribing)
+            // Prevents queueing up recordings which causes apparent freezing
+            if (recordingCoordinator != null && recordingCoordinator.IsTranscribing)
+            {
+                UpdateStatus("Busy - transcription in progress, please wait", new SolidColorBrush(Color.FromRgb(255, 165, 0))); // Orange
+                ErrorLogger.LogInfo("StartRecording: Blocked - transcription already in progress");
+                return;
+            }
+
             // CRITICAL FIX: Stop stuck-state recovery timer if somehow still running
             StopStuckStateRecoveryTimer();
 
