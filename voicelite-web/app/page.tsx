@@ -269,7 +269,7 @@ export default function Home() {
             <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
               <RippleButton
                 onClick={() => {
-                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.43/VoiceLite-Setup-1.0.43.exe';
+                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.44/VoiceLite-Setup-1.0.44.exe';
                 }}
                 className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
                 rippleColor="rgba(255, 255, 255, 0.4)"
@@ -311,17 +311,8 @@ export default function Home() {
               </Suspense>
             )}
 
-            <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 px-6 py-6 text-sm leading-6 text-blue-900 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50 dark:text-blue-100">
-              <strong className="font-bold">Important:</strong> If you get a "missing DLL" error, download{' '}
-              <a
-                href="https://aka.ms/vs/17/release/vc_redist.x64.exe"
-                className="font-bold text-purple-600 underline transition duration-200 hover:text-purple-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:text-purple-300 dark:hover:text-purple-200"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                VC++ Runtime
-              </a>
-              {' '}(13MB, 30 seconds) then run VoiceLite again.
+            <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 px-6 py-6 text-sm leading-6 text-green-900 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50 dark:text-green-100">
+              <strong className="font-bold">✨ New in v1.0.44:</strong> VC++ Runtime now auto-installed! No more DLL errors. Works completely offline. Supports Windows 10 & 11 with enhanced 4K display scaling.
             </div>
           </aside>
         </div>
