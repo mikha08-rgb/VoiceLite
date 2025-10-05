@@ -113,6 +113,20 @@ jobs:
           echo "  - $($_.Name) ($sizeInMB MB)"
         }
 
+    - name: Download VC++ Redistributable
+      shell: pwsh
+      run: |
+        echo "Downloading Microsoft Visual C++ Redistributable..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/dependencies"
+
+        $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        echo "Downloading vc_redist.x64.exe..."
+        Invoke-WebRequest -Uri $vcRedistUrl -OutFile "VoiceLite/dependencies/vc_redist.x64.exe"
+
+        $vcSize = (Get-Item "VoiceLite/dependencies/vc_redist.x64.exe").Length / 1MB
+        echo "Downloaded VC++ Runtime: $([math]::Round($vcSize, 2)) MB"
+
     - name: Download Inno Setup
       shell: pwsh
       run: |
