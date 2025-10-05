@@ -61,6 +61,10 @@ namespace VoiceLite.Models
         {
             get
             {
+                // BUG FIX (BUG-015): Add null check to prevent NullReferenceException
+                if (string.IsNullOrEmpty(Text))
+                    return string.Empty;
+
                 const int maxLength = 100;
                 if (Text.Length <= maxLength)
                     return Text;
