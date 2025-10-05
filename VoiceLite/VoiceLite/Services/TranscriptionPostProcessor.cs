@@ -501,19 +501,97 @@ namespace VoiceLite.Services
                 }
             }
 
-            // PERFORMANCE OPTIMIZATION: Build a single combined regex pattern instead of
-            // creating a new Regex object for each word. This is 5-10x faster for large word lists.
             var distinctWords = wordsToRemove.Distinct().ToList();
             if (distinctWords.Count == 0)
                 return text;
 
-            // Escape each word and combine into a single alternation pattern: \b(word1|word2|word3)\b
-            var escapedWords = distinctWords.Select(w => Regex.Escape(w));
-            var combinedPattern = $@"\b({string.Join("|", escapedWords)})\b";
-            var options = RegexOptions.Compiled | (settings.CaseSensitiveFillerRemoval ? RegexOptions.None : RegexOptions.IgnoreCase);
+            // CONTEXT-AWARE REMOVAL: Handle ambiguous words that have legitimate grammatical uses
+            // Words like "like", "right", "well" need special patterns to avoid false positives
+            var contextAwareWords = new Dictionary<string, bool>();
+            foreach (var word in new[] { "like", "right", "well", "actually", "literally", "I think" })
+            {
+                if (distinctWords.Contains(word, StringComparer.OrdinalIgnoreCase))
+                    contextAwareWords[word] = true;
+            }
 
-            // Single regex replacement instead of multiple
-            text = Regex.Replace(text, combinedPattern, "", options);
+            var simpleWords = distinctWords.Except(contextAwareWords.Keys, StringComparer.OrdinalIgnoreCase).ToList();
+
+            var options = settings.CaseSensitiveFillerRemoval ? RegexOptions.None : RegexOptions.IgnoreCase;
+
+            // CONTEXT-AWARE REMOVAL: Apply word-specific patterns
+            // Each ambiguous word has tailored rules to preserve legitimate uses
+
+            // 1. "like" - verb/preposition vs filler
+            if (contextAwareWords.ContainsKey("like"))
+            {
+                // Comma-adjacent: ", like,", ", like", "like,"
+                text = Regex.Replace(text,
+                    @"(,\s*like\s*,|,\s*like\b|\blike\s*,)",
+                    match => match.Value.StartsWith(",") && match.Value.EndsWith(",") ? "," : "",
+                    options);
+                // Quotative: "was/were like"
+                text = Regex.Replace(text, @"\b(was|were)\s+like\b", "$1", options);
+                // Isolated (not after similarity verbs, not before demonstratives)
+                text = Regex.Replace(text,
+                    @"(?<!looks|sounds|feels|seems|appears|smells|tastes)\s+like\s+(?!(this|that|it|he|she|they|we|you|a|an|the))",
+                    " ",
+                    options);
+            }
+
+            // 2. "right" - direction/correctness vs tag question filler
+            if (contextAwareWords.ContainsKey("right"))
+            {
+                // Only remove when used as tag question: "right?" or ", right" at end of sentence
+                text = Regex.Replace(text, @",\s*right\s*[?.]", match => match.Value.EndsWith("?") ? "?" : ".", options);
+                text = Regex.Replace(text, @"\bright\s*\?", "?", options);
+                // Preserve: "turn right", "right answer", "human rights", "right now"
+            }
+
+            // 3. "well" - health/quality vs transition filler
+            if (contextAwareWords.ContainsKey("well"))
+            {
+                // Remove at sentence start with comma: "Well, I think" → "I think"
+                text = Regex.Replace(text, @"^\s*well\s*,\s*", "", options);
+                text = Regex.Replace(text, @"[.!?]\s+well\s*,\s*", match => match.Value.Substring(0, match.Value.IndexOf("well", StringComparison.OrdinalIgnoreCase)), options);
+                // Preserve: "feel well", "well done", "as well", "well-known"
+            }
+
+            // 4. "actually" - meaningful emphasis vs filler
+            if (contextAwareWords.ContainsKey("actually"))
+            {
+                // Remove when comma-surrounded (clear filler)
+                text = Regex.Replace(text, @",\s*actually\s*,", ",", options);
+                // Remove at sentence start with comma
+                text = Regex.Replace(text, @"^\s*actually\s*,\s*", "", options);
+                text = Regex.Replace(text, @"[.!?]\s+actually\s*,\s*", match => match.Value.Substring(0, match.Value.IndexOf("actually", StringComparison.OrdinalIgnoreCase)), options);
+                // Preserve when used for correction: "actually correct", "actually works"
+            }
+
+            // 5. "literally" - literal meaning vs filler intensifier
+            if (contextAwareWords.ContainsKey("literally"))
+            {
+                // Remove when comma-surrounded or before common hyperbole
+                text = Regex.Replace(text, @",\s*literally\s*,", ",", options);
+                text = Regex.Replace(text, @"\bliterally\s+(dying|dead|exploded|everything|anything|nothing)", "$1", options);
+                // Preserve when used correctly: "literally translated", "literally true"
+            }
+
+            // 6. "I think" - opinion marker vs filler hedge
+            if (contextAwareWords.ContainsKey("I think"))
+            {
+                // Remove when at start or comma-surrounded (hedging)
+                text = Regex.Replace(text, @"^\s*I\s+think\s*,\s*", "", options);
+                text = Regex.Replace(text, @",\s*I\s+think\s*,", ",", options);
+                // Preserve when followed by "that" (intentional opinion): "I think that..."
+            }
+
+            // Remove simple filler words (um, uh, etc.) using combined regex
+            if (simpleWords.Count > 0)
+            {
+                var escapedWords = simpleWords.Select(w => Regex.Escape(w));
+                var combinedPattern = $@"\b({string.Join("|", escapedWords)})\b";
+                text = Regex.Replace(text, combinedPattern, "", options);
+            }
 
             // Clean up extra spaces and punctuation left by removal
             text = Regex.Replace(text, @"\s*,\s*,", ","); // Double commas
