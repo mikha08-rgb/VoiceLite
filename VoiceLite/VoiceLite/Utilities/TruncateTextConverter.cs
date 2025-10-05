@@ -16,6 +16,10 @@ namespace VoiceLite.Utilities
         {
             if (value is string text)
             {
+                // BUG FIX (BUG-003): Add null/empty check to prevent NullReferenceException
+                if (string.IsNullOrEmpty(text))
+                    return string.Empty;
+
                 // Allow parameter to override max length
                 int maxLength = DEFAULT_MAX_LENGTH;
                 if (parameter is int paramLength)
