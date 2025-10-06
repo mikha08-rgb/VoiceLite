@@ -108,7 +108,10 @@ namespace VoiceLite.Services
                     TotalTranscriptions = metrics.Count,
                     AverageProcessingTimeMs = (int)recent.Average(m => m.ProcessingTime.TotalMilliseconds),
                     AverageWordsPerMinute = CalculateWPM(recent),
-                    DictionaryModificationRate = recent.Count(m => m.WasModifiedByDictionary) / (float)recent.Count,
+                    // ISSUE #2 FIX: Check count before division to prevent divide-by-zero
+                    DictionaryModificationRate = recent.Any()
+                        ? recent.Count(m => m.WasModifiedByDictionary) / (float)recent.Count
+                        : 0f,
                     FeatureImpact = AnalyzeFeatureImpact(recent),
                     LastUpdated = DateTime.UtcNow
                 };
@@ -155,7 +158,11 @@ namespace VoiceLite.Services
             var withContext = metrics.Where(m => m.FeaturesUsed.UsedContext).ToList();
             if (withContext.Any())
             {
-                impact["Context"] = withContext.Count(m => !m.WasModifiedByDictionary) / (float)withContext.Count;
+                // ISSUE #1 FIX: Check count before division to prevent divide-by-zero
+                var contextMetrics = withContext.ToList();
+                impact["Context"] = contextMetrics.Count > 0
+                    ? contextMetrics.Count(m => !m.WasModifiedByDictionary) / (float)contextMetrics.Count
+                    : 0f;
             }
 
             var withVAD = metrics.Where(m => m.FeaturesUsed.UsedVAD).ToList();

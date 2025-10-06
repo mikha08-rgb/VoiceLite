@@ -25,7 +25,10 @@
       "Bash(dotnet run:*)",
       "Bash(powershell:*)",
       "Bash(gh run watch:*)",
-      "Bash(unzip:*)"
+      "Bash(unzip:*)",
+      "Read(//c/Users/mishk/Codingprojects/SpeakLite/**)",
+      "Bash(dotnet publish:*)",
+      "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite/Installer/VoiceLiteSetup_Simple.iss\")"
     ],
     "deny": [],
     "ask": []

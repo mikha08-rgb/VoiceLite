@@ -188,24 +188,65 @@ namespace VoiceLite.Services
         /// </summary>
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
-            // DISPOSAL SAFETY: Early exit if disposed
-            if (isDisposed)
+            // CRIT-003 FIX: Wrap entire async void method in try-catch to prevent app crash
+            try
             {
-                ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Disposed, skipping transcription");
-                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
-                return;
+                // DISPOSAL SAFETY: Early exit if disposed
+                if (isDisposed)
+                {
+                    ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Disposed, skipping transcription");
+                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                    return;
+                }
+
+                ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - isCancelled={isCancelled}, file={audioFilePath}");
+
+                // If recording was cancelled, just clean up and return
+                if (isCancelled)
+                {
+                    ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
+                    isCancelled = false;
+                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                    return;
+                }
+
+                await ProcessAudioFileAsync(audioFilePath).ConfigureAwait(false);
             }
-
-            ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - isCancelled={isCancelled}, file={audioFilePath}");
-
-            // If recording was cancelled, just clean up and return
-            if (isCancelled)
+            catch (Exception ex)
             {
-                ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
-                isCancelled = false;
-                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
-                return;
+                ErrorLogger.LogError("CRITICAL: Unhandled exception in OnAudioFileReady", ex);
+
+                // Fire error event to notify UI
+                var errorArgs = new TranscriptionCompleteEventArgs
+                {
+                    Transcription = string.Empty,
+                    ErrorMessage = $"Fatal transcription error: {ex.Message}",
+                    Success = false
+                };
+
+                try
+                {
+                    TranscriptionCompleted?.Invoke(this, errorArgs);
+                }
+                catch (Exception invokeEx)
+                {
+                    ErrorLogger.LogError("Failed to invoke TranscriptionCompleted error event", invokeEx);
+                }
+
+                // Clean up audio file
+                try
+                {
+                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                }
+                catch (Exception cleanupEx)
+                {
+                    ErrorLogger.LogError("Failed to cleanup audio file after error", cleanupEx);
+                }
             }
+        }
+
+        private async Task ProcessAudioFileAsync(string audioFilePath)
+        {
 
             // PERFORMANCE: Use original audio file directly (no copy needed)
             // AudioRecorder already creates unique temp files per recording
@@ -512,29 +553,38 @@ namespace VoiceLite.Services
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
             }
 
-            // BUG-008 FIX: Wait for any in-flight OnAudioFileReady handlers to complete with timeout
-            // Increased from 2s → 30s to handle large audio files (10-20s transcription time)
-            // SpinWait is more reliable than Thread.Sleep for synchronization
-            var spinWait = new System.Threading.SpinWait();
-            var deadline = DateTime.Now.AddSeconds(30); // BUG-008 FIX: Increased from 2s to 30s
-            int spinCount = 0;
+            // CRIT-009 FIX: Hybrid wait strategy - spin briefly, then sleep to prevent CPU spike
+            // SpinWait for first 100ms (responsive), then Thread.Sleep(50ms) intervals (CPU-friendly)
+            var deadline = DateTime.Now.AddSeconds(30);
+            var spinDeadline = DateTime.Now.AddMilliseconds(100); // Spin for first 100ms only
+            bool isSpinning = true;
 
             while (isTranscribing && DateTime.Now < deadline)
             {
-                spinWait.SpinOnce();
-
-                // BUG-008 FIX: Log progress every 5 seconds to show we're waiting gracefully
-                if (++spinCount % 50000 == 0)
+                if (isSpinning && DateTime.Now < spinDeadline)
                 {
+                    // Phase 1: Tight spin for first 100ms (responsive)
+                    System.Threading.Thread.SpinWait(100);
+                }
+                else
+                {
+                    // Phase 2: Sleep in 50ms chunks (CPU-friendly)
+                    isSpinning = false;
+                    System.Threading.Thread.Sleep(50);
+
+                    // Log progress every 5 seconds
                     var elapsed = (DateTime.Now - deadline.AddSeconds(30)).TotalSeconds;
-                    ErrorLogger.LogDebug($"BUG-008: RecordingCoordinator.Dispose waiting for transcription... {elapsed:F1}s elapsed");
+                    if (elapsed > 0 && (int)(elapsed * 10) % 50 == 0) // Every 5 seconds
+                    {
+                        ErrorLogger.LogDebug($"RecordingCoordinator.Dispose waiting for transcription... {elapsed:F1}s elapsed");
+                    }
                 }
             }
 
-            // BUG-008 FIX: Log warning if timeout reached
+            // Log warning if timeout reached
             if (isTranscribing)
             {
-                ErrorLogger.LogWarning("BUG-008: RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
+                ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
             }
 
             StopTranscriptionWatchdog();

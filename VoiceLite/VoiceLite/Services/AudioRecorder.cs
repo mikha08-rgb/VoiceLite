@@ -357,6 +357,9 @@ namespace VoiceLite.Services
                     return;
                 }
 
+                // CRIT-004 FIX: Move ArrayPool.Rent() inside try block and under lock
+                // Ensures buffer is always returned even on early exit
+                byte[]? buffer = null;
                 try
                 {
                     // CRITICAL FIX: Remove nested lock to prevent deadlock
@@ -370,34 +373,38 @@ namespace VoiceLite.Services
 
                     // Now safe to use localWaveFile outside lock (we have a reference)
                     // Apply volume scaling (InputVolumeScale is const 0.8f)
-                    // CRITICAL FIX: Use ArrayPool to prevent memory allocation on every callback
-                    var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
-                    try
-                    {
-                        Array.Copy(e.Buffer, buffer, e.BytesRecorded);
+                    // CRITICAL FIX: Rent buffer INSIDE try to ensure finally always returns it
+                    buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
 
-                        for (int i = 0; i < e.BytesRecorded; i += 2)
-                        {
-                            short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
-                            int scaled = (int)Math.Round(sample * InputVolumeScale);
-                            scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
-                            short clamped = (short)scaled;
-                            buffer[i] = (byte)(clamped & 0xFF);
-                            buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
-                        }
-                        localWaveFile.Write(buffer, 0, e.BytesRecorded);
-                    }
-                    finally
+                    Array.Copy(e.Buffer, buffer, e.BytesRecorded);
+
+                    // ISSUE #10 FIX: Ensure we process pairs of bytes only to prevent out-of-bounds access
+                    int pairCount = e.BytesRecorded / 2;
+                    for (int i = 0; i < pairCount * 2; i += 2)
                     {
-                        // SECURITY: Clear buffer to prevent audio data leakage in pooled memory
-                        System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+                        short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                        int scaled = (int)Math.Round(sample * InputVolumeScale);
+                        scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
+                        short clamped = (short)scaled;
+                        buffer[i] = (byte)(clamped & 0xFF);
+                        buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
                     }
+                    localWaveFile.Write(buffer, 0, pairCount * 2);
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("OnDataAvailable: Audio write failed", ex);
                     // Mic disconnected or error - stop this session gracefully
                     StopRecording();
+                }
+                finally
+                {
+                    // CRIT-004 FIX: Always return buffer to pool, even on early return or exception
+                    if (buffer != null)
+                    {
+                        // SECURITY: Clear buffer to prevent audio data leakage in pooled memory
+                        System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+                    }
                 }
             }
         }
@@ -621,16 +628,24 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
-            // BUG FIX (CRIT-003): Stop timer FIRST, then set disposal flag
-            // This ensures timer callback can't fire after we start disposing other resources
+            // CRIT-008 FIX: Stop timer BEFORE setting disposal flag to prevent race condition
+            // Timer callback checks isDisposed, so we must stop timer first
             if (cleanupTimer != null)
             {
-                cleanupTimer.Stop();
-                cleanupTimer.Dispose();
+                try
+                {
+                    cleanupTimer.Stop();
+                    cleanupTimer.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Timer already disposed, ignore
+                }
                 cleanupTimer = null;
             }
 
             // DISPOSAL SAFETY: Set flag to prevent any late callbacks from proceeding
+            // This must come AFTER timer.Stop() to prevent timer callback race condition
             isDisposed = true;
 
             lock (lockObject)

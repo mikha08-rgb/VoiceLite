@@ -422,34 +422,51 @@ namespace VoiceLite.Services
                         process.Kill(entireProcessTree: true);
                         ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
 
-                        // RESOURCE LEAK FIX: Verify process actually died
-                        if (!process.WaitForExit(5000)) // Wait up to 5 seconds
+                        // CRIT-005 FIX: Non-blocking process termination with hard timeout
+                        // Use Task.Run to prevent UI thread hang if process is in unkillable state
+                        var waitTask = Task.Run(() =>
+                        {
+                            try
+                            {
+                                return process.WaitForExit(5000); // Wait up to 5 seconds
+                            }
+                            catch
+                            {
+                                return false;
+                            }
+                        });
+
+                        // Hard timeout: 6 seconds max (5s wait + 1s margin)
+                        if (!waitTask.Wait(6000) || !waitTask.Result)
                         {
                             ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
 
-                            // Last resort: Use taskkill /F
-                            try
+                            // Last resort: Fire-and-forget taskkill (don't wait)
+                            _ = Task.Run(() =>
                             {
-                                var taskkill = Process.Start(new ProcessStartInfo
+                                try
                                 {
-                                    FileName = "taskkill",
-                                    Arguments = $"/F /PID {process.Id}",
-                                    CreateNoWindow = true,
-                                    UseShellExecute = false
-                                });
-                                taskkill?.WaitForExit(2000);
-                                taskkill?.Dispose();
-                            }
-                            catch (Exception taskkillEx)
-                            {
-                                ErrorLogger.LogError("taskkill also failed", taskkillEx);
-                            }
+                                    var taskkill = Process.Start(new ProcessStartInfo
+                                    {
+                                        FileName = "taskkill",
+                                        Arguments = $"/F /T /PID {process.Id}",
+                                        CreateNoWindow = true,
+                                        UseShellExecute = false
+                                    });
+                                    // Don't wait - fire and forget
+                                    taskkill?.Dispose();
+                                }
+                                catch (Exception taskkillEx)
+                                {
+                                    ErrorLogger.LogError("taskkill also failed", taskkillEx);
+                                }
+                            });
                         }
                     }
                     catch (Exception killEx)
                     {
                         ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
-                        // Try basic kill as fallback
+                        // Try basic kill as fallback (best effort, don't wait)
                         try { process.Kill(); } catch { }
                     }
 
