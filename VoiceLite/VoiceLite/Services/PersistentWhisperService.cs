@@ -369,9 +369,10 @@ namespace VoiceLite.Services
                 int timeoutSeconds;
                 if (!isWarmedUp)
                 {
-                    // First run needs more time (model loading)
-                    timeoutSeconds = 60; // 60 seconds for first run
-                    ErrorLogger.LogMessage("Using extended timeout for first run (60s)");
+                    // First run needs more time (model loading) - increased from 60s to 120s
+                    // On slow systems (4GB RAM, antivirus scanning), 466MB model can take 30-60s to load
+                    timeoutSeconds = 120; // 120 seconds for first run
+                    ErrorLogger.LogMessage("Using extended timeout for first run (120s) - model loading may take time");
                 }
                 else
                 {
@@ -449,11 +450,16 @@ namespace VoiceLite.Services
                     if (!isWarmedUp)
                     {
                         throw new TimeoutException(
-                            "First transcription timed out. This often happens when:\n" +
-                            "• Antivirus is scanning the files\n" +
-                            "• Windows Defender is blocking execution\n" +
-                            "• The model file is being loaded for the first time\n\n" +
-                            "Please try again or add VoiceLite to your antivirus exclusions.");
+                            "First transcription timed out (this is normal on slow systems).\n\n" +
+                            "Loading the AI model for the first time can take 30-120 seconds on:\n" +
+                            "• Systems with 4GB RAM or less\n" +
+                            "• Computers with antivirus actively scanning\n" +
+                            "• Older CPUs or HDDs (vs SSDs)\n\n" +
+                            "What to try:\n" +
+                            "1. Wait a moment and try again (second attempt is usually faster)\n" +
+                            "2. Run 'Fix Antivirus Issues' from your desktop to add VoiceLite exclusions\n" +
+                            "3. Close other applications to free up RAM\n" +
+                            "4. Consider using the Tiny model in Settings (smaller, loads faster)");
                     }
                     else
                     {
