@@ -39,7 +39,7 @@ const plans = [
     price: '$20 / 3 months',
     priceId: 'quarterly',
     popular: true,
-    bullets: ['All Whisper models', 'Priority support', 'Automatic updates'],
+    bullets: ['Premium models (Swift, Elite, Ultra)', 'Advanced text formatting', 'VoiceShortcuts templates', 'Priority support'],
     comingSoon: true, // Added: Pro tier launching soon
   },
   {
@@ -49,7 +49,7 @@ const plans = [
     price: '$99 one-time',
     priceId: 'lifetime',
     popular: false,
-    bullets: ['Permanent license', 'All future updates', 'Priority support'],
+    bullets: ['Permanent license', 'All premium models', 'Advanced features', 'All future updates', 'Priority support'],
     comingSoon: true, // Added: Pro tier launching soon
   },
 ];
@@ -60,32 +60,36 @@ const faqItems = [
     answer: 'No. VoiceLite runs 100% offline on your PC using local Whisper AI models. Your voice never leaves your computer - no internet connection required for transcription.',
   },
   {
-    question: 'When will Pro tier launch?',
-    answer: 'Pro tier is launching in 2-3 weeks! We\'re finalizing payment infrastructure (LLC setup and Stripe integration). The free tier with Tiny model is fully functional now. Pro will unlock premium models (base, small, medium) for 95%+ accuracy on technical terms.',
-  },
-  {
     question: "What's the difference between free and Pro?",
-    answer: 'The free version includes the tiny Whisper model (fastest, basic accuracy). Pro unlocks all premium models (base, small, medium) for higher accuracy and better performance on technical terms.',
+    answer: 'The free version includes the Pro model (466MB, ~90-93% accuracy). Pro tier unlocks premium models (Swift, Elite, Ultra) for even higher accuracy (93-97%), advanced features like VoiceShortcuts, text formatting presets, and priority support.',
   },
   {
     question: 'Which Whisper model should I use?',
-    answer: 'Start with tiny (included free) for speed. Upgrade to base or small for better accuracy. Medium is best for technical jargon but uses more RAM. All models run offline.',
+    answer: 'Start with Pro (included free, 90-93% accuracy) for balanced speed and quality. Upgrade to Swift for faster processing, or Elite/Ultra (Pro tier) for maximum accuracy on technical jargon. All models run offline.',
   },
   {
     question: 'Does it work in games, Discord, VS Code?',
     answer: 'Yes! VoiceLite works in any Windows application with a text field - browsers, IDEs, terminals, chat apps, and even games in windowed mode. Just hold your hotkey and speak.',
   },
   {
-    question: 'Can I cancel my subscription anytime?',
-    answer: 'Absolutely. Cancel anytime from your account dashboard. No questions asked, no fees. Your license remains active until the end of your billing period.',
+    question: 'What languages are supported?',
+    answer: 'VoiceLite supports 99 languages via Whisper AI including English, Spanish, French, German, Chinese, Japanese, Arabic, and many more. All languages work 100% offline with the same accuracy and speed.',
+  },
+  {
+    question: 'Can I customize the transcribed text?',
+    answer: 'Yes! VoiceLite includes advanced text formatting: auto-capitalization, filler word removal (5 intensity levels), contractions, grammar fixes, and quick presets (Professional/Code/Casual). Use VoiceShortcuts to create custom phrase replacements with Medical/Legal/Tech templates.',
   },
   {
     question: 'How accurate is the transcription?',
-    answer: 'Accuracy depends on the model: tiny (85-90%), base (90-93%), small (93-95%), medium (95-97%). Technical terms and code (useState, npm, git) are recognized well with larger models.',
+    answer: 'Accuracy depends on the model: Lite (80-85%), Pro (90-93%, free tier), Swift (90-93%), Elite (93-95%), Ultra (95-97%). Technical terms and code (useState, npm, git) are recognized well. Use text formatting features to fine-tune output.',
   },
   {
     question: 'Can I use VoiceLite on multiple PCs?',
     answer: 'Yes! Each license activates on up to 3 devices. Manage activations from your account dashboard. Deactivate old devices to free up slots.',
+  },
+  {
+    question: 'Can I cancel my subscription anytime?',
+    answer: 'Absolutely. Cancel anytime from your account dashboard. No questions asked, no fees. Your license remains active until the end of your billing period.',
   },
   {
     question: 'Is there a refund policy?',
@@ -263,13 +267,13 @@ export default function Home() {
                 <Tooltip content="Powered by OpenAI Whisper AI - runs 100% on your PC">
                   <span>100% offline</span>
                 </Tooltip>
-                . Your voice never leaves your PC.
+                . Supports 99 languages, advanced text formatting, and custom VoiceShortcuts. Your voice never leaves your PC.
               </p>
             </div>
             <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
               <RippleButton
                 onClick={() => {
-                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.45/VoiceLite-Setup-1.0.45.exe';
+                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.47/VoiceLite-Setup-1.0.47.exe';
                 }}
                 className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
                 rippleColor="rgba(255, 255, 255, 0.4)"
@@ -312,7 +316,7 @@ export default function Home() {
             )}
 
             <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 px-6 py-6 text-sm leading-6 text-green-900 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50 dark:text-green-100">
-              <strong className="font-bold">✨ New in v1.0.45:</strong> VC++ Runtime now auto-installed! No more DLL errors. Works completely offline. Supports Windows 10 & 11 with enhanced 4K display scaling.
+              <strong className="font-bold">✨ New in v1.0.47:</strong> Enhanced first-run experience with diagnostic checks, VC++ Runtime auto-installation, and improved error handling. Download verification with SHA256 hashes included.
             </div>
           </aside>
         </div>
@@ -397,18 +401,18 @@ export default function Home() {
             {[
               {
                 icon: Shield,
-                title: 'Offline by Design',
-                description: 'No account needed to start. Upgrade when you want model packs and priority support.',
+                title: 'Advanced Text Formatting',
+                description: 'Auto-capitalization, filler word removal (5 levels), grammar fixes, and quick presets (Professional/Code/Casual). Fine-tune every transcription.',
               },
               {
                 icon: Zap,
-                title: 'Passwordless Login',
-                description: 'Secure magic link + OTP authentication that works on both desktop and web.',
+                title: 'VoiceShortcuts',
+                description: 'Create custom phrase replacements with built-in templates for Medical, Legal, and Tech terminology. Type faster with voice commands.',
               },
               {
                 icon: Mic,
-                title: 'Multi-Device Licensing',
-                description: 'Activate your license on up to 3 devices. Managed from your account dashboard.',
+                title: '99 Languages Supported',
+                description: 'English, Spanish, French, German, Chinese, Japanese, Arabic, and 92 more. All languages work 100% offline with the same speed and accuracy.',
               },
             ].map((feature) => (
               <FeatureCard key={feature.title} icon={feature.icon} title={feature.title} description={feature.description} />
