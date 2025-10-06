@@ -213,7 +213,7 @@ begin
   if FindFirst(FileName, FindRec) then
   begin
     try
-      Result := FindRec.Size;
+      Result := (FindRec.SizeHigh shl 32) or FindRec.SizeLow;
     finally
       FindClose(FindRec);
     end;
@@ -252,22 +252,7 @@ begin
   end;
 end;
 
-function GetFileSize(FileName: String): Int64;
-var
-  FindRec: TFindRec;
-begin
-  Result := 0;
-  if FindFirst(FileName, FindRec) then
-  begin
-    try
-      Result := FindRec.Size;
-    finally
-      FindClose(FindRec);
-    end;
-  end;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
+procedure CurStepChanged(CurStep: TSetupStep):
 var
   AppDataDir: String;
   LogsDir: String;
