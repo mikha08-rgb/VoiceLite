@@ -1,6 +1,7 @@
-; Simple Inno Setup Script for VoiceLite
-; v1.0.47: First-run diagnostics, enhanced installer verification, comprehensive troubleshooting
+; Lite Inno Setup Script for VoiceLite
+; v1.0.47-lite: First-run diagnostics, enhanced installer verification, comprehensive troubleshooting
 ; Windows 10/11 (64-bit) compatible - auto-installs VC++ Runtime if needed
+; Pro model (466MB) can be downloaded from Settings after installation
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
@@ -13,7 +14,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.47
+OutputBaseFilename=VoiceLite-Setup-Lite-1.0.47
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -35,8 +36,8 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (Small + Tiny models - Small is new free tier default, Tiny is legacy fallback)
-Source: "..\whisper_installer\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+; Whisper files (Tiny model only for lite installer)
+Source: "..\whisper_installer_lite\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
@@ -97,6 +98,12 @@ begin
            'Note: A system restart may be required after installation.',
            mbInformation, MB_OK);
   end;
+
+  // Inform user about lite installer
+  MsgBox('You are installing VoiceLite Lite (75MB download).' + #13#10#13#10 +
+         'This includes the Tiny AI model for quick downloads.' + #13#10#13#10 +
+         'You can download the Pro model (466MB, better accuracy) from Settings after installation.',
+         mbInformation, MB_OK);
 end;
 
 procedure InstallVCRuntimeIfNeeded;
@@ -201,36 +208,13 @@ end;
 function VerifyModelFiles: Boolean;
 var
   AppPath: String;
-  SmallModelPath: String;
   TinyModelPath: String;
-  SmallModelSize: Int64;
   TinyModelSize: Int64;
 begin
   Result := True;
   AppPath := ExpandConstant('{app}');
 
-  // Check for Small model (Pro - 466MB)
-  SmallModelPath := AppPath + '\whisper\ggml-small.bin';
-  if FileExists(SmallModelPath) then
-  begin
-    SmallModelSize := GetFileSize(SmallModelPath);
-    // Small model should be ~460-470 MB (460MB = 482344960 bytes)
-    if (SmallModelSize < 400000000) or (SmallModelSize > 550000000) then
-    begin
-      Log('WARNING: Small model file size is suspicious: ' + IntToStr(SmallModelSize) + ' bytes (expected ~466MB)');
-      Result := False;
-    end
-    else
-    begin
-      Log('Small model verified: ' + IntToStr(SmallModelSize) + ' bytes');
-    end;
-  end
-  else
-  begin
-    Log('Small model not found (this is OK if Lite installer)');
-  end;
-
-  // Check for Tiny model (Lite - 75MB)
+  // Lite installer only includes Tiny model
   TinyModelPath := AppPath + '\whisper\ggml-tiny.bin';
   if FileExists(TinyModelPath) then
   begin
@@ -248,7 +232,7 @@ begin
   end
   else
   begin
-    Log('WARNING: Tiny model not found - at least one model is required');
+    Log('WARNING: Tiny model not found - required for Lite installer');
     Result := False;
   end;
 end;

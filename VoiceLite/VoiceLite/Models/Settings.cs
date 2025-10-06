@@ -266,6 +266,7 @@ namespace VoiceLite.Models
 
         // First-Run Experience
         public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
+        public bool HasSeenFirstRunDiagnostics { get; set; } = false; // Show first-run diagnostic window after installation
 
         // Post-Processing Settings
         public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
