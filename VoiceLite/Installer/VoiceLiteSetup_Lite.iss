@@ -296,7 +296,7 @@ begin
   end;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep):
+procedure CurStepChanged(CurStep: TSetupStep);
 var
   AppDataDir: String;
   LogsDir: String;
