@@ -268,6 +268,50 @@ begin
   end;
 end;
 
+function RunWhisperSmokeTest: Boolean;
+var
+  ResultCode: Integer;
+  WhisperExePath: String;
+begin
+  Result := False;
+
+  try
+    WhisperExePath := ExpandConstant('{app}\whisper\whisper.exe');
+
+    if not FileExists(WhisperExePath) then
+    begin
+      Log('ERROR: whisper.exe not found at: ' + WhisperExePath);
+      Exit;
+    end;
+
+    Log('Running whisper.exe smoke test...');
+
+    // Run whisper.exe --help (should exit with code 0 or 1)
+    if Exec(WhisperExePath, '--help', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      Log('Whisper smoke test exit code: ' + IntToStr(ResultCode));
+
+      // Exit codes 0 or 1 are both valid for --help (depends on version)
+      if (ResultCode = 0) or (ResultCode = 1) then
+      begin
+        Log('Whisper smoke test PASSED');
+        Result := True;
+      end
+      else
+      begin
+        Log('Whisper smoke test FAILED: unexpected exit code ' + IntToStr(ResultCode));
+      end;
+    end
+    else
+    begin
+      Log('Whisper smoke test FAILED: could not execute whisper.exe');
+    end;
+  except
+    Log('Whisper smoke test FAILED: exception during execution');
+    Result := False;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   AppDataDir: String;
@@ -335,50 +379,6 @@ begin
                mbCriticalError, MB_OK);
       end;
     end;
-  end;
-end;
-
-function RunWhisperSmokeTest: Boolean;
-var
-  ResultCode: Integer;
-  WhisperExePath: String;
-begin
-  Result := False;
-
-  try
-    WhisperExePath := ExpandConstant('{app}\whisper\whisper.exe');
-
-    if not FileExists(WhisperExePath) then
-    begin
-      Log('ERROR: whisper.exe not found at: ' + WhisperExePath);
-      Exit;
-    end;
-
-    Log('Running whisper.exe smoke test...');
-
-    // Run whisper.exe --help (should exit with code 0 or 1)
-    if Exec(WhisperExePath, '--help', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    begin
-      Log('Whisper smoke test exit code: ' + IntToStr(ResultCode));
-
-      // Exit codes 0 or 1 are both valid for --help (depends on version)
-      if (ResultCode = 0) or (ResultCode = 1) then
-      begin
-        Log('Whisper smoke test PASSED');
-        Result := True;
-      end
-      else
-      begin
-        Log('Whisper smoke test FAILED: unexpected exit code ' + IntToStr(ResultCode));
-      end;
-    end
-    else
-    begin
-      Log('Whisper smoke test FAILED: could not execute whisper.exe');
-    end;
-  except
-    Log('Whisper smoke test FAILED: exception during execution');
-    Result := False;
   end;
 end;
 
