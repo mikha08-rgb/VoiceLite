@@ -118,6 +118,23 @@ jobs:
           echo "  - $($_.Name) ($sizeInMB MB)"
         }
 
+    - name: Copy Whisper models to publish directory
+      shell: pwsh
+      run: |
+        echo "Copying Whisper models from whisper_installer/ to publish directory..."
+
+        $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
+        New-Item -ItemType Directory -Force -Path $publishDir
+
+        # Copy all Whisper files (models + executables + DLLs)
+        Copy-Item -Path "VoiceLite/whisper_installer/*" -Destination $publishDir -Force
+
+        echo "Copied files to publish directory:"
+        Get-ChildItem $publishDir | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
     - name: Download VC++ Redistributable
       shell: pwsh
       run: |
