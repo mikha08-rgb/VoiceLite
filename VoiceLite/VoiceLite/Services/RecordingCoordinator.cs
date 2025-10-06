@@ -31,6 +31,7 @@ namespace VoiceLite.Services
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
         private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
+        private readonly System.Threading.ManualResetEventSlim transcriptionComplete = new System.Threading.ManualResetEventSlim(true); // WEEK1-DAY2: Signaling for disposal (true = initially set)
 
         // Events for MainWindow to subscribe to
         public event EventHandler<RecordingStatusEventArgs>? StatusChanged;
@@ -264,6 +265,9 @@ namespace VoiceLite.Services
             // Start watchdog timer to detect stuck transcriptions
             StartTranscriptionWatchdog();
 
+            // WEEK1-DAY2: Signal that transcription is in progress
+            transcriptionComplete.Reset();
+
             // BUG FIX (BUG-007): Move completion flag and event firing logic to prevent double-fire
             // If event handler throws exception, catch block would fire event again
             TranscriptionCompleteEventArgs? eventArgs = null;
@@ -395,6 +399,10 @@ namespace VoiceLite.Services
                 {
                     await CleanupAudioFileAsync(workingAudioPath).ConfigureAwait(false);
                 }
+
+                // WEEK1-DAY2: Signal that transcription is complete (success or failure)
+                // This allows Dispose() to proceed without spin-waiting
+                transcriptionComplete.Set();
             }
         }
 
@@ -541,8 +549,14 @@ namespace VoiceLite.Services
             }).ConfigureAwait(false);
         }
 
+        private volatile bool isDisposing = false; // WEEK1-DAY2: Guard for double-disposal
+
         public void Dispose()
         {
+            // WEEK1-DAY2: Guard against multiple Dispose() calls
+            if (isDisposing) return;
+            isDisposing = true;
+
             // DISPOSAL SAFETY: Set flag first to prevent new operations
             isDisposed = true;
 
@@ -553,41 +567,25 @@ namespace VoiceLite.Services
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
             }
 
-            // CRIT-009 FIX: Hybrid wait strategy - spin briefly, then sleep to prevent CPU spike
-            // SpinWait for first 100ms (responsive), then Thread.Sleep(50ms) intervals (CPU-friendly)
-            var deadline = DateTime.Now.AddSeconds(30);
-            var spinDeadline = DateTime.Now.AddMilliseconds(100); // Spin for first 100ms only
-            bool isSpinning = true;
-
-            while (isTranscribing && DateTime.Now < deadline)
+            // WEEK1-DAY2: Wait for transcription to complete using ManualResetEventSlim
+            // Old approach: Spin-wait loop (100% CPU for 100ms, then 50ms sleeps up to 30s)
+            // New approach: Efficient signaling with 5s timeout
+            try
             {
-                if (isSpinning && DateTime.Now < spinDeadline)
+                if (!transcriptionComplete.Wait(5000)) // Wait max 5 seconds
                 {
-                    // Phase 1: Tight spin for first 100ms (responsive)
-                    System.Threading.Thread.SpinWait(100);
-                }
-                else
-                {
-                    // Phase 2: Sleep in 50ms chunks (CPU-friendly)
-                    isSpinning = false;
-                    System.Threading.Thread.Sleep(50);
-
-                    // Log progress every 5 seconds
-                    var elapsed = (DateTime.Now - deadline.AddSeconds(30)).TotalSeconds;
-                    if (elapsed > 0 && (int)(elapsed * 10) % 50 == 0) // Every 5 seconds
-                    {
-                        ErrorLogger.LogDebug($"RecordingCoordinator.Dispose waiting for transcription... {elapsed:F1}s elapsed");
-                    }
+                    ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 5s timeout, forcing disposal");
                 }
             }
-
-            // Log warning if timeout reached
-            if (isTranscribing)
+            catch (ObjectDisposedException)
             {
-                ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
+                // Already disposed, ignore
             }
 
             StopTranscriptionWatchdog();
+
+            // WEEK1-DAY2: Dispose ManualResetEventSlim to free resources
+            transcriptionComplete?.Dispose();
         }
     }
 
