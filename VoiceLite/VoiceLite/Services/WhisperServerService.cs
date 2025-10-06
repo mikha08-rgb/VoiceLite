@@ -24,6 +24,8 @@ namespace VoiceLite.Services
         private readonly ITranscriber fallbackService;
         private bool isServerRunning = false;
         private bool isDisposed = false;
+        private readonly object httpClientLock = new object();
+        private readonly CancellationTokenSource disposeCts = new CancellationTokenSource();
 
         public WhisperServerService(Settings settings)
         {
@@ -208,8 +210,17 @@ namespace VoiceLite.Services
 
         private async Task<string> TranscribeViaServerAsync(string audioFilePath)
         {
-            if (httpClient == null)
-                throw new InvalidOperationException("Server not initialized");
+            // CRIT-002 FIX: Capture httpClient reference under lock to prevent disposal race
+            HttpClient? client;
+            lock (httpClientLock)
+            {
+                if (isDisposed)
+                    throw new ObjectDisposedException(nameof(WhisperServerService));
+
+                client = httpClient;
+                if (client == null)
+                    throw new InvalidOperationException("Server not initialized");
+            }
 
             using var audioStream = File.OpenRead(audioFilePath);
             using var content = new MultipartFormDataContent();
@@ -223,20 +234,25 @@ namespace VoiceLite.Services
             content.Add(new StringContent(settings.Language), "language");
             content.Add(new StringContent("json"), "response_format");
 
-            // CRITICAL FIX: Add timeout to prevent infinite hang if server stops responding
-            // 120 seconds max (same as RecordingCoordinator watchdog timeout)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            // CRIT-007 FIX: Create linked token with dispose cancellation
+            using var localCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(localCts.Token, disposeCts.Token);
+
             try
             {
-                var response = await httpClient.PostAsync("/inference", content, cts.Token).ConfigureAwait(false);
+                var response = await client.PostAsync("/inference", content, linkedCts.Token).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
 
-                var jsonResponse = await response.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+                var jsonResponse = await response.Content.ReadAsStringAsync(linkedCts.Token).ConfigureAwait(false);
                 var result = JsonSerializer.Deserialize<WhisperServerResponse>(jsonResponse);
 
                 return result?.text?.Trim() ?? string.Empty;
             }
-            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
+            catch (OperationCanceledException) when (disposeCts.IsCancellationRequested)
+            {
+                throw new ObjectDisposedException(nameof(WhisperServerService), "Service disposed during transcription");
+            }
+            catch (OperationCanceledException) when (localCts.Token.IsCancellationRequested)
             {
                 ErrorLogger.LogWarning("WhisperServerService: HTTP request timed out after 120 seconds");
                 throw new TimeoutException("Server transcription timed out after 120 seconds. The server may be overloaded or unresponsive.");
@@ -284,29 +300,94 @@ namespace VoiceLite.Services
         public void Dispose()
         {
             if (isDisposed) return;
-            isDisposed = true;
 
-            httpClient?.Dispose();
+            // CRIT-007 FIX: Cancel any pending requests immediately
+            try
+            {
+                disposeCts.Cancel();
+            }
+            catch { /* Ignore cancellation errors */ }
 
+            // CRIT-002 FIX: Lock to prevent disposal during active transcription
+            lock (httpClientLock)
+            {
+                isDisposed = true;
+
+                // Cancel pending HTTP requests before disposal
+                try
+                {
+                    httpClient?.CancelPendingRequests();
+                }
+                catch { /* Best effort */ }
+
+                httpClient?.Dispose();
+            }
+
+            // CRIT-001 FIX: Non-blocking process termination with hard timeout
             if (serverProcess != null && !serverProcess.HasExited)
             {
                 try
                 {
                     serverProcess.Kill(entireProcessTree: true);
-                    serverProcess.WaitForExit(2000);
-                    ErrorLogger.LogMessage("Whisper server stopped");
+
+                    // CRITICAL: Use Task.Run to prevent UI thread blocking
+                    var waitTask = Task.Run(() =>
+                    {
+                        try
+                        {
+                            return serverProcess.WaitForExit(2000);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    });
+
+                    // Hard timeout: 3 seconds max
+                    if (waitTask.Wait(3000) && waitTask.Result)
+                    {
+                        ErrorLogger.LogMessage("Whisper server stopped gracefully");
+                    }
+                    else
+                    {
+                        ErrorLogger.LogWarning("Whisper server kill timed out - process may still be running");
+                        // Fire-and-forget taskkill as last resort (don't wait)
+                        _ = Task.Run(() =>
+                        {
+                            try
+                            {
+                                System.Diagnostics.Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "taskkill",
+                                    Arguments = $"/F /T /PID {serverProcess.Id}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                            }
+                            catch { /* Best effort */ }
+                        });
+                    }
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("Failed to stop Whisper server", ex);
                 }
-                serverProcess.Dispose();
+                finally
+                {
+                    try
+                    {
+                        serverProcess.Dispose();
+                    }
+                    catch { /* Ignore disposal errors */ }
+                }
             }
 
             if (fallbackService is IDisposable disposable)
             {
                 disposable.Dispose();
             }
+
+            disposeCts.Dispose();
         }
 
         private class WhisperServerResponse

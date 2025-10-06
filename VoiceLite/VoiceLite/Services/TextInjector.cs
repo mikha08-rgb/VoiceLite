@@ -275,7 +275,8 @@ namespace VoiceLite.Services
                             {
                                 if (Clipboard.ContainsText())
                                 {
-                                    currentClipboard = Clipboard.GetText();
+                                    // ISSUE #8 FIX: Clipboard.GetText() can return null on failure
+                                    currentClipboard = Clipboard.GetText() ?? string.Empty;
                                 }
                             }
                             catch (Exception ex)
@@ -287,6 +288,7 @@ namespace VoiceLite.Services
 
                             // BUG-007 FIX: Use CRC32 hash comparison for more reliable detection
                             // Handles cases where string equality fails due to whitespace or encoding differences
+                            // ISSUE #8 FIX: currentClipboard is never null after ?? string.Empty above
                             bool clipboardUnchanged = string.IsNullOrEmpty(currentClipboard) ||
                                                      currentClipboard == text ||
                                                      CalculateCRC32(currentClipboard) == transcriptionHash;

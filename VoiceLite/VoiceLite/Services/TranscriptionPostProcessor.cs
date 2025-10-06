@@ -328,9 +328,12 @@ namespace VoiceLite.Services
             if (shouldCapitalize)
             {
                 // Capitalize first letter
+                // ISSUE #4 FIX: Handle single-character strings without Substring out of bounds
                 if (capitalizeFirstLetter && text.Length > 0 && char.IsLower(text[0]))
                 {
-                    text = char.ToUpper(text[0]) + text.Substring(1);
+                    text = text.Length == 1
+                        ? char.ToUpper(text[0]).ToString()
+                        : char.ToUpper(text[0]) + text.Substring(1);
                 }
 
                 // Capitalize after periods
@@ -552,7 +555,12 @@ namespace VoiceLite.Services
             {
                 // Remove at sentence start with comma: "Well, I think" → "I think"
                 text = Regex.Replace(text, @"^\s*well\s*,\s*", "", options);
-                text = Regex.Replace(text, @"[.!?]\s+well\s*,\s*", match => match.Value.Substring(0, match.Value.IndexOf("well", StringComparison.OrdinalIgnoreCase)), options);
+                // ISSUE #7 FIX: Check IndexOf result for -1 before Substring
+                text = Regex.Replace(text, @"[.!?]\s+well\s*,\s*", match =>
+                {
+                    int index = match.Value.IndexOf("well", StringComparison.OrdinalIgnoreCase);
+                    return index >= 0 ? match.Value.Substring(0, index) : match.Value;
+                }, options);
                 // Preserve: "feel well", "well done", "as well", "well-known"
             }
 
@@ -563,7 +571,12 @@ namespace VoiceLite.Services
                 text = Regex.Replace(text, @",\s*actually\s*,", ",", options);
                 // Remove at sentence start with comma
                 text = Regex.Replace(text, @"^\s*actually\s*,\s*", "", options);
-                text = Regex.Replace(text, @"[.!?]\s+actually\s*,\s*", match => match.Value.Substring(0, match.Value.IndexOf("actually", StringComparison.OrdinalIgnoreCase)), options);
+                // ISSUE #7 FIX: Check IndexOf result for -1 before Substring
+                text = Regex.Replace(text, @"[.!?]\s+actually\s*,\s*", match =>
+                {
+                    int index = match.Value.IndexOf("actually", StringComparison.OrdinalIgnoreCase);
+                    return index >= 0 ? match.Value.Substring(0, index) : match.Value;
+                }, options);
                 // Preserve when used for correction: "actually correct", "actually works"
             }
 
