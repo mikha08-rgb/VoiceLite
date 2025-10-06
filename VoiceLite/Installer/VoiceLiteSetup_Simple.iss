@@ -206,7 +206,7 @@ begin
   if FindFirst(FileName, FindRec) then
   begin
     try
-      Result := FindRec.Size;
+      Result := (FindRec.SizeHigh shl 32) or FindRec.SizeLow;
     finally
       FindClose(FindRec);
     end;
