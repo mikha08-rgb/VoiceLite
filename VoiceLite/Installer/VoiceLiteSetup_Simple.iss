@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.47: First-run diagnostics, enhanced installer verification, comprehensive troubleshooting
-; Windows 10/11 (64-bit) compatible - auto-installs VC++ Runtime if needed
+; v1.0.49: Critical bug fixes - 16 issues resolved (PC freeze, crashes, edge cases)
+; Windows 10/11 (64-bit) compatible - detects VC++ Runtime if needed
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.47
+AppVersion=1.0.49
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.47
+OutputBaseFilename=VoiceLite-Setup-1.0.49
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -35,14 +35,21 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (Small + Tiny models - Small is new free tier default, Tiny is legacy fallback)
-Source: "..\whisper_installer\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+; Whisper files (Small + Tiny models ONLY - Small is new free tier default, Tiny is legacy fallback)
+; CRITICAL FIX: Only include Small + Tiny models to keep installer size ~540MB (not 2.6GB with all models)
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-small.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\server.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
 
 ; Icon file
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 ; VC++ Redistributable installer (bundled for offline installation)
-Source: "..\dependencies\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+; OPTIONAL: Commented out - user downloads from Microsoft if needed (detected in InitializeSetup)
+; Source: "..\dependencies\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; Antivirus exclusion PowerShell script
 Source: "..\Installer\Add-VoiceLite-Exclusion.ps1"; DestDir: "{app}"; Flags: ignoreversion
