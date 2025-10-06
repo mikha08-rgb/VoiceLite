@@ -62,8 +62,7 @@ namespace VoiceLite.Models
     public enum UIPreset
     {
         Default,        // Hybrid baseline - clean and balanced
-        Compact,        // Power user - maximum density
-        StatusHero      // Large status banner - clear visual feedback
+        Compact         // Power user - maximum density
     }
 
     public class FillerWordLists
@@ -181,7 +180,9 @@ namespace VoiceLite.Models
         public bool EnableNoiseSuppression { get; set; } = false;
         public bool EnableAutomaticGain { get; set; } = false;
         private float _targetRmsLevel = 0.2f;
-        private double _noiseGateThreshold = 0.02;
+        // BUG-004 FIX: Reduced from 0.02 (2%) to 0.005 (0.5%) to prevent silencing quiet speech
+        // Old threshold was too aggressive and cut off consonants and quiet speakers
+        private double _noiseGateThreshold = 0.005;
         public AudioPreset CurrentAudioPreset { get; set; } = AudioPreset.Default;
 
         public float TargetRmsLevel
@@ -237,13 +238,15 @@ namespace VoiceLite.Models
         public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
 
         // Transcription History
-        private int _maxHistoryItems = 10;
+        private int _maxHistoryItems = 50;
 
-        // BUG FIX (BUG-016): Add validation to prevent OOM
+        // BUG FIX (BUG-016 + BUG-003): Reduced cap from 1000 to 250 to prevent memory bloat
+        // 250 items = ~500KB-1MB memory footprint (reasonable for 24/7 usage)
+        // 1000 items = ~2-5MB memory + slow UI rendering with large lists
         public int MaxHistoryItems
         {
             get => _maxHistoryItems;
-            set => _maxHistoryItems = Math.Clamp(value, 1, 1000); // Max 1000 items
+            set => _maxHistoryItems = Math.Clamp(value, 1, 250); // BUG-003 FIX: Reduced from 1000 to 250
         }
         public bool EnableHistory { get; set; } = true; // Allow users to disable history tracking
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
@@ -273,6 +276,10 @@ namespace VoiceLite.Models
 
         // UI Preset (Appearance)
         public UIPreset UIPreset { get; set; } = UIPreset.Compact;
+
+        // BUG-009 FIX: Track if one-time UI preset migration has been applied
+        // Prevents repeated migrations from overwriting user's explicit choice
+        public bool UIPresetMigrationApplied { get; set; } = false;
 
         /// <summary>
         /// Apply an audio preset to configure all audio enhancement settings.

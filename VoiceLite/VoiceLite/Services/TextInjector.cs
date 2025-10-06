@@ -25,6 +25,25 @@ namespace VoiceLite.Services
             inputSimulator = new InputSimulator();
         }
 
+        /// <summary>
+        /// BUG-007 FIX: Calculate CRC32 checksum for clipboard verification
+        /// More reliable than string equality for large texts or texts with whitespace variations
+        /// </summary>
+        private static uint CalculateCRC32(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return 0;
+
+            uint crc = 0xFFFFFFFF;
+            foreach (char c in text)
+            {
+                crc ^= (uint)c;
+                for (int i = 0; i < 8; i++)
+                    crc = (crc >> 1) ^ (0xEDB88320 & ~((crc & 1) - 1));
+            }
+            return ~crc;
+        }
+
         public void InjectText(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -237,6 +256,9 @@ namespace VoiceLite.Services
                 if (hadOriginalClipboard && !string.IsNullOrEmpty(originalClipboard))
                 {
                     var clipboardToRestore = originalClipboard; // Capture for closure
+                    // BUG-007 FIX: Calculate CRC32 hash of transcription for reliable comparison
+                    var transcriptionHash = CalculateCRC32(text);
+
                     _ = Task.Run(async () =>
                     {
                         try
@@ -258,14 +280,18 @@ namespace VoiceLite.Services
                             }
                             catch (Exception ex)
                             {
-                                ErrorLogger.LogMessage($"Failed to check current clipboard: {ex.Message}");
+                                ErrorLogger.LogMessage($"BUG-007: Failed to check current clipboard: {ex.Message}");
                                 // Can't check clipboard state - skip restoration to be safe
                                 return;
                             }
 
-                            // Only restore if clipboard is unchanged (still has our transcription)
-                            // or is empty (paste completed and cleared it)
-                            if (string.IsNullOrEmpty(currentClipboard) || currentClipboard == text)
+                            // BUG-007 FIX: Use CRC32 hash comparison for more reliable detection
+                            // Handles cases where string equality fails due to whitespace or encoding differences
+                            bool clipboardUnchanged = string.IsNullOrEmpty(currentClipboard) ||
+                                                     currentClipboard == text ||
+                                                     CalculateCRC32(currentClipboard) == transcriptionHash;
+
+                            if (clipboardUnchanged)
                             {
                                 // Safe to restore - clipboard hasn't been modified by user
                                 for (int attempt = 0; attempt < 3; attempt++)

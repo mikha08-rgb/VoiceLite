@@ -330,13 +330,21 @@ namespace VoiceLite
                     settings = SettingsValidator.ValidateAndRepair(loadedSettings) ?? new Settings();
                     ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
 
-                    // MIGRATION 2: Upgrade Default UI preset to Compact (v1.0.38+)
+                    // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
+                    // BUG-009 FIX: Check migration flag to prevent overwriting user's explicit choice
                     // New users get Compact by default, migrate existing users to Compact for consistency
-                    if (settings.UIPreset == UIPreset.Default)
+                    if (!settings.UIPresetMigrationApplied && settings.UIPreset == UIPreset.Default)
                     {
                         settings.UIPreset = UIPreset.Compact;
-                        ErrorLogger.LogMessage("✅ Migrated UI preset from Default to Compact (cleaner single-line history)");
+                        settings.UIPresetMigrationApplied = true; // Mark migration as done
+                        ErrorLogger.LogMessage("BUG-009 FIX: Migrated UI preset from Default to Compact (one-time migration)");
                         SaveSettingsInternal(); // Save immediately
+                    }
+                    else if (!settings.UIPresetMigrationApplied)
+                    {
+                        // User already has non-Default preset, just mark migration as done
+                        settings.UIPresetMigrationApplied = true;
+                        SaveSettingsInternal();
                     }
 
                     // Verify whisper model exists
@@ -350,12 +358,47 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("LoadSettings", ex);
-                MessageBox.Show($"Failed to load settings: {ex.Message}\n\nUsing default settings.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Failed to load settings: {ex.Message}\n\nUsing default settings.", "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 settings = new Settings();
             }
 
+            // BUG-003 FIX: Auto-cleanup old history items (>7 days, not pinned)
+            CleanupOldHistoryItems();
+
             MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
             UpdateConfigDisplay();
+        }
+
+        /// <summary>
+        /// BUG-003 FIX: Remove old transcription history items to prevent memory bloat
+        /// Runs on startup to clean up items older than 7 days (except pinned items)
+        /// </summary>
+        private void CleanupOldHistoryItems()
+        {
+            try
+            {
+                if (settings.TranscriptionHistory == null || settings.TranscriptionHistory.Count == 0)
+                    return;
+
+                var sevenDaysAgo = DateTime.Now.AddDays(-7);
+                var itemsToRemove = settings.TranscriptionHistory
+                    .Where(h => !h.IsPinned && h.Timestamp < sevenDaysAgo)
+                    .ToList();
+
+                if (itemsToRemove.Count > 0)
+                {
+                    foreach (var item in itemsToRemove)
+                    {
+                        settings.TranscriptionHistory.Remove(item);
+                    }
+                    ErrorLogger.LogMessage($"BUG-003 FIX: Cleaned up {itemsToRemove.Count} old history items (>7 days, not pinned)");
+                    SaveSettingsInternal(); // Persist cleanup immediately
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("CleanupOldHistoryItems", ex);
+            }
         }
 
         /// <summary>
@@ -436,7 +479,7 @@ namespace VoiceLite
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("SaveSettings", ex);
-                    MessageBox.Show($"Failed to save settings: {ex.Message}", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show($"Failed to save settings: {ex.Message}", "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             } // End lock (saveSettingsLock)
         }
@@ -524,6 +567,9 @@ namespace VoiceLite
                 {
                     hotkeyManager.HotkeyPressed += OnHotkeyPressed;
                     hotkeyManager.HotkeyReleased += OnHotkeyReleased;
+
+                    // BUG-006 FIX: Subscribe to polling mode notification
+                    hotkeyManager.PollingModeActivated += OnPollingModeActivated;
                 }
 
                 systemTrayManager = new SystemTrayManager(this);
@@ -542,7 +588,7 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to initialize: {ex.Message}",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -705,31 +751,47 @@ namespace VoiceLite
                 InstructionText.Text = $"Press {hotkeyHint} to record";
             }
 
-            // Update hotkey display
-            HotkeyText.Text = GetHotkeyDisplayString();
-
-            // Update microphone display
-            if (settings.SelectedMicrophoneIndex == -1)
+            // Update empty state hotkey hint
+            if (EmptyStateHotkeyHint != null)
             {
-                MicrophoneText.Text = "Default Microphone";
+                string hotkeyHint = GetHotkeyDisplayString();
+                EmptyStateHotkeyHint.Text = $"Press {hotkeyHint} to start recording";
             }
-            else if (!string.IsNullOrEmpty(settings.SelectedMicrophoneName))
+
+            // Update hotkey display (null check for XAML control)
+            if (HotkeyText != null)
             {
-                // Truncate long microphone names
-                string micName = settings.SelectedMicrophoneName;
-                if (micName.Length > 25)
+                HotkeyText.Text = GetHotkeyDisplayString();
+            }
+
+            // Update microphone display (null check for XAML control)
+            if (MicrophoneText != null)
+            {
+                if (settings.SelectedMicrophoneIndex == -1)
                 {
-                    micName = micName.Substring(0, 22) + "...";
+                    MicrophoneText.Text = "Default Microphone";
                 }
-                MicrophoneText.Text = micName;
-            }
-            else
-            {
-                MicrophoneText.Text = "Microphone " + settings.SelectedMicrophoneIndex;
+                else if (!string.IsNullOrEmpty(settings.SelectedMicrophoneName))
+                {
+                    // Truncate long microphone names
+                    string micName = settings.SelectedMicrophoneName;
+                    if (micName.Length > 25)
+                    {
+                        micName = micName.Substring(0, 22) + "...";
+                    }
+                    MicrophoneText.Text = micName;
+                }
+                else
+                {
+                    MicrophoneText.Text = "Microphone " + settings.SelectedMicrophoneIndex;
+                }
             }
 
-            // Update model display
-            ModelText.Text = GetModelDisplayName(settings.WhisperModel);
+            // Update model display (null check for XAML control)
+            if (ModelText != null)
+            {
+                ModelText.Text = GetModelDisplayName(settings.WhisperModel);
+            }
         }
 
         private string GetModelDisplayName(string modelPath)
@@ -990,50 +1052,133 @@ namespace VoiceLite
 
         private void OnHotkeyPressed(object? sender, EventArgs e)
         {
-            ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-
-            // Debounce protection - ignore rapid key presses
-            var now = DateTime.Now;
-            if ((now - lastHotkeyPressTime).TotalMilliseconds < TimingConstants.HotkeyDebounceMs)
+            // CRITICAL: Event handlers must never throw exceptions - wrap entire method
+            try
             {
-                ErrorLogger.LogMessage("OnHotkeyPressed: Debounced - too rapid key press");
-                return;
-            }
-            lastHotkeyPressTime = now;
+                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
-            lock (recordingLock)
+                // Debounce protection - ignore rapid key presses
+                var now = DateTime.Now;
+                if ((now - lastHotkeyPressTime).TotalMilliseconds < TimingConstants.HotkeyDebounceMs)
+                {
+                    ErrorLogger.LogMessage("OnHotkeyPressed: Debounced - too rapid key press");
+                    return;
+                }
+                lastHotkeyPressTime = now;
+
+                lock (recordingLock)
+                {
+                    ErrorLogger.LogMessage($"OnHotkeyPressed: Inside lock - Mode={settings.Mode}, isRecording={isRecording}");
+
+                    if (settings.Mode == Models.RecordMode.PushToTalk)
+                    {
+                        HandlePushToTalkPressed();
+                    }
+                    else if (settings.Mode == Models.RecordMode.Toggle)
+                    {
+                        HandleToggleModePressed();
+                    }
+                }
+
+                ErrorLogger.LogMessage($"OnHotkeyPressed: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            }
+            catch (Exception ex)
             {
-                ErrorLogger.LogMessage($"OnHotkeyPressed: Inside lock - Mode={settings.Mode}, isRecording={isRecording}");
+                ErrorLogger.LogError("CRITICAL: OnHotkeyPressed exception - hotkey system may be broken", ex);
 
-                if (settings.Mode == Models.RecordMode.PushToTalk)
+                // Attempt to reset state to prevent stuck recording
+                try
                 {
-                    HandlePushToTalkPressed();
+                    if (isRecording)
+                    {
+                        StopRecording(cancel: true);
+                    }
                 }
-                else if (settings.Mode == Models.RecordMode.Toggle)
+                catch
                 {
-                    HandleToggleModePressed();
+                    // Last resort - ignore secondary exceptions during recovery
                 }
+
+                // Notify user of critical failure
+                Dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        $"Hotkey system error: {ex.Message}\n\nPlease restart VoiceLite.",
+                        "Critical Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                });
             }
-
-            ErrorLogger.LogMessage($"OnHotkeyPressed: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
         }
 
         private void OnHotkeyReleased(object? sender, EventArgs e)
         {
-            ErrorLogger.LogMessage($"OnHotkeyReleased: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-
-            lock (recordingLock)
+            // CRITICAL: Event handlers must never throw exceptions - wrap entire method
+            try
             {
-                ErrorLogger.LogMessage($"OnHotkeyReleased: Inside lock - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"OnHotkeyReleased: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
-                if (settings.Mode == Models.RecordMode.PushToTalk)
+                lock (recordingLock)
                 {
-                    HandlePushToTalkReleased();
-                }
-                // In Toggle mode, do nothing on release - all action happens on press
-            }
+                    ErrorLogger.LogMessage($"OnHotkeyReleased: Inside lock - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
 
-            ErrorLogger.LogMessage($"OnHotkeyReleased: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                    if (settings.Mode == Models.RecordMode.PushToTalk)
+                    {
+                        HandlePushToTalkReleased();
+                    }
+                    // In Toggle mode, do nothing on release - all action happens on press
+                }
+
+                ErrorLogger.LogMessage($"OnHotkeyReleased: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("CRITICAL: OnHotkeyReleased exception - hotkey system may be broken", ex);
+
+                // Attempt to stop recording if stuck
+                try
+                {
+                    if (isRecording)
+                    {
+                        StopRecording(cancel: true);
+                    }
+                }
+                catch
+                {
+                    // Last resort - ignore secondary exceptions
+                }
+            }
+        }
+
+        /// <summary>
+        /// BUG-006 FIX: Handle polling mode activation notification
+        /// Shows a brief status message when polling mode is active for standalone modifier keys
+        /// </summary>
+        private void OnPollingModeActivated(object? sender, string message)
+        {
+            try
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    // Show subtle notification (orange color, auto-dismiss after 3 seconds)
+                    StatusText.Text = message;
+                    StatusText.Foreground = Brushes.Orange;
+                    ErrorLogger.LogMessage($"BUG-006 FIX: {message}");
+
+                    // Auto-clear after 3 seconds and restore normal status
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                    timer.Tick += (_, __) =>
+                    {
+                        timer.Stop();
+                        UpdateUIForCurrentMode(); // Restore normal status text
+                    };
+                    timer.Start();
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnPollingModeActivated", ex);
+            }
         }
 
         private void HandlePushToTalkPressed()
@@ -1276,19 +1421,27 @@ namespace VoiceLite
                 recordingElapsedTimer = null;
 
                 // Show user-friendly message (non-blocking async)
-                await Dispatcher.InvokeAsync(() =>
+                try
                 {
-                    MessageBox.Show(
-                        "VoiceLite recovered from a stuck state.\n\n" +
-                        "The app was stuck processing for too long and has been reset.\n\n" +
-                        "If this happens frequently:\n" +
-                        "• Try using a smaller Whisper model\n" +
-                        "• Check if antivirus is blocking the app\n" +
-                        "• Restart VoiceLite",
-                        "Stuck State Recovery",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                });
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show(
+                            "VoiceLite recovered from a stuck state.\n\n" +
+                            "The app was stuck processing for too long and has been reset.\n\n" +
+                            "If this happens frequently:\n" +
+                            "• Try using a smaller Whisper model\n" +
+                            "• Check if antivirus is blocking the app\n" +
+                            "• Restart VoiceLite",
+                            "Stuck State Recovery",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    });
+                }
+                catch (TaskCanceledException)
+                {
+                    // Dispatcher shutting down during app close - this is normal, just log it
+                    ErrorLogger.LogMessage("OnStuckStateRecovery: Dispatcher shutting down (app closing)");
+                }
 
                 // Reset UI to default mode
                 UpdateUIForCurrentMode();
@@ -1350,27 +1503,39 @@ namespace VoiceLite
         {
             ErrorLogger.LogMessage("OnAutoTimeout: Auto-timeout triggered - stopping recording for safety");
 
-            await Dispatcher.InvokeAsync(() =>
+            try
             {
-                lock (recordingLock)
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    if (isRecording)
+                    lock (recordingLock)
                     {
-                        // Show timeout warning
-                        UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
+                        if (isRecording)
+                        {
+                            // Show timeout warning
+                            UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
 
-                        // Audio feedback for timeout
-                        recordingCoordinator?.PlaySoundFeedback();
+                            // Audio feedback for timeout
+                            recordingCoordinator?.PlaySoundFeedback();
 
-                        StopRecording(false);
-                        StopAutoTimeoutTimer();
+                            StopRecording(false);
+                            StopAutoTimeoutTimer();
 
-                        // Show message to user
-                        MessageBox.Show("Recording automatically stopped after 5 minutes for safety.\n\nThis prevents forgotten hot microphones.",
-                            "Auto-Timeout", MessageBoxButton.OK, MessageBoxImage.Information);
+                            // Show message to user
+                            MessageBox.Show("Recording automatically stopped after 5 minutes for safety.\n\nThis prevents forgotten hot microphones.",
+                                "Auto-Timeout", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     }
-                }
-            });
+                });
+            }
+            catch (TaskCanceledException)
+            {
+                // App is shutting down - ignore dispatcher exceptions
+                ErrorLogger.LogMessage("OnAutoTimeout: Dispatcher shutting down (app closing)");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnAutoTimeout: Unexpected exception", ex);
+            }
         }
 
         /// <summary>
@@ -1425,6 +1590,11 @@ namespace VoiceLite
                     }
                 });
             }
+            catch (TaskCanceledException)
+            {
+                // Dispatcher shutting down during app close - this is normal, just log it
+                ErrorLogger.LogMessage("OnRecordingStatusChanged: Dispatcher shutting down (app closing)");
+            }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("OnRecordingStatusChanged failed", ex);
@@ -1457,12 +1627,15 @@ namespace VoiceLite
                             UpdateStatus("✓ Transcribed successfully", Brushes.Green);
 
                             // Revert to Ready after 2 seconds
-                            // CRITICAL FIX: Properly dispose timer to prevent memory leak
+                            // CRITICAL FIX: Store lambda reference for proper unsubscription
                             var revertTimer = new System.Windows.Threading.DispatcherTimer
                             {
                                 Interval = TimeSpan.FromSeconds(2)
                             };
-                            revertTimer.Tick += (s, args) =>
+
+                            // Store handler in variable so we can unsubscribe it properly
+                            EventHandler? tickHandler = null;
+                            tickHandler = (s, args) =>
                             {
                                 try
                                 {
@@ -1472,11 +1645,15 @@ namespace VoiceLite
                                 }
                                 finally
                                 {
-                                    // CRITICAL: Stop AND dispose timer to prevent memory leak
+                                    // CRITICAL: Stop AND unsubscribe to prevent memory leak
                                     revertTimer.Stop();
-                                    revertTimer.Tick -= (s, args) => { }; // Unsubscribe to break circular reference
+                                    if (tickHandler != null)
+                                    {
+                                        revertTimer.Tick -= tickHandler; // Properly unsubscribe using stored reference
+                                    }
                                 }
                             };
+                            revertTimer.Tick += tickHandler;
                             revertTimer.Start();
 
                             // History is already added by RecordingCoordinator
@@ -1503,14 +1680,25 @@ namespace VoiceLite
                         {
                             _ = Task.Run(async () =>
                             {
-                                await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
-                                await Dispatcher.InvokeAsync(() =>
+                                try
                                 {
-                                    if (!isRecording) // Only reset if not currently recording again
+                                    await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
+                                    await Dispatcher.InvokeAsync(() =>
                                     {
-                                        UpdateUIForCurrentMode();
-                                    }
-                                });
+                                        if (!isRecording) // Only reset if not currently recording again
+                                        {
+                                            UpdateUIForCurrentMode();
+                                        }
+                                    });
+                                }
+                                catch (TaskCanceledException)
+                                {
+                                    // Dispatcher shutting down during app close - this is normal
+                                }
+                                catch (Exception ex)
+                                {
+                                    ErrorLogger.LogError("OnTranscriptionCompleted: TranscriptionText reset failed", ex);
+                                }
                             });
                         }
 
@@ -1594,6 +1782,11 @@ namespace VoiceLite
                     }
                 });
             }
+            catch (TaskCanceledException)
+            {
+                // Dispatcher shutting down during app close - this is normal, just log it
+                ErrorLogger.LogMessage("OnTranscriptionCompleted: Dispatcher shutting down (app closing)");
+            }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("OnTranscriptionCompleted", ex);
@@ -1644,6 +1837,11 @@ namespace VoiceLite
                     MessageBox.Show(errorMessage, "Recording Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 });
             }
+            catch (TaskCanceledException)
+            {
+                // Dispatcher shutting down during app close - this is normal, just log it
+                ErrorLogger.LogMessage("OnRecordingError: Dispatcher shutting down (app closing)");
+            }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("OnRecordingError", ex);
@@ -1662,11 +1860,23 @@ namespace VoiceLite
         {
             if (e.Level == MemoryAlertLevel.Critical || e.Level == MemoryAlertLevel.PotentialLeak)
             {
-                await Dispatcher.InvokeAsync(() =>
+                try
                 {
-                    ErrorLogger.LogMessage($"Memory alert: {e.Message}");
-                    // Could show a warning to user if needed
-                });
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        ErrorLogger.LogMessage($"Memory alert: {e.Message}");
+                        // Could show a warning to user if needed
+                    });
+                }
+                catch (TaskCanceledException)
+                {
+                    // Dispatcher shutting down during app close - this is normal, just log it
+                    ErrorLogger.LogMessage("OnMemoryAlert: Dispatcher shutting down (app closing)");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("OnMemoryAlert: Unexpected exception", ex);
+                }
             }
         }
 
@@ -2047,7 +2257,16 @@ namespace VoiceLite
 
         protected override void OnClosed(EventArgs e)
         {
-            SaveSettings();
+            // CRITICAL FIX (BUG-002): Flush pending settings save BEFORE disposal
+            // If timer is active, debounce hasn't fired yet - force immediate save to prevent data loss
+            if (settingsSaveTimer != null && settingsSaveTimer.IsEnabled)
+            {
+                settingsSaveTimer.Stop();
+                SaveSettingsInternal(); // Force immediate flush
+                ErrorLogger.LogMessage("BUG-002 FIX: Flushed pending settings save on app close");
+            }
+
+            SaveSettings(); // Belt-and-suspenders: call debounced save too (will be no-op if timer null)
 
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
@@ -2186,7 +2405,7 @@ namespace VoiceLite
             {
                 ErrorLogger.LogError("OnTrayReportBugMenuClicked", ex);
                 MessageBox.Show("Failed to open feedback window. Please try again.",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -2211,7 +2430,7 @@ namespace VoiceLite
                 ErrorLogger.LogError("SignOutAsync", ex);
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    MessageBox.Show($"Failed to sign out: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"Failed to sign out: {ex.Message}", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
                 });
             }
         }

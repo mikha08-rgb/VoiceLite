@@ -27,7 +27,7 @@ namespace VoiceLite.Services
         private readonly object recordingLock = new object();
         private System.Threading.Timer? transcriptionWatchdog;
         private volatile bool isTranscribing = false;
-        private volatile bool transcriptionCompleted = false; // Prevents duplicate completion events
+        private int transcriptionCompletedFlag = 0; // 0 = not completed, 1 = completed (atomic)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
         private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
@@ -316,21 +316,32 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // Mark as completed in finally block (always executes)
-                transcriptionCompleted = true;
-                StopTranscriptionWatchdog();
+                // BUG FIX (CRIT-005): Atomically mark as completed to prevent race condition with watchdog
+                // Only fire event if we're the first to complete (either normal or watchdog, but not both)
+                bool wasCompleted = System.Threading.Interlocked.CompareExchange(ref transcriptionCompletedFlag, 1, 0) == 1;
 
-                // Fire event outside try-catch to prevent double-fire if handler throws
-                if (eventArgs != null)
+                if (!wasCompleted)
                 {
-                    try
+                    // We're the first to complete - stop watchdog and fire event
+                    StopTranscriptionWatchdog();
+
+                    // Fire event outside try-catch to prevent double-fire if handler throws
+                    if (eventArgs != null)
                     {
-                        TranscriptionCompleted?.Invoke(this, eventArgs);
+                        try
+                        {
+                            TranscriptionCompleted?.Invoke(this, eventArgs);
+                        }
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogError("TranscriptionCompleted event handler threw exception", ex);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogError("TranscriptionCompleted event handler threw exception", ex);
-                    }
+                }
+                else
+                {
+                    // Watchdog already fired timeout event - skip event firing to prevent duplicate
+                    ErrorLogger.LogWarning("RecordingCoordinator: Transcription completed after watchdog timeout - event already fired");
                 }
 
                 // RACE CONDITION FIX: Wait briefly to ensure Whisper process has closed file handle
@@ -352,7 +363,7 @@ namespace VoiceLite.Services
         private void StartTranscriptionWatchdog()
         {
             isTranscribing = true;
-            transcriptionCompleted = false; // Reset completion flag
+            System.Threading.Interlocked.Exchange(ref transcriptionCompletedFlag, 0); // Reset completion flag atomically
             transcriptionStartTime = DateTime.Now;
 
             // Create watchdog timer that checks every 10 seconds
@@ -403,7 +414,7 @@ namespace VoiceLite.Services
             try
             {
                 // CRITICAL: Check if already completed to prevent duplicate events
-                if (!isTranscribing || transcriptionCompleted)
+                if (!isTranscribing)
                     return;
 
                 var elapsed = DateTime.Now - transcriptionStartTime;
@@ -413,24 +424,32 @@ namespace VoiceLite.Services
                 {
                     ErrorLogger.LogWarning($"RecordingCoordinator: Watchdog TIMEOUT! Transcription stuck for {elapsed.TotalSeconds:F0}s");
 
-                    // Mark as completed FIRST to prevent race condition with normal completion
-                    transcriptionCompleted = true;
+                    // BUG FIX (CRIT-005): Atomically check-and-set completion flag to prevent race with normal completion
+                    // Only one thread (either watchdog or OnAudioFileReady finally) should fire the event
+                    bool wasAlreadyCompleted = System.Threading.Interlocked.CompareExchange(ref transcriptionCompletedFlag, 1, 0) == 1;
 
-                    // Stop the watchdog
-                    StopTranscriptionWatchdog();
-
-                    // Fire error event to reset UI state (only if not already completed)
-                    TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
+                    if (!wasAlreadyCompleted)
                     {
-                        Transcription = string.Empty,
-                        ErrorMessage = $"Transcription timed out after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds.\n\n" +
-                                     "This may be caused by:\n" +
-                                     "• Whisper process hung or crashed\n" +
-                                     "• System running low on memory\n" +
-                                     "• Antivirus blocking the process\n\n" +
-                                     "Try restarting the application or using a smaller model.",
-                        Success = false
-                    });
+                        // We won the race - fire timeout event
+                        StopTranscriptionWatchdog();
+
+                        TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
+                        {
+                            Transcription = string.Empty,
+                            ErrorMessage = $"Transcription timed out after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds.\n\n" +
+                                         "This may be caused by:\n" +
+                                         "• Whisper process hung or crashed\n" +
+                                         "• System running low on memory\n" +
+                                         "• Antivirus blocking the process\n\n" +
+                                         "Try restarting the application or using a smaller model.",
+                            Success = false
+                        });
+                    }
+                    else
+                    {
+                        // Normal completion beat us to it - do nothing
+                        ErrorLogger.LogMessage("RecordingCoordinator: Watchdog detected timeout but transcription already completed normally");
+                    }
                 }
             }
             catch (Exception ex)
@@ -493,13 +512,29 @@ namespace VoiceLite.Services
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
             }
 
-            // Wait for any in-flight OnAudioFileReady handlers to complete with timeout
+            // BUG-008 FIX: Wait for any in-flight OnAudioFileReady handlers to complete with timeout
+            // Increased from 2s → 30s to handle large audio files (10-20s transcription time)
             // SpinWait is more reliable than Thread.Sleep for synchronization
             var spinWait = new System.Threading.SpinWait();
-            var deadline = DateTime.Now.AddSeconds(2);
+            var deadline = DateTime.Now.AddSeconds(30); // BUG-008 FIX: Increased from 2s to 30s
+            int spinCount = 0;
+
             while (isTranscribing && DateTime.Now < deadline)
             {
                 spinWait.SpinOnce();
+
+                // BUG-008 FIX: Log progress every 5 seconds to show we're waiting gracefully
+                if (++spinCount % 50000 == 0)
+                {
+                    var elapsed = (DateTime.Now - deadline.AddSeconds(30)).TotalSeconds;
+                    ErrorLogger.LogDebug($"BUG-008: RecordingCoordinator.Dispose waiting for transcription... {elapsed:F1}s elapsed");
+                }
+            }
+
+            // BUG-008 FIX: Log warning if timeout reached
+            if (isTranscribing)
+            {
+                ErrorLogger.LogWarning("BUG-008: RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
             }
 
             StopTranscriptionWatchdog();

@@ -359,16 +359,13 @@ namespace VoiceLite.Services
 
                 try
                 {
-                    // BUG FIX (BUG-012): Capture waveFile reference under lock to prevent dispose race
-                    // If Dispose() is called on another thread between null check and Write(), we crash
-                    WaveFileWriter? localWaveFile;
-                    lock (lockObject)
+                    // CRITICAL FIX: Remove nested lock to prevent deadlock
+                    // We're already inside the lock from line 334, no need to lock again
+                    // BUG FIX (BUG-012): Capture waveFile reference (already under lock from line 334)
+                    WaveFileWriter? localWaveFile = waveFile;
+                    if (localWaveFile == null || !isRecording || e.BytesRecorded <= 0)
                     {
-                        localWaveFile = waveFile; // Capture under lock
-                        if (localWaveFile == null || !isRecording || e.BytesRecorded <= 0)
-                        {
-                            return; // Exit early if disposed or not recording
-                        }
+                        return; // Exit early if disposed or not recording
                     }
 
                     // Now safe to use localWaveFile outside lock (we have a reference)
@@ -624,15 +621,20 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
-            // DISPOSAL SAFETY: Set flag first to prevent cleanup timer callback
+            // BUG FIX (CRIT-003): Stop timer FIRST, then set disposal flag
+            // This ensures timer callback can't fire after we start disposing other resources
+            if (cleanupTimer != null)
+            {
+                cleanupTimer.Stop();
+                cleanupTimer.Dispose();
+                cleanupTimer = null;
+            }
+
+            // DISPOSAL SAFETY: Set flag to prevent any late callbacks from proceeding
             isDisposed = true;
 
             lock (lockObject)
             {
-                // Stop cleanup timer
-                cleanupTimer?.Stop();
-                cleanupTimer?.Dispose();
-                cleanupTimer = null;
 
                 if (isRecording)
                 {

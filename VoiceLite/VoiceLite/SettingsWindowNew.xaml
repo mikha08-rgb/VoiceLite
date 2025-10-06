@@ -128,19 +128,25 @@
                         <!-- Other Settings -->
                         <GroupBox Header="System Settings" Margin="0,0,0,15">
                             <StackPanel Margin="10">
+                                <!-- Start with Windows feature - not yet implemented -->
+                                <!--
                                 <CheckBox Name="StartWithWindowsCheckBox"
                                           Content="Start with Windows"
                                           Margin="0,0,0,5"
                                           IsEnabled="False"/>
+                                -->
                                 <CheckBox Name="MinimizeToTrayCheckBox"
                                           Content="Minimize to system tray on close"
                                           IsChecked="True"
-                                          Margin="0,0,0,5"/>
+                                          Margin="0,0,0,0"/>
+                                <!-- Show tray icon checkbox - always enabled, hidden since it's required -->
+                                <!--
                                 <CheckBox Name="ShowTrayIconCheckBox"
                                           Content="Show system tray icon"
                                           IsChecked="True"
                                           IsEnabled="False"
                                           Margin="0,0,0,5"/>
+                                -->
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
@@ -179,7 +185,7 @@
                                 <!-- Compact Preset -->
                                 <RadioButton Name="PresetCompactRadio"
                                              GroupName="UIPreset"
-                                             Margin="0,0,0,15"
+                                             Margin="0,0,0,0"
                                              Checked="UIPreset_Changed">
                                     <StackPanel>
                                         <TextBlock Text="Compact (Power User)"
@@ -190,30 +196,6 @@
                                                    FontSize="11"
                                                    Foreground="#7A7A7A"
                                                    Margin="0,0,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
-
-                                <!-- Status Hero Preset - DISABLED (Coming Soon) -->
-                                <RadioButton Name="PresetStatusHeroRadio"
-                                             GroupName="UIPreset"
-                                             Margin="0,0,0,0"
-                                             IsEnabled="False"
-                                             Checked="UIPreset_Changed">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Status Hero (Clear Feedback)"
-                                                       FontWeight="SemiBold"
-                                                       FontSize="13"
-                                                       Margin="0,0,5,0"/>
-                                            <TextBlock Text="- Coming Soon"
-                                                       FontSize="11"
-                                                       Foreground="#F39C12"
-                                                       VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <TextBlock Text="Large status indicator - never miss recording state"
-                                                   FontSize="11"
-                                                   Foreground="#7A7A7A"
-                                                   Margin="0,3,0,0"/>
                                     </StackPanel>
                                 </RadioButton>
 
@@ -535,12 +517,15 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Custom filler words feature hidden - not yet implemented -->
+                                <!--
                                 <TextBlock Text="Custom Filler Words:" FontWeight="SemiBold" FontSize="12" Margin="0,10,0,5"/>
                                 <Button Name="ManageCustomFillerWordsButton"
                                         Content="Manage Custom Filler Words..."
                                         Width="200"
                                         HorizontalAlignment="Left"
                                         Click="ManageCustomFillerWords_Click"/>
+                                -->
                             </StackPanel>
                         </GroupBox>
 

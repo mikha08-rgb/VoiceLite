@@ -190,18 +190,39 @@ namespace VoiceLite.Services
             return stats;
         }
 
+        /// <summary>
+        /// BUG-004 FIX: Apply smooth noise gate to prevent clicks and preserve quiet speech
+        /// Old version: Hard-cut audio below threshold → clipped consonants
+        /// New version: Smooth fade-out zone → preserves speech intelligibility
+        /// </summary>
         private static void ApplyNoiseGate(float[] buffer, int count, Settings settings)
         {
             if (!settings.EnableNoiseSuppression)
                 return;
 
-            float threshold = (float)Math.Clamp(settings.NoiseGateThreshold, 0.001, 0.2);
+            // BUG-004 FIX: Lower max threshold from 0.2 (20%) to 0.05 (5%)
+            float threshold = (float)Math.Clamp(settings.NoiseGateThreshold, 0.001, 0.05);
+
+            // BUG-004 FIX: Add smooth transition zone to prevent audio clicks
+            // Fade-out zone = 50% of threshold (e.g., if threshold is 0.005, fade zone is 0.0025)
+            float gateRange = threshold * 0.5f;
+
             for (int i = 0; i < count; i++)
             {
-                if (Math.Abs(buffer[i]) < threshold)
+                float abs = Math.Abs(buffer[i]);
+
+                if (abs < threshold - gateRange)
                 {
+                    // Below gate - full silence
                     buffer[i] = 0f;
                 }
+                else if (abs < threshold)
+                {
+                    // In fade zone - apply smooth attenuation to prevent clicks
+                    float ratio = (abs - (threshold - gateRange)) / gateRange;
+                    buffer[i] *= ratio;
+                }
+                // Else: above threshold - keep original sample (speech preserved)
             }
         }
 

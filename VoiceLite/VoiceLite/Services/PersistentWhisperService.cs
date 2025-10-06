@@ -216,9 +216,13 @@ namespace VoiceLite.Services
                 process.Start();
 
                 // Set high priority for warmup
+                // BUG FIX: Check if process is still running before accessing PriorityClass
                 try
                 {
-                    process.PriorityClass = ProcessPriorityClass.AboveNormal;
+                    if (!process.HasExited)
+                    {
+                        process.PriorityClass = ProcessPriorityClass.AboveNormal;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -276,24 +280,26 @@ namespace VoiceLite.Services
                 return string.Empty;
             }
 
-            // BUG FIX (BUG-003): Track semaphore acquisition to prevent double-release
+            // BUG FIX (CRIT-004): Track semaphore acquisition to prevent double-release
+            // CRITICAL: WaitAsync must be inside try block to ensure proper cleanup in all exception paths
             bool semaphoreAcquired = false;
-
-            // Use semaphore to ensure only one transcription at a time
-            await transcriptionSemaphore.WaitAsync();
-            semaphoreAcquired = true;
 
             try
             {
+                // Use semaphore to ensure only one transcription at a time
+                await transcriptionSemaphore.WaitAsync();
+                semaphoreAcquired = true;
                 // Preprocess audio if needed
                 try
                 {
-                    // TEMPORARILY DISABLED - AudioPreprocessor is too aggressive and silences all audio
-                    // AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
+                    // BUG-004 FIX: Re-enabled AudioPreprocessor with fixed noise gate
+                    // Fixed issues: Lower threshold (0.005 vs 0.02), smooth fade zone, lower max cap (0.05 vs 0.2)
+                    // This prevents silencing quiet speech while still removing background noise
+                    AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
                 }
                 catch (Exception preprocessEx)
                 {
-                    ErrorLogger.LogError("Preprocessing failed, continuing with unprocessed audio", preprocessEx);
+                    ErrorLogger.LogError("BUG-004: Preprocessing failed, continuing with unprocessed audio", preprocessEx);
                 }
                 var startTime = DateTime.Now;
 
@@ -369,10 +375,11 @@ namespace VoiceLite.Services
                 int timeoutSeconds;
                 if (!isWarmedUp)
                 {
-                    // First run needs more time (model loading) - increased from 60s to 120s
-                    // On slow systems (4GB RAM, antivirus scanning), 466MB model can take 30-60s to load
-                    timeoutSeconds = 120; // 120 seconds for first run
-                    ErrorLogger.LogMessage("Using extended timeout for first run (120s) - model loading may take time");
+                    // BUG-005 FIX: Increased from 120s to 180s (3 minutes) for first run
+                    // On slow systems (4GB RAM, antivirus scanning), 466MB model can take 30-120s to load
+                    // Additional headroom prevents false timeouts on resource-constrained systems
+                    timeoutSeconds = 180; // 180 seconds (3 minutes) for first run
+                    ErrorLogger.LogMessage("BUG-005 FIX: Using extended timeout for first run (180s) - model loading may take time on slow systems");
                 }
                 else
                 {

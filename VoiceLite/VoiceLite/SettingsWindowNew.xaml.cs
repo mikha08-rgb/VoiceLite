@@ -60,9 +60,9 @@ namespace VoiceLite
                 ToggleRadio.IsChecked = true;
 
             // System Settings
-            StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows;
+            // StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows; // Hidden - not implemented
             MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
-            ShowTrayIconCheckBox.IsChecked = settings.ShowTrayIcon;
+            // ShowTrayIconCheckBox.IsChecked = settings.ShowTrayIcon; // Hidden - always enabled
 
             // Audio Settings
             LoadMicrophones();
@@ -108,9 +108,6 @@ namespace VoiceLite
                     break;
                 case UIPreset.Compact:
                     PresetCompactRadio.IsChecked = true;
-                    break;
-                case UIPreset.StatusHero:
-                    PresetStatusHeroRadio.IsChecked = true;
                     break;
                 default:
                     PresetDefaultRadio.IsChecked = true;
@@ -334,9 +331,9 @@ namespace VoiceLite
             settings.Mode = (PushToTalkRadio.IsChecked == true) ? RecordMode.PushToTalk : RecordMode.Toggle;
 
             // System Settings
-            settings.StartWithWindows = StartWithWindowsCheckBox.IsChecked ?? false;
+            // settings.StartWithWindows = StartWithWindowsCheckBox.IsChecked ?? false; // Hidden - not implemented
             settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
-            settings.ShowTrayIcon = ShowTrayIconCheckBox.IsChecked ?? true;
+            // settings.ShowTrayIcon = ShowTrayIconCheckBox.IsChecked ?? true; // Hidden - always enabled (hardcoded true)
 
             // Audio Settings
             settings.PlaySoundFeedback = PlaySoundFeedbackCheckBox.IsChecked ?? true;
@@ -1043,10 +1040,11 @@ namespace VoiceLite
             UpdatePreview(null, null);
         }
 
-        private void ManageCustomFillerWords_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Custom filler words management coming soon!", "Feature In Development", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+        // Feature hidden - not yet implemented
+        // private void ManageCustomFillerWords_Click(object sender, RoutedEventArgs e)
+        // {
+        //     MessageBox.Show("Custom filler words management coming soon!", "Feature In Development", MessageBoxButton.OK, MessageBoxImage.Information);
+        // }
 
         private void UIPreset_Changed(object sender, RoutedEventArgs e)
         {
@@ -1060,10 +1058,6 @@ namespace VoiceLite
             else if (PresetCompactRadio.IsChecked == true)
             {
                 settings.UIPreset = UIPreset.Compact;
-            }
-            else if (PresetStatusHeroRadio.IsChecked == true)
-            {
-                settings.UIPreset = UIPreset.StatusHero;
             }
         }
 
