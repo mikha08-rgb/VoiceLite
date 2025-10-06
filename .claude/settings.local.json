@@ -22,7 +22,10 @@
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(dotnet clean:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(powershell:*)",
+      "Bash(gh run watch:*)",
+      "Bash(unzip:*)"
     ],
     "deny": [],
     "ask": []
