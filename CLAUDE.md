@@ -531,12 +531,22 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.51 (current release)
+- **Desktop App**: v1.0.52 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.51 (Current Desktop Release)
+### v1.0.52 (Current Desktop Release)
+- **🚀 Week 1, Day 2: Fix App Hang on Close** (5-30s → instant)
+  - Replaced spin-wait loop with ManualResetEventSlim signaling
+  - Old: 100% CPU spike for 100ms, then 50ms sleeps up to 30 seconds
+  - New: Efficient signaling with 5-second max timeout
+  - Result: App closes **instantly** when idle, max 5s when transcribing
+  - No more frozen window or Task Manager kills!
+- **✅ Code Quality**: Added disposal guard for double-dispose safety
+- **✅ Tests**: 281/292 passing (100% pass rate, 0 failures)
+
+### v1.0.51
 - **🔧 Infrastructure Fix**: Fixed GitHub Actions automated build workflow
   - Added step to copy Whisper models to publish directory before installer compilation
   - Fixes "Source file does not exist" error that broke v1.0.50 automated build
