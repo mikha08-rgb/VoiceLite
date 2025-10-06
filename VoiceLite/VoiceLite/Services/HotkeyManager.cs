@@ -49,6 +49,10 @@ namespace VoiceLite.Services
         public event EventHandler? HotkeyPressed;
         public event EventHandler? HotkeyReleased;
 
+        // BUG-006 FIX: Add event to notify UI when polling mode is activated
+        // Allows UI to show notification that polling mode has slightly higher latency
+        public event EventHandler<string>? PollingModeActivated;
+
         public Key CurrentKey => currentKey;
         public ModifierKeys CurrentModifiers => currentModifiers;
 
@@ -80,6 +84,9 @@ namespace VoiceLite.Services
                 ErrorLogger.LogMessage($"Using polling method for standalone modifier key: {key}");
                 StartPollingForModifierKey(key);
                 isRegistered = true;
+
+                // BUG-006 FIX: Notify UI that polling mode is active
+                PollingModeActivated?.Invoke(this, $"Using polling mode for {key} - may have slightly higher latency than standard hotkeys");
             }
             else if (isSpecialKey)
             {
@@ -87,6 +94,9 @@ namespace VoiceLite.Services
                 ErrorLogger.LogMessage($"Using polling method for special key: {key}");
                 StartPollingForModifierKey(key);
                 isRegistered = true;
+
+                // BUG-006 FIX: Notify UI that polling mode is active
+                PollingModeActivated?.Invoke(this, $"Using polling mode for {key} - may have slightly higher latency");
             }
             else
             {
