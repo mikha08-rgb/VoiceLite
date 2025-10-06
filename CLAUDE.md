@@ -531,12 +531,20 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.50 (current release)
+- **Desktop App**: v1.0.51 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.50 (Current Desktop Release)
+### v1.0.51 (Current Desktop Release)
+- **🔧 Infrastructure Fix**: Fixed GitHub Actions automated build workflow
+  - Added step to copy Whisper models to publish directory before installer compilation
+  - Fixes "Source file does not exist" error that broke v1.0.50 automated build
+  - Installer now builds successfully on GitHub Actions
+- **✅ Verification**: Same code as v1.0.50 (transcription fixes + performance improvements)
+- **🚀 Ready for Distribution**: Automated installer works on any PC
+
+### v1.0.50
 - **🔧 CRITICAL FIX**: Transcription bug resolved (broken in v1.0.44-49)
   - Root cause: AudioPreprocessor re-enabled with noise gate still too aggressive
   - Symptom: Whisper received silent audio, returned empty strings
