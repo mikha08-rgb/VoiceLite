@@ -877,30 +877,33 @@ namespace VoiceLite
 
         private async void AccountButton_Click(object sender, RoutedEventArgs e)
         {
-            if (authenticationCoordinator == null)
+            // CRIT-006 FIX: Wrap entire async void method in try-catch
+            try
             {
-                MessageBox.Show("Authentication services are not initialized yet.", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (currentSession == null)
-            {
-                var loginWindow = new LoginWindow(authenticationCoordinator)
+                if (authenticationCoordinator == null)
                 {
-                    Owner = this,
-                };
-
-                if (loginWindow.ShowDialog() == true && loginWindow.Session != null)
-                {
-                    currentSession = loginWindow.Session;
-                    settings.LastSignedInEmail = currentSession.Email;
-                    SaveSettings();
-                    await UpdateLicenseStatusAsync();
-                    systemTrayManager?.UpdateAccountMenuText("Manage Account");
+                    MessageBox.Show("Authentication services are not initialized yet.", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
                 }
 
-                return;
-            }
+                if (currentSession == null)
+                {
+                    var loginWindow = new LoginWindow(authenticationCoordinator)
+                    {
+                        Owner = this,
+                    };
+
+                    if (loginWindow.ShowDialog() == true && loginWindow.Session != null)
+                    {
+                        currentSession = loginWindow.Session;
+                        settings.LastSignedInEmail = currentSession.Email;
+                        SaveSettings();
+                        await UpdateLicenseStatusAsync();
+                        systemTrayManager?.UpdateAccountMenuText("Manage Account");
+                    }
+
+                    return;
+                }
 
             // User is signed in - show account management
             var message = $"Signed in as: {currentSession.Email}\n\n";
@@ -924,6 +927,12 @@ namespace VoiceLite
                 currentLicenseStatus = LicenseStatus.Unlicensed;
                 UpdateAccountStatusUI("Not signed in", Brushes.Gray);
                 systemTrayManager?.UpdateAccountMenuText("Sign In");
+            }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("CRITICAL: Unhandled exception in AccountButton_Click", ex);
+                MessageBox.Show($"Account operation failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1390,14 +1399,17 @@ namespace VoiceLite
         /// </summary>
         private async void OnStuckStateRecovery(object? sender, EventArgs e)
         {
-            ErrorLogger.LogWarning("OnStuckStateRecovery: STUCK STATE DETECTED! Forcing recovery...");
+            // CRIT-006 FIX: Wrap entire async void method in try-catch
+            try
+            {
+                ErrorLogger.LogWarning("OnStuckStateRecovery: STUCK STATE DETECTED! Forcing recovery...");
 
-            // Stop the timer immediately
-            StopStuckStateRecoveryTimer();
+                // Stop the timer immediately
+                StopStuckStateRecoveryTimer();
 
-            // CRITICAL FIX: Kill any hung whisper.exe processes BEFORE showing dialog
-            // This prevents PC freeze from stuck processes consuming resources
-            await KillHungWhisperProcessesAsync();
+                // CRITICAL FIX: Kill any hung whisper.exe processes BEFORE showing dialog
+                // This prevents PC freeze from stuck processes consuming resources
+                await KillHungWhisperProcessesAsync();
 
             // Force UI back to ready state
             try
@@ -1446,9 +1458,20 @@ namespace VoiceLite
                 // Reset UI to default mode
                 UpdateUIForCurrentMode();
             }
+            catch (Exception innerEx)
+            {
+                ErrorLogger.LogError("OnStuckStateRecovery: Failed to recover", innerEx);
+            }
+            }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("OnStuckStateRecovery: Failed to recover", ex);
+                ErrorLogger.LogError("CRITICAL: Unhandled exception in OnStuckStateRecovery", ex);
+                // Best effort to reset UI
+                try
+                {
+                    UpdateStatus("Error during recovery", Brushes.Red);
+                }
+                catch { /* Ignore */ }
             }
         }
 
