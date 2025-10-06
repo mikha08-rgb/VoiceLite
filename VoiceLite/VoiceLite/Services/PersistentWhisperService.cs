@@ -292,14 +292,14 @@ namespace VoiceLite.Services
                 // Preprocess audio if needed
                 try
                 {
-                    // BUG-004 FIX: Re-enabled AudioPreprocessor with fixed noise gate
-                    // Fixed issues: Lower threshold (0.005 vs 0.02), smooth fade zone, lower max cap (0.05 vs 0.2)
-                    // This prevents silencing quiet speech while still removing background noise
-                    AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
+                    // ROLLBACK: AudioPreprocessor is too aggressive and silences all audio
+                    // Even with "fixed" noise gate, it's filtering out speech completely
+                    // DISABLED until further investigation - raw audio works fine with Whisper
+                    // AudioPreprocessor.ProcessAudioFile(audioFilePath, settings);
                 }
                 catch (Exception preprocessEx)
                 {
-                    ErrorLogger.LogError("BUG-004: Preprocessing failed, continuing with unprocessed audio", preprocessEx);
+                    ErrorLogger.LogError("Preprocessing failed, continuing with unprocessed audio", preprocessEx);
                 }
                 var startTime = DateTime.Now;
 
