@@ -188,6 +188,11 @@ namespace VoiceLite.Services
                 {
                     // Generate 5 seconds of test audio (could be silence or test tone)
                     var sampleRate = format.SampleRate;
+
+                    // ISSUE #3 FIX: Validate sample rate before division
+                    if (sampleRate <= 0)
+                        throw new InvalidOperationException($"Invalid sample rate for audio generation: {sampleRate}");
+
                     var seconds = 5;
                     var samples = sampleRate * seconds;
 
