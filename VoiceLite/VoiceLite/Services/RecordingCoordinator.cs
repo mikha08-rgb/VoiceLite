@@ -21,12 +21,12 @@ namespace VoiceLite.Services
         private readonly SoundService? soundService;
         private readonly Settings settings;
 
-        private bool _isRecording = false;
-        private bool isCancelled = false;
+        // WEEK1-DAY3: State machine replaces 3 separate bool flags (_isRecording, isCancelled, isTranscribing)
+        private readonly RecordingStateMachine stateMachine;
+
         private DateTime recordingStartTime;
         private readonly object recordingLock = new object();
         private System.Threading.Timer? transcriptionWatchdog;
-        private volatile bool isTranscribing = false;
         private int transcriptionCompletedFlag = 0; // 0 = not completed, 1 = completed (atomic)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
@@ -38,8 +38,10 @@ namespace VoiceLite.Services
         public event EventHandler<TranscriptionCompleteEventArgs>? TranscriptionCompleted;
         public event EventHandler<string>? ErrorOccurred;
 
-        public bool IsRecording => _isRecording;
-        public bool IsTranscribing => isTranscribing; // PERFORMANCE FIX: Expose for busy state check
+        // WEEK1-DAY3: Expose state machine state instead of local bool flags
+        public bool IsRecording => stateMachine.CurrentState == RecordingState.Recording;
+        public bool IsTranscribing => stateMachine.CurrentState == RecordingState.Transcribing;
+        public RecordingState CurrentState => stateMachine.CurrentState;
 
         public RecordingCoordinator(
             AudioRecorder audioRecorder,
@@ -58,6 +60,9 @@ namespace VoiceLite.Services
             this.soundService = soundService;
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
+            // WEEK1-DAY3: Initialize state machine
+            this.stateMachine = new RecordingStateMachine();
+
             // Wire up audio recorder events
             audioRecorder.AudioFileReady += OnAudioFileReady;
         }
@@ -67,22 +72,20 @@ namespace VoiceLite.Services
         /// </summary>
         public void StartRecording()
         {
-            ErrorLogger.LogDebug($"RecordingCoordinator.StartRecording: Entry - isRecording={_isRecording}");
+            ErrorLogger.LogDebug($"RecordingCoordinator.StartRecording: Entry - state={stateMachine.CurrentState}");
 
             lock (recordingLock)
             {
-                if (_isRecording)
+                // WEEK1-DAY3: Use state machine instead of bool flag
+                if (!stateMachine.TryTransition(RecordingState.Recording))
                 {
-                    ErrorLogger.LogDebug("RecordingCoordinator.StartRecording: Already recording, returning early");
+                    ErrorLogger.LogWarning($"RecordingCoordinator.StartRecording: Cannot transition to Recording from {stateMachine.CurrentState}");
                     return;
                 }
 
                 try
                 {
-                    _isRecording = true;
-                    isCancelled = false;
                     recordingStartTime = DateTime.Now;
-
                     audioRecorder.StartRecording();
 
                     // Notify UI
@@ -98,19 +101,22 @@ namespace VoiceLite.Services
                 catch (InvalidOperationException ex) when (ex.Message.Contains("No microphone"))
                 {
                     ErrorLogger.LogWarning($"StartRecording failed: No microphone - {ex.Message}");
-                    _isRecording = false;
+                    stateMachine.TryTransition(RecordingState.Error);
+                    stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, $"No microphone detected!\n\nPlease connect a microphone and restart the application.");
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("Failed to access"))
                 {
                     ErrorLogger.LogWarning($"StartRecording failed: Microphone busy - {ex.Message}");
-                    _isRecording = false;
+                    stateMachine.TryTransition(RecordingState.Error);
+                    stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("RecordingCoordinator.StartRecording failed", ex);
-                    _isRecording = false;
+                    stateMachine.TryTransition(RecordingState.Error);
+                    stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, $"Failed to start recording: {ex.Message}");
                 }
             }
@@ -122,13 +128,16 @@ namespace VoiceLite.Services
         /// <param name="cancel">If true, discards recording without transcription</param>
         public void StopRecording(bool cancel = false)
         {
-            ErrorLogger.LogDebug($"RecordingCoordinator.StopRecording: Entry - isRecording={_isRecording}, cancel={cancel}");
+            ErrorLogger.LogDebug($"RecordingCoordinator.StopRecording: Entry - state={stateMachine.CurrentState}, cancel={cancel}");
 
             lock (recordingLock)
             {
-                if (!_isRecording)
+                // WEEK1-DAY3: Use state machine transitions
+                RecordingState targetState = cancel ? RecordingState.Cancelled : RecordingState.Stopping;
+
+                if (!stateMachine.TryTransition(targetState))
                 {
-                    ErrorLogger.LogDebug("RecordingCoordinator.StopRecording: Not recording, returning early");
+                    ErrorLogger.LogWarning($"RecordingCoordinator.StopRecording: Cannot transition to {targetState} from {stateMachine.CurrentState}");
                     return;
                 }
 
@@ -136,12 +145,10 @@ namespace VoiceLite.Services
                 {
                     if (cancel)
                     {
-                        isCancelled = true;
                         ErrorLogger.LogInfo("Recording cancelled by user");
                     }
 
                     audioRecorder.StopRecording();
-                    _isRecording = false;
 
                     // Notify UI
                     StatusChanged?.Invoke(this, new RecordingStatusEventArgs
@@ -156,7 +163,8 @@ namespace VoiceLite.Services
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("RecordingCoordinator.StopRecording failed", ex);
-                    _isRecording = false;
+                    stateMachine.TryTransition(RecordingState.Error);
+                    stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, "Error stopping recording");
                 }
             }
@@ -167,7 +175,8 @@ namespace VoiceLite.Services
         /// </summary>
         public TimeSpan GetRecordingDuration()
         {
-            if (!_isRecording)
+            // WEEK1-DAY3: Use state machine instead of bool flag
+            if (stateMachine.CurrentState != RecordingState.Recording)
                 return TimeSpan.Zero;
 
             return DateTime.Now - recordingStartTime;
@@ -200,13 +209,15 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - isCancelled={isCancelled}, file={audioFilePath}");
+                // WEEK1-DAY3: Check state machine instead of isCancelled flag
+                var currentState = stateMachine.CurrentState;
+                ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - state={currentState}, file={audioFilePath}");
 
                 // If recording was cancelled, just clean up and return
-                if (isCancelled)
+                if (currentState == RecordingState.Cancelled)
                 {
                     ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
-                    isCancelled = false;
+                    stateMachine.TryTransition(RecordingState.Idle); // Reset to idle
                     await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                     return;
                 }
@@ -248,12 +259,19 @@ namespace VoiceLite.Services
 
         private async Task ProcessAudioFileAsync(string audioFilePath)
         {
-
             // PERFORMANCE: Use original audio file directly (no copy needed)
             // AudioRecorder already creates unique temp files per recording
             // Semaphore in WhisperService prevents concurrent access
             // We still need to clean up the original file after transcription
             string workingAudioPath = audioFilePath;
+
+            // WEEK1-DAY3: Transition to Transcribing state
+            if (!stateMachine.TryTransition(RecordingState.Transcribing))
+            {
+                ErrorLogger.LogWarning($"ProcessAudioFileAsync: Cannot transition to Transcribing from {stateMachine.CurrentState}");
+                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                return;
+            }
 
             // Notify UI that transcription is starting
             StatusChanged?.Invoke(this, new RecordingStatusEventArgs
@@ -321,6 +339,9 @@ namespace VoiceLite.Services
                 bool textInjected = false;
                 if (!string.IsNullOrWhiteSpace(transcription))
                 {
+                    // WEEK1-DAY3: Transition to Injecting state
+                    stateMachine.TryTransition(RecordingState.Injecting);
+
                     textInjector.AutoPaste = settings.AutoPaste;
 
                     if (settings.AutoPaste)
@@ -338,6 +359,9 @@ namespace VoiceLite.Services
                     textInjected = true;
                 }
 
+                // WEEK1-DAY3: Transition to Complete state (success path)
+                stateMachine.TryTransition(RecordingState.Complete);
+
                 // Prepare event args (don't fire yet)
                 eventArgs = new TranscriptionCompleteEventArgs
                 {
@@ -350,6 +374,9 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("RecordingCoordinator.OnAudioFileReady", ex);
+
+                // WEEK1-DAY3: Transition to Error state
+                stateMachine.TryTransition(RecordingState.Error);
 
                 // Prepare error event args (don't fire yet)
                 eventArgs = new TranscriptionCompleteEventArgs
@@ -400,6 +427,9 @@ namespace VoiceLite.Services
                     await CleanupAudioFileAsync(workingAudioPath).ConfigureAwait(false);
                 }
 
+                // WEEK1-DAY3: Return to Idle state (ready for next recording)
+                stateMachine.TryTransition(RecordingState.Idle);
+
                 // WEEK1-DAY2: Signal that transcription is complete (success or failure)
                 // This allows Dispose() to proceed without spin-waiting
                 transcriptionComplete.Set();
@@ -411,7 +441,7 @@ namespace VoiceLite.Services
         /// </summary>
         private void StartTranscriptionWatchdog()
         {
-            isTranscribing = true;
+            // WEEK1-DAY3: No need to set isTranscribing flag, state machine tracks this
             System.Threading.Interlocked.Exchange(ref transcriptionCompletedFlag, 0); // Reset completion flag atomically
             transcriptionStartTime = DateTime.Now;
 
@@ -431,7 +461,7 @@ namespace VoiceLite.Services
         /// </summary>
         private void StopTranscriptionWatchdog()
         {
-            isTranscribing = false;
+            // WEEK1-DAY3: No need to clear isTranscribing flag, state machine tracks this
 
             var watchdog = transcriptionWatchdog;
             transcriptionWatchdog = null; // Clear reference first to prevent double-dispose
@@ -462,8 +492,8 @@ namespace VoiceLite.Services
         {
             try
             {
-                // CRITICAL: Check if already completed to prevent duplicate events
-                if (!isTranscribing)
+                // WEEK1-DAY3: Check state machine instead of isTranscribing flag
+                if (stateMachine.CurrentState != RecordingState.Transcribing)
                     return;
 
                 var elapsed = DateTime.Now - transcriptionStartTime;
@@ -583,6 +613,9 @@ namespace VoiceLite.Services
             }
 
             StopTranscriptionWatchdog();
+
+            // WEEK1-DAY3: Reset state machine to Idle on disposal
+            stateMachine.Reset();
 
             // WEEK1-DAY2: Dispose ManualResetEventSlim to free resources
             transcriptionComplete?.Dispose();

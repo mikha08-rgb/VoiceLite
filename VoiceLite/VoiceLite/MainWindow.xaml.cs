@@ -36,19 +36,8 @@ namespace VoiceLite
 
         // Recording state
         private DateTime recordingStartTime;
-        private bool _isRecording = false;
-        private bool isRecording
-        {
-            get => _isRecording;
-            set
-            {
-                if (_isRecording != value)
-                {
-                    ErrorLogger.LogMessage($"isRecording state change: {_isRecording} -> {value}");
-                    _isRecording = value;
-                }
-            }
-        }
+        // WEEK1-DAY3: Removed local isRecording flag - use recordingCoordinator.IsRecording instead
+        private bool IsRecording => recordingCoordinator?.IsRecording ?? false;
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
         private readonly object saveSettingsLock = new object(); // CONCURRENCY FIX: Prevent simultaneous settings saves
@@ -825,7 +814,7 @@ namespace VoiceLite
             }
             else // Toggle mode
             {
-                if (isRecording)
+                if (IsRecording)
                 {
                     TranscriptionText.Text = $"Recording... Press {hotkeyDisplay} again to stop and transcribe.";
                 }
@@ -842,7 +831,7 @@ namespace VoiceLite
 
         private void TestButton_Click(object sender, RoutedEventArgs e)
         {
-            ErrorLogger.LogDebug($"TestButton_Click: Entry - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+            ErrorLogger.LogDebug($"TestButton_Click: Entry - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
             // Prevent rapid clicking (debounce)
             var now = DateTime.Now;
@@ -862,7 +851,7 @@ namespace VoiceLite
 
             lock (recordingLock)
             {
-                if (!isRecording)
+                if (!IsRecording)
                 {
                     ErrorLogger.LogInfo("User clicked to start recording");
                     StartRecording();
@@ -951,7 +940,7 @@ namespace VoiceLite
 
         private void StartRecording()
         {
-            ErrorLogger.LogDebug($"StartRecording: Entry - isRecording={isRecording}");
+            ErrorLogger.LogDebug($"StartRecording: Entry - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}");
 
             // CRITICAL FIX: Validate AudioRecorder is not already recording (prevents race conditions)
             var recorder = audioRecorder;
@@ -968,7 +957,7 @@ namespace VoiceLite
             }
 
             // Pre-check: if already recording, do nothing
-            if (isRecording)
+            if (IsRecording)
             {
                 ErrorLogger.LogDebug("StartRecording: Already recording, returning early");
                 return;
@@ -987,7 +976,7 @@ namespace VoiceLite
             StopStuckStateRecoveryTimer();
 
             // Set state BEFORE attempting to start (defensive)
-            isRecording = true;
+            // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = true;
             recordingStartTime = DateTime.Now;
 
             // Delegate to coordinator
@@ -1016,17 +1005,17 @@ namespace VoiceLite
             {
                 // Recording failed to start - rollback state
                 ErrorLogger.LogWarning("StartRecording: Recording failed to start, rolling back state");
-                isRecording = false;
+                // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                 UpdateStatus("Failed to start recording", Brushes.Red);
             }
         }
 
         private void StopRecording(bool cancel = false)
         {
-            ErrorLogger.LogDebug($"StopRecording: Entry - isRecording={isRecording}, cancel={cancel}");
+            ErrorLogger.LogDebug($"StopRecording: Entry - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, cancel={cancel}");
 
             // Pre-check: if not recording, do nothing
-            if (!isRecording)
+            if (!IsRecording)
             {
                 ErrorLogger.LogDebug("StopRecording: Not recording, returning early");
                 return;
@@ -1039,7 +1028,7 @@ namespace VoiceLite
             // Delegate to coordinator
             recordingCoordinator?.StopRecording(cancel);
 
-            isRecording = false;
+            // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
 
             // Update UI immediately
             if (cancel)
@@ -1064,7 +1053,7 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
                 // Debounce protection - ignore rapid key presses
                 var now = DateTime.Now;
@@ -1077,7 +1066,7 @@ namespace VoiceLite
 
                 lock (recordingLock)
                 {
-                    ErrorLogger.LogMessage($"OnHotkeyPressed: Inside lock - Mode={settings.Mode}, isRecording={isRecording}");
+                    ErrorLogger.LogMessage($"OnHotkeyPressed: Inside lock - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}");
 
                     if (settings.Mode == Models.RecordMode.PushToTalk)
                     {
@@ -1089,7 +1078,7 @@ namespace VoiceLite
                     }
                 }
 
-                ErrorLogger.LogMessage($"OnHotkeyPressed: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"OnHotkeyPressed: Exit - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
             }
             catch (Exception ex)
             {
@@ -1098,7 +1087,7 @@ namespace VoiceLite
                 // Attempt to reset state to prevent stuck recording
                 try
                 {
-                    if (isRecording)
+                    if (IsRecording)
                     {
                         StopRecording(cancel: true);
                     }
@@ -1125,11 +1114,11 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                ErrorLogger.LogMessage($"OnHotkeyReleased: Entry - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"OnHotkeyReleased: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
                 lock (recordingLock)
                 {
-                    ErrorLogger.LogMessage($"OnHotkeyReleased: Inside lock - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                    ErrorLogger.LogMessage($"OnHotkeyReleased: Inside lock - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
                     if (settings.Mode == Models.RecordMode.PushToTalk)
                     {
@@ -1138,7 +1127,7 @@ namespace VoiceLite
                     // In Toggle mode, do nothing on release - all action happens on press
                 }
 
-                ErrorLogger.LogMessage($"OnHotkeyReleased: Exit - Mode={settings.Mode}, isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"OnHotkeyReleased: Exit - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
             }
             catch (Exception ex)
             {
@@ -1147,7 +1136,7 @@ namespace VoiceLite
                 // Attempt to stop recording if stuck
                 try
                 {
-                    if (isRecording)
+                    if (IsRecording)
                     {
                         StopRecording(cancel: true);
                     }
@@ -1202,13 +1191,13 @@ namespace VoiceLite
 
             bool actuallyRecording = recorder.IsRecording;
 
-            if (isRecording != actuallyRecording)
+            if (IsRecording != actuallyRecording)
             {
-                ErrorLogger.LogMessage($"HandlePushToTalkPressed: State mismatch detected - isRecording={isRecording}, actuallyRecording={actuallyRecording}. Syncing...");
-                isRecording = actuallyRecording;
+                ErrorLogger.LogMessage($"HandlePushToTalkPressed: State mismatch detected - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, actuallyRecording={actuallyRecording}. Syncing...");
+                // WEEK1-DAY3: State managed by coordinator - IsRecording = actuallyRecording;
             }
 
-            if (!isRecording)
+            if (!IsRecording)
             {
                 ErrorLogger.LogMessage("HandlePushToTalkPressed: Setting isHotkeyMode=true and starting recording");
                 isHotkeyMode = true;
@@ -1236,13 +1225,13 @@ namespace VoiceLite
 
             bool actuallyRecording = recorder.IsRecording;
 
-            if (isRecording != actuallyRecording)
+            if (IsRecording != actuallyRecording)
             {
-                ErrorLogger.LogMessage($"HandlePushToTalkReleased: State mismatch detected - isRecording={isRecording}, actuallyRecording={actuallyRecording}. Syncing...");
-                isRecording = actuallyRecording;
+                ErrorLogger.LogMessage($"HandlePushToTalkReleased: State mismatch detected - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, actuallyRecording={actuallyRecording}. Syncing...");
+                // WEEK1-DAY3: State managed by coordinator - IsRecording = actuallyRecording;
             }
 
-            if (isRecording && isHotkeyMode)
+            if (IsRecording && isHotkeyMode)
             {
                 ErrorLogger.LogMessage("HandlePushToTalkReleased: Stopping recording");
 
@@ -1255,7 +1244,7 @@ namespace VoiceLite
             }
             else
             {
-                ErrorLogger.LogMessage($"HandlePushToTalkReleased: Not stopping - isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogMessage($"HandlePushToTalkReleased: Not stopping - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
                 // Defensive reset - but only if we're not actually recording
                 if (isHotkeyMode && !actuallyRecording)
                 {
@@ -1277,15 +1266,15 @@ namespace VoiceLite
 
             bool actuallyRecording = recorder.IsRecording;
 
-            if (isRecording != actuallyRecording)
+            if (IsRecording != actuallyRecording)
             {
-                ErrorLogger.LogMessage($"HandleToggleModePressed: State mismatch detected - isRecording={isRecording}, actuallyRecording={actuallyRecording}. Syncing...");
-                isRecording = actuallyRecording;
+                ErrorLogger.LogMessage($"HandleToggleModePressed: State mismatch detected - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, actuallyRecording={actuallyRecording}. Syncing...");
+                // WEEK1-DAY3: State managed by coordinator - IsRecording = actuallyRecording;
             }
 
-            ErrorLogger.LogMessage($"HandleToggleModePressed: Current state - isRecording={isRecording}, audioRecorder.IsRecording={actuallyRecording}");
+            ErrorLogger.LogMessage($"HandleToggleModePressed: Current state - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, audioRecorder.IsRecording={actuallyRecording}");
 
-            if (!isRecording)
+            if (!IsRecording)
             {
                 ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE ON - Starting continuous recording");
 
@@ -1294,7 +1283,7 @@ namespace VoiceLite
 
                 StartRecording();
                 StartAutoTimeoutTimer();
-                ErrorLogger.LogMessage($"HandleToggleModePressed: After start - isRecording={isRecording}");
+                ErrorLogger.LogMessage($"HandleToggleModePressed: After start - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}");
             }
             else
             {
@@ -1305,7 +1294,7 @@ namespace VoiceLite
 
                 StopRecording(false);
                 StopAutoTimeoutTimer();
-                ErrorLogger.LogMessage($"HandleToggleModePressed: After stop - isRecording={isRecording}");
+                ErrorLogger.LogMessage($"HandleToggleModePressed: After stop - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}");
             }
         }
 
@@ -1422,8 +1411,8 @@ namespace VoiceLite
                 // Reset all state flags
                 lock (recordingLock)
                 {
-                    ErrorLogger.LogWarning($"OnStuckStateRecovery: Force-resetting state - was isRecording={isRecording}, isHotkeyMode={isHotkeyMode}");
-                    isRecording = false;
+                    ErrorLogger.LogWarning($"OnStuckStateRecovery: Force-resetting state - was // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
+                    // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                     isHotkeyMode = false;
                 }
 
@@ -1532,7 +1521,7 @@ namespace VoiceLite
                 {
                     lock (recordingLock)
                     {
-                        if (isRecording)
+                        if (IsRecording)
                         {
                             // Show timeout warning
                             UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
@@ -1672,7 +1661,7 @@ namespace VoiceLite
                                     await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
                                     await Dispatcher.InvokeAsync(() =>
                                     {
-                                        if (!isRecording) // Only reset if not currently recording again
+                                        if (!IsRecording) // Only reset if not currently recording again
                                         {
                                             UpdateUIForCurrentMode();
                                         }
@@ -1710,7 +1699,7 @@ namespace VoiceLite
                             else
                             {
                                 ErrorLogger.LogMessage($"OnTranscriptionCompleted: Resetting state");
-                                isRecording = false;
+                                // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                                 isHotkeyMode = false;
                                 StopAutoTimeoutTimer();
                             }
@@ -1730,7 +1719,7 @@ namespace VoiceLite
                                 await Task.Delay(3000);
                                 await Dispatcher.InvokeAsync(() =>
                                 {
-                                    if (!isRecording)
+                                    if (!IsRecording)
                                     {
                                         UpdateUIForCurrentMode();
                                         UpdateStatus("Ready", new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7A7A7A")));
@@ -1749,7 +1738,7 @@ namespace VoiceLite
                             if (!actuallyRecording)
                             {
                                 ErrorLogger.LogMessage($"OnTranscriptionCompleted: Error - forcing state reset");
-                                isRecording = false;
+                                // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                                 isHotkeyMode = false;
                                 StopAutoTimeoutTimer();
                             }
@@ -1774,7 +1763,7 @@ namespace VoiceLite
 
                         if (!actuallyRecording)
                         {
-                            isRecording = false;
+                            // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                             isHotkeyMode = false;
                             StopAutoTimeoutTimer();
                         }
@@ -1886,7 +1875,7 @@ namespace VoiceLite
             {
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    isRecording = false;
+                    // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                     UpdateStatus("Error", Brushes.Red);
                     UpdateUIForCurrentMode();
                     TranscriptionText.Foreground = Brushes.Black;
@@ -1998,7 +1987,7 @@ namespace VoiceLite
                 }
 
                 // CRITICAL FIX: Preserve current recording state and minimize service recreation
-                bool wasRecording = isRecording;
+                bool wasRecording = IsRecording;
                 bool wasHotkeyMode = isHotkeyMode;
 
                 // Only recreate if service is null (never had one)
@@ -2014,7 +2003,7 @@ namespace VoiceLite
                 }
 
                 // CRITICAL FIX: Only change microphone if not currently recording
-                if (audioRecorder != null && !isRecording && settings.SelectedMicrophoneIndex >= -1)
+                if (audioRecorder != null && !IsRecording && settings.SelectedMicrophoneIndex >= -1)
                 {
                     try
                     {
@@ -2027,7 +2016,7 @@ namespace VoiceLite
                         // Don't throw - this is not fatal
                     }
                 }
-                else if (isRecording)
+                else if (IsRecording)
                 {
                     ErrorLogger.LogMessage("Skipping microphone change - recording in progress");
                 }
@@ -2046,10 +2035,10 @@ namespace VoiceLite
                         hotkeyManager.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
                         // CRITICAL FIX: Restore recording state after hotkey recreation
-                        isRecording = wasRecording;
+                        // WEEK1-DAY3: State managed by coordinator - IsRecording = wasRecording;
                         isHotkeyMode = wasHotkeyMode;
 
-                        ErrorLogger.LogMessage($"Hotkey re-registration successful. State restored: recording={isRecording}, hotkeyMode={isHotkeyMode}");
+                        ErrorLogger.LogMessage($"Hotkey re-registration successful. State restored: recording={IsRecording}, hotkeyMode={isHotkeyMode}");
                     }
                     catch (Exception ex)
                     {
@@ -2122,13 +2111,13 @@ namespace VoiceLite
             }
 
             // Handle Esc key to cancel recording
-            if (e.Key == Key.Escape && isRecording)
+            if (e.Key == Key.Escape && IsRecording)
             {
                 ErrorLogger.LogMessage($"MainWindow_PreviewKeyDown: Esc pressed while recording - Mode={settings.Mode}");
 
                 lock (recordingLock)
                 {
-                    if (isRecording)
+                    if (IsRecording)
                     {
                         // Audio feedback for cancel
                         if (settings.PlaySoundFeedback)
@@ -2355,7 +2344,7 @@ namespace VoiceLite
             try
             {
                 // Stop recording FIRST to ensure no active operations
-                if (isRecording)
+                if (IsRecording)
                 {
                     StopRecording(true);
                 }
