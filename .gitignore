@@ -46,3 +46,5 @@ api-keys.txt
 
 # VC++ redistributable (downloaded during GitHub Actions build)
 VoiceLite/dependencies/
+VoiceLite/whisper_installer/
+VoiceLite/whisper_installer_lite/
