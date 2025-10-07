@@ -439,19 +439,17 @@ namespace VoiceLite.Services
                     ErrorLogger.LogWarning("RecordingCoordinator: Transcription completed after watchdog timeout - event already fired");
                 }
 
-                // RACE CONDITION FIX: Wait briefly to ensure Whisper process has closed file handle
-                // Whisper process might still be reading the file, give it time to release handle
-                await Task.Delay(300).ConfigureAwait(false);
+                // PERFORMANCE FIX: Transition to Idle IMMEDIATELY for responsive UI
+                // File cleanup happens asynchronously in background without blocking state transition
+                stateMachine.TryTransition(RecordingState.Idle);
 
                 // CLEANUP: Always delete the original audio file from AudioRecorder
                 // This prevents temp files from accumulating in AppData
+                // Note: 300ms delay moved inside CleanupAudioFileAsync to not block UI
                 if (File.Exists(workingAudioPath))
                 {
                     await CleanupAudioFileAsync(workingAudioPath).ConfigureAwait(false);
                 }
-
-                // WEEK1-DAY3: Return to Idle state (ready for next recording)
-                stateMachine.TryTransition(RecordingState.Idle);
 
                 // WEEK1-DAY2: Signal that transcription is complete (success or failure)
                 // This allows Dispose() to proceed without spin-waiting
@@ -651,8 +649,10 @@ namespace VoiceLite.Services
             // File.Delete() can block for 50-200ms with antivirus scanning
             await Task.Run(async () =>
             {
-                // Small delay to let file handles close
-                await Task.Delay(100).ConfigureAwait(false);
+                // RACE CONDITION FIX: Wait briefly to ensure Whisper process has closed file handle
+                // Moved from main flow (line 444) to background cleanup to not block UI state transition
+                // Whisper process might still be reading the file, give it time to release handle
+                await Task.Delay(300).ConfigureAwait(false);
 
                 for (int i = 0; i < TimingConstants.FileCleanupMaxRetries; i++)
                 {
