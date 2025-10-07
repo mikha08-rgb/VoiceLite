@@ -27,10 +27,12 @@ namespace VoiceLite.Services
         private DateTime recordingStartTime;
         private readonly object recordingLock = new object();
         private System.Threading.Timer? transcriptionWatchdog;
+        private System.Threading.Timer? stoppingTimeoutTimer;
         private int transcriptionCompletedFlag = 0; // 0 = not completed, 1 = completed (atomic)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
         private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
+        private const int STOPPING_TIMEOUT_SECONDS = 10; // 10 seconds max to wait for AudioFileReady
         private readonly System.Threading.ManualResetEventSlim transcriptionComplete = new System.Threading.ManualResetEventSlim(true); // WEEK1-DAY2: Signaling for disposal (true = initially set)
 
         // Events for MainWindow to subscribe to
@@ -158,11 +160,24 @@ namespace VoiceLite.Services
                         IsCancelled = cancel
                     });
 
+                    // BUG FIX: Start safety timer to recover if AudioFileReady never fires
+                    // This prevents state machine from getting stuck in Stopping state
+                    // Only needed for normal stop (not cancellation, which goes directly to Idle)
+                    if (!cancel)
+                    {
+                        StartStoppingTimeoutTimer();
+                    }
+
                     ErrorLogger.LogDebug("RecordingCoordinator.StopRecording: Recording stopped successfully");
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("RecordingCoordinator.StopRecording failed", ex);
+
+                    // Clean up timeout timer if it was started
+                    StopStoppingTimeoutTimer();
+
+                    // Transition to error state, then back to idle
                     stateMachine.TryTransition(RecordingState.Error);
                     stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, "Error stopping recording");
@@ -201,6 +216,9 @@ namespace VoiceLite.Services
             // CRIT-003 FIX: Wrap entire async void method in try-catch to prevent app crash
             try
             {
+                // BUG FIX: Stop safety timer since AudioFileReady fired successfully
+                StopStoppingTimeoutTimer();
+
                 // DISPOSAL SAFETY: Early exit if disposed
                 if (isDisposed)
                 {
@@ -217,6 +235,10 @@ namespace VoiceLite.Services
                 if (currentState == RecordingState.Cancelled)
                 {
                     ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
+
+                    // Stop timeout timer if it's still running (defensive cleanup)
+                    StopStoppingTimeoutTimer();
+
                     stateMachine.TryTransition(RecordingState.Idle); // Reset to idle
                     await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                     return;
@@ -543,6 +565,84 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
+        /// Start timeout timer for Stopping state - recovers if AudioFileReady never fires
+        /// </summary>
+        private void StartStoppingTimeoutTimer()
+        {
+            // Create timer that fires once after timeout
+            stoppingTimeoutTimer = new System.Threading.Timer(
+                callback: StoppingTimeoutCallback,
+                state: null,
+                dueTime: STOPPING_TIMEOUT_SECONDS * 1000, // Convert to milliseconds
+                period: System.Threading.Timeout.Infinite // Fire only once
+            );
+
+            ErrorLogger.LogDebug($"RecordingCoordinator: Stopping timeout timer started - timeout={STOPPING_TIMEOUT_SECONDS}s");
+        }
+
+        /// <summary>
+        /// Stop stopping timeout timer - safe to call multiple times
+        /// </summary>
+        private void StopStoppingTimeoutTimer()
+        {
+            var timer = stoppingTimeoutTimer;
+            stoppingTimeoutTimer = null; // Clear reference first to prevent double-dispose
+
+            if (timer != null)
+            {
+                try
+                {
+                    timer.Dispose();
+                    ErrorLogger.LogDebug("RecordingCoordinator: Stopping timeout timer stopped");
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already disposed, ignore
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("RecordingCoordinator: Error stopping timeout timer", ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Timeout callback for stuck Stopping state - recovers to Idle if AudioFileReady never fires
+        /// CRITICAL: Must never throw exceptions (runs on timer thread)
+        /// </summary>
+        private void StoppingTimeoutCallback(object? state)
+        {
+            try
+            {
+                // Check if still stuck in Stopping state
+                if (stateMachine.CurrentState == RecordingState.Stopping)
+                {
+                    ErrorLogger.LogWarning($"RecordingCoordinator: STOPPING TIMEOUT! AudioFileReady did not fire within {STOPPING_TIMEOUT_SECONDS}s");
+
+                    // Force transition back to Idle to recover
+                    stateMachine.TryTransition(RecordingState.Error);
+                    stateMachine.TryTransition(RecordingState.Idle);
+
+                    // Notify UI of error
+                    ErrorOccurred?.Invoke(this, "Recording failed - audio file was not ready in time.\n\nThis may be caused by:\n• Disk I/O failure\n• Antivirus blocking file operations\n• Insufficient disk space\n\nPlease try again.");
+
+                    ErrorLogger.LogMessage("RecordingCoordinator: Recovered from stuck Stopping state → Idle");
+                }
+
+                // Clean up timer
+                StopStoppingTimeoutTimer();
+            }
+            catch (Exception ex)
+            {
+                // CRITICAL: Timeout runs on timer thread - exceptions must not escape
+                ErrorLogger.LogError("RecordingCoordinator: Stopping timeout callback exception", ex);
+
+                // Try to stop timer even if error occurred
+                try { StopStoppingTimeoutTimer(); } catch { /* ignore */ }
+            }
+        }
+
+        /// <summary>
         /// Clean up audio file with retry logic (fire-and-forget to prevent UI blocking)
         /// </summary>
         private async Task CleanupAudioFileAsync(string audioFilePath)
@@ -614,6 +714,7 @@ namespace VoiceLite.Services
             }
 
             StopTranscriptionWatchdog();
+            StopStoppingTimeoutTimer();
 
             // WEEK1-DAY3: Reset state machine to Idle on disposal
             stateMachine.Reset();
