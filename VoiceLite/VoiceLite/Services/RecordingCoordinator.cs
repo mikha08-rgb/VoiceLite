@@ -335,13 +335,14 @@ namespace VoiceLite.Services
                     }
                 }
 
+                // WEEK1-DAY3-FIX: ALWAYS transition to Injecting state, even if no text
+                // This prevents invalid Transcribing → Complete transition
+                stateMachine.TryTransition(RecordingState.Injecting);
+
                 // Handle text injection on background thread if we have text
                 bool textInjected = false;
                 if (!string.IsNullOrWhiteSpace(transcription))
                 {
-                    // WEEK1-DAY3: Transition to Injecting state
-                    stateMachine.TryTransition(RecordingState.Injecting);
-
                     textInjector.AutoPaste = settings.AutoPaste;
 
                     if (settings.AutoPaste)
