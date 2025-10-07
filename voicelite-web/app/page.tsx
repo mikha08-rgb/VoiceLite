@@ -273,7 +273,7 @@ export default function Home() {
             <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
               <RippleButton
                 onClick={() => {
-                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.47/VoiceLite-Setup-1.0.47.exe';
+                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.54/VoiceLite-Setup-1.0.54.exe';
                 }}
                 className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
                 rippleColor="rgba(255, 255, 255, 0.4)"
@@ -316,7 +316,7 @@ export default function Home() {
             )}
 
             <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 px-6 py-6 text-sm leading-6 text-green-900 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50 dark:text-green-100">
-              <strong className="font-bold">✨ New in v1.0.47:</strong> Enhanced first-run experience with diagnostic checks, VC++ Runtime auto-installation, and improved error handling. Download verification with SHA256 hashes included.
+              <strong className="font-bold">✨ New in v1.0.54:</strong> Production-ready stability release! Eliminates audio buffer contamination, prevents zombie process leaks, and removes all UI thread blocking. Zero-lag transcription experience with comprehensive process tracking.
             </div>
           </aside>
         </div>
