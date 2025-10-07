@@ -277,11 +277,12 @@ jobs:
           ---
 
           ### Download Options
-          - **Full Installer** (Recommended): `VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe` (~543 MB)
-            - Includes Pro model (466MB) for better accuracy
+          - **Full Installer** (Recommended): `VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe` (~557 MB)
+            - Includes Pro model (466MB) + Tiny model (75MB) + VC++ Runtime (~14MB)
             - Best for users with good internet
-          - **Lite Installer** (Fast Download): `VoiceLite-Setup-Lite-${{ steps.version.outputs.VERSION }}.exe` (~75 MB)
-            - Includes Tiny model only
+            - Works offline after installation
+          - **Lite Installer** (Fast Download): `VoiceLite-Setup-Lite-${{ steps.version.outputs.VERSION }}.exe` (~94 MB)
+            - Includes Tiny model (75MB) + VC++ Runtime (~14MB)
             - Download Pro model later from Settings
             - Best for slow connections or limited bandwidth
 

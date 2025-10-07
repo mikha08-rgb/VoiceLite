@@ -531,22 +531,23 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.53 (current release)
+- **Desktop App**: v1.0.60 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.53 (Current Desktop Release)
-- **🏗️ Week 1, Day 3-4: RecordingStateMachine Implementation**
-  - Added 8-state state machine (Idle/Recording/Stopping/Transcribing/Injecting/Complete/Cancelled/Error)
-  - Refactored RecordingCoordinator: removed 3 bool flags, single source of truth
-  - Refactored MainWindow: removed local isRecording property (52 usages replaced)
-  - Deleted defensive sync checks (state machine guarantees consistency)
-  - Thread-safe state transitions with validation
-- **🐛 Bug Fix**: 80% reduction in state desync bugs ("stuck recording" eliminated)
-- **✅ Code Quality**: +857 insertions, -93 deletions (net +764 lines)
-- **✅ Tests**: 309/309 passing (28 new state machine tests, 100% coverage)
+### v1.0.60 (Current Desktop Release)
+- **📦 Bundled VC++ Runtime**: True offline installation
+  - VC++ Redistributable 2015-2022 (~14MB) now bundled in installer
+  - Works in Windows Sandbox and airgapped environments
+  - No internet required for fresh Windows installations
+  - Installer size: Full ~557MB (+14MB), Lite ~94MB (+19MB)
+- **📝 Documentation**: Updated release notes with accurate installer sizes
+- **🧹 Repository Hygiene**: Added .gitignore entries for build artifacts
+- **✅ Production Ready**: Zero breaking changes, fully backward compatible
 
+
+### v1.0.53
 ### v1.0.52
 - **🚀 Week 1, Day 2: Fix App Hang on Close** (5-30s → instant)
   - Replaced spin-wait loop with ManualResetEventSlim signaling
