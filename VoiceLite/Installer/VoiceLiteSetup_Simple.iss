@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.53: RecordingStateMachine - 80% reduction in state desync bugs
+; v1.0.60: Bundled VC++ Runtime - true offline installation
 ; Windows 10/11 (64-bit) compatible - detects VC++ Runtime if needed
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.53
+AppVersion=1.0.60
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.53
+OutputBaseFilename=VoiceLite-Setup-1.0.60
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -48,8 +48,7 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*.dll";
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 ; VC++ Redistributable installer (bundled for offline installation)
-; OPTIONAL: Commented out - user downloads from Microsoft if needed (detected in InitializeSetup)
-; Source: "..\dependencies\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\dependencies\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; Antivirus exclusion PowerShell script
 Source: "..\Installer\Add-VoiceLite-Exclusion.ps1"; DestDir: "{app}"; Flags: ignoreversion
