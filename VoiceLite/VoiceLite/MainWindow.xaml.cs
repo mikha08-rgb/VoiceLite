@@ -962,6 +962,12 @@ namespace VoiceLite
         {
             ErrorLogger.LogDebug($"StartRecording: Entry - // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}");
 
+            // v1.0.57 CRITICAL FIX: Wrap entire method in lock to prevent race condition
+            // BUG: 3 simultaneous StartRecording() calls were bypassing all guards (seen in logs)
+            // Root cause: Guards checked state outside lock, so all 3 threads saw IsRecording=false
+            lock (recordingLock)
+            {
+
             // CRITICAL FIX: Validate AudioRecorder is not already recording (prevents race conditions)
             var recorder = audioRecorder;
             if (recorder == null)
@@ -1028,6 +1034,7 @@ namespace VoiceLite
                 // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - IsRecording = false;
                 UpdateStatus("Failed to start recording", Brushes.Red);
             }
+            } // v1.0.57: Close lock scope
         }
 
         private void StopRecording(bool cancel = false)
