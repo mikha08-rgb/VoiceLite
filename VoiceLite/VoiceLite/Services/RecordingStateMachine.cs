@@ -171,11 +171,17 @@ namespace VoiceLite.Services
                 // Recording → Cancelled (user cancelled during recording)
                 (RecordingState.Recording, RecordingState.Cancelled) => true,
 
+                // Recording → Error (error during recording - mic disconnect, etc.)
+                (RecordingState.Recording, RecordingState.Error) => true,
+
                 // Stopping → Transcribing (audio file ready, starting transcription)
                 (RecordingState.Stopping, RecordingState.Transcribing) => true,
 
                 // Stopping → Cancelled (user cancelled during stop)
                 (RecordingState.Stopping, RecordingState.Cancelled) => true,
+
+                // Stopping → Error (error during audio finalization or file save)
+                (RecordingState.Stopping, RecordingState.Error) => true,
 
                 // Transcribing → Injecting (transcription complete, injecting text)
                 (RecordingState.Transcribing, RecordingState.Injecting) => true,
