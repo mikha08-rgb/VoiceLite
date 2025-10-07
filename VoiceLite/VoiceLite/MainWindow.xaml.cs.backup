@@ -424,14 +424,6 @@ namespace VoiceLite
         /// </summary>
         private async Task SaveSettingsInternalAsync()
         {
-            // v1.0.55 BUG FIX: Capture UI state on UI thread BEFORE going async
-            // Prevents "The calling thread cannot access this object" errors
-            bool minimizeToTray = false;
-            await Dispatcher.InvokeAsync(() =>
-            {
-                minimizeToTray = MinimizeCheckBox.IsChecked == true;
-            });
-
             // TIER 1.4: Use SemaphoreSlim instead of lock for async compatibility
             await saveSettingsSemaphore.WaitAsync();
             try
@@ -441,7 +433,7 @@ namespace VoiceLite
                     // Ensure AppData directory exists
                     EnsureAppDataDirectoryExists();
 
-                    settings.MinimizeToTray = minimizeToTray;
+                    settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
                     string settingsPath = GetSettingsPath();
 
                     // TIER 1.4: Serialize on background thread to avoid UI blocking
