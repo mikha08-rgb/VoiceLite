@@ -19,6 +19,10 @@ namespace VoiceLite.Services
         private readonly InputSimulator inputSimulator;
         private readonly Settings settings;
 
+        // QUICK WIN 5: Track clipboard restoration failures for data-driven decision making
+        private static int clipboardRestoreFailures = 0;
+        private static int clipboardRestoreSuccesses = 0;
+
         public TextInjector(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -263,13 +267,14 @@ namespace VoiceLite.Services
                     {
                         try
                         {
-                            // Increased delay from 150ms → 300ms for better reliability
-                            // This gives paste operation more time to complete on slow systems
-                            await Task.Delay(300);
+                            // QUICK WIN 2: Reduced delay from 300ms → 50ms
+                            // Paste completes in <10ms on modern systems, 300ms created 5x larger race window
+                            // This reduces chance of external clipboard modification and speeds up completion by 250ms
+                            await Task.Delay(50);
 
                             // CRITICAL FIX: Check if clipboard was modified by user before restoring
                             // Only restore if clipboard still contains our transcription text
-                            // This prevents overwriting user's new clipboard content during the 300ms window
+                            // This prevents overwriting user's new clipboard content during the 50ms window
                             string? currentClipboard = null;
                             try
                             {
@@ -296,12 +301,14 @@ namespace VoiceLite.Services
                             if (clipboardUnchanged)
                             {
                                 // Safe to restore - clipboard hasn't been modified by user
+                                bool restoreSucceeded = false;
                                 for (int attempt = 0; attempt < 3; attempt++)
                                 {
                                     try
                                     {
                                         SetClipboardText(clipboardToRestore);
                                         ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
+                                        restoreSucceeded = true;
                                         break;
                                     }
                                     catch (Exception ex)
@@ -311,6 +318,21 @@ namespace VoiceLite.Services
                                             await Task.Delay(50);
                                         else
                                             ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                                    }
+                                }
+
+                                // QUICK WIN 5: Track restoration success/failure for metrics
+                                if (restoreSucceeded)
+                                {
+                                    System.Threading.Interlocked.Increment(ref clipboardRestoreSuccesses);
+                                }
+                                else
+                                {
+                                    int failures = System.Threading.Interlocked.Increment(ref clipboardRestoreFailures);
+                                    // Log every 10 failures to track problem severity
+                                    if (failures % 10 == 0)
+                                    {
+                                        ErrorLogger.LogWarning($"QUICK WIN 5: Clipboard restoration has failed {failures} times (successes: {clipboardRestoreSuccesses})");
                                     }
                                 }
                             }
