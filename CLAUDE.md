@@ -531,12 +531,24 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.60 (current release)
+- **Desktop App**: v1.0.61 (current release)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Changelog Highlights
 
-### v1.0.60 (Current Desktop Release)
+### v1.0.61 (Current Desktop Release)
+- **🔧 CRITICAL FIX**: VC++ Runtime installation timing issue resolved
+  - Root cause: `InstallVCRuntimeIfNeeded()` called at `ssInstall` (before files copied)
+  - Fix: Moved VC++ installation to `[Run]` section (after files copied)
+  - Impact: Installer now works in Windows Sandbox and airgapped environments
+- **✅ Both Installers Fixed**: Applied same fix to Full and Lite installers
+- **📦 File Changes**: 
+  - VoiceLiteSetup_Simple.iss: Added [Run] entry, removed ssInstall call, fixed path typo
+  - VoiceLiteSetup_Lite.iss: Applied same fix (was still broken on v1.0.47)
+- **🎯 Testing**: Works in clean Windows environments without internet
+- **⚠️ Zero Breaking Changes**: Fully backward compatible with v1.0.60
+
+### v1.0.60
 - **📦 Bundled VC++ Runtime**: True offline installation
   - VC++ Redistributable 2015-2022 (~14MB) now bundled in installer
   - Works in Windows Sandbox and airgapped environments
