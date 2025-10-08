@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.60: Bundled VC++ Runtime - true offline installation
+; v1.0.61: Fixed VC++ Runtime installation timing - moved to [Run] section
 ; Windows 10/11 (64-bit) compatible - detects VC++ Runtime if needed
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.60
+AppVersion=1.0.61
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.60
+OutputBaseFilename=VoiceLite-Setup-1.0.61
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -59,6 +59,9 @@ Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktop
 Name: "{autodesktop}\Fix Antivirus Issues"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\Add-VoiceLite-Exclusion.ps1"""; Comment: "Add VoiceLite to Windows Defender exclusions"
 
 [Run]
+; Install VC++ Runtime BEFORE running VoiceLite (only if not already installed)
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Check: not IsVCRuntimeInstalled; Flags: waituntilterminated
+; Launch VoiceLite after installation
 Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
@@ -323,11 +326,8 @@ var
   AppDataDir: String;
   LogsDir: String;
 begin
-  if CurStep = ssInstall then
-  begin
-    // Install VC++ Runtime BEFORE installing VoiceLite files
-    InstallVCRuntimeIfNeeded;
-  end;
+  // [Run] section now handles VC++ Runtime installation automatically
+
 
   if CurStep = ssPostInstall then
   begin
