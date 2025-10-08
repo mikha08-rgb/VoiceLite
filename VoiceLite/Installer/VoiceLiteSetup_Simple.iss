@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.61: Fixed VC++ Runtime installation timing - moved to [Run] section
+; v1.0.62: Fixed VC++ Runtime installation timing - moved to [Run] section
 ; Windows 10/11 (64-bit) compatible - detects VC++ Runtime if needed
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.61
+AppVersion=1.0.62
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.61
+OutputBaseFilename=VoiceLite-Setup-1.0.62
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -102,108 +102,29 @@ begin
   if not IsVCRuntimeInstalled then
   begin
     MsgBox('VoiceLite requires Microsoft Visual C++ Runtime 2015-2022.' + #13#10#13#10 +
-           'The installer will now install this required component.' + #13#10 +
+           'This required component will be installed automatically during setup.' + #13#10 +
            'Note: A system restart may be required after installation.',
            mbInformation, MB_OK);
   end;
 end;
 
-procedure InstallVCRuntimeIfNeeded;
+// VC++ Runtime installation is now handled by [Run] section (lines 62-63)
+// This ensures vc_redist.x64.exe exists in {tmp} before installation attempts
+// Old InstallVCRuntimeIfNeeded() function removed in v1.0.62 to eliminate dead code
+
+function IsRestartPending: Boolean;
 var
-  ResultCode: Integer;
-  VCInstaller: String;
-  RetryCount: Integer;
-  Success: Boolean;
+  PendingFileRenameOps: String;
 begin
-  // Skip if already installed
-  if IsVCRuntimeInstalled then
+  Result := False;
+
+  // Check for pending file rename operations (common after VC++ install)
+  if RegQueryMultiStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager',
+                                'PendingFileRenameOperations', PendingFileRenameOps) then
   begin
-    Log('VC++ Runtime already installed, skipping');
-    Exit;
-  end;
-
-  Log('VC++ Runtime not detected, installing bundled version...');
-
-  VCInstaller := ExpandConstant('{tmp}\vc_redist.x64.exe');
-
-  if not FileExists(VCInstaller) then
-  begin
-    MsgBox('CRITICAL ERROR: Visual C++ Runtime installer is missing from setup package.' + #13#10#13#10 +
-           'VoiceLite cannot run without this component.' + #13#10#13#10 +
-           'Please download the complete installer from:' + #13#10 +
-           'https://github.com/mikha08-rgb/VoiceLite/releases',
-           mbCriticalError, MB_OK);
-    // Block installation
-    WizardForm.Close;
-    Exit;
-  end;
-
-  // Retry up to 2 times
-  RetryCount := 0;
-  Success := False;
-
-  while (RetryCount < 2) and (not Success) do
-  begin
-    // Install silently without restart
-    if Exec(VCInstaller, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    begin
-      if (ResultCode = 0) or (ResultCode = 3010) then
-      begin
-        Log('VC++ Runtime installed successfully (exit code: ' + IntToStr(ResultCode) + ')');
-        Success := True;
-
-        if ResultCode = 3010 then
-        begin
-          MsgBox('Microsoft Visual C++ Runtime installed successfully.' + #13#10#13#10 +
-                 'IMPORTANT: A system restart is REQUIRED for VoiceLite to work properly.' + #13#10#13#10 +
-                 'Please restart your computer after installation completes.',
-                 mbInformation, MB_OK);
-        end;
-      end
-      else if ResultCode = 1638 then
-      begin
-        Log('VC++ Runtime already installed (detected by installer)');
-        Success := True;
-      end
-      else
-      begin
-        Inc(RetryCount);
-        if RetryCount < 2 then
-        begin
-          if MsgBox('Visual C++ Runtime installation failed (error code: ' + IntToStr(ResultCode) + ')' + #13#10#13#10 +
-                    'Would you like to retry?',
-                    mbError, MB_YESNO) = IDNO then
-          begin
-            Break;
-          end;
-        end;
-      end;
-    end
-    else
-    begin
-      Inc(RetryCount);
-      if RetryCount < 2 then
-      begin
-        if MsgBox('Failed to run Visual C++ Runtime installer.' + #13#10#13#10 +
-                  'Would you like to retry?',
-                  mbError, MB_YESNO) = IDNO then
-        begin
-          Break;
-        end;
-      end;
-    end;
-  end;
-
-  // If installation failed after retries, block VoiceLite installation
-  if not Success and not IsVCRuntimeInstalled then
-  begin
-    MsgBox('INSTALLATION BLOCKED: Visual C++ Runtime installation failed.' + #13#10#13#10 +
-           'VoiceLite cannot function without this component.' + #13#10#13#10 +
-           'Please install it manually from:' + #13#10 +
-           'https://aka.ms/vs/17/release/vc_redist.x64.exe' + #13#10#13#10 +
-           'Then restart your computer and run this installer again.',
-           mbCriticalError, MB_OK);
-    WizardForm.Close;
+    Result := (Length(PendingFileRenameOps) > 0);
+    if Result then
+      Log('Restart pending: PendingFileRenameOperations detected');
   end;
 end;
 
@@ -370,6 +291,16 @@ begin
     end
     else
     begin
+      // Check if system restart is pending after VC++ installation
+      if IsRestartPending then
+      begin
+        MsgBox('IMPORTANT: A system restart is required.' + #13#10#13#10 +
+               'Visual C++ Runtime was installed successfully, but Windows needs to restart.' + #13#10#13#10 +
+               'Please RESTART your computer before launching VoiceLite.' + #13#10#13#10 +
+               'If you launch VoiceLite without restarting, it may fail with "missing DLL" errors.',
+               mbInformation, MB_OK);
+      end;
+
       // VC++ verified - now run whisper.exe smoke test
       if not RunWhisperSmokeTest then
       begin
