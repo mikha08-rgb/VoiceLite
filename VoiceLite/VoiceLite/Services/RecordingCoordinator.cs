@@ -79,10 +79,32 @@ namespace VoiceLite.Services
             lock (recordingLock)
             {
                 // WEEK1-DAY3: Use state machine instead of bool flag
+                // CRITICAL FIX: Add force-reset recovery when state machine gets stuck
                 if (!stateMachine.TryTransition(RecordingState.Recording))
                 {
-                    ErrorLogger.LogWarning($"RecordingCoordinator.StartRecording: Cannot transition to Recording from {stateMachine.CurrentState}");
-                    return;
+                    ErrorLogger.LogWarning($"RecordingCoordinator.StartRecording: REJECTED - Cannot transition to Recording from {stateMachine.CurrentState}");
+
+                    // Force recovery if stuck in non-Idle state (prevents permanent freeze)
+                    if (stateMachine.CurrentState != RecordingState.Idle)
+                    {
+                        ErrorLogger.LogWarning($"RecordingCoordinator: Force-resetting stuck state machine from {stateMachine.CurrentState} to Idle");
+                        stateMachine.Reset(); // Force back to Idle
+
+                        // Retry transition after reset
+                        if (!stateMachine.TryTransition(RecordingState.Recording))
+                        {
+                            ErrorLogger.LogWarning("RecordingCoordinator: Force-reset FAILED - still cannot start recording");
+                            ErrorOccurred?.Invoke(this, "Recording failed to start. Please restart VoiceLite.");
+                            return;
+                        }
+                        ErrorLogger.LogMessage("RecordingCoordinator: Force-reset SUCCEEDED - recording starting");
+                    }
+                    else
+                    {
+                        // Already in Idle state, this is a genuine rejection (shouldn't happen)
+                        ErrorLogger.LogWarning("RecordingCoordinator: Cannot start recording from Idle state - this should not happen!");
+                        return;
+                    }
                 }
 
                 try
@@ -314,9 +336,38 @@ namespace VoiceLite.Services
 
             try
             {
-                // Run transcription on background thread
-                var transcription = await Task.Run(async () =>
-                    await whisperService.TranscribeAsync(workingAudioPath).ConfigureAwait(false)).ConfigureAwait(false);
+                // RELIABILITY FIX: Retry transcription up to 3 times on failure
+                string? transcription = null;
+                Exception? lastException = null;
+                int maxRetries = 3;
+
+                for (int attempt = 1; attempt <= maxRetries; attempt++)
+                {
+                    try
+                    {
+                        // Run transcription on background thread
+                        transcription = await Task.Run(async () =>
+                            await whisperService.TranscribeAsync(workingAudioPath).ConfigureAwait(false)).ConfigureAwait(false);
+
+                        // Success - break retry loop
+                        break;
+                    }
+                    catch (Exception retryEx) when (attempt < maxRetries)
+                    {
+                        lastException = retryEx;
+                        ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed: {retryEx.Message}. Retrying...");
+
+                        // Wait before retrying (exponential backoff: 500ms, 1000ms)
+                        await Task.Delay(500 * attempt).ConfigureAwait(false);
+                    }
+                }
+
+                // If all retries failed, throw the last exception
+                if (transcription == null && lastException != null)
+                {
+                    ErrorLogger.LogMessage($"All {maxRetries} transcription attempts failed");
+                    throw lastException;
+                }
 
                 ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
 
@@ -700,12 +751,13 @@ namespace VoiceLite.Services
 
             // WEEK1-DAY2: Wait for transcription to complete using ManualResetEventSlim
             // Old approach: Spin-wait loop (100% CPU for 100ms, then 50ms sleeps up to 30s)
-            // New approach: Efficient signaling with 5s timeout
+            // New approach: Efficient signaling with 30s timeout
+            // CRITICAL FIX: Increased from 5s to 30s - process mode fallback + long audio can take 10-15s
             try
             {
-                if (!transcriptionComplete.Wait(5000)) // Wait max 5 seconds
+                if (!transcriptionComplete.Wait(30000)) // Wait max 30 seconds (matches original timeout)
                 {
-                    ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 5s timeout, forcing disposal");
+                    ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
                 }
             }
             catch (ObjectDisposedException)
