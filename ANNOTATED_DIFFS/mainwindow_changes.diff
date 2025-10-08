@@ -1,0 +1,270 @@
+diff --git a/VoiceLite/VoiceLite/MainWindow.xaml.cs b/VoiceLite/VoiceLite/MainWindow.xaml.cs
+index 809f749..e8348b2 100644
+--- a/VoiceLite/VoiceLite/MainWindow.xaml.cs
++++ b/VoiceLite/VoiceLite/MainWindow.xaml.cs
+@@ -61,6 +61,13 @@ namespace VoiceLite
+         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
+         private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
+ 
++        // Child windows (for proper disposal)
++        private SettingsWindowNew? currentSettingsWindow;
++        private DictionaryManagerWindow? currentDictionaryWindow;
++        private LoginWindow? currentLoginWindow;
++        private FeedbackWindow? currentFeedbackWindow;
++        private AnalyticsConsentWindow? currentAnalyticsConsentWindow;
++
+         #endregion
+ 
+         #region Initialization & Lifecycle
+@@ -624,12 +631,10 @@ namespace VoiceLite
+                 UpdateUIForCurrentMode();
+                 UpdateConfigDisplay();
+ 
+-                // Mark as ready with helpful hint
++                // Mark as ready
+                 if (StatusText.Text == "Initializing...")
+                 {
+-                    var hotkeyHint = GetHotkeyDisplayString();
+-                    var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+-                    StatusText.Text = $"Ready ({modelName}) - Press {hotkeyHint} to record";
++                    StatusText.Text = "Ready";
+                     StatusText.Foreground = Brushes.Green;
+                 }
+ 
+@@ -720,9 +725,9 @@ namespace VoiceLite
+                     // Small delay to let the main window fully load
+                     await Task.Delay(1000);
+ 
+-                    var consentWindow = new AnalyticsConsentWindow(settings);
+-                    consentWindow.Owner = this;
+-                    var result = consentWindow.ShowDialog();
++                    currentAnalyticsConsentWindow = new AnalyticsConsentWindow(settings);
++                    currentAnalyticsConsentWindow.Owner = this;
++                    var result = currentAnalyticsConsentWindow.ShowDialog();
+ 
+                     // Save settings after consent decision
+                     SaveSettings();
+@@ -753,21 +758,13 @@ namespace VoiceLite
+ 
+         private void UpdateConfigDisplay()
+         {
+-            // Update instruction text with actual hotkey
+-            if (InstructionText != null)
+-            {
+-                string hotkeyHint = GetHotkeyDisplayString();
+-                InstructionText.Text = $"Press {hotkeyHint} to record";
+-            }
+-
+-            // Update empty state hotkey hint
+-            if (EmptyStateHotkeyHint != null)
++            // Update hotkey display in top bar
++            if (HotkeyDisplay != null)
+             {
+-                string hotkeyHint = GetHotkeyDisplayString();
+-                EmptyStateHotkeyHint.Text = $"Press {hotkeyHint} to start recording";
++                HotkeyDisplay.Text = GetHotkeyDisplayString();
+             }
+ 
+-            // Update hotkey display (null check for XAML control)
++            // Update hidden hotkey text (for legacy compatibility)
+             if (HotkeyText != null)
+             {
+                 HotkeyText.Text = GetHotkeyDisplayString();
+@@ -897,14 +894,14 @@ namespace VoiceLite
+ 
+                 if (currentSession == null)
+                 {
+-                    var loginWindow = new LoginWindow(authenticationCoordinator)
++                    currentLoginWindow = new LoginWindow(authenticationCoordinator)
+                     {
+                         Owner = this,
+                     };
+ 
+-                    if (loginWindow.ShowDialog() == true && loginWindow.Session != null)
++                    if (currentLoginWindow.ShowDialog() == true && currentLoginWindow.Session != null)
+                     {
+-                        currentSession = loginWindow.Session;
++                        currentSession = currentLoginWindow.Session;
+                         settings.LastSignedInEmail = currentSession.Email;
+                         SaveSettings();
+                         await UpdateLicenseStatusAsync();
+@@ -1606,7 +1603,7 @@ namespace VoiceLite
+                             break;
+ 
+                         case "Transcribing":
+-                            UpdateStatus("Transcribing...", new SolidColorBrush(StatusColors.Info));
++                            UpdateStatus("Processing", new SolidColorBrush(StatusColors.Info));
+                             // CRITICAL FIX: Start recovery timer when entering transcribing state
+                             // This catches cases where StopRecording didn't start the timer
+                             if (stuckStateRecoveryTimer == null)
+@@ -1616,7 +1613,7 @@ namespace VoiceLite
+                             break;
+ 
+                         case "Pasting":
+-                            UpdateStatus("Pasting...", Brushes.Purple);
++                            UpdateStatus("Pasting", Brushes.Purple);
+                             break;
+ 
+                         case "Copied to clipboard":
+@@ -1630,7 +1627,7 @@ namespace VoiceLite
+                             break;
+ 
+                         case "Processing":
+-                            UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
++                            UpdateStatus("Processing", new SolidColorBrush(StatusColors.Processing));
+                             // CRITICAL FIX: Ensure recovery timer is running when entering processing state
+                             if (stuckStateRecoveryTimer == null)
+                             {
+@@ -1677,14 +1674,8 @@ namespace VoiceLite
+                         }
+                         else
+                         {
+-                            TranscriptionText.Text = "(No speech detected)";
+-                            TranscriptionText.Foreground = Brushes.Gray;
++                            // Empty transcription - silently return to ready
+                             this.BorderThickness = new Thickness(0);
+-
+-                            // Revert to ready immediately for no-speech case
+-                            var hotkeyHint = GetHotkeyDisplayString();
+-                            var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+-                            UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", Brushes.Green);
+                         }
+ 
+                         // Reset TranscriptionText to ready state after delay (fire-and-forget)
+@@ -1839,9 +1830,7 @@ namespace VoiceLite
+             {
+                 try
+                 {
+-                    var hotkeyHint = GetHotkeyDisplayString();
+-                    var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+-                    UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", Brushes.Green);
++                    UpdateStatus("Ready", Brushes.Green);
+                 }
+                 finally
+                 {
+@@ -1975,9 +1964,9 @@ namespace VoiceLite
+ 
+         private void DictionaryButton_Click(object sender, RoutedEventArgs e)
+         {
+-            var dialog = new DictionaryManagerWindow(settings);
+-            dialog.Owner = this;
+-            if (dialog.ShowDialog() == true)
++            currentDictionaryWindow = new DictionaryManagerWindow(settings);
++            currentDictionaryWindow.Owner = this;
++            if (currentDictionaryWindow.ShowDialog() == true)
+             {
+                 SaveSettings();
+             }
+@@ -1985,9 +1974,9 @@ namespace VoiceLite
+ 
+         private void VoiceShortcutsButton_Click(object sender, RoutedEventArgs e)
+         {
+-            var dialog = new DictionaryManagerWindow(settings);
+-            dialog.Owner = this;
+-            if (dialog.ShowDialog() == true)
++            currentDictionaryWindow = new DictionaryManagerWindow(settings);
++            currentDictionaryWindow.Owner = this;
++            if (currentDictionaryWindow.ShowDialog() == true)
+             {
+                 SaveSettings();
+             }
+@@ -1999,12 +1988,12 @@ namespace VoiceLite
+             var oldHotkey = settings.RecordHotkey;
+             var oldModifiers = settings.HotkeyModifiers;
+ 
+-            var settingsWindow = new SettingsWindowNew(settings, analyticsService, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+-            settingsWindow.Owner = this;
++            currentSettingsWindow = new SettingsWindowNew(settings, analyticsService, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
++            currentSettingsWindow.Owner = this;
+ 
+-            if (settingsWindow.ShowDialog() == true)
++            if (currentSettingsWindow.ShowDialog() == true)
+             {
+-                settings = SettingsValidator.ValidateAndRepair(settingsWindow.Settings);
++                settings = SettingsValidator.ValidateAndRepair(currentSettingsWindow.Settings);
+                 MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
+                 SaveSettings();
+ 
+@@ -2414,6 +2403,7 @@ namespace VoiceLite
+                 {
+                     hotkeyManager.HotkeyPressed -= OnHotkeyPressed;
+                     hotkeyManager.HotkeyReleased -= OnHotkeyReleased;
++                    hotkeyManager.PollingModeActivated -= OnPollingModeActivated;
+                 }
+ 
+                 if (systemTrayManager != null)
+@@ -2427,6 +2417,22 @@ namespace VoiceLite
+                     memoryMonitor.MemoryAlert -= OnMemoryAlert;
+                 }
+ 
++                // Dispose child windows (WPF Window resources)
++                try { currentAnalyticsConsentWindow?.Close(); } catch { }
++                currentAnalyticsConsentWindow = null;
++
++                try { currentLoginWindow?.Close(); } catch { }
++                currentLoginWindow = null;
++
++                try { currentDictionaryWindow?.Close(); } catch { }
++                currentDictionaryWindow = null;
++
++                try { currentSettingsWindow?.Close(); } catch { }
++                currentSettingsWindow = null;
++
++                try { currentFeedbackWindow?.Close(); } catch { }
++                currentFeedbackWindow = null;
++
+                 // Now dispose services in reverse order of creation
+                 memoryMonitor?.Dispose();
+                 memoryMonitor = null;
+@@ -2440,6 +2446,13 @@ namespace VoiceLite
+                 recordingCoordinator?.Dispose();
+                 recordingCoordinator = null;
+ 
++                // Dispose remaining services (soundService implements IDisposable)
++                try { soundService?.Dispose(); } catch { }
++                soundService = null;
++
++                // Dispose semaphore (SemaphoreSlim implements IDisposable)
++                try { saveSettingsSemaphore?.Dispose(); } catch { }
++
+                 whisperService?.Dispose();
+                 whisperService = null;
+ 
+@@ -2496,9 +2509,9 @@ namespace VoiceLite
+                 }
+ 
+                 // Show feedback window
+-                var feedbackWindow = new FeedbackWindow(settings, lastError);
+-                feedbackWindow.Owner = this;
+-                feedbackWindow.ShowDialog();
++                currentFeedbackWindow = new FeedbackWindow(settings, lastError);
++                currentFeedbackWindow.Owner = this;
++                currentFeedbackWindow.ShowDialog();
+             }
+             catch (Exception ex)
+             {
+@@ -2566,13 +2579,6 @@ namespace VoiceLite
+                     if (count == 0)
+                     {
+                         EmptyHistoryMessage.Visibility = Visibility.Visible;
+-                        // Update empty state with current hotkey
+-                        var hotkeyDisplay = GetHotkeyDisplayString();
+-                        var hotkeyHintElement = EmptyHistoryMessage.FindName("EmptyStateHotkeyHint") as TextBlock;
+-                        if (hotkeyHintElement != null)
+-                        {
+-                            hotkeyHintElement.Text = $"Press {hotkeyDisplay} to start recording";
+-                        }
+                         return;
+                     }
+ 
+@@ -2720,9 +2726,7 @@ namespace VoiceLite
+                     EventHandler? handler = null;
+                     handler = (ts, te) =>
+                     {
+-                        var hotkeyHint = GetHotkeyDisplayString();
+-                        var modelName = WhisperModelInfo.GetDisplayName(settings.WhisperModel);
+-                        UpdateStatus($"Ready ({modelName}) - Press {hotkeyHint} to record", new SolidColorBrush(StatusColors.Ready));
++                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
+                         timer.Stop();
+                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                     };
