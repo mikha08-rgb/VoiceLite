@@ -28,6 +28,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "antivirusfix"; Description: "Create 'Fix Antivirus Issues' desktop shortcut"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 ; Main application files
@@ -56,7 +57,7 @@ Source: "..\Installer\Add-VoiceLite-Exclusion.ps1"; DestDir: "{app}"; Flags: ign
 [Icons]
 Name: "{autoprograms}\VoiceLite"; Filename: "{app}\VoiceLite.exe"
 Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktopicon
-Name: "{autodesktop}\Fix Antivirus Issues"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\Add-VoiceLite-Exclusion.ps1"""; Comment: "Add VoiceLite to Windows Defender exclusions"
+Name: "{autodesktop}\Fix Antivirus Issues"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\Add-VoiceLite-Exclusion.ps1"""; Comment: "Add VoiceLite to Windows Defender exclusions"; Tasks: antivirusfix
 
 [Run]
 ; Install VC++ Runtime BEFORE running VoiceLite (only if not already installed)
@@ -69,6 +70,19 @@ Type: filesandordirs; Name: "{app}\temp"
 Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 [Code]
+const
+  // File size constants (in bytes)
+  MB = 1048576; // 1 MB in bytes
+
+  // Model file size thresholds (in MB)
+  SMALL_MODEL_MIN_MB = 400;
+  SMALL_MODEL_MAX_MB = 550;
+  SMALL_MODEL_EXPECTED_MB = 466;
+
+  TINY_MODEL_MIN_MB = 60;
+  TINY_MODEL_MAX_MB = 90;
+  TINY_MODEL_EXPECTED_MB = 75;
+
 // Check for Visual C++ Runtime 2015-2022 (Windows 10/11 compatible)
 function IsVCRuntimeInstalled: Boolean;
 var
@@ -115,16 +129,44 @@ end;
 function IsRestartPending: Boolean;
 var
   PendingFileRenameOps: String;
+  UpdateExeVolatile: Cardinal;
 begin
   Result := False;
 
-  // Check for pending file rename operations (common after VC++ install)
+  // Check 1: Pending file rename operations (VC++ Runtime common cause)
   if RegQueryMultiStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager',
                                 'PendingFileRenameOperations', PendingFileRenameOps) then
   begin
-    Result := (Length(PendingFileRenameOps) > 0);
-    if Result then
+    if Length(PendingFileRenameOps) > 0 then
+    begin
       Log('Restart pending: PendingFileRenameOperations detected');
+      Result := True;
+      Exit;
+    end;
+  end;
+
+  // Check 2: Component Based Servicing (Windows Updates)
+  if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') then
+  begin
+    Log('Restart pending: CBS RebootPending key exists');
+    Result := True;
+    Exit;
+  end;
+
+  // Check 3: Windows Update Auto Update
+  if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') then
+  begin
+    Log('Restart pending: WindowsUpdate RebootRequired key exists');
+    Result := True;
+    Exit;
+  end;
+
+  // Check 4: Session Manager PendingFileRenameOperations2 (Windows 10+)
+  if RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations2') then
+  begin
+    Log('Restart pending: PendingFileRenameOperations2 key exists');
+    Result := True;
+    Exit;
   end;
 end;
 
@@ -242,6 +284,71 @@ begin
   end;
 end;
 
+function InstallVCRuntimeWithRetry: Boolean;
+var
+  ResultCode: Integer;
+  Attempt: Integer;
+  MaxAttempts: Integer;
+begin
+  MaxAttempts := 3;
+  Result := False;
+
+  for Attempt := 1 to MaxAttempts do
+  begin
+    Log('VC++ Runtime installation attempt ' + IntToStr(Attempt) + '/' + IntToStr(MaxAttempts));
+
+    if Exec(ExpandConstant('{tmp}\vc_redist.x64.exe'), '/install /quiet /norestart',
+            '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      Log('VC++ Runtime installer exit code: ' + IntToStr(ResultCode));
+
+      if ResultCode = 0 then
+      begin
+        // Success
+        Log('VC++ Runtime installed successfully');
+        Result := True;
+        Break;
+      end
+      else if ResultCode = 1638 then
+      begin
+        // Already installed or newer version present
+        Log('VC++ Runtime already installed (exit code 1638)');
+        Result := True;
+        Break;
+      end
+      else if ResultCode = 3010 then
+      begin
+        // Success but restart required
+        Log('VC++ Runtime installed successfully (restart required, exit code 3010)');
+        Result := True;
+        Break;
+      end
+      else
+      begin
+        Log('VC++ Runtime installation failed with exit code: ' + IntToStr(ResultCode));
+        if Attempt < MaxAttempts then
+        begin
+          Log('Waiting 2 seconds before retry...');
+          Sleep(2000); // Wait 2 seconds before retry
+        end;
+      end;
+    end
+    else
+    begin
+      Log('VC++ Runtime installer failed to execute');
+      if Attempt < MaxAttempts then
+      begin
+        Sleep(2000);
+      end;
+    end;
+  end;
+
+  if not Result then
+  begin
+    Log('VC++ Runtime installation failed after ' + IntToStr(MaxAttempts) + ' attempts');
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   AppDataDir: String;
@@ -304,16 +411,24 @@ begin
       // VC++ verified - now run whisper.exe smoke test
       if not RunWhisperSmokeTest then
       begin
-        MsgBox('CRITICAL: Whisper AI engine failed verification test.' + #13#10#13#10 +
-               'This may be caused by:' + #13#10 +
-               '• Missing DLL files (corrupted download)' + #13#10 +
-               '• Antivirus blocking whisper.exe' + #13#10 +
-               '• Incompatible system configuration' + #13#10#13#10 +
-               'SOLUTIONS:' + #13#10 +
-               '1. Run the desktop shortcut "Fix Antivirus Issues"' + #13#10 +
-               '2. Restart your computer' + #13#10 +
-               '3. Re-download installer and verify SHA256 hash',
-               mbCriticalError, MB_OK);
+        if MsgBox('CRITICAL: Whisper AI engine failed verification test.' + #13#10#13#10 +
+                   'VoiceLite cannot function without this component!' + #13#10#13#10 +
+                   'This may be caused by:' + #13#10 +
+                   '• Missing DLL files (corrupted download)' + #13#10 +
+                   '• Antivirus blocking whisper.exe' + #13#10 +
+                   '• Incompatible system configuration' + #13#10#13#10 +
+                   'Do you want to ABORT the installation and try again?' + #13#10 +
+                   '(Click YES to abort, NO to continue anyway)',
+                   mbCriticalError, MB_YESNO) = IDYES then
+        begin
+          Log('User chose to abort installation due to Whisper smoke test failure');
+          // Abort triggers automatic rollback
+          Abort;
+        end
+        else
+        begin
+          Log('User chose to continue despite Whisper smoke test failure');
+        end;
       end;
     end;
   end;

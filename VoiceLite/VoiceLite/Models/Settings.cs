@@ -122,7 +122,7 @@ namespace VoiceLite.Models
 
         private RecordMode _mode = RecordMode.PushToTalk;
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
-        private Key _recordHotkey = Key.LeftAlt;
+        private Key _recordHotkey = Key.LeftAlt; // Default hotkey for recording
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
         private string _whisperModel = "ggml-small.bin"; // Free tier default (temporary promotion for growth)
         private int _beamSize = 1; // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (greedy decoding)
