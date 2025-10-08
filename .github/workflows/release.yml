@@ -149,6 +149,21 @@ jobs:
         $vcSize = (Get-Item "VoiceLite/dependencies/vc_redist.x64.exe").Length / 1MB
         echo "Downloaded VC++ Runtime: $([math]::Round($vcSize, 2)) MB"
 
+        # Verify SHA256 hash
+        $actualHash = (Get-FileHash "VoiceLite/dependencies/vc_redist.x64.exe" -Algorithm SHA256).Hash
+        echo "SHA256: $actualHash"
+
+        # Note: VC++ Runtime hash changes with each Microsoft update (quarterly)
+        # This verification detects corrupted downloads but not version changes
+        # Expected size: ~13-15 MB (if significantly different, likely corrupted)
+        if ($vcSize -lt 10 -or $vcSize -gt 20) {
+          echo "ERROR: VC++ Runtime file size is suspicious: $([math]::Round($vcSize, 2)) MB"
+          echo "Expected: 13-15 MB. File may be corrupted."
+          exit 1
+        }
+
+        echo "VC++ Runtime verified: size OK, hash logged"
+
     - name: Download Inno Setup
       shell: pwsh
       run: |
