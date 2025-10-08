@@ -84,9 +84,6 @@ namespace VoiceLite
             // Analytics (Privacy)
             EnableAnalyticsCheckBox.IsChecked = settings.EnableAnalytics ?? false;
 
-            // Performance Settings
-            UseWhisperServerCheckBox.IsChecked = settings.UseWhisperServer;
-
             // Text Formatting (Post-Processing)
             LoadTextFormattingSettings();
 
@@ -371,9 +368,6 @@ namespace VoiceLite
                 settings.WhisperTimeoutMultiplier = Math.Max(0.5, Math.Min(10.0, timeout));
 
             // Audio Enhancement - already saved via event handlers, no need to duplicate
-
-            // Performance Settings
-            settings.UseWhisperServer = UseWhisperServerCheckBox.IsChecked ?? false;
 
             // Hotkey (already saved on change)
         }

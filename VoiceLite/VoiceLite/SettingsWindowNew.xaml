@@ -932,34 +932,6 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <!-- Performance Settings -->
-                        <GroupBox Header="Performance" Margin="0,0,0,15">
-                            <StackPanel Margin="10">
-                                <CheckBox Name="UseWhisperServerCheckBox"
-                                          Content="⚡ Fast Mode (5x faster transcription)"
-                                          FontWeight="SemiBold"
-                                          Margin="0,0,0,5"
-                                          ToolTip="Keeps AI model loaded in memory for instant transcription. Requires app restart. Uses ~500MB extra RAM."/>
-                                <Border Background="#FFF9E6" Padding="8" CornerRadius="4" BorderBrush="#FFE5B3" BorderThickness="1" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <TextBlock FontWeight="SemiBold" FontSize="11" Foreground="#8B6F00" Margin="0,0,0,3">
-                                            <Run Text="⏱️ Performance Comparison:"/>
-                                        </TextBlock>
-                                        <TextBlock FontSize="11" Foreground="#8B6F00" TextWrapping="Wrap">
-                                            <Run Text="• Standard Mode: ~2.5s per transcription"/>
-                                            <LineBreak/>
-                                            <Run Text="• Fast Mode: ~0.5s per transcription (5x boost!)"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Border>
-                                <TextBlock Text="⚠️ Requires app restart to take effect. Uses persistent server.exe to keep model in memory. Falls back to standard mode if server fails."
-                                           FontSize="11"
-                                           Foreground="Gray"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,0"/>
-                            </StackPanel>
-                        </GroupBox>
-
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
