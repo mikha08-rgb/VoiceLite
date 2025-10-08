@@ -149,6 +149,53 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
+        /// RELIABILITY: Check if state machine is stuck and needs auto-recovery.
+        /// Returns true if forced reset was needed.
+        /// </summary>
+        public bool CheckForStuckState()
+        {
+            lock (_lock)
+            {
+                var timeInState = DateTime.Now - _stateEnteredAt;
+
+                // Define timeout thresholds for each state
+                var isStuck = _state switch
+                {
+                    RecordingState.Transcribing => timeInState.TotalSeconds > 180, // 3 minutes max
+                    RecordingState.Stopping => timeInState.TotalSeconds > 15,      // 15 seconds max
+                    RecordingState.Injecting => timeInState.TotalSeconds > 30,     // 30 seconds max
+                    RecordingState.Recording => timeInState.TotalSeconds > 300,    // 5 minutes max (long recording)
+                    _ => false // Other states don't timeout
+                };
+
+                if (isStuck)
+                {
+                    ErrorLogger.LogError($"RecordingStateMachine: STUCK STATE DETECTED! State={_state}, TimeInState={timeInState.TotalSeconds:F1}s",
+                        new TimeoutException($"State machine stuck in {_state} for {timeInState.TotalSeconds:F1} seconds"));
+
+                    // Force reset to Idle
+                    RecordingState fromState = _state;
+                    _previousState = fromState;
+                    _state = RecordingState.Idle;
+                    _stateEnteredAt = DateTime.Now;
+
+                    ErrorLogger.LogMessage($"RecordingStateMachine: AUTO-RECOVERY - Force reset from {fromState} → Idle");
+
+                    var handler = StateChanged;
+                    if (handler != null)
+                    {
+                        var args = new StateChangedEventArgs(fromState, RecordingState.Idle);
+                        System.Threading.Tasks.Task.Run(() => handler(this, args));
+                    }
+
+                    return true; // Stuck state was detected and reset
+                }
+
+                return false; // State is healthy
+            }
+        }
+
+        /// <summary>
         /// Validate state transitions according to workflow rules.
         ///
         /// Valid workflow paths:
