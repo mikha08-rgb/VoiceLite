@@ -28,7 +28,12 @@
       "Bash(unzip:*)",
       "Read(//c/Users/mishk/Codingprojects/SpeakLite/**)",
       "Bash(dotnet publish:*)",
-      "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite/Installer/VoiceLiteSetup_Simple.iss\")"
+      "Bash(\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" \"VoiceLite/Installer/VoiceLiteSetup_Simple.iss\")",
+      "Bash(find:*)",
+      "Bash(awk:*)",
+      "Bash(taskkill:*)",
+      "Bash(start \"\" \"VoiceLite/VoiceLite/bin/Debug/net8.0-windows/VoiceLite.exe\")",
+      "Read(//c/Users/mishk/AppData/Local/VoiceLite/logs/**)"
     ],
     "deny": [],
     "ask": []
