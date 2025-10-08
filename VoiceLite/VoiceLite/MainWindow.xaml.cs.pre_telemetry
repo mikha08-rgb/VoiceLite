@@ -36,7 +36,6 @@ namespace VoiceLite
         private SoundService? soundService;
         private AnalyticsService? analyticsService;
         private RecordingCoordinator? recordingCoordinator;
-        private SimpleTelemetry? telemetry; // Production telemetry
 
         // Recording state
         private DateTime recordingStartTime;
@@ -607,11 +606,6 @@ namespace VoiceLite
                 soundService = new SoundService();
                 analyticsService = new AnalyticsService(settings);
 
-                // Initialize production telemetry (privacy-first, opt-in)
-                telemetry = new SimpleTelemetry(settings);
-                telemetry.TrackAppStart();
-                telemetry.TrackDailyActiveUser();
-
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
                 if (audioRecorder == null || whisperService == null || textInjector == null ||
                     historyService == null || analyticsService == null || soundService == null)
@@ -1082,8 +1076,6 @@ namespace VoiceLite
 
             // Delegate to coordinator
             recordingCoordinator?.StartRecording();
-            // TELEMETRY: Track hotkey response time end
-            telemetry?.TrackHotkeyResponseEnd();
 
             // CRITICAL FIX: Verify recording actually started, otherwise rollback state
             if (recorder.IsRecording)
@@ -1157,9 +1149,6 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                // TELEMETRY: Track hotkey response time start
-                telemetry?.TrackHotkeyResponseStart();
-
                 ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
                 // Debounce protection - ignore rapid key presses
@@ -1757,12 +1746,6 @@ namespace VoiceLite
                         {
                             // PERFORMANCE FIX: Batch all UI updates into single call
                             BatchUpdateTranscriptionSuccess(e);
-
-                            // TELEMETRY: Track transcription performance
-                            var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
-                            var wordCount = e.Transcription?.Split(new[] { (char)32 }, StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
-                            telemetry?.TrackTranscriptionDuration((long)durationMs, settings.WhisperModel, wordCount, success: true);
-                            telemetry?.TrackFeatureAttempt("transcription", success: true);
                         }
                         else
                         {
@@ -2477,14 +2460,6 @@ namespace VoiceLite
         protected override void OnClosed(EventArgs e)
         {
             // Settings save already handled in OnClosing (async pattern)
-
-            // TELEMETRY: Track session metrics and upload final batch
-            try
-            {
-                telemetry?.TrackSessionEnd();
-                telemetry?.Dispose();
-            }
-            catch { /* Silent fail */ }
 
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
@@ -3361,5 +3336,4 @@ namespace VoiceLite
         #endregion
     }
 }
-
 

@@ -40,7 +40,8 @@
       "Bash(start:*)",
       "Bash(tasklist)",
       "Bash(./server.exe --help)",
-      "Bash(./whisper/whisper.exe:*)"
+      "Bash(./whisper/whisper.exe:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
