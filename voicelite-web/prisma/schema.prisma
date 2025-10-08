@@ -274,3 +274,17 @@ model AnalyticsEvent {
   @@index([tier])
   @@index([appVersion])
 }
+
+// Production telemetry metrics for monitoring performance, reliability, and usage
+model TelemetryMetric {
+  id              String    @id @default(cuid())
+  anonymousUserId String    // SHA256 hash, no PII
+  metricType      String    // e.g., "app_start_time_ms", "transcription_duration_ms", "crash", "error"
+  value           Float     // Numeric metric value
+  metadata        String?   // JSON - additional context (model, component, success, etc.)
+  timestamp       DateTime  @default(now())
+
+  @@index([anonymousUserId])
+  @@index([metricType])
+  @@index([timestamp])
+}
