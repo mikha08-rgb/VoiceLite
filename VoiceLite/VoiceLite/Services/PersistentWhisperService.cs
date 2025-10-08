@@ -26,9 +26,12 @@ namespace VoiceLite.Services
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
 
-        // TIER 1.3: Static process tracker to detect zombie whisper.exe processes
-        private static readonly HashSet<int> activeProcessIds = new();
-        private static readonly object processLock = new object();
+        // MEMORY_FIX 2025-10-08: Refactored from static to instance-based to prevent zombie leaks
+        // TIER 1.3: Instance-based process tracker to detect zombie whisper.exe processes
+        // OLD: private static readonly HashSet<int> activeProcessIds = new();
+        // OLD: private static readonly object processLock = new object();
+        private readonly HashSet<int> activeProcessIds = new();
+        private readonly object processLock = new object();
 
         // PERFORMANCE: Periodic warmup to keep model in OS disk cache
         private System.Threading.Timer? warmupTimer;

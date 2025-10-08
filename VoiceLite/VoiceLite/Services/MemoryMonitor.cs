@@ -209,11 +209,34 @@ namespace VoiceLite.Services
             var gen1 = GC.CollectionCount(1);
             var gen2 = GC.CollectionCount(2);
 
+            // MEMORY_FIX 2025-10-08: Enhanced logging - check for zombie whisper.exe processes
+            var whisperProcesses = Process.GetProcessesByName("whisper");
+            var whisperCount = whisperProcesses.Length;
+            var whisperMemoryMB = 0L;
+            foreach (var proc in whisperProcesses)
+            {
+                try
+                {
+                    proc.Refresh();
+                    whisperMemoryMB += proc.WorkingSet64 / 1024 / 1024;
+                    proc.Dispose();
+                }
+                catch { }
+            }
+
             ErrorLogger.LogMessage(
                 $"Memory Stats - Working Set: {workingSetMB}MB | " +
                 $"GC Memory: {gcMemoryMB}MB | " +
                 $"Peak: {peakMemory / 1024 / 1024}MB | " +
-                $"GC Counts: G0={gen0}, G1={gen1}, G2={gen2}");
+                $"GC Counts: G0={gen0}, G1={gen1}, G2={gen2} | " +
+                $"Whisper Processes: {whisperCount} ({whisperMemoryMB}MB)");
+
+            // CRITICAL: Alert if zombie whisper.exe detected
+            if (whisperCount > 0)
+            {
+                OnMemoryAlert(MemoryAlertLevel.Warning, workingSetMB,
+                    $"Zombie whisper.exe processes detected: {whisperCount} processes using {whisperMemoryMB}MB");
+            }
         }
 
         private void OnMemoryAlert(MemoryAlertLevel level, long memoryMB, string message)

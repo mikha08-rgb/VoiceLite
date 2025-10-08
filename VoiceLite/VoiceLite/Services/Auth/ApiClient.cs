@@ -76,10 +76,14 @@ namespace VoiceLite.Services.Auth
                         cookieDto.Domain
                     );
 
-                    if (!string.IsNullOrEmpty(cookieDto.Expires))
+                    // BUG-007 FIX: Use TryParse to handle malformed cookie expiry dates
+                    // Prevents login failure if server sends invalid date format
+                    if (!string.IsNullOrEmpty(cookieDto.Expires) &&
+                        DateTime.TryParse(cookieDto.Expires, out var expiryDate))
                     {
-                        cookie.Expires = DateTime.Parse(cookieDto.Expires);
+                        cookie.Expires = expiryDate;
                     }
+                    // Else: Cookie will use default expiry (session cookie)
 
                     cookie.HttpOnly = cookieDto.HttpOnly;
                     cookie.Secure = cookieDto.Secure;
@@ -155,6 +159,32 @@ namespace VoiceLite.Services.Auth
             catch
             {
                 // Ignore errors
+            }
+        }
+
+        // MEMORY_FIX 2025-10-08: Static HttpClient disposal to prevent TCP connection leaks
+        /// <summary>
+        /// Dispose static HttpClient and Handler to release TCP connections.
+        /// CRITICAL: Must be called on app exit to prevent socket handle exhaustion.
+        /// </summary>
+        public static void Dispose()
+        {
+            try
+            {
+                Client?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("ApiClient.Dispose - Failed to dispose HttpClient", ex);
+            }
+
+            try
+            {
+                Handler?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("ApiClient.Dispose - Failed to dispose HttpClientHandler", ex);
             }
         }
 
