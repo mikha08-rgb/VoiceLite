@@ -28,11 +28,13 @@ namespace VoiceLite.Services
         private readonly object recordingLock = new object();
         private System.Threading.Timer? transcriptionWatchdog;
         private System.Threading.Timer? stoppingTimeoutTimer;
+        private System.Threading.Timer? stuckStateWatchdog; // RELIABILITY: Periodic check for stuck states
         private int transcriptionCompletedFlag = 0; // 0 = not completed, 1 = completed (atomic)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
         private DateTime transcriptionStartTime;
         private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
         private const int STOPPING_TIMEOUT_SECONDS = 10; // 10 seconds max to wait for AudioFileReady
+        private const int STUCK_STATE_CHECK_INTERVAL_SECONDS = 30; // Check every 30 seconds
         private readonly System.Threading.ManualResetEventSlim transcriptionComplete = new System.Threading.ManualResetEventSlim(true); // WEEK1-DAY2: Signaling for disposal (true = initially set)
 
         // Events for MainWindow to subscribe to
@@ -67,6 +69,14 @@ namespace VoiceLite.Services
 
             // Wire up audio recorder events
             audioRecorder.AudioFileReady += OnAudioFileReady;
+
+            // RELIABILITY: Start stuck state watchdog - checks every 30s for hung states
+            stuckStateWatchdog = new System.Threading.Timer(
+                callback: _ => CheckForStuckStates(),
+                state: null,
+                dueTime: TimeSpan.FromSeconds(STUCK_STATE_CHECK_INTERVAL_SECONDS),
+                period: TimeSpan.FromSeconds(STUCK_STATE_CHECK_INTERVAL_SECONDS)
+            );
         }
 
         /// <summary>
@@ -303,6 +313,42 @@ namespace VoiceLite.Services
 
         private async Task ProcessAudioFileAsync(string audioFilePath)
         {
+            // RELIABILITY: Pre-flight health checks - fail fast instead of timing out after 120s
+            try
+            {
+                // Check 1: Audio file exists and has content
+                var fileInfo = new FileInfo(audioFilePath);
+                if (!fileInfo.Exists)
+                {
+                    ErrorOccurred?.Invoke(this, "Audio file not found. Recording may have been cancelled.");
+                    return;
+                }
+
+                if (fileInfo.Length < 100) // Less than 100 bytes = no audio data
+                {
+                    ErrorLogger.LogMessage($"Pre-flight check: Audio file too small ({fileInfo.Length} bytes), skipping transcription");
+                    // This is normal for very short recordings - not an error
+                    return;
+                }
+
+                // Check 2: Whisper service is ready (not disposed)
+                if (whisperService == null)
+                {
+                    ErrorOccurred?.Invoke(this, "Transcription service not available.");
+                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                    return;
+                }
+
+                ErrorLogger.LogMessage($"Pre-flight checks passed: {fileInfo.Length} bytes audio file ready");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Pre-flight health check failed", ex);
+                ErrorOccurred?.Invoke(this, $"Pre-flight check failed: {ex.Message}");
+                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
+                return;
+            }
+
             // PERFORMANCE: Use original audio file directly (no copy needed)
             // AudioRecorder already creates unique temp files per recording
             // Semaphore in WhisperService prevents concurrent access
@@ -355,10 +401,40 @@ namespace VoiceLite.Services
                     catch (Exception retryEx) when (attempt < maxRetries)
                     {
                         lastException = retryEx;
-                        ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed: {retryEx.Message}. Retrying...");
 
-                        // Wait before retrying (exponential backoff: 500ms, 1000ms)
-                        await Task.Delay(500 * attempt).ConfigureAwait(false);
+                        // RELIABILITY: Smart retry logic based on error type
+                        int retryDelayMs = retryEx switch
+                        {
+                            // File not found - don't retry (permanent failure) - CHECK FIRST (before IOException)
+                            FileNotFoundException => int.MaxValue, // Skip retry
+
+                            // Timeout - don't retry (likely stuck, need fresh start)
+                            TimeoutException => int.MaxValue, // Skip retry
+
+                            // File access errors - retry immediately (likely lock contention)
+                            IOException => 0,
+                            UnauthorizedAccessException => 0,
+
+                            // Process errors - short delay then retry
+                            System.ComponentModel.Win32Exception => 200,
+
+                            // Everything else - exponential backoff
+                            _ => 500 * attempt
+                        };
+
+                        // Skip retry for non-retryable errors
+                        if (retryDelayMs == int.MaxValue)
+                        {
+                            ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed with non-retryable error: {retryEx.GetType().Name}");
+                            throw; // Exit retry loop immediately
+                        }
+
+                        ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed: {retryEx.Message}. Retrying after {retryDelayMs}ms...");
+
+                        if (retryDelayMs > 0)
+                        {
+                            await Task.Delay(retryDelayMs).ConfigureAwait(false);
+                        }
                     }
                 }
 
@@ -553,6 +629,39 @@ namespace VoiceLite.Services
                 {
                     ErrorLogger.LogError("RecordingCoordinator: Error stopping watchdog", ex);
                 }
+            }
+        }
+
+        /// <summary>
+        /// RELIABILITY: Periodic check for stuck states - auto-recovery mechanism
+        /// Runs every 30 seconds to detect and reset hung state machine
+        /// CRITICAL: Must never throw exceptions (runs on timer thread)
+        /// </summary>
+        private void CheckForStuckStates()
+        {
+            if (isDisposed)
+                return;
+
+            try
+            {
+                bool wasStuck = stateMachine.CheckForStuckState();
+                if (wasStuck)
+                {
+                    // State machine was stuck and has been auto-recovered
+                    ErrorLogger.LogMessage("RecordingCoordinator: Stuck state detected and recovered automatically");
+
+                    // Notify UI that we recovered from error
+                    ErrorOccurred?.Invoke(this, "Recovered from stuck state. Ready to continue.");
+
+                    // Clean up any lingering resources
+                    StopTranscriptionWatchdog();
+                    StopStoppingTimeoutTimer();
+                }
+            }
+            catch (Exception ex)
+            {
+                // CRITICAL: Never let watchdog crash the timer thread
+                ErrorLogger.LogError("CheckForStuckStates: Watchdog callback failed", ex);
             }
         }
 
@@ -767,6 +876,15 @@ namespace VoiceLite.Services
 
             StopTranscriptionWatchdog();
             StopStoppingTimeoutTimer();
+
+            // RELIABILITY: Stop stuck state watchdog
+            try
+            {
+                stuckStateWatchdog?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+                stuckStateWatchdog?.Dispose();
+                stuckStateWatchdog = null;
+            }
+            catch { /* Ignore timer disposal errors */ }
 
             // WEEK1-DAY3: Reset state machine to Idle on disposal
             stateMachine.Reset();
