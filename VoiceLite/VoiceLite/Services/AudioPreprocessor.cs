@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using NAudio.Wave;
 using VoiceLite.Models;
 
@@ -474,8 +475,22 @@ namespace VoiceLite.Services
                         writer.WriteSamples(audioData, speechStart, speechLength);
                     }
 
-                    File.Delete(audioFilePath);
-                    File.Move(tempFile, audioFilePath);
+                    // RELIABILITY FIX: Retry file operations with delays (file might be locked by NAudio)
+                    int maxRetries = 3;
+                    for (int attempt = 0; attempt < maxRetries; attempt++)
+                    {
+                        try
+                        {
+                            File.Delete(audioFilePath);
+                            File.Move(tempFile, audioFilePath);
+                            break; // Success
+                        }
+                        catch (IOException) when (attempt < maxRetries - 1)
+                        {
+                            // File locked, wait and retry
+                            Thread.Sleep(100 * (attempt + 1)); // 100ms, 200ms, 300ms
+                        }
+                    }
 
                     // Calculate and return trimmed milliseconds
                     var trimmedMs = (trimmedSamples * 1000.0) / waveFormat.SampleRate;

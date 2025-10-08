@@ -47,6 +47,15 @@ namespace VoiceLite.Services
                 return;
             }
 
+            // PERFORMANCE FIX: Check if server already running and healthy (singleton pattern)
+            // Avoids unnecessary restarts and improves reliability
+            if (await IsServerHealthy())
+            {
+                ErrorLogger.LogMessage("WhisperServer already running and healthy - reusing existing instance");
+                isServerRunning = true;
+                return; // Reuse existing server
+            }
+
             try
             {
                 await StartServerAsync().ConfigureAwait(false);
@@ -93,6 +102,10 @@ namespace VoiceLite.Services
 
         private async Task StartServerAsync()
         {
+            // CRITICAL FIX: Kill any zombie server.exe processes before starting new one
+            // This prevents multiple servers from fighting over resources and deadlocking
+            KillExistingServers();
+
             var serverExePath = Path.Combine(baseDir, "whisper", "server.exe");
             var modelPath = ResolveModelPath();
 
@@ -143,7 +156,9 @@ namespace VoiceLite.Services
             try
             {
                 tempClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{serverPort}") };
-                tempClient.Timeout = TimeSpan.FromSeconds(3);
+                // CRITICAL FIX: Use 120s timeout for transcription (was 3s, caused timeouts on longer audio)
+                // Health checks use separate 1s timeout via CancellationToken (line 167)
+                tempClient.Timeout = TimeSpan.FromSeconds(120);
 
                 // Overall timeout to prevent infinite waiting
                 using var overallTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -388,6 +403,86 @@ namespace VoiceLite.Services
             }
 
             disposeCts.Dispose();
+        }
+
+        /// <summary>
+        /// PERFORMANCE FIX: Check if server is already running and healthy
+        /// Enables singleton pattern - reuse existing server instead of restarting
+        /// </summary>
+        private async Task<bool> IsServerHealthy()
+        {
+            if (httpClient == null)
+                return false;
+
+            try
+            {
+                using var cts = new CancellationTokenSource(1000); // 1 second timeout
+                var response = await httpClient.GetAsync("/", cts.Token);
+
+                // Any HTTP response (even 404) means server is alive
+                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+            }
+            catch
+            {
+                // Timeout, connection refused, or other error = server not healthy
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// CRITICAL FIX: Kill zombie server.exe processes before starting new one
+        /// Prevents multiple servers from deadlocking over shared resources
+        /// </summary>
+        private void KillExistingServers()
+        {
+            try
+            {
+                var existingServers = Process.GetProcessesByName("server");
+                if (existingServers.Length == 0)
+                {
+                    return; // No servers running
+                }
+
+                ErrorLogger.LogMessage($"Found {existingServers.Length} existing server.exe process(es) - checking if zombies");
+
+                foreach (var proc in existingServers)
+                {
+                    try
+                    {
+                        // Only kill if it's from whisper directory (not unrelated server.exe)
+                        var mainModule = proc.MainModule?.FileName;
+                        if (mainModule != null && mainModule.Contains("whisper", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ErrorLogger.LogWarning($"Killing zombie server.exe PID {proc.Id} from {mainModule}");
+                            proc.Kill(entireProcessTree: true);
+
+                            // Wait briefly for clean shutdown
+                            if (!proc.WaitForExit(2000))
+                            {
+                                ErrorLogger.LogWarning($"Zombie server {proc.Id} did not exit cleanly - forcing");
+                            }
+                        }
+                        else if (mainModule != null)
+                        {
+                            ErrorLogger.LogMessage($"Ignoring unrelated server.exe at {mainModule}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Process might already be dead or access denied - ignore
+                        ErrorLogger.LogMessage($"Could not check/kill server PID {proc.Id}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        proc.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-critical failure - log and continue
+                ErrorLogger.LogMessage($"Failed to check for zombie servers: {ex.Message}");
+            }
         }
 
         private class WhisperServerResponse

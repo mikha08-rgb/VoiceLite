@@ -33,7 +33,13 @@
       "Bash(awk:*)",
       "Bash(taskkill:*)",
       "Bash(start \"\" \"VoiceLite/VoiceLite/bin/Debug/net8.0-windows/VoiceLite.exe\")",
-      "Read(//c/Users/mishk/AppData/Local/VoiceLite/logs/**)"
+      "Read(//c/Users/mishk/AppData/Local/VoiceLite/logs/**)",
+      "Bash(claude mcp add postgres:*)",
+      "Bash(start \"\" \"VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/VoiceLite.exe\")",
+      "Read(//c/Users/mishk/AppData/Local/VoiceLite/**)",
+      "Bash(start:*)",
+      "Bash(tasklist)",
+      "Bash(./server.exe --help)"
     ],
     "deny": [],
     "ask": []

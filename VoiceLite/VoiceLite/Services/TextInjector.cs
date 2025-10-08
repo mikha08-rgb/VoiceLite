@@ -52,11 +52,15 @@ namespace VoiceLite.Services
         {
             if (string.IsNullOrWhiteSpace(text))
             {
+#if DEBUG
                 ErrorLogger.LogMessage("InjectText called with empty text");
+#endif
                 return;
             }
 
+#if DEBUG
             ErrorLogger.LogMessage($"InjectText called with {text.Length} characters, AutoPaste: {AutoPaste}");
+#endif
 
             try
             {
@@ -64,12 +68,16 @@ namespace VoiceLite.Services
                 if (ShouldUseTyping(text))
                 {
                     InjectViaTyping(text);
+#if DEBUG
                     ErrorLogger.LogMessage($"Text injected via typing ({text.Length} chars)");
+#endif
                 }
                 else
                 {
                     InjectViaClipboard(text);
+#if DEBUG
                     ErrorLogger.LogMessage($"Text injected via clipboard ({text.Length} chars)");
+#endif
                 }
             }
             catch (Exception ex)
@@ -78,7 +86,9 @@ namespace VoiceLite.Services
                 // Fallback to clipboard method if typing fails
                 try
                 {
+#if DEBUG
                     ErrorLogger.LogMessage("Falling back to clipboard injection");
+#endif
                     PasteViaClipboard(text);
                 }
                 catch
@@ -236,13 +246,21 @@ namespace VoiceLite.Services
                     {
                         originalClipboard = Clipboard.GetText();
                         hadOriginalClipboard = true;
+#if DEBUG
                         ErrorLogger.LogMessage($"Original clipboard saved ({originalClipboard.Length} chars)");
+#endif
                         break;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception
+#if DEBUG
+                ex
+#endif
+                )
                 {
+#if DEBUG
                     ErrorLogger.LogMessage($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
+#endif
                     if (attempt < 2)
                         Thread.Sleep(10); // Brief delay before retry
                 }
@@ -307,17 +325,29 @@ namespace VoiceLite.Services
                                     try
                                     {
                                         SetClipboardText(clipboardToRestore);
+#if DEBUG
                                         ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
+#endif
                                         restoreSucceeded = true;
                                         break;
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception
+#if DEBUG
+                                    ex
+#endif
+                                    )
                                     {
+#if DEBUG
                                         ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
+#endif
                                         if (attempt < 2)
                                             await Task.Delay(50);
                                         else
+                                        {
+#if DEBUG
                                             ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+#endif
+                                        }
                                     }
                                 }
 
@@ -338,8 +368,10 @@ namespace VoiceLite.Services
                             }
                             else
                             {
+#if DEBUG
                                 // User copied something new - don't overwrite it!
                                 ErrorLogger.LogMessage("Clipboard was modified by user - skipping restoration to preserve user's clipboard");
+#endif
                             }
                         }
                         catch (Exception ex)
@@ -399,7 +431,9 @@ namespace VoiceLite.Services
                 try
                 {
                     Clipboard.SetText(text, TextDataFormat.UnicodeText);
+#if DEBUG
                     ErrorLogger.LogMessage("Text copied to clipboard successfully");
+#endif
                     return;
                 }
                 catch (ExternalException)
@@ -422,7 +456,9 @@ namespace VoiceLite.Services
         {
             try
             {
+#if DEBUG
                 ErrorLogger.LogMessage("Simulating Ctrl+V");
+#endif
 
                 // CRITICAL PERFORMANCE FIX: Optimize key simulation timing
                 // Old: 10ms delay between each key event (30ms total)
@@ -443,7 +479,9 @@ namespace VoiceLite.Services
                 Thread.Sleep(1);
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
 
+#if DEBUG
                 ErrorLogger.LogMessage("Ctrl+V simulation completed");
+#endif
             }
             catch (Exception ex)
             {
