@@ -180,6 +180,11 @@ namespace VoiceLite.Services
                     if (cancel)
                     {
                         ErrorLogger.LogInfo("Recording cancelled by user");
+
+                        // BUG-009 FIX: Stop all watchdog timers immediately on cancel
+                        // Prevents false "stuck state" recovery after user cancellation
+                        StopStoppingTimeoutTimer();
+                        StopTranscriptionWatchdog();
                     }
 
                     audioRecorder.StopRecording();
