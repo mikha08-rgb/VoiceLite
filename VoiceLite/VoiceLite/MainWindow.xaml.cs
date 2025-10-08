@@ -559,13 +559,11 @@ namespace VoiceLite
                         ShowServerFallbackNotification();
 
                         // Fall back to process mode
-                        StatusText.Text = "Loading Whisper AI...";
                         whisperService = new PersistentWhisperService(settings);
                     }
                 }
                 else
                 {
-                    StatusText.Text = "Loading Whisper AI...";
                     whisperService = new PersistentWhisperService(settings);
                 }
 
