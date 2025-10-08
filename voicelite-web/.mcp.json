@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "filesystem-web": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/mishk/Codingprojects/SpeakLite/HereWeGoAgain v3.3 Fuck/voicelite-web"
+      ],
+      "env": {}
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://localhost:5432/voicelite"
+      }
+    }
+  }
+}
