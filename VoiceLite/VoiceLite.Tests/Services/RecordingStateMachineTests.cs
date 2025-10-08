@@ -283,7 +283,7 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public void ThreadSafety_ConcurrentTransitions_NoCorruption()
+        public async Task ThreadSafety_ConcurrentTransitions_NoCorruption()
         {
             // Arrange
             var stateMachine = new RecordingStateMachine();
@@ -315,7 +315,7 @@ namespace VoiceLite.Tests.Services
                 }
             })).ToArray();
 
-            Task.WaitAll(tasks, TimeSpan.FromSeconds(5));
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5));
 
             // Assert
             errors.Should().BeEmpty("no exceptions should occur during concurrent transitions");
@@ -337,7 +337,7 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public void ThreadSafety_ConcurrentReadsAndWrites_NoDeadlock()
+        public async Task ThreadSafety_ConcurrentReadsAndWrites_NoDeadlock()
         {
             // Arrange
             var stateMachine = new RecordingStateMachine();
@@ -383,7 +383,7 @@ namespace VoiceLite.Tests.Services
                 }
             });
 
-            Task.WaitAll(new[] { readerTask, writerTask }, TimeSpan.FromSeconds(5));
+            await Task.WhenAll(readerTask, writerTask).WaitAsync(TimeSpan.FromSeconds(5));
 
             // Assert
             exceptions.Should().BeEmpty("no deadlocks or exceptions should occur");
