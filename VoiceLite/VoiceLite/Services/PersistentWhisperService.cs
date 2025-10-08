@@ -34,13 +34,6 @@ namespace VoiceLite.Services
         private System.Threading.Timer? warmupTimer;
         private const int WARMUP_INTERVAL_MINUTES = 5; // Run warmup every 5 minutes
 
-        // PERFORMANCE FIX: Cache whisper.exe process between transcriptions (Part 2)
-        // Keeps process alive for 30s to skip 1.5s model reload on subsequent transcriptions
-        private Process? cachedProcess = null;
-        private DateTime lastTranscriptionTime = DateTime.MinValue;
-        private readonly TimeSpan processCacheDuration = TimeSpan.FromSeconds(30);
-        private readonly object cachedProcessLock = new object();
-
         public PersistentWhisperService(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
