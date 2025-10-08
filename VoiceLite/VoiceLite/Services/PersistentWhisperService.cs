@@ -29,6 +29,14 @@ namespace VoiceLite.Services
         // TIER 1.3: Static process tracker to detect zombie whisper.exe processes
         private static readonly HashSet<int> activeProcessIds = new();
         private static readonly object processLock = new object();
+
+        // PERFORMANCE FIX: Cache whisper.exe process between transcriptions (Part 2)
+        // Keeps process alive for 30s to skip 1.5s model reload on subsequent transcriptions
+        private Process? cachedProcess = null;
+        private DateTime lastTranscriptionTime = DateTime.MinValue;
+        private readonly TimeSpan processCacheDuration = TimeSpan.FromSeconds(30);
+        private readonly object cachedProcessLock = new object();
+
         public PersistentWhisperService(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));

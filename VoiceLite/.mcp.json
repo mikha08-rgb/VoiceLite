@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "filesystem-desktop": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/mishk/Codingprojects/SpeakLite/HereWeGoAgain v3.3 Fuck/VoiceLite"
+      ],
+      "env": {}
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {}
+    }
+  }
+}
