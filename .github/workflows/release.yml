@@ -155,10 +155,10 @@ jobs:
 
         # Note: VC++ Runtime hash changes with each Microsoft update (quarterly)
         # This verification detects corrupted downloads but not version changes
-        # Expected size: ~13-15 MB (if significantly different, likely corrupted)
-        if ($vcSize -lt 10 -or $vcSize -gt 20) {
+        # Expected size: ~13-25 MB (Microsoft updates may increase size)
+        if ($vcSize -lt 10 -or $vcSize -gt 30) {
           echo "ERROR: VC++ Runtime file size is suspicious: $([math]::Round($vcSize, 2)) MB"
-          echo "Expected: 13-15 MB. File may be corrupted."
+          echo "Expected: 10-30 MB. File may be corrupted."
           exit 1
         }
 
