@@ -316,7 +316,7 @@ export default function Home() {
             )}
 
             <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 px-6 py-6 text-sm leading-6 text-green-900 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50 dark:text-green-100">
-              <strong className="font-bold">✨ New in v1.0.59:</strong> Lightning-fast UI responsiveness! Eliminated 300ms delay after transcription - app now feels instant. State transitions happen immediately while cleanup runs in background.
+              <strong className="font-bold">✨ New in v1.0.63:</strong> Memory leak fixes! Eliminated 11 critical memory leaks (27-60 MB). Proper disposal of child windows, services, and event handlers. App now stays lean even after hours of use.
             </div>
           </aside>
         </div>
