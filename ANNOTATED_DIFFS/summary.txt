@@ -1,0 +1,8 @@
+ .claude/settings.local.json                        |   7 +-
+ VoiceLite/Installer/VoiceLiteSetup_Simple.iss      | 143 +++++++++++++++++++--
+ .../Services/RecordingStateMachineTests.cs         |   8 +-
+ .../Services/WhisperErrorRecoveryTests.cs          |   5 +-
+ .../Services/WhisperServiceTests.cs                |  10 +-
+ VoiceLite/VoiceLite/MainWindow.xaml                |  28 +---
+ VoiceLite/VoiceLite/MainWindow.xaml.cs             | 120 ++++++++---------
+ 7 files changed, 216 insertions(+), 105 deletions(-)

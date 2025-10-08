@@ -39,7 +39,8 @@
       "Read(//c/Users/mishk/AppData/Local/VoiceLite/**)",
       "Bash(start:*)",
       "Bash(tasklist)",
-      "Bash(./server.exe --help)"
+      "Bash(./server.exe --help)",
+      "Bash(./whisper/whisper.exe:*)"
     ],
     "deny": [],
     "ask": []

@@ -30,6 +30,10 @@ namespace VoiceLite.Services
         private static readonly HashSet<int> activeProcessIds = new();
         private static readonly object processLock = new object();
 
+        // PERFORMANCE: Periodic warmup to keep model in OS disk cache
+        private System.Threading.Timer? warmupTimer;
+        private const int WARMUP_INTERVAL_MINUTES = 5; // Run warmup every 5 minutes
+
         // PERFORMANCE FIX: Cache whisper.exe process between transcriptions (Part 2)
         // Keeps process alive for 30s to skip 1.5s model reload on subsequent transcriptions
         private Process? cachedProcess = null;
@@ -62,6 +66,15 @@ namespace VoiceLite.Services
                     ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
                 }
             }, disposeCts.Token);
+
+            // PERFORMANCE: Start periodic warmup timer to keep model hot in OS cache
+            // This ensures consistent low latency even after idle periods
+            warmupTimer = new System.Threading.Timer(
+                callback: async _ => await PeriodicWarmupCallback(),
+                state: null,
+                dueTime: TimeSpan.FromMinutes(WARMUP_INTERVAL_MINUTES),
+                period: TimeSpan.FromMinutes(WARMUP_INTERVAL_MINUTES)
+            );
         }
 
         private string ResolveWhisperExePath()
@@ -268,6 +281,26 @@ namespace VoiceLite.Services
             }
         }
 
+        /// <summary>
+        /// PERFORMANCE: Periodic warmup callback to keep model hot in OS disk cache
+        /// Runs every 5 minutes in background to ensure consistent low latency
+        /// </summary>
+        private async Task PeriodicWarmupCallback()
+        {
+            if (isDisposed || disposeCts.IsCancellationRequested)
+                return;
+
+            try
+            {
+                ErrorLogger.LogMessage("Periodic warmup: Keeping model file hot in OS cache");
+                await WarmUpWhisperAsync();
+            }
+            catch (Exception ex)
+            {
+                // Non-critical - log but don't crash
+                ErrorLogger.LogMessage($"Periodic warmup failed (non-critical): {ex.Message}");
+            }
+        }
 
         public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
         {
@@ -667,6 +700,15 @@ namespace VoiceLite.Services
                 return;
 
             isDisposed = true;
+
+            // PERFORMANCE: Stop periodic warmup timer
+            try
+            {
+                warmupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                warmupTimer?.Dispose();
+                warmupTimer = null;
+            }
+            catch { /* Ignore timer disposal errors */ }
 
             // Cancel all background tasks (warmup tasks)
             try
