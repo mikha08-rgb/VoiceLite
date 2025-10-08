@@ -31,10 +31,12 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private MemoryMonitor? memoryMonitor;
+        private ZombieProcessCleanupService? zombieCleanupService; // MEMORY_FIX 2025-10-08: Periodic zombie process cleanup
         private TranscriptionHistoryService? historyService;
         private SoundService? soundService;
         private AnalyticsService? analyticsService;
         private RecordingCoordinator? recordingCoordinator;
+        private SimpleTelemetry? telemetry; // Production telemetry
 
         // Recording state
         private DateTime recordingStartTime;
@@ -333,28 +335,44 @@ namespace VoiceLite
                 {
                     string json = File.ReadAllText(settingsPath);
                     var loadedSettings = JsonSerializer.Deserialize<Settings>(json);
-                    settings = SettingsValidator.ValidateAndRepair(loadedSettings) ?? new Settings();
-                    ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
+                    var validatedSettings = SettingsValidator.ValidateAndRepair(loadedSettings);
 
-                    // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
-                    // BUG-009 FIX: Check migration flag to prevent overwriting user's explicit choice
-                    // New users get Compact by default, migrate existing users to Compact for consistency
-                    if (!settings.UIPresetMigrationApplied && settings.UIPreset == UIPreset.Default)
+                    // BUG-011 FIX: Only use validated settings if repair succeeded
+                    // If validation fails, use defaults WITHOUT running cleanup (prevents data loss)
+                    if (validatedSettings != null)
                     {
-                        settings.UIPreset = UIPreset.Compact;
-                        settings.UIPresetMigrationApplied = true; // Mark migration as done
-                        ErrorLogger.LogMessage("BUG-009 FIX: Migrated UI preset from Default to Compact (one-time migration)");
-                        _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
-                    }
-                    else if (!settings.UIPresetMigrationApplied)
-                    {
-                        // User already has non-Default preset, just mark migration as done
-                        settings.UIPresetMigrationApplied = true;
-                        _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
-                    }
+                        settings = validatedSettings;
+                        ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
 
-                    // Verify whisper model exists
-                    ValidateWhisperModel();
+                        // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
+                        // BUG-009 FIX: Check migration flag to prevent overwriting user's explicit choice
+                        // New users get Compact by default, migrate existing users to Compact for consistency
+                        if (!settings.UIPresetMigrationApplied && settings.UIPreset == UIPreset.Default)
+                        {
+                            settings.UIPreset = UIPreset.Compact;
+                            settings.UIPresetMigrationApplied = true; // Mark migration as done
+                            ErrorLogger.LogMessage("BUG-009 FIX: Migrated UI preset from Default to Compact (one-time migration)");
+                            _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
+                        }
+                        else if (!settings.UIPresetMigrationApplied)
+                        {
+                            // User already has non-Default preset, just mark migration as done
+                            settings.UIPresetMigrationApplied = true;
+                            _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
+                        }
+
+                        // Verify whisper model exists
+                        ValidateWhisperModel();
+
+                        // BUG-011 FIX: Only cleanup history if we successfully loaded existing settings
+                        // DO NOT cleanup on default settings (prevents accidental data loss)
+                        CleanupOldHistoryItems();
+                    }
+                    else
+                    {
+                        ErrorLogger.LogMessage("Settings validation failed - using defaults WITHOUT cleanup");
+                        settings = new Settings();
+                    }
                 }
                 else
                 {
@@ -367,9 +385,6 @@ namespace VoiceLite
                 MessageBox.Show($"Failed to load settings: {ex.Message}\n\nUsing default settings.", "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 settings = new Settings();
             }
-
-            // BUG-003 FIX: Auto-cleanup old history items (>7 days, not pinned)
-            CleanupOldHistoryItems();
 
             MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
             UpdateConfigDisplay();
@@ -455,11 +470,19 @@ namespace VoiceLite
                     // Ensure AppData directory exists
                     EnsureAppDataDirectoryExists();
 
-                    settings.MinimizeToTray = minimizeToTray;
                     string settingsPath = GetSettingsPath();
+
+                    // BUG-002 FIX (CORRECTED): Update settings inside lock, serialize on background thread
+                    // Prevents race condition while maintaining async performance
+                    lock (settings.SyncRoot)
+                    {
+                        // Update settings inside lock to prevent concurrent modifications
+                        settings.MinimizeToTray = minimizeToTray;
+                    }
 
                     // TIER 1.4: Serialize on background thread to avoid UI blocking
                     // P1 OPTIMIZATION: Use pre-configured JsonSerializerOptions with optimized buffer size
+                    // Lock is held only during serialization to prevent concurrent modifications
                     string json = await Task.Run(() =>
                     {
                         lock (settings.SyncRoot)
@@ -473,14 +496,26 @@ namespace VoiceLite
                     string tempPath = settingsPath + ".tmp";
                     await File.WriteAllTextAsync(tempPath, json);
 
-                    // Delete old file if exists (required before rename on Windows)
-                    if (File.Exists(settingsPath))
+                    // BUG-010 FIX: Verify temp file is valid JSON before replacing original
+                    // Prevents data loss if app crashes during serialization
+                    try
                     {
-                        File.Delete(settingsPath);
+                        var testLoad = JsonSerializer.Deserialize<Settings>(await File.ReadAllTextAsync(tempPath));
+                        if (testLoad == null)
+                        {
+                            throw new InvalidDataException("Settings deserialized to null");
+                        }
+                    }
+                    catch (Exception validationEx)
+                    {
+                        // Delete corrupt temp file
+                        try { File.Delete(tempPath); } catch { }
+                        throw new InvalidOperationException("Settings save failed - temp file validation failed", validationEx);
                     }
 
-                    // Atomic rename - if this fails, temp file remains for recovery
-                    File.Move(tempPath, settingsPath);
+                    // BUG-008 FIX: Use File.Move with overwrite to handle race conditions
+                    // Prevents "file already exists" error if another thread recreated the file
+                    File.Move(tempPath, settingsPath, overwrite: true);
 
                     ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
                 }
@@ -572,6 +607,11 @@ namespace VoiceLite
                 soundService = new SoundService();
                 analyticsService = new AnalyticsService(settings);
 
+                // Initialize production telemetry (privacy-first, opt-in)
+                telemetry = new SimpleTelemetry(settings);
+                telemetry.TrackAppStart();
+                telemetry.TrackDailyActiveUser();
+
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
                 if (audioRecorder == null || whisperService == null || textInjector == null ||
                     historyService == null || analyticsService == null || soundService == null)
@@ -614,6 +654,10 @@ namespace VoiceLite
                 memoryMonitor = new MemoryMonitor();
                 memoryMonitor.MemoryAlert += OnMemoryAlert;
 
+                // MEMORY_FIX 2025-10-08: Start periodic zombie process cleanup service
+                zombieCleanupService = new ZombieProcessCleanupService();
+                zombieCleanupService.ZombieDetected += OnZombieProcessDetected;
+
                 // Load and display existing history
                 _ = UpdateHistoryUI();
 
@@ -641,8 +685,24 @@ namespace VoiceLite
                 await InitializeServicesAsync();
 
                 // Step 3: Register hotkey (ONLY after services are ready)
+                // BUG-005 FIX: Wrap hotkey registration in try-catch to show user-friendly error
                 var helper = new WindowInteropHelper(this);
-                hotkeyManager?.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
+                try
+                {
+                    hotkeyManager?.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ErrorLogger.LogError("Initial hotkey registration failed", ex);
+                    MessageBox.Show(
+                        $"Failed to register hotkey: {ex.Message}\n\n" +
+                        $"The hotkey may be in use by another application.\n\n" +
+                        $"You can change the hotkey in Settings, or the app will use manual buttons.",
+                        "Hotkey Registration Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    // App continues - user can still use manual buttons
+                }
 
                 // Step 4: Update UI (now safe - all services initialized)
                 string hotkeyDisplay = GetHotkeyDisplayString();
@@ -1022,6 +1082,8 @@ namespace VoiceLite
 
             // Delegate to coordinator
             recordingCoordinator?.StartRecording();
+            // TELEMETRY: Track hotkey response time end
+            telemetry?.TrackHotkeyResponseEnd();
 
             // CRITICAL FIX: Verify recording actually started, otherwise rollback state
             if (recorder.IsRecording)
@@ -1095,7 +1157,7 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
+                                // TELEMETRY: Track hotkey response time startn                telemetry?.TrackHotkeyResponseStart();nn                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - IsRecording ={IsRecording}, isHotkeyMode={isHotkeyMode}");
 
                 // Debounce protection - ignore rapid key presses
                 var now = DateTime.Now;
@@ -1692,6 +1754,12 @@ namespace VoiceLite
                         {
                             // PERFORMANCE FIX: Batch all UI updates into single call
                             BatchUpdateTranscriptionSuccess(e);
+
+                            // TELEMETRY: Track transcription performance
+                            var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
+                            var wordCount = e.Transcription?.Split(new[] { (char)32 }, StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
+                            telemetry?.TrackTranscriptionDuration((long)durationMs, settings.WhisperModel, wordCount, success: true);
+                            telemetry?.TrackFeatureAttempt("transcription", success: true);
                         }
                         else
                         {
@@ -1972,6 +2040,13 @@ namespace VoiceLite
                     ErrorLogger.LogError("OnMemoryAlert: Unexpected exception", ex);
                 }
             }
+        }
+
+        // MEMORY_FIX 2025-10-08: Handle zombie whisper.exe process detection
+        private void OnZombieProcessDetected(object? sender, ZombieCleanupEventArgs e)
+        {
+            ErrorLogger.LogWarning($"Zombie whisper.exe detected and killed: PID {e.ProcessId} ({e.MemoryMB}MB)");
+            // Could notify user via toast notification if needed
         }
 
         #endregion
@@ -2400,6 +2475,14 @@ namespace VoiceLite
         {
             // Settings save already handled in OnClosing (async pattern)
 
+            // TELEMETRY: Track session metrics and upload final batch
+            try
+            {
+                telemetry?.TrackSessionEnd();
+                telemetry?.Dispose();
+            }
+            catch { /* Silent fail */ }
+
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
             autoTimeoutTimer = null;
@@ -2461,6 +2544,12 @@ namespace VoiceLite
                     memoryMonitor.MemoryAlert -= OnMemoryAlert;
                 }
 
+                // MEMORY_FIX 2025-10-08: Unsubscribe zombie cleanup service
+                if (zombieCleanupService != null)
+                {
+                    zombieCleanupService.ZombieDetected -= OnZombieProcessDetected;
+                }
+
                 // Dispose child windows (WPF Window resources)
                 try { currentAnalyticsConsentWindow?.Close(); } catch { }
                 currentAnalyticsConsentWindow = null;
@@ -2478,6 +2567,10 @@ namespace VoiceLite
                 currentFeedbackWindow = null;
 
                 // Now dispose services in reverse order of creation
+                // MEMORY_FIX 2025-10-08: Dispose zombie cleanup service
+                zombieCleanupService?.Dispose();
+                zombieCleanupService = null;
+
                 memoryMonitor?.Dispose();
                 memoryMonitor = null;
 
@@ -2505,6 +2598,10 @@ namespace VoiceLite
 
                 // Stop security protection
                 SecurityService.StopProtection();
+
+                // MEMORY_FIX 2025-10-08: Dispose static HttpClient to prevent TCP connection leaks
+                // CRITICAL: Fixes socket handle exhaustion (~10KB per leaked connection)
+                VoiceLite.Services.Auth.ApiClient.Dispose();
 
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
@@ -3261,4 +3358,5 @@ namespace VoiceLite
         #endregion
     }
 }
+
 
