@@ -259,11 +259,6 @@ namespace VoiceLite.Models
         public List<DictionaryEntry> CustomDictionaryEntries { get; set; } = new List<DictionaryEntry>();
         public DictionaryCategory? ActiveDictionaryCategory { get; set; } = null; // null = all categories
 
-        // Anonymous Analytics (Privacy-First, Opt-In)
-        public bool? EnableAnalytics { get; set; } = null; // null = not asked yet, false = opted out, true = opted in
-        public string? AnonymousUserId { get; set; } // SHA256 hash for anonymous tracking
-        public DateTime? AnalyticsConsentDate { get; set; } // When user consented (or declined)
-
         // First-Run Experience
         public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
         public bool HasSeenFirstRunDiagnostics { get; set; } = false; // Show first-run diagnostic window after installation
@@ -271,12 +266,8 @@ namespace VoiceLite.Models
         // Post-Processing Settings
         public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
 
-        // UI Preset (Appearance)
-        public UIPreset UIPreset { get; set; } = UIPreset.Compact;
-
-        // BUG-009 FIX: Track if one-time UI preset migration has been applied
-        // Prevents repeated migrations from overwriting user's explicit choice
-        public bool UIPresetMigrationApplied { get; set; } = false;
+        // UI Preset (Appearance) - Hardcoded to Compact
+        public UIPreset UIPreset => UIPreset.Compact;
 
         /// <summary>
         /// Apply an audio preset to configure all audio enhancement settings.

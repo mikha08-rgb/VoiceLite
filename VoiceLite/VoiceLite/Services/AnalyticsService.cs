@@ -29,30 +29,12 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Initialize or load the anonymous user ID (SHA256 hash)
+        /// Initialize or load the anonymous user ID (SHA256 hash) - STUB: Analytics removed
         /// </summary>
         private void InitializeAnonymousUserId()
         {
-            if (settings.AnonymousUserId != null)
-            {
-                anonymousUserId = settings.AnonymousUserId;
-                return;
-            }
-
-            // Generate new anonymous ID from machine ID + timestamp
-            var machineId = Environment.MachineName;
-            var timestamp = DateTime.UtcNow.Ticks.ToString();
-            var combined = $"{machineId}:{timestamp}";
-
-            // SHA256 hash for anonymization (irreversible)
-            using (var sha256 = SHA256.Create())
-            {
-                var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
-                anonymousUserId = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            }
-
-            // Save to settings
-            settings.AnonymousUserId = anonymousUserId;
+            // Analytics removed - use placeholder
+            anonymousUserId = "analytics-disabled";
         }
 
         /// <summary>
@@ -230,12 +212,12 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Check if analytics is enabled
+        /// Check if analytics is enabled - STUB: Analytics removed
         /// </summary>
         private bool IsAnalyticsEnabled()
         {
-            // null = not asked yet, false = opted out, true = opted in
-            return settings.EnableAnalytics == true;
+            // Analytics removed - always return false
+            return false;
         }
 
         /// <summary>

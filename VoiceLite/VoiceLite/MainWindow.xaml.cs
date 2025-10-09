@@ -34,7 +34,6 @@ namespace VoiceLite
         private ZombieProcessCleanupService? zombieCleanupService; // MEMORY_FIX 2025-10-08: Periodic zombie process cleanup
         private TranscriptionHistoryService? historyService;
         private SoundService? soundService;
-        private AnalyticsService? analyticsService;
         private RecordingCoordinator? recordingCoordinator;
         private SimpleTelemetry? telemetry; // Production telemetry
 
@@ -79,7 +78,6 @@ namespace VoiceLite
         private DictionaryManagerWindow? currentDictionaryWindow;
         private LoginWindow? currentLoginWindow;
         private FeedbackWindow? currentFeedbackWindow;
-        private AnalyticsConsentWindow? currentAnalyticsConsentWindow;
 
         #endregion
 
@@ -349,21 +347,7 @@ namespace VoiceLite
                         ErrorLogger.LogMessage($"Settings loaded from: {settingsPath}");
 
                         // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
-                        // BUG-009 FIX: Check migration flag to prevent overwriting user's explicit choice
-                        // New users get Compact by default, migrate existing users to Compact for consistency
-                        if (!settings.UIPresetMigrationApplied && settings.UIPreset == UIPreset.Default)
-                        {
-                            settings.UIPreset = UIPreset.Compact;
-                            settings.UIPresetMigrationApplied = true; // Mark migration as done
-                            ErrorLogger.LogMessage("BUG-009 FIX: Migrated UI preset from Default to Compact (one-time migration)");
-                            _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
-                        }
-                        else if (!settings.UIPresetMigrationApplied)
-                        {
-                            // User already has non-Default preset, just mark migration as done
-                            settings.UIPresetMigrationApplied = true;
-                            _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
-                        }
+                        // UI Preset is now hardcoded to Compact - migration code removed
 
                         // Verify whisper model exists
                         ValidateWhisperModel();
@@ -584,7 +568,6 @@ namespace VoiceLite
                 // Initialize services BEFORE coordinator (coordinator needs these references)
                 historyService = new TranscriptionHistoryService(settings);
                 soundService = new SoundService();
-                analyticsService = new AnalyticsService(settings);
 
                 // Initialize production telemetry (privacy-first, opt-in)
                 telemetry = new SimpleTelemetry(settings);
@@ -593,7 +576,7 @@ namespace VoiceLite
 
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
                 if (audioRecorder == null || whisperService == null || textInjector == null ||
-                    historyService == null || analyticsService == null || soundService == null)
+                    historyService == null || soundService == null)
                 {
                     throw new InvalidOperationException(
                         "Failed to initialize core services - one or more required services is null. " +
@@ -606,7 +589,7 @@ namespace VoiceLite
                     whisperService,
                     textInjector,
                     historyService,
-                    analyticsService,
+                    null,
                     soundService,
                     settings);
 
@@ -627,7 +610,6 @@ namespace VoiceLite
 
                 systemTrayManager = new SystemTrayManager(this);
                 systemTrayManager.AccountMenuClicked += OnTrayAccountMenuClicked;
-                systemTrayManager.ReportBugMenuClicked += OnTrayReportBugMenuClicked;
 
                 // Initialize memory monitoring
                 memoryMonitor = new MemoryMonitor();
@@ -777,38 +759,8 @@ namespace VoiceLite
 
         private async void CheckAnalyticsConsentAsync()
         {
-            try
-            {
-                // If consent not asked yet (null), show consent dialog
-                if (settings.EnableAnalytics == null)
-                {
-                    // Small delay to let the main window fully load
-                    await Task.Delay(1000);
-
-                    currentAnalyticsConsentWindow = new AnalyticsConsentWindow(settings);
-                    currentAnalyticsConsentWindow.Owner = this;
-                    var result = currentAnalyticsConsentWindow.ShowDialog();
-
-                    // Save settings after consent decision
-                    SaveSettings();
-
-                    // If user consented, track app launch
-                    if (settings.EnableAnalytics == true && analyticsService != null)
-                    {
-                        await analyticsService.TrackAppLaunchAsync();
-                    }
-                }
-                else if (settings.EnableAnalytics == true && analyticsService != null)
-                {
-                    // User already consented, track app launch
-                    await analyticsService.TrackAppLaunchAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Analytics consent check failed", ex);
-                // Fail silently - analytics should never break the app
-            }
+            // Analytics removed - no action needed
+            await Task.CompletedTask;
         }
 
         private string GetHotkeyDisplayString()
@@ -1504,7 +1456,6 @@ namespace VoiceLite
                 TranscriptionText.Text = "Processing timed out - app recovered";
                 TranscriptionText.Foreground = Brushes.Orange;
                 UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-                this.BorderThickness = new Thickness(0);
 
                 // Reset all state flags
                 lock (recordingLock)
@@ -1663,8 +1614,6 @@ namespace VoiceLite
                     {
                         case "Recording":
                             UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
-                            this.BorderBrush = new SolidColorBrush(StatusColors.Recording);
-                            this.BorderThickness = new Thickness(3);
                             break;
 
                         case "Transcribing":
@@ -1752,7 +1701,6 @@ namespace VoiceLite
                             TranscriptionText.Text = "(No speech detected)";
                             TranscriptionText.Foreground = Brushes.Gray;
                             UpdateStatus("Ready", Brushes.Green);
-                            this.BorderThickness = new Thickness(0);
                         }
 
                         // Reset TranscriptionText to ready state after delay (fire-and-forget)
@@ -1891,11 +1839,10 @@ namespace VoiceLite
         /// </summary>
         private void BatchUpdateTranscriptionSuccess(TranscriptionCompleteEventArgs e)
         {
-            // All 5 UI updates batched together
+            // All UI updates batched together
             TranscriptionText.Text = e.Transcription;
             TranscriptionText.Foreground = Brushes.Black;
             UpdateStatus("✓ Transcribed successfully", Brushes.Green);
-            this.BorderThickness = new Thickness(0);
 
             // Start revert timer (already on UI thread, no Dispatcher needed)
             var revertTimer = new System.Windows.Threading.DispatcherTimer
@@ -1935,7 +1882,6 @@ namespace VoiceLite
             TranscriptionText.Text = errorMessage;
             TranscriptionText.Foreground = Brushes.Red;
             UpdateStatus("Error", Brushes.Red);
-            this.BorderThickness = new Thickness(0);
         }
 
         /// <summary>
@@ -2073,7 +2019,7 @@ namespace VoiceLite
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
 
-            currentSettingsWindow = new SettingsWindowNew(settings, analyticsService, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+            currentSettingsWindow = new SettingsWindowNew(settings, null, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
             currentSettingsWindow.Owner = this;
 
             if (currentSettingsWindow.ShowDialog() == true)
@@ -2503,7 +2449,6 @@ namespace VoiceLite
                 if (systemTrayManager != null)
                 {
                     systemTrayManager.AccountMenuClicked -= OnTrayAccountMenuClicked;
-                    systemTrayManager.ReportBugMenuClicked -= OnTrayReportBugMenuClicked;
                 }
 
                 if (memoryMonitor != null)
@@ -2518,8 +2463,6 @@ namespace VoiceLite
                 }
 
                 // Dispose child windows (WPF Window resources)
-                try { currentAnalyticsConsentWindow?.Close(); } catch { }
-                currentAnalyticsConsentWindow = null;
 
                 try { currentLoginWindow?.Close(); } catch { }
                 currentLoginWindow = null;
@@ -2587,47 +2530,6 @@ namespace VoiceLite
             await Dispatcher.InvokeAsync(() => AccountButton_Click(sender ?? this, new RoutedEventArgs()));
         }
 
-        private void OnTrayReportBugMenuClicked(object? sender, EventArgs e)
-        {
-            try
-            {
-                // Get last error from ErrorLogger if available
-                string? lastError = null;
-                try
-                {
-                    var logPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "VoiceLite", "logs", "voicelite.log");
-
-                    if (File.Exists(logPath))
-                    {
-                        // Read last 500 characters of log file to get recent errors
-                        using var stream = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        if (stream.Length > 500)
-                        {
-                            stream.Seek(-500, SeekOrigin.End);
-                        }
-                        using var reader = new StreamReader(stream);
-                        lastError = reader.ReadToEnd();
-                    }
-                }
-                catch
-                {
-                    // Ignore errors reading log file
-                }
-
-                // Show feedback window
-                currentFeedbackWindow = new FeedbackWindow(settings, lastError);
-                currentFeedbackWindow.Owner = this;
-                currentFeedbackWindow.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("OnTrayReportBugMenuClicked", ex);
-                MessageBox.Show("Failed to open feedback window. Please try again.",
-                    "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         private async Task SignOutAsync()
         {
