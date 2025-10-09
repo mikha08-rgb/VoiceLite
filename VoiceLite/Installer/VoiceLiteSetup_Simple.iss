@@ -42,7 +42,6 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-sm
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\server.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
 
 ; Icon file

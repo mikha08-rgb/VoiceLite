@@ -88,15 +88,14 @@ jobs:
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
 
-        # Download whisper.cpp binaries (includes all DLLs + executables)
+        # Download whisper.cpp binaries (whisper.exe + DLLs)
         $whisperBinUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
-        echo "Downloading whisper.cpp binaries (whisper.exe, whisper.dll, server.exe, DLLs)..."
+        echo "Downloading whisper.cpp binaries (whisper.exe, whisper.dll, DLLs)..."
         Invoke-WebRequest -Uri $whisperBinUrl -OutFile "whisper-temp.zip"
         Expand-Archive -Path "whisper-temp.zip" -DestinationPath "whisper-temp" -Force
 
         # Copy all required files
         Copy-Item -Path "whisper-temp/main.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
-        Copy-Item -Path "whisper-temp/server.exe" -Destination "VoiceLite/whisper_installer/server.exe" -Force
         Copy-Item -Path "whisper-temp/*.dll" -Destination "VoiceLite/whisper_installer/" -Force
 
         Remove-Item "whisper-temp.zip" -Force
@@ -205,9 +204,8 @@ jobs:
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
 
-        # Copy only whisper executables and Tiny model (no Small model)
+        # Copy only whisper executable, DLLs, and Tiny model (no Small model)
         Copy-Item -Path "VoiceLite/whisper_installer/whisper.exe" -Destination "VoiceLite/whisper_installer_lite/whisper.exe" -Force
-        Copy-Item -Path "VoiceLite/whisper_installer/server.exe" -Destination "VoiceLite/whisper_installer_lite/server.exe" -Force
         Copy-Item -Path "VoiceLite/whisper_installer/ggml-tiny.bin" -Destination "VoiceLite/whisper_installer_lite/ggml-tiny.bin" -Force
         Copy-Item -Path "VoiceLite/whisper_installer/*.dll" -Destination "VoiceLite/whisper_installer_lite/" -Force
 
