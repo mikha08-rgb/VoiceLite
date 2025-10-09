@@ -521,25 +521,9 @@ namespace VoiceLite.Services
                     throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
                 }
 
-                var result = outputBuilder.ToString();
-
-                // Clean up the output - remove system messages and empty lines
-                var lines = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                var cleanedResult = new StringBuilder();
-                foreach (var line in lines)
-                {
-                    // Skip system messages from whisper
-                    if (!line.StartsWith("[") && !line.Contains("whisper_") && !line.Contains("ggml_"))
-                    {
-                        cleanedResult.AppendLine(line.Trim());
-                    }
-                }
-
-                result = cleanedResult.ToString().Trim();
-
-                // Post-process the transcription
-                var customDict = settings.EnableCustomDictionary ? settings.CustomDictionaryEntries : null;
-                result = TranscriptionPostProcessor.ProcessTranscription(result, settings.UseEnhancedDictionary, customDict, settings.PostProcessing);
+                // SIMPLIFICATION: Return 100% raw Whisper output (zero filtering)
+                // All post-processing and cleanup removed - rebuild from clean slate
+                var result = outputBuilder.ToString().Trim();
 
                 var totalTime = DateTime.Now - startTime;
                 ErrorLogger.LogMessage($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms");
