@@ -44,6 +44,10 @@ namespace VoiceLite
         private bool IsRecording => recordingCoordinator?.IsRecording ?? false;
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
+
+        // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
+        // More reliable than time-based check (works on slow PCs with 10+ second startup)
+        private bool isInitializing = true;
         // TIER 1.4: Replaced lock with SemaphoreSlim for async compatibility
         private readonly SemaphoreSlim saveSettingsSemaphore = new SemaphoreSlim(1, 1);
         private DateTime lastClickTime = DateTime.MinValue;
@@ -574,33 +578,8 @@ namespace VoiceLite
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
                 }
 
-                // CRITICAL FIX: Initialize Whisper service asynchronously with progress feedback
-                if (settings.UseWhisperServer)
-                {
-                    StatusText.Text = "Starting Whisper server...";
-                    var serverService = new WhisperServerService(settings);
-
-                    try
-                    {
-                        // Run initialization in background - don't block UI
-                        await serverService.InitializeAsync();
-                        whisperService = serverService;
-                        StatusText.Text = "Whisper server ready";
-                    }
-                    catch (Exception ex)
-                    {
-                        // Server failed to start - show notification and fall back to process mode
-                        ErrorLogger.LogError($"Whisper Server Mode failed to start: {ex.Message}", ex);
-                        ShowServerFallbackNotification();
-
-                        // Fall back to process mode
-                        whisperService = new PersistentWhisperService(settings);
-                    }
-                }
-                else
-                {
-                    whisperService = new PersistentWhisperService(settings);
-                }
+                // Initialize Whisper service using process mode
+                whisperService = new PersistentWhisperService(settings);
 
                 // Initialize services BEFORE coordinator (coordinator needs these references)
                 historyService = new TranscriptionHistoryService(settings);
@@ -715,6 +694,9 @@ namespace VoiceLite
                     StatusText.Text = "Ready";
                     StatusText.Foreground = Brushes.Green;
                 }
+
+                // UI BUG FIX: Initialization complete - allow polling mode warnings to show now
+                isInitializing = false;
 
                 // Step 5: Check for first-run diagnostics (blocking for critical issues)
                 await CheckFirstRunDiagnosticsAsync();
@@ -1263,12 +1245,12 @@ namespace VoiceLite
         {
             try
             {
-                // BUG FIX: Suppress polling mode notification during startup (first 2 seconds)
-                // This prevents the orange warning from appearing on app launch
-                var timeSinceStartup = DateTime.Now - Process.GetCurrentProcess().StartTime;
-                if (timeSinceStartup.TotalSeconds < 2)
+                // UI BUG FIX: Suppress polling mode notification during initialization
+                // Prevents overlapping yellow text bug on launch (even on slow PCs with 10+ second startup)
+                // Replaced time-based check with initialization flag for 100% reliability
+                if (isInitializing)
                 {
-                    ErrorLogger.LogDebug($"Suppressing polling mode notification during startup: {message}");
+                    ErrorLogger.LogDebug($"Suppressing polling mode notification during initialization: {message}");
                     return;
                 }
 
@@ -2185,24 +2167,6 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Show one-time notification when Whisper Server Mode fails to start
-        /// </summary>
-        private void ShowServerFallbackNotification()
-        {
-            if (!settings.HasSeenServerFallbackNotification)
-            {
-                MessageBox.Show(
-                    "Fast Mode couldn't start. Using standard speed (still works great!).\n\n" +
-                    "Tip: Try restarting the app or disable Fast Mode in Settings → Advanced.",
-                    "Performance Mode Unavailable",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information
-                );
-                settings.HasSeenServerFallbackNotification = true;
-                _ = Task.Run(() => SaveSettingsAsync()); // Save in background
-            }
-        }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {

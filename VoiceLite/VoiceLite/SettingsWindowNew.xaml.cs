@@ -24,7 +24,6 @@ namespace VoiceLite
         private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
         private AnalyticsService? analyticsService;
         private string? originalModel;
-        private bool originalUseWhisperServer;
 
         public Settings Settings => settings;
 
@@ -36,7 +35,6 @@ namespace VoiceLite
             testRecordingCallback = onTestRecording;
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
-            originalUseWhisperServer = settings.UseWhisperServer;
 
             DownloadModelsButton.Visibility = Visibility.Visible;
             UpdateModelDownloadButton();
@@ -133,14 +131,25 @@ namespace VoiceLite
 
         private void UpdateModelDownloadButton()
         {
+            var tinyInstalled = IsModelInstalled("ggml-tiny.bin");
             var mediumInstalled = IsModelInstalled("ggml-medium.bin");
 
-            if (mediumInstalled)
+            if (tinyInstalled && mediumInstalled)
             {
-                DownloadModelsButton.Content = "Medium model installed";
+                DownloadModelsButton.Content = "All models installed";
                 DownloadModelsButton.IsEnabled = false;
             }
-            else
+            else if (!tinyInstalled && !mediumInstalled)
+            {
+                DownloadModelsButton.Content = "Download Tiny + Medium Models (1.6GB)";
+                DownloadModelsButton.IsEnabled = true;
+            }
+            else if (!tinyInstalled)
+            {
+                DownloadModelsButton.Content = "Download Tiny Model (75MB)";
+                DownloadModelsButton.IsEnabled = true;
+            }
+            else // !mediumInstalled
             {
                 DownloadModelsButton.Content = "Download Medium Model (1.5GB)";
                 DownloadModelsButton.IsEnabled = true;
@@ -299,16 +308,6 @@ namespace VoiceLite
             SaveSettings();
             saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
 
-            // Check if UseWhisperServer changed - requires restart
-            if (settings.UseWhisperServer != originalUseWhisperServer)
-            {
-                MessageBox.Show(
-                    "Whisper Server mode change requires an app restart to take effect.",
-                    "Restart Required",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-
             // Track analytics if enabled
             _ = TrackAnalyticsChangesAsync();
 
@@ -432,10 +431,13 @@ namespace VoiceLite
                 return;
             }
 
-            if (IsModelInstalled("ggml-medium.bin"))
+            var tinyInstalled = IsModelInstalled("ggml-tiny.bin");
+            var mediumInstalled = IsModelInstalled("ggml-medium.bin");
+
+            if (tinyInstalled && mediumInstalled)
             {
                 UpdateModelDownloadButton();
-                StatusText.Text = "Medium model is already available";
+                StatusText.Text = "All models are already installed";
                 return;
             }
 
@@ -444,11 +446,21 @@ namespace VoiceLite
 
             try
             {
-                var models = new[]
+                // Build list of models to download based on what's missing
+                var modelsToDownload = new List<(string, string)>();
+
+                if (!tinyInstalled)
                 {
-                    ("ggml-medium.bin", "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin")
-                    // Large model (2.9GB) exceeds GitHub's 2GB limit - will be added in future update
-                };
+                    modelsToDownload.Add(("ggml-tiny.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"));
+                }
+
+                if (!mediumInstalled)
+                {
+                    modelsToDownload.Add(("ggml-medium.bin", "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin"));
+                }
+
+                var models = modelsToDownload.ToArray();
+                // Large model (2.9GB) exceeds GitHub's 2GB limit - will be added in future update
 
                 var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
                 Directory.CreateDirectory(whisperPath);
