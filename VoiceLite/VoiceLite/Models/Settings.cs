@@ -19,38 +19,6 @@ namespace VoiceLite.Models
         PreferPaste     // Paste when possible, type when necessary
     }
 
-    public enum FillerWordRemovalLevel
-    {
-        None,
-        Light,       // Only hesitations (um, uh)
-        Moderate,    // Hesitations + verbal tics
-        Aggressive,  // All built-in lists
-        Custom       // User-defined
-    }
-
-    public enum ContractionMode
-    {
-        LeaveAsIs,
-        Expand,      // don't → do not
-        Contract     // do not → don't
-    }
-
-    public enum EndingPunctuationType
-    {
-        Period,
-        Question,
-        Exclamation,
-        None
-    }
-
-    public enum PostProcessingPreset
-    {
-        Custom,
-        Professional,
-        Code,
-        Casual
-    }
-
     public enum AudioPreset
     {
         Default,
@@ -63,55 +31,6 @@ namespace VoiceLite.Models
     {
         Default,        // Hybrid baseline - clean and balanced
         Compact         // Power user - maximum density
-    }
-
-    public class FillerWordLists
-    {
-        public bool Hesitations { get; set; } = false;  // um, uh, er, ah
-        public bool VerbalTics { get; set; } = false;   // like, you know, I mean
-        public bool Qualifiers { get; set; } = false;   // sort of, kind of
-        public bool Intensifiers { get; set; } = false; // literally, actually
-        public bool Transitions { get; set; } = false;  // so yeah, anyway
-
-        // Each list has editable word collections
-        public List<string> HesitationWords { get; set; } = new List<string> { "um", "uh", "er", "ah", "hmm" };
-        public List<string> VerbalTicWords { get; set; } = new List<string> { "like", "you know", "I mean", "I guess", "I think", "right", "yeah no", "no yeah" };
-        public List<string> QualifierWords { get; set; } = new List<string> { "sort of", "kind of", "pretty much", "more or less", "somewhat", "rather" };
-        public List<string> IntensifierWords { get; set; } = new List<string> { "literally", "actually", "honestly", "seriously", "totally", "absolutely", "definitely" };
-        public List<string> TransitionWords { get; set; } = new List<string> { "so yeah", "anyway", "well", "alright", "OK" };
-    }
-
-    public class PostProcessingSettings
-    {
-        // Capitalization
-        public bool EnableCapitalization { get; set; } = true;
-        public bool CapitalizeFirstLetter { get; set; } = true;
-        public bool CapitalizeAfterPeriod { get; set; } = true;
-        public bool CapitalizeAfterQuestionExclamation { get; set; } = true;
-        public List<string> CapitalizationExceptions { get; set; } = new List<string> { "iPhone", "eBay", "iOS" };
-
-        // Ending Punctuation
-        public bool EnableEndingPunctuation { get; set; } = true;
-        public EndingPunctuationType DefaultPunctuation { get; set; } = EndingPunctuationType.Period;
-        public bool UseSmartPunctuation { get; set; } = false; // Detect questions
-        public bool OnlyAddIfMissing { get; set; } = true;
-
-        // Filler Words
-        public FillerWordRemovalLevel FillerRemovalIntensity { get; set; } = FillerWordRemovalLevel.None;
-        public FillerWordLists EnabledLists { get; set; } = new FillerWordLists();
-        public List<string> CustomFillerWords { get; set; } = new List<string>();
-        public bool CaseSensitiveFillerRemoval { get; set; } = false;
-
-        // Contractions
-        public ContractionMode ContractionHandling { get; set; } = ContractionMode.LeaveAsIs;
-
-        // Grammar
-        public bool FixHomophones { get; set; } = false;
-        public bool FixDoubleNegatives { get; set; } = false;
-        public bool FixSubjectVerbAgreement { get; set; } = false;
-
-        // Presets
-        public PostProcessingPreset ActivePreset { get; set; } = PostProcessingPreset.Custom;
     }
 
     public class Settings
@@ -262,9 +181,6 @@ namespace VoiceLite.Models
         // First-Run Experience
         public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
         public bool HasSeenFirstRunDiagnostics { get; set; } = false; // Show first-run diagnostic window after installation
-
-        // Post-Processing Settings
-        public PostProcessingSettings PostProcessing { get; set; } = new PostProcessingSettings();
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
