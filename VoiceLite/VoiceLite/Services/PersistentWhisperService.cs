@@ -33,9 +33,6 @@ namespace VoiceLite.Services
         private readonly HashSet<int> activeProcessIds = new();
         private readonly object processLock = new object();
 
-        // PERFORMANCE: Periodic warmup to keep model in OS disk cache
-        private System.Threading.Timer? warmupTimer;
-        private const int WARMUP_INTERVAL_MINUTES = 5; // Run warmup every 5 minutes
 
         public PersistentWhisperService(Settings settings)
         {
@@ -62,15 +59,6 @@ namespace VoiceLite.Services
                     ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
                 }
             }, disposeCts.Token);
-
-            // PERFORMANCE: Start periodic warmup timer to keep model hot in OS cache
-            // This ensures consistent low latency even after idle periods
-            warmupTimer = new System.Threading.Timer(
-                callback: async _ => await PeriodicWarmupCallback(),
-                state: null,
-                dueTime: TimeSpan.FromMinutes(WARMUP_INTERVAL_MINUTES),
-                period: TimeSpan.FromMinutes(WARMUP_INTERVAL_MINUTES)
-            );
         }
 
         private string ResolveWhisperExePath()
@@ -277,26 +265,6 @@ namespace VoiceLite.Services
             }
         }
 
-        /// <summary>
-        /// PERFORMANCE: Periodic warmup callback to keep model hot in OS disk cache
-        /// Runs every 5 minutes in background to ensure consistent low latency
-        /// </summary>
-        private async Task PeriodicWarmupCallback()
-        {
-            if (isDisposed || disposeCts.IsCancellationRequested)
-                return;
-
-            try
-            {
-                ErrorLogger.LogMessage("Periodic warmup: Keeping model file hot in OS cache");
-                await WarmUpWhisperAsync();
-            }
-            catch (Exception ex)
-            {
-                // Non-critical - log but don't crash
-                ErrorLogger.LogMessage($"Periodic warmup failed (non-critical): {ex.Message}");
-            }
-        }
 
         public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
         {
@@ -434,48 +402,8 @@ namespace VoiceLite.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                // Smart timeout calculation
-                var audioInfo = new FileInfo(audioFilePath);
-
-                // Calculate timeout based on multiple factors
-                int timeoutSeconds;
-                if (!isWarmedUp)
-                {
-                    // BUG-005 FIX: Increased from 120s to 180s (3 minutes) for first run
-                    // On slow systems (4GB RAM, antivirus scanning), 466MB model can take 30-120s to load
-                    // Additional headroom prevents false timeouts on resource-constrained systems
-                    timeoutSeconds = 180; // 180 seconds (3 minutes) for first run
-                    ErrorLogger.LogMessage("BUG-005 FIX: Using extended timeout for first run (180s) - model loading may take time on slow systems");
-                }
-                else
-                {
-                    // Calculate based on file size and typical processing speed
-                    // Whisper typically processes at 10-50x realtime speed depending on model
-                    var estimatedAudioSeconds = audioInfo.Length / 32000.0; // Rough estimate (16kHz, 16-bit)
-
-                    // Use model-specific multiplier
-                    var processingMultiplier = settings.WhisperModel switch
-                    {
-                        "ggml-tiny.bin" => 2.0,    // Very fast
-                        "ggml-base.bin" => 3.0,    // Fast
-                        "ggml-small.bin" => 5.0,   // Default
-                        "ggml-medium.bin" => 10.0, // Slower
-                        "ggml-large-v3.bin" => 20.0, // Slowest
-                        _ => 5.0
-                    };
-
-                    timeoutSeconds = Math.Max(10, (int)(estimatedAudioSeconds * processingMultiplier) + 5);
-
-                    // BUG FIX: Apply user multiplier BEFORE capping, not after
-                    // This allows users to increase timeout for large models/files
-                    timeoutSeconds = (int)(timeoutSeconds * settings.WhisperTimeoutMultiplier);
-
-                    // Cap at reasonable max (10 minutes) to prevent infinite waits
-                    timeoutSeconds = Math.Min(timeoutSeconds, 600); // 10 minutes max
-                    timeoutSeconds = Math.Max(1, timeoutSeconds); // Minimum 1 second
-                }
-
-                ErrorLogger.LogMessage($"Timeout set to {timeoutSeconds}s for {audioInfo.Length} byte file (multiplier: {settings.WhisperTimeoutMultiplier})");
+                // Fixed timeout - fail fast instead of complex calculation
+                int timeoutSeconds = 60; // 60 seconds max
 
                 bool exited = await Task.Run(() => process.WaitForExit(timeoutSeconds * 1000));
 
@@ -697,14 +625,6 @@ namespace VoiceLite.Services
 
             isDisposed = true;
 
-            // PERFORMANCE: Stop periodic warmup timer
-            try
-            {
-                warmupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-                warmupTimer?.Dispose();
-                warmupTimer = null;
-            }
-            catch { /* Ignore timer disposal errors */ }
 
             // Cancel all background tasks (warmup tasks)
             try

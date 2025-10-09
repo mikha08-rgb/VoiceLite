@@ -9,7 +9,7 @@ namespace VoiceLite.Services
 {
     /// <summary>
     /// Coordinates the recording workflow: audio capture, transcription, text injection, and history.
-    /// Keeps business logic separate from UI concerns.
+    /// Simplified version with fail-fast errors and single timeout.
     /// </summary>
     public class RecordingCoordinator : IDisposable
     {
@@ -17,25 +17,18 @@ namespace VoiceLite.Services
         private readonly ITranscriber whisperService;
         private readonly TextInjector textInjector;
         private readonly TranscriptionHistoryService? historyService;
-        private readonly AnalyticsService? analyticsService;
         private readonly SoundService? soundService;
         private readonly Settings settings;
 
-        // WEEK1-DAY3: State machine replaces 3 separate bool flags (_isRecording, isCancelled, isTranscribing)
         private readonly RecordingStateMachine stateMachine;
 
         private DateTime recordingStartTime;
         private readonly object recordingLock = new object();
         private System.Threading.Timer? transcriptionWatchdog;
-        private System.Threading.Timer? stoppingTimeoutTimer;
-        private System.Threading.Timer? stuckStateWatchdog; // RELIABILITY: Periodic check for stuck states
-        private int transcriptionCompletedFlag = 0; // 0 = not completed, 1 = completed (atomic)
-        private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents use-after-dispose
+        private volatile bool isDisposed = false;
         private DateTime transcriptionStartTime;
-        private const int TRANSCRIPTION_TIMEOUT_SECONDS = 120; // 2 minutes max
-        private const int STOPPING_TIMEOUT_SECONDS = 10; // 10 seconds max to wait for AudioFileReady
-        private const int STUCK_STATE_CHECK_INTERVAL_SECONDS = 30; // Check every 30 seconds
-        private readonly System.Threading.ManualResetEventSlim transcriptionComplete = new System.Threading.ManualResetEventSlim(true); // WEEK1-DAY2: Signaling for disposal (true = initially set)
+        private const int TRANSCRIPTION_TIMEOUT_SECONDS = 60; // 1 minute max
+        private readonly System.Threading.ManualResetEventSlim transcriptionComplete = new System.Threading.ManualResetEventSlim(true);
 
         // Events for MainWindow to subscribe to
         public event EventHandler<RecordingStatusEventArgs>? StatusChanged;
@@ -60,23 +53,12 @@ namespace VoiceLite.Services
             this.whisperService = whisperService ?? throw new ArgumentNullException(nameof(whisperService));
             this.textInjector = textInjector ?? throw new ArgumentNullException(nameof(textInjector));
             this.historyService = historyService;
-            this.analyticsService = analyticsService;
             this.soundService = soundService;
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
-            // WEEK1-DAY3: Initialize state machine
             this.stateMachine = new RecordingStateMachine();
 
-            // Wire up audio recorder events
             audioRecorder.AudioFileReady += OnAudioFileReady;
-
-            // RELIABILITY: Start stuck state watchdog - checks every 30s for hung states
-            stuckStateWatchdog = new System.Threading.Timer(
-                callback: _ => CheckForStuckStates(),
-                state: null,
-                dueTime: TimeSpan.FromSeconds(STUCK_STATE_CHECK_INTERVAL_SECONDS),
-                period: TimeSpan.FromSeconds(STUCK_STATE_CHECK_INTERVAL_SECONDS)
-            );
         }
 
         /// <summary>
@@ -84,37 +66,19 @@ namespace VoiceLite.Services
         /// </summary>
         public void StartRecording()
         {
-            ErrorLogger.LogDebug($"RecordingCoordinator.StartRecording: Entry - state={stateMachine.CurrentState}");
-
             lock (recordingLock)
             {
-                // WEEK1-DAY3: Use state machine instead of bool flag
-                // CRITICAL FIX: Add force-reset recovery when state machine gets stuck
+                // Fail-fast: Reset if stuck in non-Idle state (defensive recovery for rapid hotkey presses)
+                if (stateMachine.CurrentState != RecordingState.Idle)
+                {
+                    ErrorLogger.LogWarning($"StartRecording called from {stateMachine.CurrentState}, forcing reset to Idle");
+                    stateMachine.Reset();
+                }
+
                 if (!stateMachine.TryTransition(RecordingState.Recording))
                 {
-                    ErrorLogger.LogWarning($"RecordingCoordinator.StartRecording: REJECTED - Cannot transition to Recording from {stateMachine.CurrentState}");
-
-                    // Force recovery if stuck in non-Idle state (prevents permanent freeze)
-                    if (stateMachine.CurrentState != RecordingState.Idle)
-                    {
-                        ErrorLogger.LogWarning($"RecordingCoordinator: Force-resetting stuck state machine from {stateMachine.CurrentState} to Idle");
-                        stateMachine.Reset(); // Force back to Idle
-
-                        // Retry transition after reset
-                        if (!stateMachine.TryTransition(RecordingState.Recording))
-                        {
-                            ErrorLogger.LogWarning("RecordingCoordinator: Force-reset FAILED - still cannot start recording");
-                            ErrorOccurred?.Invoke(this, "Recording failed to start. Please restart VoiceLite.");
-                            return;
-                        }
-                        ErrorLogger.LogMessage("RecordingCoordinator: Force-reset SUCCEEDED - recording starting");
-                    }
-                    else
-                    {
-                        // Already in Idle state, this is a genuine rejection (shouldn't happen)
-                        ErrorLogger.LogWarning("RecordingCoordinator: Cannot start recording from Idle state - this should not happen!");
-                        return;
-                    }
+                    ErrorLogger.LogWarning($"Cannot start recording from {stateMachine.CurrentState}");
+                    return;
                 }
 
                 try
@@ -122,26 +86,21 @@ namespace VoiceLite.Services
                     recordingStartTime = DateTime.Now;
                     audioRecorder.StartRecording();
 
-                    // Notify UI
                     StatusChanged?.Invoke(this, new RecordingStatusEventArgs
                     {
                         Status = "Recording",
                         IsRecording = true,
                         ElapsedSeconds = 0
                     });
-
-                    ErrorLogger.LogDebug("RecordingCoordinator.StartRecording: Recording started successfully");
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("No microphone"))
                 {
-                    ErrorLogger.LogWarning($"StartRecording failed: No microphone - {ex.Message}");
                     stateMachine.TryTransition(RecordingState.Error);
                     stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, $"No microphone detected!\n\nPlease connect a microphone and restart the application.");
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("Failed to access"))
                 {
-                    ErrorLogger.LogWarning($"StartRecording failed: Microphone busy - {ex.Message}");
                     stateMachine.TryTransition(RecordingState.Error);
                     stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, ex.Message);
@@ -162,16 +121,13 @@ namespace VoiceLite.Services
         /// <param name="cancel">If true, discards recording without transcription</param>
         public void StopRecording(bool cancel = false)
         {
-            ErrorLogger.LogDebug($"RecordingCoordinator.StopRecording: Entry - state={stateMachine.CurrentState}, cancel={cancel}");
-
             lock (recordingLock)
             {
-                // WEEK1-DAY3: Use state machine transitions
                 RecordingState targetState = cancel ? RecordingState.Cancelled : RecordingState.Stopping;
 
                 if (!stateMachine.TryTransition(targetState))
                 {
-                    ErrorLogger.LogWarning($"RecordingCoordinator.StopRecording: Cannot transition to {targetState} from {stateMachine.CurrentState}");
+                    ErrorLogger.LogWarning($"Cannot transition to {targetState} from {stateMachine.CurrentState}");
                     return;
                 }
 
@@ -179,42 +135,21 @@ namespace VoiceLite.Services
                 {
                     if (cancel)
                     {
-                        ErrorLogger.LogInfo("Recording cancelled by user");
-
-                        // BUG-009 FIX: Stop all watchdog timers immediately on cancel
-                        // Prevents false "stuck state" recovery after user cancellation
-                        StopStoppingTimeoutTimer();
                         StopTranscriptionWatchdog();
                     }
 
                     audioRecorder.StopRecording();
 
-                    // Notify UI
                     StatusChanged?.Invoke(this, new RecordingStatusEventArgs
                     {
                         Status = cancel ? "Cancelled" : "Processing",
                         IsRecording = false,
                         IsCancelled = cancel
                     });
-
-                    // BUG FIX: Start safety timer to recover if AudioFileReady never fires
-                    // This prevents state machine from getting stuck in Stopping state
-                    // Only needed for normal stop (not cancellation, which goes directly to Idle)
-                    if (!cancel)
-                    {
-                        StartStoppingTimeoutTimer();
-                    }
-
-                    ErrorLogger.LogDebug("RecordingCoordinator.StopRecording: Recording stopped successfully");
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("RecordingCoordinator.StopRecording failed", ex);
-
-                    // Clean up timeout timer if it was started
-                    StopStoppingTimeoutTimer();
-
-                    // Transition to error state, then back to idle
                     stateMachine.TryTransition(RecordingState.Error);
                     stateMachine.TryTransition(RecordingState.Idle);
                     ErrorOccurred?.Invoke(this, "Error stopping recording");
@@ -227,7 +162,6 @@ namespace VoiceLite.Services
         /// </summary>
         public TimeSpan GetRecordingDuration()
         {
-            // WEEK1-DAY3: Use state machine instead of bool flag
             if (stateMachine.CurrentState != RecordingState.Recording)
                 return TimeSpan.Zero;
 
@@ -250,33 +184,19 @@ namespace VoiceLite.Services
         /// </summary>
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
-            // CRIT-003 FIX: Wrap entire async void method in try-catch to prevent app crash
             try
             {
-                // BUG FIX: Stop safety timer since AudioFileReady fired successfully
-                StopStoppingTimeoutTimer();
-
-                // DISPOSAL SAFETY: Early exit if disposed
                 if (isDisposed)
                 {
-                    ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Disposed, skipping transcription");
                     await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                     return;
                 }
 
-                // WEEK1-DAY3: Check state machine instead of isCancelled flag
                 var currentState = stateMachine.CurrentState;
-                ErrorLogger.LogMessage($"RecordingCoordinator.OnAudioFileReady: Entry - state={currentState}, file={audioFilePath}");
 
-                // If recording was cancelled, just clean up and return
                 if (currentState == RecordingState.Cancelled)
                 {
-                    ErrorLogger.LogMessage("RecordingCoordinator.OnAudioFileReady: Recording was cancelled, skipping transcription");
-
-                    // Stop timeout timer if it's still running (defensive cleanup)
-                    StopStoppingTimeoutTimer();
-
-                    stateMachine.TryTransition(RecordingState.Idle); // Reset to idle
+                    stateMachine.TryTransition(RecordingState.Idle);
                     await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                     return;
                 }
@@ -287,188 +207,42 @@ namespace VoiceLite.Services
             {
                 ErrorLogger.LogError("CRITICAL: Unhandled exception in OnAudioFileReady", ex);
 
-                // Fire error event to notify UI
-                var errorArgs = new TranscriptionCompleteEventArgs
+                TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
                 {
                     Transcription = string.Empty,
                     ErrorMessage = $"Fatal transcription error: {ex.Message}",
                     Success = false
-                };
+                });
 
-                try
-                {
-                    TranscriptionCompleted?.Invoke(this, errorArgs);
-                }
-                catch (Exception invokeEx)
-                {
-                    ErrorLogger.LogError("Failed to invoke TranscriptionCompleted error event", invokeEx);
-                }
-
-                // Clean up audio file
-                try
-                {
-                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
-                }
-                catch (Exception cleanupEx)
-                {
-                    ErrorLogger.LogError("Failed to cleanup audio file after error", cleanupEx);
-                }
+                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
             }
         }
 
         private async Task ProcessAudioFileAsync(string audioFilePath)
         {
-            // RELIABILITY: Pre-flight health checks - fail fast instead of timing out after 120s
-            try
-            {
-                // Check 1: Audio file exists and has content
-                var fileInfo = new FileInfo(audioFilePath);
-                if (!fileInfo.Exists)
-                {
-                    ErrorOccurred?.Invoke(this, "Audio file not found. Recording may have been cancelled.");
-                    return;
-                }
-
-                if (fileInfo.Length < 100) // Less than 100 bytes = no audio data
-                {
-                    ErrorLogger.LogMessage($"Pre-flight check: Audio file too small ({fileInfo.Length} bytes), skipping transcription");
-                    // This is normal for very short recordings - not an error
-                    return;
-                }
-
-                // Check 2: Whisper service is ready (not disposed)
-                if (whisperService == null)
-                {
-                    ErrorOccurred?.Invoke(this, "Transcription service not available.");
-                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
-                    return;
-                }
-
-                ErrorLogger.LogMessage($"Pre-flight checks passed: {fileInfo.Length} bytes audio file ready");
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Pre-flight health check failed", ex);
-                ErrorOccurred?.Invoke(this, $"Pre-flight check failed: {ex.Message}");
-                await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
-                return;
-            }
-
-            // PERFORMANCE: Use original audio file directly (no copy needed)
-            // AudioRecorder already creates unique temp files per recording
-            // Semaphore in WhisperService prevents concurrent access
-            // We still need to clean up the original file after transcription
-            string workingAudioPath = audioFilePath;
-
-            // WEEK1-DAY3: Transition to Transcribing state
             if (!stateMachine.TryTransition(RecordingState.Transcribing))
             {
-                ErrorLogger.LogWarning($"ProcessAudioFileAsync: Cannot transition to Transcribing from {stateMachine.CurrentState}");
+                ErrorLogger.LogWarning($"Cannot transition to Transcribing from {stateMachine.CurrentState}");
                 await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                 return;
             }
 
-            // Notify UI that transcription is starting
             StatusChanged?.Invoke(this, new RecordingStatusEventArgs
             {
                 Status = "Transcribing",
                 IsRecording = false
             });
 
-            // Start watchdog timer to detect stuck transcriptions
             StartTranscriptionWatchdog();
-
-            // WEEK1-DAY2: Signal that transcription is in progress
             transcriptionComplete.Reset();
 
-            // BUG FIX (BUG-007): Move completion flag and event firing logic to prevent double-fire
-            // If event handler throws exception, catch block would fire event again
             TranscriptionCompleteEventArgs? eventArgs = null;
 
             try
             {
-                // RELIABILITY FIX: Retry transcription up to 3 times on failure
-                string? transcription = null;
-                Exception? lastException = null;
-                int maxRetries = 3;
-
-                for (int attempt = 1; attempt <= maxRetries; attempt++)
-                {
-                    try
-                    {
-                        // Run transcription on background thread
-                        transcription = await Task.Run(async () =>
-                            await whisperService.TranscribeAsync(workingAudioPath).ConfigureAwait(false)).ConfigureAwait(false);
-
-                        // Success - break retry loop
-                        break;
-                    }
-                    catch (Exception retryEx) when (attempt < maxRetries)
-                    {
-                        lastException = retryEx;
-
-                        // RELIABILITY: Smart retry logic based on error type
-                        int retryDelayMs = retryEx switch
-                        {
-                            // File not found - don't retry (permanent failure) - CHECK FIRST (before IOException)
-                            FileNotFoundException => int.MaxValue, // Skip retry
-
-                            // Timeout - don't retry (likely stuck, need fresh start)
-                            TimeoutException => int.MaxValue, // Skip retry
-
-                            // File access errors - retry immediately (likely lock contention)
-                            IOException => 0,
-                            UnauthorizedAccessException => 0,
-
-                            // Process errors - short delay then retry
-                            System.ComponentModel.Win32Exception => 200,
-
-                            // Everything else - exponential backoff
-                            _ => 500 * attempt
-                        };
-
-                        // Skip retry for non-retryable errors
-                        if (retryDelayMs == int.MaxValue)
-                        {
-                            ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed with non-retryable error: {retryEx.GetType().Name}");
-                            throw; // Exit retry loop immediately
-                        }
-
-                        ErrorLogger.LogMessage($"Transcription attempt {attempt}/{maxRetries} failed: {retryEx.Message}. Retrying after {retryDelayMs}ms...");
-
-                        if (retryDelayMs > 0)
-                        {
-                            await Task.Delay(retryDelayMs).ConfigureAwait(false);
-                        }
-                    }
-                }
-
-                // If all retries failed, throw the last exception
-                if (transcription == null && lastException != null)
-                {
-                    ErrorLogger.LogMessage($"All {maxRetries} transcription attempts failed");
-                    throw lastException;
-                }
-
-                ErrorLogger.LogMessage($"Transcription result: '{transcription?.Substring(0, Math.Min(transcription?.Length ?? 0, 50))}'... (length: {transcription?.Length})");
-
-                // Track analytics for successful transcription
-                if (!string.IsNullOrWhiteSpace(transcription) && analyticsService != null)
-                {
-                    var wordCount = TextAnalyzer.CountWords(transcription);
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await analyticsService.TrackTranscriptionAsync(settings.WhisperModel, wordCount).ConfigureAwait(false);
-                        }
-                        catch (Exception ex)
-                        {
-                            // BUG FIX (BUG-013): Log analytics failures, don't let them crash transcription
-                            ErrorLogger.LogError("Analytics tracking failed (non-fatal)", ex);
-                        }
-                    });
-                }
+                // Single transcription attempt - fail fast with clear errors
+                string? transcription = await Task.Run(async () =>
+                    await whisperService.TranscribeAsync(audioFilePath).ConfigureAwait(false)).ConfigureAwait(false);
 
                 // Create history item
                 TranscriptionHistoryItem? historyItem = null;
@@ -483,17 +257,12 @@ namespace VoiceLite.Services
                         ModelUsed = settings.WhisperModel
                     };
 
-                    if (!isDisposed)
-                    {
-                        historyService?.AddToHistory(historyItem);
-                    }
+                    historyService?.AddToHistory(historyItem);
                 }
 
-                // WEEK1-DAY3-FIX: ALWAYS transition to Injecting state, even if no text
-                // This prevents invalid Transcribing → Complete transition
                 stateMachine.TryTransition(RecordingState.Injecting);
 
-                // Handle text injection on background thread if we have text
+                // Handle text injection if we have text
                 bool textInjected = false;
                 if (!string.IsNullOrWhiteSpace(transcription))
                 {
@@ -501,12 +270,10 @@ namespace VoiceLite.Services
 
                     if (settings.AutoPaste)
                     {
-                        ErrorLogger.LogMessage("Auto-pasting text via Ctrl+V simulation");
                         StatusChanged?.Invoke(this, new RecordingStatusEventArgs { Status = "Pasting" });
                     }
                     else
                     {
-                        ErrorLogger.LogMessage("Copying text to clipboard (manual paste required)");
                         StatusChanged?.Invoke(this, new RecordingStatusEventArgs { Status = "Copied to clipboard" });
                     }
 
@@ -514,10 +281,8 @@ namespace VoiceLite.Services
                     textInjected = true;
                 }
 
-                // WEEK1-DAY3: Transition to Complete state (success path)
                 stateMachine.TryTransition(RecordingState.Complete);
 
-                // Prepare event args (don't fire yet)
                 eventArgs = new TranscriptionCompleteEventArgs
                 {
                     Transcription = transcription ?? string.Empty,
@@ -528,12 +293,9 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("RecordingCoordinator.OnAudioFileReady", ex);
-
-                // WEEK1-DAY3: Transition to Error state
+                ErrorLogger.LogError("Transcription failed", ex);
                 stateMachine.TryTransition(RecordingState.Error);
 
-                // Prepare error event args (don't fire yet)
                 eventArgs = new TranscriptionCompleteEventArgs
                 {
                     Transcription = string.Empty,
@@ -543,48 +305,20 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // BUG FIX (CRIT-005): Atomically mark as completed to prevent race condition with watchdog
-                // Only fire event if we're the first to complete (either normal or watchdog, but not both)
-                bool wasCompleted = System.Threading.Interlocked.CompareExchange(ref transcriptionCompletedFlag, 1, 0) == 1;
+                StopTranscriptionWatchdog();
 
-                if (!wasCompleted)
+                if (eventArgs != null)
                 {
-                    // We're the first to complete - stop watchdog and fire event
-                    StopTranscriptionWatchdog();
-
-                    // Fire event outside try-catch to prevent double-fire if handler throws
-                    if (eventArgs != null)
-                    {
-                        try
-                        {
-                            TranscriptionCompleted?.Invoke(this, eventArgs);
-                        }
-                        catch (Exception ex)
-                        {
-                            ErrorLogger.LogError("TranscriptionCompleted event handler threw exception", ex);
-                        }
-                    }
-                }
-                else
-                {
-                    // Watchdog already fired timeout event - skip event firing to prevent duplicate
-                    ErrorLogger.LogWarning("RecordingCoordinator: Transcription completed after watchdog timeout - event already fired");
+                    TranscriptionCompleted?.Invoke(this, eventArgs);
                 }
 
-                // PERFORMANCE FIX: Transition to Idle IMMEDIATELY for responsive UI
-                // File cleanup happens asynchronously in background without blocking state transition
                 stateMachine.TryTransition(RecordingState.Idle);
 
-                // CLEANUP: Always delete the original audio file from AudioRecorder
-                // This prevents temp files from accumulating in AppData
-                // Note: 300ms delay moved inside CleanupAudioFileAsync to not block UI
-                if (File.Exists(workingAudioPath))
+                if (File.Exists(audioFilePath))
                 {
-                    await CleanupAudioFileAsync(workingAudioPath).ConfigureAwait(false);
+                    await CleanupAudioFileAsync(audioFilePath).ConfigureAwait(false);
                 }
 
-                // WEEK1-DAY2: Signal that transcription is complete (success or failure)
-                // This allows Dispose() to proceed without spin-waiting
                 transcriptionComplete.Set();
             }
         }
@@ -594,284 +328,99 @@ namespace VoiceLite.Services
         /// </summary>
         private void StartTranscriptionWatchdog()
         {
-            // WEEK1-DAY3: No need to set isTranscribing flag, state machine tracks this
-            System.Threading.Interlocked.Exchange(ref transcriptionCompletedFlag, 0); // Reset completion flag atomically
             transcriptionStartTime = DateTime.Now;
 
-            // Create watchdog timer that checks every 10 seconds
             transcriptionWatchdog = new System.Threading.Timer(
                 callback: WatchdogCallback,
                 state: null,
-                dueTime: TimeSpan.FromSeconds(10),
-                period: TimeSpan.FromSeconds(10)
+                dueTime: TRANSCRIPTION_TIMEOUT_SECONDS * 1000,
+                period: System.Threading.Timeout.Infinite
             );
-
-            ErrorLogger.LogDebug($"RecordingCoordinator: Watchdog started - timeout={TRANSCRIPTION_TIMEOUT_SECONDS}s");
         }
 
         /// <summary>
-        /// Stop watchdog timer - safe to call multiple times
+        /// Stop watchdog timer
         /// </summary>
         private void StopTranscriptionWatchdog()
         {
-            // WEEK1-DAY3: No need to clear isTranscribing flag, state machine tracks this
-
             var watchdog = transcriptionWatchdog;
-            transcriptionWatchdog = null; // Clear reference first to prevent double-dispose
+            transcriptionWatchdog = null;
 
-            if (watchdog != null)
-            {
-                try
-                {
-                    watchdog.Dispose();
-                    ErrorLogger.LogDebug("RecordingCoordinator: Watchdog stopped");
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Already disposed, ignore
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("RecordingCoordinator: Error stopping watchdog", ex);
-                }
-            }
+            watchdog?.Dispose();
         }
 
         /// <summary>
-        /// RELIABILITY: Periodic check for stuck states - auto-recovery mechanism
-        /// Runs every 30 seconds to detect and reset hung state machine
-        /// CRITICAL: Must never throw exceptions (runs on timer thread)
-        /// </summary>
-        private void CheckForStuckStates()
-        {
-            if (isDisposed)
-                return;
-
-            try
-            {
-                bool wasStuck = stateMachine.CheckForStuckState();
-                if (wasStuck)
-                {
-                    // State machine was stuck and has been auto-recovered
-                    ErrorLogger.LogMessage("RecordingCoordinator: Stuck state detected and recovered automatically");
-
-                    // Notify UI that we recovered from error
-                    ErrorOccurred?.Invoke(this, "Recovered from stuck state. Ready to continue.");
-
-                    // Clean up any lingering resources
-                    StopTranscriptionWatchdog();
-                    StopStoppingTimeoutTimer();
-                }
-            }
-            catch (Exception ex)
-            {
-                // CRITICAL: Never let watchdog crash the timer thread
-                ErrorLogger.LogError("CheckForStuckStates: Watchdog callback failed", ex);
-            }
-        }
-
-        /// <summary>
-        /// Watchdog callback - detects if transcription has been stuck too long
-        /// CRITICAL: Must never throw exceptions (runs on timer thread)
+        /// Watchdog callback - simple timeout handler
         /// </summary>
         private void WatchdogCallback(object? state)
         {
             try
             {
-                // WEEK1-DAY3: Check state machine instead of isTranscribing flag
-                if (stateMachine.CurrentState != RecordingState.Transcribing)
-                    return;
-
-                var elapsed = DateTime.Now - transcriptionStartTime;
-                ErrorLogger.LogDebug($"RecordingCoordinator: Watchdog check - elapsed={elapsed.TotalSeconds:F0}s");
-
-                if (elapsed.TotalSeconds > TRANSCRIPTION_TIMEOUT_SECONDS)
+                if (stateMachine.CurrentState == RecordingState.Transcribing)
                 {
-                    ErrorLogger.LogWarning($"RecordingCoordinator: Watchdog TIMEOUT! Transcription stuck for {elapsed.TotalSeconds:F0}s");
+                    ErrorLogger.LogWarning($"Transcription timeout after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds");
 
-                    // BUG FIX (CRIT-005): Atomically check-and-set completion flag to prevent race with normal completion
-                    // Only one thread (either watchdog or OnAudioFileReady finally) should fire the event
-                    bool wasAlreadyCompleted = System.Threading.Interlocked.CompareExchange(ref transcriptionCompletedFlag, 1, 0) == 1;
+                    StopTranscriptionWatchdog();
 
-                    if (!wasAlreadyCompleted)
+                    TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
                     {
-                        // We won the race - fire timeout event
-                        StopTranscriptionWatchdog();
-
-                        TranscriptionCompleted?.Invoke(this, new TranscriptionCompleteEventArgs
-                        {
-                            Transcription = string.Empty,
-                            ErrorMessage = $"Transcription timed out after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds.\n\n" +
-                                         "This may be caused by:\n" +
-                                         "• Whisper process hung or crashed\n" +
-                                         "• System running low on memory\n" +
-                                         "• Antivirus blocking the process\n\n" +
-                                         "Try restarting the application or using a smaller model.",
-                            Success = false
-                        });
-                    }
-                    else
-                    {
-                        // Normal completion beat us to it - do nothing
-                        ErrorLogger.LogMessage("RecordingCoordinator: Watchdog detected timeout but transcription already completed normally");
-                    }
+                        Transcription = string.Empty,
+                        ErrorMessage = $"Transcription timed out after {TRANSCRIPTION_TIMEOUT_SECONDS} seconds.\n\n" +
+                                     "This may be caused by:\n" +
+                                     "• Whisper process hung or crashed\n" +
+                                     "• System running low on memory\n" +
+                                     "• Antivirus blocking the process\n\n" +
+                                     "Try restarting the application or using a smaller model.",
+                        Success = false
+                    });
                 }
             }
             catch (Exception ex)
             {
-                // CRITICAL: Watchdog runs on timer thread - exceptions must not escape
-                ErrorLogger.LogError("RecordingCoordinator: Watchdog callback exception", ex);
-
-                // Try to stop watchdog even if error occurred
-                try { StopTranscriptionWatchdog(); } catch { /* ignore */ }
+                ErrorLogger.LogError("Watchdog callback exception", ex);
             }
         }
 
         /// <summary>
-        /// Start timeout timer for Stopping state - recovers if AudioFileReady never fires
-        /// </summary>
-        private void StartStoppingTimeoutTimer()
-        {
-            // Create timer that fires once after timeout
-            stoppingTimeoutTimer = new System.Threading.Timer(
-                callback: StoppingTimeoutCallback,
-                state: null,
-                dueTime: STOPPING_TIMEOUT_SECONDS * 1000, // Convert to milliseconds
-                period: System.Threading.Timeout.Infinite // Fire only once
-            );
-
-            ErrorLogger.LogDebug($"RecordingCoordinator: Stopping timeout timer started - timeout={STOPPING_TIMEOUT_SECONDS}s");
-        }
-
-        /// <summary>
-        /// Stop stopping timeout timer - safe to call multiple times
-        /// </summary>
-        private void StopStoppingTimeoutTimer()
-        {
-            var timer = stoppingTimeoutTimer;
-            stoppingTimeoutTimer = null; // Clear reference first to prevent double-dispose
-
-            if (timer != null)
-            {
-                try
-                {
-                    timer.Dispose();
-                    ErrorLogger.LogDebug("RecordingCoordinator: Stopping timeout timer stopped");
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Already disposed, ignore
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("RecordingCoordinator: Error stopping timeout timer", ex);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Timeout callback for stuck Stopping state - recovers to Idle if AudioFileReady never fires
-        /// CRITICAL: Must never throw exceptions (runs on timer thread)
-        /// </summary>
-        private void StoppingTimeoutCallback(object? state)
-        {
-            try
-            {
-                // Check if still stuck in Stopping state
-                if (stateMachine.CurrentState == RecordingState.Stopping)
-                {
-                    ErrorLogger.LogWarning($"RecordingCoordinator: STOPPING TIMEOUT! AudioFileReady did not fire within {STOPPING_TIMEOUT_SECONDS}s");
-
-                    // Force transition back to Idle to recover
-                    stateMachine.TryTransition(RecordingState.Error);
-                    stateMachine.TryTransition(RecordingState.Idle);
-
-                    // Notify UI of error
-                    ErrorOccurred?.Invoke(this, "Recording failed - audio file was not ready in time.\n\nThis may be caused by:\n• Disk I/O failure\n• Antivirus blocking file operations\n• Insufficient disk space\n\nPlease try again.");
-
-                    ErrorLogger.LogMessage("RecordingCoordinator: Recovered from stuck Stopping state → Idle");
-                }
-
-                // Clean up timer
-                StopStoppingTimeoutTimer();
-            }
-            catch (Exception ex)
-            {
-                // CRITICAL: Timeout runs on timer thread - exceptions must not escape
-                ErrorLogger.LogError("RecordingCoordinator: Stopping timeout callback exception", ex);
-
-                // Try to stop timer even if error occurred
-                try { StopStoppingTimeoutTimer(); } catch { /* ignore */ }
-            }
-        }
-
-        /// <summary>
-        /// Clean up audio file with retry logic (fire-and-forget to prevent UI blocking)
+        /// Clean up audio file
         /// </summary>
         private async Task CleanupAudioFileAsync(string audioFilePath)
         {
-            // PERFORMANCE FIX: Run cleanup on background thread pool to prevent UI blocking
-            // File.Delete() can block for 50-200ms with antivirus scanning
-            await Task.Run(async () =>
+            await Task.Run(() =>
             {
-                // RACE CONDITION FIX: Wait briefly to ensure Whisper process has closed file handle
-                // Moved from main flow (line 444) to background cleanup to not block UI state transition
-                // Whisper process might still be reading the file, give it time to release handle
-                await Task.Delay(300).ConfigureAwait(false);
-
-                for (int i = 0; i < TimingConstants.FileCleanupMaxRetries; i++)
+                try
                 {
-                    try
+                    if (File.Exists(audioFilePath))
                     {
-                        if (File.Exists(audioFilePath))
-                        {
-                            File.Delete(audioFilePath);
-                            break;
-                        }
+                        File.Delete(audioFilePath);
                     }
-                    catch (Exception ex)
-                    {
-                        if (i == TimingConstants.FileCleanupMaxRetries - 1) // Last attempt
-                        {
-                            // Don't block on logging either - fire and forget
-                            _ = Task.Run(() => ErrorLogger.LogError("RecordingCoordinator.CleanupAudioFile", ex));
-                        }
-
-                        // Exponential backoff: 50ms, 100ms, 200ms, 400ms
-                        int delayMs = 50 * (int)Math.Pow(2, i);
-                        await Task.Delay(delayMs).ConfigureAwait(false);
-                    }
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Failed to delete audio file", ex);
                 }
             }).ConfigureAwait(false);
         }
 
-        private volatile bool isDisposing = false; // WEEK1-DAY2: Guard for double-disposal
+        private volatile bool isDisposing = false;
 
         public void Dispose()
         {
-            // WEEK1-DAY2: Guard against multiple Dispose() calls
             if (isDisposing) return;
             isDisposing = true;
 
-            // DISPOSAL SAFETY: Set flag first to prevent new operations
             isDisposed = true;
 
-            // BUG FIX (BUG-001): Unsubscribe FIRST to prevent new events from firing
-            // This ensures no new OnAudioFileReady events can be queued after this point
             if (audioRecorder != null)
             {
                 audioRecorder.AudioFileReady -= OnAudioFileReady;
             }
 
-            // WEEK1-DAY2: Wait for transcription to complete using ManualResetEventSlim
-            // Old approach: Spin-wait loop (100% CPU for 100ms, then 50ms sleeps up to 30s)
-            // New approach: Efficient signaling with 30s timeout
-            // CRITICAL FIX: Increased from 5s to 30s - process mode fallback + long audio can take 10-15s
             try
             {
-                if (!transcriptionComplete.Wait(30000)) // Wait max 30 seconds (matches original timeout)
+                if (!transcriptionComplete.Wait(5000))
                 {
-                    ErrorLogger.LogWarning("RecordingCoordinator.Dispose - Transcription did not complete within 30s timeout, forcing disposal");
+                    ErrorLogger.LogWarning("Transcription did not complete within 5s timeout, forcing disposal");
                 }
             }
             catch (ObjectDisposedException)
@@ -880,21 +429,7 @@ namespace VoiceLite.Services
             }
 
             StopTranscriptionWatchdog();
-            StopStoppingTimeoutTimer();
-
-            // RELIABILITY: Stop stuck state watchdog
-            try
-            {
-                stuckStateWatchdog?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
-                stuckStateWatchdog?.Dispose();
-                stuckStateWatchdog = null;
-            }
-            catch { /* Ignore timer disposal errors */ }
-
-            // WEEK1-DAY3: Reset state machine to Idle on disposal
             stateMachine.Reset();
-
-            // WEEK1-DAY2: Dispose ManualResetEventSlim to free resources
             transcriptionComplete?.Dispose();
         }
     }

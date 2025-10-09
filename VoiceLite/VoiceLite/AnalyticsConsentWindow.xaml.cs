@@ -18,22 +18,16 @@ namespace VoiceLite
 
         private void EnableButton_Click(object sender, RoutedEventArgs e)
         {
-            // User opted in to analytics
-            settings.EnableAnalytics = true;
-            settings.AnalyticsConsentDate = DateTime.UtcNow;
+            // Analytics removed - just close
             UserConsented = true;
-
             DialogResult = true;
             Close();
         }
 
         private void DeclineButton_Click(object sender, RoutedEventArgs e)
         {
-            // User opted out of analytics
-            settings.EnableAnalytics = false;
-            settings.AnalyticsConsentDate = DateTime.UtcNow;
+            // Analytics removed - just close
             UserConsented = false;
-
             DialogResult = false;
             Close();
         }

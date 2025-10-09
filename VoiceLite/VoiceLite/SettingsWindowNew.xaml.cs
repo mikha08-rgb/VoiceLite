@@ -22,7 +22,6 @@ namespace VoiceLite
         private ModifierKeys capturedModifiers = ModifierKeys.None;
         private Action? testRecordingCallback;
         private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
-        private AnalyticsService? analyticsService;
         private string? originalModel;
 
         public Settings Settings => settings;
@@ -31,7 +30,6 @@ namespace VoiceLite
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
-            analyticsService = analytics;
             testRecordingCallback = onTestRecording;
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
@@ -79,36 +77,11 @@ namespace VoiceLite
             EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
             UpdateDictionaryCount();
 
-            // Analytics (Privacy)
-            EnableAnalyticsCheckBox.IsChecked = settings.EnableAnalytics ?? false;
-
-            // Text Formatting (Post-Processing)
-            LoadTextFormattingSettings();
-
-            // UI Preset (Appearance)
-            LoadUIPresetSettings();
-
             // Current Model is set in SetupModelComparison
 
             isInitialized = true;
         }
 
-        private void LoadUIPresetSettings()
-        {
-            // Set radio button based on current UI preset
-            switch (settings.UIPreset)
-            {
-                case UIPreset.Default:
-                    PresetDefaultRadio.IsChecked = true;
-                    break;
-                case UIPreset.Compact:
-                    PresetCompactRadio.IsChecked = true;
-                    break;
-                default:
-                    PresetDefaultRadio.IsChecked = true;
-                    break;
-            }
-        }
 
         private void UpdateDictionaryCount()
         {
@@ -344,16 +317,6 @@ namespace VoiceLite
             // Custom Dictionary
             settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked ?? true;
 
-            // Analytics (Privacy)
-            settings.EnableAnalytics = EnableAnalyticsCheckBox.IsChecked;
-            if (settings.EnableAnalytics.HasValue && settings.AnalyticsConsentDate == null)
-            {
-                settings.AnalyticsConsentDate = DateTime.UtcNow;
-            }
-
-            // Text Formatting (Post-Processing)
-            SaveTextFormattingSettings();
-
             // Whisper Model is already saved when selected
 
             // Whisper Parameters
@@ -509,23 +472,13 @@ namespace VoiceLite
 
         private void EnableAnalyticsCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            // This event handler allows users to toggle analytics from settings
-            // The actual save happens in SaveSettings() when they click Save/Apply
+            // Analytics removed - no action needed
         }
 
         private async Task TrackAnalyticsChangesAsync()
         {
-            if (analyticsService == null)
-                return;
-
-            // Track model changes
-            if (originalModel != null && originalModel != settings.WhisperModel)
-            {
-                await analyticsService.TrackModelChangeAsync(originalModel, settings.WhisperModel);
-            }
-
-            // Track settings save
-            await analyticsService.TrackSettingsChangeAsync("settings_saved");
+            // Analytics removed - no action needed
+            await Task.CompletedTask;
         }
 
         private void LoadVersionInfo()
@@ -763,308 +716,6 @@ namespace VoiceLite
 
             settings.CurrentAudioPreset = AudioPreset.Custom;
             HighlightPresetButton(AudioPreset.Custom);
-        }
-
-        #endregion
-
-        #region Text Formatting Tab
-
-        private void LoadTextFormattingSettings()
-        {
-            var postProc = settings.PostProcessing;
-
-            // Capitalization
-            EnableCapitalizationCheckBox.IsChecked = postProc.EnableCapitalization;
-            CapFirstLetterCheckBox.IsChecked = postProc.CapitalizeFirstLetter;
-            CapAfterPeriodCheckBox.IsChecked = postProc.CapitalizeAfterPeriod;
-            CapAfterQuestionCheckBox.IsChecked = postProc.CapitalizeAfterQuestionExclamation;
-
-            // Ending Punctuation
-            EnableEndingPunctuationCheckBox.IsChecked = postProc.EnableEndingPunctuation;
-            SmartPunctuationCheckBox.IsChecked = postProc.UseSmartPunctuation;
-
-            switch (postProc.DefaultPunctuation)
-            {
-                case EndingPunctuationType.Period:
-                    PeriodRadio.IsChecked = true;
-                    break;
-                case EndingPunctuationType.Question:
-                    QuestionRadio.IsChecked = true;
-                    break;
-                case EndingPunctuationType.Exclamation:
-                    ExclamationRadio.IsChecked = true;
-                    break;
-            }
-
-            // Filler Words
-            FillerIntensitySlider.Value = (int)postProc.FillerRemovalIntensity;
-            UpdateFillerIntensityLabel();
-
-            HesitationsCheckBox.IsChecked = postProc.EnabledLists.Hesitations;
-            VerbalTicsCheckBox.IsChecked = postProc.EnabledLists.VerbalTics;
-            QualifiersCheckBox.IsChecked = postProc.EnabledLists.Qualifiers;
-            IntensifiersCheckBox.IsChecked = postProc.EnabledLists.Intensifiers;
-            TransitionsCheckBox.IsChecked = postProc.EnabledLists.Transitions;
-
-            // Contractions
-            switch (postProc.ContractionHandling)
-            {
-                case ContractionMode.LeaveAsIs:
-                    LeaveAsIsRadio.IsChecked = true;
-                    break;
-                case ContractionMode.Expand:
-                    ExpandRadio.IsChecked = true;
-                    break;
-                case ContractionMode.Contract:
-                    ContractRadio.IsChecked = true;
-                    break;
-            }
-
-            // Grammar
-            FixHomophonesCheckBox.IsChecked = postProc.FixHomophones;
-            FixDoubleNegativesCheckBox.IsChecked = postProc.FixDoubleNegatives;
-            FixSubjectVerbCheckBox.IsChecked = postProc.FixSubjectVerbAgreement;
-
-            // Initialize preview
-            UpdatePreview(null, null);
-        }
-
-        private void SaveTextFormattingSettings()
-        {
-            var postProc = settings.PostProcessing;
-
-            // Capitalization
-            postProc.EnableCapitalization = EnableCapitalizationCheckBox.IsChecked == true;
-            postProc.CapitalizeFirstLetter = CapFirstLetterCheckBox.IsChecked == true;
-            postProc.CapitalizeAfterPeriod = CapAfterPeriodCheckBox.IsChecked == true;
-            postProc.CapitalizeAfterQuestionExclamation = CapAfterQuestionCheckBox.IsChecked == true;
-
-            // Ending Punctuation
-            postProc.EnableEndingPunctuation = EnableEndingPunctuationCheckBox.IsChecked == true;
-            postProc.UseSmartPunctuation = SmartPunctuationCheckBox.IsChecked == true;
-
-            if (PeriodRadio.IsChecked == true)
-                postProc.DefaultPunctuation = EndingPunctuationType.Period;
-            else if (QuestionRadio.IsChecked == true)
-                postProc.DefaultPunctuation = EndingPunctuationType.Question;
-            else if (ExclamationRadio.IsChecked == true)
-                postProc.DefaultPunctuation = EndingPunctuationType.Exclamation;
-
-            // Filler Words
-            postProc.FillerRemovalIntensity = (FillerWordRemovalLevel)(int)FillerIntensitySlider.Value;
-            postProc.EnabledLists.Hesitations = HesitationsCheckBox.IsChecked == true;
-            postProc.EnabledLists.VerbalTics = VerbalTicsCheckBox.IsChecked == true;
-            postProc.EnabledLists.Qualifiers = QualifiersCheckBox.IsChecked == true;
-            postProc.EnabledLists.Intensifiers = IntensifiersCheckBox.IsChecked == true;
-            postProc.EnabledLists.Transitions = TransitionsCheckBox.IsChecked == true;
-
-            // Contractions
-            if (LeaveAsIsRadio.IsChecked == true)
-                postProc.ContractionHandling = ContractionMode.LeaveAsIs;
-            else if (ExpandRadio.IsChecked == true)
-                postProc.ContractionHandling = ContractionMode.Expand;
-            else if (ContractRadio.IsChecked == true)
-                postProc.ContractionHandling = ContractionMode.Contract;
-
-            // Grammar
-            postProc.FixHomophones = FixHomophonesCheckBox.IsChecked == true;
-            postProc.FixDoubleNegatives = FixDoubleNegativesCheckBox.IsChecked == true;
-            postProc.FixSubjectVerbAgreement = FixSubjectVerbCheckBox.IsChecked == true;
-        }
-
-        private void UpdatePreview(object? sender, RoutedEventArgs? e)
-        {
-            if (PreviewInputTextBox == null || PreviewBeforeText == null || PreviewAfterText == null)
-                return;
-
-            var input = PreviewInputTextBox.Text;
-            PreviewBeforeText.Text = input;
-
-            // Build PostProcessingSettings from current UI state
-            var previewSettings = new PostProcessingSettings
-            {
-                EnableCapitalization = EnableCapitalizationCheckBox?.IsChecked == true,
-                CapitalizeFirstLetter = CapFirstLetterCheckBox?.IsChecked == true,
-                CapitalizeAfterPeriod = CapAfterPeriodCheckBox?.IsChecked == true,
-                CapitalizeAfterQuestionExclamation = CapAfterQuestionCheckBox?.IsChecked == true,
-                EnableEndingPunctuation = EnableEndingPunctuationCheckBox?.IsChecked == true,
-                UseSmartPunctuation = SmartPunctuationCheckBox?.IsChecked == true,
-                DefaultPunctuation = GetSelectedPunctuationType(),
-                FillerRemovalIntensity = GetSelectedFillerLevel(),
-                EnabledLists = new FillerWordLists
-                {
-                    Hesitations = HesitationsCheckBox?.IsChecked == true,
-                    VerbalTics = VerbalTicsCheckBox?.IsChecked == true,
-                    Qualifiers = QualifiersCheckBox?.IsChecked == true,
-                    Intensifiers = IntensifiersCheckBox?.IsChecked == true,
-                    Transitions = TransitionsCheckBox?.IsChecked == true,
-                    // Copy word lists from settings
-                    HesitationWords = settings.PostProcessing.EnabledLists.HesitationWords,
-                    VerbalTicWords = settings.PostProcessing.EnabledLists.VerbalTicWords,
-                    QualifierWords = settings.PostProcessing.EnabledLists.QualifierWords,
-                    IntensifierWords = settings.PostProcessing.EnabledLists.IntensifierWords,
-                    TransitionWords = settings.PostProcessing.EnabledLists.TransitionWords
-                },
-                CustomFillerWords = settings.PostProcessing.CustomFillerWords,
-                ContractionHandling = GetSelectedContractionMode(),
-                FixHomophones = FixHomophonesCheckBox?.IsChecked == true,
-                FixDoubleNegatives = FixDoubleNegativesCheckBox?.IsChecked == true,
-                FixSubjectVerbAgreement = FixSubjectVerbCheckBox?.IsChecked == true
-            };
-
-            // Process and display result
-            var processed = Services.TranscriptionPostProcessor.ProcessTranscription(
-                input,
-                useEnhancedDictionary: false,
-                customDictionary: null,
-                postProcessingSettings: previewSettings
-            );
-
-            PreviewAfterText.Text = processed;
-        }
-
-        private EndingPunctuationType GetSelectedPunctuationType()
-        {
-            if (PeriodRadio?.IsChecked == true) return EndingPunctuationType.Period;
-            if (QuestionRadio?.IsChecked == true) return EndingPunctuationType.Question;
-            if (ExclamationRadio?.IsChecked == true) return EndingPunctuationType.Exclamation;
-            return EndingPunctuationType.Period;
-        }
-
-        private FillerWordRemovalLevel GetSelectedFillerLevel()
-        {
-            if (FillerIntensitySlider == null) return FillerWordRemovalLevel.None;
-            return (FillerWordRemovalLevel)(int)FillerIntensitySlider.Value;
-        }
-
-        private ContractionMode GetSelectedContractionMode()
-        {
-            if (LeaveAsIsRadio?.IsChecked == true) return ContractionMode.LeaveAsIs;
-            if (ExpandRadio?.IsChecked == true) return ContractionMode.Expand;
-            if (ContractRadio?.IsChecked == true) return ContractionMode.Contract;
-            return ContractionMode.LeaveAsIs;
-        }
-
-        private void FillerIntensity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            UpdateFillerIntensityLabel();
-
-            // Auto-enable/disable checkboxes based on intensity level
-            if (FillerIntensitySlider.Value == 0) // None
-            {
-                // Disable all checkboxes
-                if (HesitationsCheckBox != null) HesitationsCheckBox.IsChecked = false;
-                if (VerbalTicsCheckBox != null) VerbalTicsCheckBox.IsChecked = false;
-                if (QualifiersCheckBox != null) QualifiersCheckBox.IsChecked = false;
-                if (IntensifiersCheckBox != null) IntensifiersCheckBox.IsChecked = false;
-                if (TransitionsCheckBox != null) TransitionsCheckBox.IsChecked = false;
-            }
-            else if (FillerIntensitySlider.Value == 1) // Light
-            {
-                if (HesitationsCheckBox != null) HesitationsCheckBox.IsChecked = true;
-            }
-            else if (FillerIntensitySlider.Value == 2) // Moderate
-            {
-                if (HesitationsCheckBox != null) HesitationsCheckBox.IsChecked = true;
-                if (VerbalTicsCheckBox != null) VerbalTicsCheckBox.IsChecked = true;
-            }
-            else if (FillerIntensitySlider.Value == 3) // Aggressive
-            {
-                if (HesitationsCheckBox != null) HesitationsCheckBox.IsChecked = true;
-                if (VerbalTicsCheckBox != null) VerbalTicsCheckBox.IsChecked = true;
-                if (QualifiersCheckBox != null) QualifiersCheckBox.IsChecked = true;
-                if (IntensifiersCheckBox != null) IntensifiersCheckBox.IsChecked = true;
-                if (TransitionsCheckBox != null) TransitionsCheckBox.IsChecked = true;
-            }
-            // Custom mode (4) - user manages checkboxes manually
-
-            UpdatePreview(null, null);
-        }
-
-        private void UpdateFillerIntensityLabel()
-        {
-            if (FillerIntensityLabel == null || FillerIntensitySlider == null) return;
-
-            FillerIntensityLabel.Text = (int)FillerIntensitySlider.Value switch
-            {
-                0 => "None",
-                1 => "Light",
-                2 => "Moderate",
-                3 => "Aggressive",
-                4 => "Custom",
-                _ => "None"
-            };
-        }
-
-        private void ProfessionalPreset_Click(object sender, RoutedEventArgs e)
-        {
-            // Professional: Remove all fillers, expand contractions, fix grammar
-            EnableCapitalizationCheckBox.IsChecked = true;
-            CapFirstLetterCheckBox.IsChecked = true;
-            CapAfterPeriodCheckBox.IsChecked = true;
-            CapAfterQuestionCheckBox.IsChecked = true;
-            EnableEndingPunctuationCheckBox.IsChecked = true;
-            PeriodRadio.IsChecked = true;
-            FillerIntensitySlider.Value = 3; // Aggressive
-            ExpandRadio.IsChecked = true;
-            FixHomophonesCheckBox.IsChecked = true;
-            FixDoubleNegativesCheckBox.IsChecked = true;
-            FixSubjectVerbCheckBox.IsChecked = true;
-
-            UpdatePreview(null, null);
-        }
-
-        private void CodePreset_Click(object sender, RoutedEventArgs e)
-        {
-            // Code: Preserve casing, no punctuation, no filler removal
-            EnableCapitalizationCheckBox.IsChecked = false;
-            EnableEndingPunctuationCheckBox.IsChecked = false;
-            FillerIntensitySlider.Value = 0; // None
-            LeaveAsIsRadio.IsChecked = true;
-            FixHomophonesCheckBox.IsChecked = false;
-            FixDoubleNegativesCheckBox.IsChecked = false;
-            FixSubjectVerbCheckBox.IsChecked = false;
-
-            UpdatePreview(null, null);
-        }
-
-        private void CasualPreset_Click(object sender, RoutedEventArgs e)
-        {
-            // Casual: Light filler removal, keep contractions
-            EnableCapitalizationCheckBox.IsChecked = true;
-            CapFirstLetterCheckBox.IsChecked = true;
-            CapAfterPeriodCheckBox.IsChecked = true;
-            CapAfterQuestionCheckBox.IsChecked = false;
-            EnableEndingPunctuationCheckBox.IsChecked = true;
-            PeriodRadio.IsChecked = true;
-            FillerIntensitySlider.Value = 1; // Light
-            LeaveAsIsRadio.IsChecked = true;
-            FixHomophonesCheckBox.IsChecked = false;
-            FixDoubleNegativesCheckBox.IsChecked = false;
-            FixSubjectVerbCheckBox.IsChecked = false;
-
-            UpdatePreview(null, null);
-        }
-
-        // Feature hidden - not yet implemented
-        // private void ManageCustomFillerWords_Click(object sender, RoutedEventArgs e)
-        // {
-        //     MessageBox.Show("Custom filler words management coming soon!", "Feature In Development", MessageBoxButton.OK, MessageBoxImage.Information);
-        // }
-
-        private void UIPreset_Changed(object sender, RoutedEventArgs e)
-        {
-            if (!isInitialized) return;
-
-            // Update settings based on selected radio button
-            if (PresetDefaultRadio.IsChecked == true)
-            {
-                settings.UIPreset = UIPreset.Default;
-            }
-            else if (PresetCompactRadio.IsChecked == true)
-            {
-                settings.UIPreset = UIPreset.Compact;
-            }
         }
 
         #endregion

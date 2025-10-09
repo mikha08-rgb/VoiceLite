@@ -294,14 +294,13 @@ namespace VoiceLite.Services
         /// </summary>
         private void TrackMetric(TelemetryMetric metric)
         {
-            // Respect analytics opt-in (reuse existing setting)
-            if (settings.EnableAnalytics != true)
-                return;
+            // Analytics removed - always return
+            return;
 
             try
             {
                 metric.Timestamp = DateTime.UtcNow;
-                metric.AnonymousUserId = settings.AnonymousUserId ?? "unknown";
+                metric.AnonymousUserId = "analytics-disabled";
 
                 lock (telemetryLock)
                 {
@@ -352,8 +351,8 @@ namespace VoiceLite.Services
         /// </summary>
         private void UploadMetricsNow()
         {
-            if (settings.EnableAnalytics != true)
-                return;
+            // Analytics removed - always return
+            return;
 
             List<TelemetryMetric> metricsToUpload;
             lock (telemetryLock)
