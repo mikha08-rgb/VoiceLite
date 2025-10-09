@@ -2,25 +2,14 @@
   "name": "VoiceLite Development",
   "image": "mcr.microsoft.com/dotnet/sdk:8.0",
   "features": {
-    "ghcr.io/devcontainers/features/dotnet:2": {},
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/git:1": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-dotnettools.csharp",
-        "ms-dotnettools.vscode-dotnet-runtime",
-        "streetsidesoftware.code-spell-checker",
-        "esbenp.prettier-vscode",
-        "github.copilot"
-      ],
-      "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash"
-      }
+        "ms-dotnettools.csharp"
+      ]
     }
   },
-  "postCreateCommand": "dotnet restore",
-  "forwardPorts": [5000, 5001],
-  "remoteUser": "vscode"
+  "forwardPorts": [5000, 5001]
 }
