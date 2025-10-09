@@ -41,7 +41,12 @@
       "Bash(tasklist)",
       "Bash(./server.exe --help)",
       "Bash(./whisper/whisper.exe:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(set DATABASE_URL=\"postgresql://postgres.dzgqyytpkvjguxlhcpgl:jY%26%23DvbBo2a%25Oo%2Az@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true\")",
+      "Bash(set DIRECT_DATABASE_URL=\"postgresql://postgres:jY%26%23DvbBo2a%25Oo%2Az@db.dzgqyytpkvjguxlhcpgl.supabase.co:5432/postgres\")",
+      "Bash(npx prisma:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []
