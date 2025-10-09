@@ -15,8 +15,6 @@ using VoiceLite.Services;
 using VoiceLite.Interfaces;
 using VoiceLite.Utilities;
 using System.Text.Json;
-using VoiceLite.Services.Auth;
-using VoiceLite.Services.Licensing;
 
 namespace VoiceLite
 {
@@ -33,7 +31,7 @@ namespace VoiceLite
         private MemoryMonitor? memoryMonitor;
         private ZombieProcessCleanupService? zombieCleanupService; // MEMORY_FIX 2025-10-08: Periodic zombie process cleanup
         private TranscriptionHistoryService? historyService;
-        private SoundService? soundService;
+        // SoundService removed per user request - no audio feedback
         private SimpleTelemetry? telemetry; // Production telemetry
 
         // Recording state
@@ -59,13 +57,7 @@ namespace VoiceLite
             DefaultBufferSize = 131072 // 128KB buffer (matches typical settings size with large history)
         };
 
-        // Authentication & Licensing
         private Settings settings = new();
-        private AuthenticationService authenticationService = new();
-        private AuthenticationCoordinator? authenticationCoordinator;
-        private LicenseService licenseService = new();
-        private UserSession? currentSession;
-        private LicenseStatus currentLicenseStatus = LicenseStatus.Unknown;
 
         // Timers
         private System.Timers.Timer? autoTimeoutTimer;
@@ -75,9 +67,6 @@ namespace VoiceLite
 
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
-        private DictionaryManagerWindow? currentDictionaryWindow;
-        private LoginWindow? currentLoginWindow;
-        private FeedbackWindow? currentFeedbackWindow;
 
         #endregion
 
@@ -537,8 +526,6 @@ namespace VoiceLite
             {
                 StatusText.Text = "Initializing services...";
 
-                authenticationCoordinator = new AuthenticationCoordinator(authenticationService);
-
                 // Initialize core services
                 textInjector = new TextInjector(settings);
                 audioRecorder = new AudioRecorder();
@@ -565,9 +552,9 @@ namespace VoiceLite
                 // Initialize Whisper service using process mode
                 whisperService = new PersistentWhisperService(settings);
 
-                // Initialize services BEFORE coordinator (coordinator needs these references)
+                // Initialize services
                 historyService = new TranscriptionHistoryService(settings);
-                soundService = new SoundService();
+                // SoundService removed per user request - no audio feedback
 
                 // Initialize production telemetry (privacy-first, opt-in)
                 telemetry = new SimpleTelemetry(settings);
@@ -597,7 +584,6 @@ namespace VoiceLite
                 }
 
                 systemTrayManager = new SystemTrayManager(this);
-                systemTrayManager.AccountMenuClicked += OnTrayAccountMenuClicked;
 
                 // Initialize memory monitoring
                 memoryMonitor = new MemoryMonitor();
@@ -881,66 +867,6 @@ namespace VoiceLite
             }
         }
 
-        private async void AccountButton_Click(object sender, RoutedEventArgs e)
-        {
-            // CRIT-006 FIX: Wrap entire async void method in try-catch
-            try
-            {
-                if (authenticationCoordinator == null)
-                {
-                    MessageBox.Show("Authentication services are not initialized yet.", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                if (currentSession == null)
-                {
-                    currentLoginWindow = new LoginWindow(authenticationCoordinator)
-                    {
-                        Owner = this,
-                    };
-
-                    if (currentLoginWindow.ShowDialog() == true && currentLoginWindow.Session != null)
-                    {
-                        currentSession = currentLoginWindow.Session;
-                        settings.LastSignedInEmail = currentSession.Email;
-                        SaveSettings();
-                        await UpdateLicenseStatusAsync();
-                        systemTrayManager?.UpdateAccountMenuText("Manage Account");
-                    }
-
-                    return;
-                }
-
-            // User is signed in - show account management
-            var message = $"Signed in as: {currentSession.Email}\n\n";
-            message += $"License Status: {currentLicenseStatus}\n\n";
-            message += "Would you like to sign out?";
-
-            var result = MessageBox.Show(message, "Account Management", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (result == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    await authenticationCoordinator.SignOutAsync();
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("SignOutAsync", ex);
-                    MessageBox.Show($"Sign out failed: {ex.Message}", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-
-                currentSession = null;
-                currentLicenseStatus = LicenseStatus.Unlicensed;
-                UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                systemTrayManager?.UpdateAccountMenuText("Sign In");
-            }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("CRITICAL: Unhandled exception in AccountButton_Click", ex);
-                MessageBox.Show($"Account operation failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
 
         private void UpdateStatus(string status, Brush color)
         {
@@ -1234,8 +1160,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandlePushToTalkPressed: Setting isHotkeyMode=true and starting recording");
                 isHotkeyMode = true;
 
-                // Audio feedback for push-to-talk start
-                soundService?.PlaySound();
+                // Sound feedback removed per user request
 
                 StartRecording();
             }
@@ -1268,7 +1193,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandlePushToTalkReleased: Stopping recording");
 
                 // Audio feedback for push-to-talk stop
-                soundService?.PlaySound();
+                // Sound removed per user request
 
                 StopRecording(false);
                 isHotkeyMode = false;
@@ -1311,7 +1236,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE ON - Starting continuous recording");
 
                 // Audio feedback for toggle start
-                soundService?.PlaySound();
+                // Sound removed per user request
 
                 StartRecording();
                 StartAutoTimeoutTimer();
@@ -1322,7 +1247,7 @@ namespace VoiceLite
                 ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE OFF - Stopping recording");
 
                 // Audio feedback for toggle stop
-                soundService?.PlaySound();
+                // Sound removed per user request
 
                 StopRecording(false);
                 StopAutoTimeoutTimer();
@@ -1558,7 +1483,7 @@ namespace VoiceLite
                             UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
 
                             // Audio feedback for timeout
-                            soundService?.PlaySound();
+                            // Sound removed per user request
 
                             StopRecording(false);
                             StopAutoTimeoutTimer();
@@ -1795,9 +1720,6 @@ namespace VoiceLite
 
         private void DictionaryButton_Click(object sender, RoutedEventArgs e)
         {
-            currentDictionaryWindow = new DictionaryManagerWindow(settings);
-            currentDictionaryWindow.Owner = this;
-            if (currentDictionaryWindow.ShowDialog() == true)
             {
                 SaveSettings();
             }
@@ -1805,9 +1727,6 @@ namespace VoiceLite
 
         private void VoiceShortcutsButton_Click(object sender, RoutedEventArgs e)
         {
-            currentDictionaryWindow = new DictionaryManagerWindow(settings);
-            currentDictionaryWindow.Owner = this;
-            if (currentDictionaryWindow.ShowDialog() == true)
             {
                 SaveSettings();
             }
@@ -1977,7 +1896,7 @@ namespace VoiceLite
                         // Audio feedback for cancel
                         if (settings.PlaySoundFeedback)
                         {
-                            soundService?.PlaySound();
+                            // Sound removed per user request
                         }
 
                         // Cancel the recording
@@ -1993,133 +1912,6 @@ namespace VoiceLite
             }
         }
 
-        private async Task RestoreAccountAsync()
-        {
-            if (authenticationCoordinator == null)
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                    systemTrayManager?.UpdateAccountMenuText("Sign In");
-                });
-                return;
-            }
-
-            try
-            {
-                var session = await authenticationCoordinator.TryRestoreSessionAsync().ConfigureAwait(false);
-                if (session == null)
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                        systemTrayManager?.UpdateAccountMenuText("Sign In");
-                    });
-                    return;
-                }
-
-                currentSession = session;
-                settings.LastSignedInEmail = session.Email;
-                SaveSettings();
-                await UpdateLicenseStatusAsync().ConfigureAwait(false);
-
-                // Update tray menu for signed-in user
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    systemTrayManager?.UpdateAccountMenuText("Manage Account");
-                });
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("RestoreAccountAsync", ex);
-                // Hide account status for errors - don't alarm free users
-                UpdateAccountStatusUI("", Brushes.Transparent);
-            }
-        }
-
-        private async Task UpdateLicenseStatusAsync()
-        {
-            try
-            {
-                // First validate local license file if it exists
-                var validationResult = await licenseService.ValidateLocalLicenseAsync().ConfigureAwait(false);
-
-                if (validationResult.IsValid)
-                {
-                    currentLicenseStatus = LicenseStatus.Active;
-
-                    if (validationResult.IsInGracePeriod)
-                    {
-                        if (validationResult.Payload?.ExpiresAt != null)
-                        {
-                            var expiresAt = DateTime.Parse(validationResult.Payload.ExpiresAt);
-                            var daysRemaining = (expiresAt - DateTime.UtcNow).Days;
-                            UpdateAccountStatusUI($"Pro license (expires in {daysRemaining} days)", Brushes.Orange);
-                            ErrorLogger.LogMessage($"License in grace period, expires in {daysRemaining} days");
-                        }
-                    }
-                    else
-                    {
-                        UpdateAccountStatusUI("Pro license active (offline)", Brushes.SeaGreen);
-                    }
-                }
-                else if (!string.IsNullOrEmpty(validationResult.Reason))
-                {
-                    ErrorLogger.LogMessage($"Local license validation failed: {validationResult.Reason}");
-                }
-
-                // Then check online status (if authenticated)
-                if (currentSession != null)
-                {
-                    var status = await licenseService.GetCurrentStatusAsync().ConfigureAwait(false);
-                    currentLicenseStatus = status;
-
-                    switch (status)
-                    {
-                        case LicenseStatus.Active:
-                            UpdateAccountStatusUI("Pro license active", Brushes.SeaGreen);
-                            try
-                            {
-                                // Fetch and save updated license file
-                                var fetched = await licenseService.FetchAndSaveLicenseAsync().ConfigureAwait(false);
-                                if (fetched)
-                                {
-                                    ErrorLogger.LogMessage("License file updated from server");
-                                }
-
-                                await licenseService.SyncAsync().ConfigureAwait(false);
-                            }
-                            catch (Exception syncEx)
-                            {
-                                ErrorLogger.LogError("License sync", syncEx);
-                            }
-                            break;
-                        case LicenseStatus.Expired:
-                            UpdateAccountStatusUI("License expired", Brushes.OrangeRed);
-                            break;
-                        case LicenseStatus.Unlicensed:
-                            UpdateAccountStatusUI("Signed in (no license)", Brushes.SlateBlue);
-                            break;
-                        default:
-                            UpdateAccountStatusUI("License status unknown", Brushes.OrangeRed);
-                            break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("UpdateLicenseStatusAsync", ex);
-                // Hide licensing errors - they're logged but don't alarm users
-                UpdateAccountStatusUI("", Brushes.Transparent);
-            }
-        }
-
-        private void UpdateAccountStatusUI(string text, Brush brush)
-        {
-            // This method is always called from UI thread or inside Dispatcher.InvokeAsync
-            AccountStatusText.Text = text;
-            AccountStatusText.Foreground = brush;
-        }
 
         private void ValidateWhisperModel()
         {
@@ -2244,10 +2036,6 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated -= OnPollingModeActivated;
                 }
 
-                if (systemTrayManager != null)
-                {
-                    systemTrayManager.AccountMenuClicked -= OnTrayAccountMenuClicked;
-                }
 
                 if (memoryMonitor != null)
                 {
@@ -2262,17 +2050,9 @@ namespace VoiceLite
 
                 // Dispose child windows (WPF Window resources)
 
-                try { currentLoginWindow?.Close(); } catch { }
-                currentLoginWindow = null;
-
-                try { currentDictionaryWindow?.Close(); } catch { }
-                currentDictionaryWindow = null;
-
                 try { currentSettingsWindow?.Close(); } catch { }
                 currentSettingsWindow = null;
 
-                try { currentFeedbackWindow?.Close(); } catch { }
-                currentFeedbackWindow = null;
 
                 // Now dispose services in reverse order of creation
                 // MEMORY_FIX 2025-10-08: Dispose zombie cleanup service
@@ -2288,9 +2068,7 @@ namespace VoiceLite
                 hotkeyManager?.Dispose();
                 hotkeyManager = null;
 
-                // Dispose remaining services (soundService implements IDisposable)
-                try { soundService?.Dispose(); } catch { }
-                soundService = null;
+                // SoundService removed per user request - no disposal needed
 
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
                 try { saveSettingsSemaphore?.Dispose(); } catch { }
@@ -2307,10 +2085,6 @@ namespace VoiceLite
                 // Stop security protection
                 SecurityService.StopProtection();
 
-                // MEMORY_FIX 2025-10-08: Dispose static HttpClient to prevent TCP connection leaks
-                // CRITICAL: Fixes socket handle exhaustion (~10KB per leaked connection)
-                VoiceLite.Services.Auth.ApiClient.Dispose();
-
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
             catch (Exception ex)
@@ -2321,39 +2095,6 @@ namespace VoiceLite
             base.OnClosed(e);
         }
 
-        private async void OnTrayAccountMenuClicked(object? sender, EventArgs e)
-        {
-            ShowMainWindow();
-            // Call the account button logic directly
-            await Dispatcher.InvokeAsync(() => AccountButton_Click(sender ?? this, new RoutedEventArgs()));
-        }
-
-
-        private async Task SignOutAsync()
-        {
-            try
-            {
-                await authenticationService.SignOutAsync().ConfigureAwait(false);
-                currentSession = null;
-                currentLicenseStatus = LicenseStatus.Unknown;
-                settings.LastSignedInEmail = string.Empty;
-                SaveSettings();
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    UpdateAccountStatusUI("Not signed in", Brushes.Gray);
-                    systemTrayManager?.UpdateAccountMenuText("Sign In");
-                });
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("SignOutAsync", ex);
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    MessageBox.Show($"Failed to sign out: {ex.Message}", "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
-                });
-            }
-        }
 
         private void ShowMainWindow()
         {
