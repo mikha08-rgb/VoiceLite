@@ -9,7 +9,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using VoiceLite.Models;
-using VoiceLite.Services.Auth;
 
 namespace VoiceLite.Services
 {
