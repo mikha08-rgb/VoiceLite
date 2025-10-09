@@ -126,11 +126,6 @@ namespace VoiceLite.Models
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
 
-        // Authentication placeholders - populated once login/auth flow ships
-        public string? LastSignedInEmail { get; set; }
-
-        public bool RememberLastSession { get; set; } = false;
-
         // Accuracy Improvement Features - ALWAYS ON for best experience
         public bool UseTemperatureOptimization { get; set; } = true; // Use temperature 0.2 for better accuracy
         private float _whisperTemperature = 0.2f;
@@ -172,11 +167,6 @@ namespace VoiceLite.Models
         public bool HistoryShowWordCount { get; set; } = true; // Show word count in history items
         public bool HistoryShowTimestamp { get; set; } = true; // Show timestamp in history items
         public double HistoryPanelWidth { get; set; } = 280; // Remember panel width
-
-        // Custom Dictionary
-        public bool EnableCustomDictionary { get; set; } = true; // Enable custom dictionary replacements
-        public List<DictionaryEntry> CustomDictionaryEntries { get; set; } = new List<DictionaryEntry>();
-        public DictionaryCategory? ActiveDictionaryCategory { get; set; } = null; // null = all categories
 
         // First-Run Experience
         public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
