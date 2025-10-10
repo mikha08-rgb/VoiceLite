@@ -76,9 +76,9 @@ namespace VoiceLite
             InitializeComponent();
             LoadSettings();
 
-            // CRITICAL FIX: Show loading state immediately
-            StatusText.Text = "Initializing...";
-            StatusText.Foreground = Brushes.Gray;
+            // Start with Ready state - initialization happens in background
+            StatusText.Text = "Ready";
+            StatusText.Foreground = Brushes.Green;
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
@@ -636,13 +636,6 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
 
-                // Mark as ready
-                if (StatusText.Text == "Initializing...")
-                {
-                    StatusText.Text = "Ready";
-                    StatusText.Foreground = Brushes.Green;
-                }
-
                 // UI BUG FIX: Initialization complete - allow polling mode warnings to show now
                 isInitializing = false;
 
@@ -910,6 +903,11 @@ namespace VoiceLite
                 recordingStartTime = DateTime.Now;
                 isRecording = true;
 
+                // IMMEDIATE FEEDBACK: Update UI before starting recorder for instant response
+                UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
+                UpdateUIForCurrentMode();
+                TranscriptionText.Foreground = Brushes.Gray;
+
                 try
                 {
                     recorder.StartRecording();
@@ -926,9 +924,6 @@ namespace VoiceLite
                             UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush(StatusColors.Recording));
                         };
                         recordingElapsedTimer.Start();
-
-                        UpdateUIForCurrentMode();
-                        TranscriptionText.Foreground = Brushes.Gray;
                     }
                     else
                     {
