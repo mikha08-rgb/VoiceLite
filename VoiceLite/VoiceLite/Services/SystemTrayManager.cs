@@ -10,9 +10,6 @@ namespace VoiceLite.Services
         private TaskbarIcon? trayIcon;
         private System.Drawing.Icon? customIcon;
         private readonly Window mainWindow;
-        private System.Windows.Controls.MenuItem? accountMenuItem;
-
-        public event EventHandler? AccountMenuClicked;
 
         public SystemTrayManager(Window window)
         {
@@ -54,12 +51,6 @@ namespace VoiceLite.Services
                 IsEnabled = false
             };
 
-            accountMenuItem = new System.Windows.Controls.MenuItem
-            {
-                Header = "Sign In"
-            };
-            accountMenuItem.Click += (s, e) => AccountMenuClicked?.Invoke(this, EventArgs.Empty);
-
             var separator = new System.Windows.Controls.Separator();
 
             var exitItem = new System.Windows.Controls.MenuItem
@@ -73,7 +64,6 @@ namespace VoiceLite.Services
 
             contextMenu.Items.Add(showItem);
             contextMenu.Items.Add(settingsItem);
-            contextMenu.Items.Add(accountMenuItem);
             contextMenu.Items.Add(separator);
             contextMenu.Items.Add(exitItem);
 
@@ -96,14 +86,6 @@ namespace VoiceLite.Services
         {
             mainWindow.Hide();
             ShowBalloonTip("VoiceLite", "Running in background. Hold Alt to dictate.");
-        }
-
-        public void UpdateAccountMenuText(string text)
-        {
-            if (accountMenuItem != null)
-            {
-                accountMenuItem.Header = text;
-            }
         }
 
         public void Dispose()
