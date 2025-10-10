@@ -644,6 +644,9 @@ namespace VoiceLite
 
                 // Step 6: Check for analytics consent on first run (non-blocking)
                 CheckAnalyticsConsentAsync();
+
+                // Step 7: Mark initialization complete - show "Ready" status
+                UpdateStatus("Ready", Brushes.Green);
             }
             catch (Exception ex)
             {
@@ -916,7 +919,7 @@ namespace VoiceLite
                     {
                         recordingElapsedTimer = new System.Windows.Threading.DispatcherTimer
                         {
-                            Interval = TimeSpan.FromSeconds(1)
+                            Interval = TimeSpan.FromMilliseconds(100) // Update 10x per second for smooth timer
                         };
                         recordingElapsedTimer.Tick += (s, e) =>
                         {
@@ -1520,7 +1523,7 @@ namespace VoiceLite
                     {
                         TranscriptionText.Text = transcription;
                         TranscriptionText.Foreground = Brushes.Black;
-                        UpdateStatus("✓ Transcribed successfully", Brushes.Green);
+                        UpdateStatus("Ready", Brushes.Green);
 
                         var historyItem = new TranscriptionHistoryItem
                         {
