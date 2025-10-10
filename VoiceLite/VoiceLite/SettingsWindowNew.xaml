@@ -152,23 +152,6 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
-
-            <!-- Whisper Model Tab -->
-            <TabItem Header="AI Model" Name="ModelTab">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
-                    <StackPanel>
-                        <controls:SimpleModelSelector x:Name="SimpleModelSelector"
-                                                      ModelSelected="SimpleModelSelector_ModelSelected"/>
-
-                        <Button Name="DownloadModelsButton"
-                                Content="Download Elite Model (1.5GB)"
-                                Height="35"
-                                Margin="0,15,0,0"
-                                Click="DownloadModelsButton_Click"
-                                Visibility="Visible"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
         </TabControl>
 
         <!-- Footer with Buttons -->
