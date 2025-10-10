@@ -973,7 +973,7 @@ namespace VoiceLite
                     UpdateStatus("Processing...", new SolidColorBrush(StatusColors.Processing));
                     TranscriptionText.Text = "Processing audio...";
                     TranscriptionText.Foreground = new SolidColorBrush(StatusColors.Processing);
-                    StartStuckStateRecoveryTimer();
+                    // Note: Stuck state timer will be started in OnAudioFileReady when we have confirmed audio to process
                 }
             }
             catch (Exception ex)
@@ -1504,6 +1504,9 @@ namespace VoiceLite
             }
 
             isTranscribing = true;
+
+            // Start stuck state recovery timer now that we have audio to process
+            StartStuckStateRecoveryTimer();
 
             try
             {
