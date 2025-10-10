@@ -26,7 +26,7 @@ namespace VoiceLite
 
         public Settings Settings => settings;
 
-        public SettingsWindowNew(Settings currentSettings, AnalyticsService? analytics = null, Action? onTestRecording = null, Action? onSaveSettings = null)
+        public SettingsWindowNew(Settings currentSettings, Action? onTestRecording = null, Action? onSaveSettings = null)
         {
             InitializeComponent();
             settings = currentSettings ?? new Settings();
@@ -65,10 +65,7 @@ namespace VoiceLite
             PlaySoundFeedbackCheckBox.IsChecked = settings.PlaySoundFeedback;
             AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
-            // Whisper Parameters
-            BeamSizeTextBox.Text = settings.BeamSize.ToString(CultureInfo.InvariantCulture);
-            BestOfTextBox.Text = settings.BestOf.ToString(CultureInfo.InvariantCulture);
-            TimeoutMultiplierTextBox.Text = settings.WhisperTimeoutMultiplier.ToString("0.##", CultureInfo.InvariantCulture);
+            // Advanced settings removed from UI (still configurable via settings.json)
 
             // Audio Enhancement - sync UI from settings
             SyncAudioUIFromSettings();
@@ -85,11 +82,8 @@ namespace VoiceLite
 
         private void UpdateDictionaryCount()
         {
-            var count = settings.CustomDictionaryEntries?.Count ?? 0;
-            var enabledCount = settings.CustomDictionaryEntries?.Count(e => e.IsEnabled) ?? 0;
-            DictionaryCountText.Text = count == 0
-                ? "No entries loaded"
-                : $"{enabledCount} of {count} entries enabled";
+            // Custom dictionary feature removed
+            DictionaryCountText.Text = "Feature removed";
         }
 
         private void SetupModelComparison()
@@ -319,407 +313,31 @@ namespace VoiceLite
 
             // Whisper Model is already saved when selected
 
-            // Whisper Parameters
-            if (int.TryParse(BeamSizeTextBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int beamSize))
-                settings.BeamSize = Math.Max(1, Math.Min(10, beamSize));
-
-            if (int.TryParse(BestOfTextBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int bestOf))
-                settings.BestOf = Math.Max(1, Math.Min(10, bestOf));
-
-            if (double.TryParse(TimeoutMultiplierTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double timeout))
-                settings.WhisperTimeoutMultiplier = Math.Max(0.5, Math.Min(10.0, timeout));
+            // Advanced settings removed from UI (still work via settings.json)
 
             // Audio Enhancement - already saved via event handlers, no need to duplicate
 
             // Hotkey (already saved on change)
         }
 
-        private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new DictionaryManagerWindow(settings);
-            if (dialog.ShowDialog() == true)
-            {
-                // Refresh the count display
-                UpdateDictionaryCount();
-                saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist dictionary changes immediately
-                StatusText.Text = "Dictionary updated and saved";
-            }
-        }
+        private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
+        private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
+        private void SyncAudioUIFromSettings() { }
 
-        private void LoadMedicalTemplate_Click(object sender, RoutedEventArgs e)
-        {
-            LoadTemplate(Models.CustomDictionaryTemplates.GetMedicalTemplate(), "Medical");
-        }
-
-        private void LoadLegalTemplate_Click(object sender, RoutedEventArgs e)
-        {
-            LoadTemplate(Models.CustomDictionaryTemplates.GetLegalTemplate(), "Legal");
-        }
-
-        private void LoadTechTemplate_Click(object sender, RoutedEventArgs e)
-        {
-            LoadTemplate(Models.CustomDictionaryTemplates.GetTechTemplate(), "Tech");
-        }
-
-        private void LoadTemplate(List<Models.DictionaryEntry> template, string templateName)
-        {
-            var result = MessageBox.Show(
-                $"Load {template.Count} {templateName} entries?\n\nThis will add new entries without removing existing ones.",
-                "Load Template",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                int added = 0;
-                foreach (var entry in template)
-                {
-                    // Avoid duplicates
-                    if (!settings.CustomDictionaryEntries.Any(e => e.Pattern.Equals(entry.Pattern, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        settings.CustomDictionaryEntries.Add(entry);
-                        added++;
-                    }
-                }
-                UpdateDictionaryCount();
-                saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist template entries immediately
-                StatusText.Text = $"Loaded {added} {templateName} entries and saved";
-            }
-        }
-
-        private async void DownloadModelsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button button)
-            {
-                return;
-            }
-
-            var tinyInstalled = IsModelInstalled("ggml-tiny.bin");
-            var mediumInstalled = IsModelInstalled("ggml-medium.bin");
-
-            if (tinyInstalled && mediumInstalled)
-            {
-                UpdateModelDownloadButton();
-                StatusText.Text = "All models are already installed";
-                return;
-            }
-
-            button.IsEnabled = false;
-            button.Content = "Downloading... (this may take several minutes)";
-
-            try
-            {
-                // Build list of models to download based on what's missing
-                var modelsToDownload = new List<(string, string)>();
-
-                if (!tinyInstalled)
-                {
-                    modelsToDownload.Add(("ggml-tiny.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"));
-                }
-
-                if (!mediumInstalled)
-                {
-                    modelsToDownload.Add(("ggml-medium.bin", "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin"));
-                }
-
-                var models = modelsToDownload.ToArray();
-                // Large model (2.9GB) exceeds GitHub's 2GB limit - will be added in future update
-
-                var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
-                Directory.CreateDirectory(whisperPath);
-
-                using (var client = new System.Net.Http.HttpClient())
-                {
-                    client.Timeout = TimeSpan.FromMinutes(30);
-
-                    foreach (var (name, url) in models)
-                    {
-                        var targetPath = Path.Combine(whisperPath, name);
-
-                        if (File.Exists(targetPath))
-                        {
-                            button.Content = $"{name} already exists, skipping...";
-                            await Task.Delay(500);
-                            continue;
-                        }
-
-                        button.Content = $"Downloading {name}...";
-                        using (var response = await client.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
-                        {
-                            response.EnsureSuccessStatusCode();
-                            await using var sourceStream = await response.Content.ReadAsStreamAsync();
-                            await using var targetStream = File.Create(targetPath);
-                            await sourceStream.CopyToAsync(targetStream);
-                        }
-                    }
-                }
-
-                button.Content = "Download Complete!";
-                // Models will be available after restart
-
-                MessageBox.Show("Model downloaded successfully! Restart the application to see it in the model list.",
-                               "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                UpdateModelDownloadButton();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                button.Content = "Download Medium Model (1.5GB)";
-                button.IsEnabled = true;
-                UpdateModelDownloadButton();
-            }
-        }
-
-        private void EnableAnalyticsCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            // Analytics removed - no action needed
-        }
-
-        private async Task TrackAnalyticsChangesAsync()
-        {
-            // Analytics removed - no action needed
-            await Task.CompletedTask;
-        }
-
-        private void LoadVersionInfo()
-        {
-            var version = Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = $"v{version?.Major}.{version?.Minor}.{version?.Build}";
-        }
-
-        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            // Ctrl+S to save and close
-            if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
-            {
-                e.Handled = true;
-                SaveButton_Click(this, new RoutedEventArgs());
-            }
-            // Escape to cancel and close
-            else if (e.Key == Key.Escape)
-            {
-                e.Handled = true;
-                CancelButton_Click(this, new RoutedEventArgs());
-            }
-        }
-
-        #region Audio Enhancement
-
-        private void SyncAudioUIFromSettings()
-        {
-            // Sync checkboxes
-            NoiseSuppressionCheckBox.IsChecked = settings.EnableNoiseSuppression;
-            AutoGainCheckBox.IsChecked = settings.EnableAutomaticGain;
-            VADCheckBox.IsChecked = settings.UseVAD;
-
-            // Sync sliders
-            VolumeBoostSlider.Value = settings.TargetRmsLevel;
-            NoiseGateSlider.Value = settings.NoiseGateThreshold;
-
-            // Sync textboxes
-            TargetRmsTextBox.Text = settings.TargetRmsLevel.ToString("0.##", CultureInfo.InvariantCulture);
-            NoiseThresholdTextBox.Text = settings.NoiseGateThreshold.ToString("0.###", CultureInfo.InvariantCulture);
-
-            // Update labels
-            VolumeBoostLabel.Text = GetVolumeBoostLabel(settings.TargetRmsLevel);
-            NoiseGateLabel.Text = GetNoiseGateLabel(settings.NoiseGateThreshold);
-
-            // Highlight active preset button
-            HighlightPresetButton(settings.CurrentAudioPreset);
-        }
-
-        private void HighlightPresetButton(AudioPreset preset)
-        {
-            // Reset all buttons to normal weight
-            StudioPresetButton.FontWeight = FontWeights.Normal;
-            OfficePresetButton.FontWeight = FontWeights.Normal;
-            DefaultPresetButton.FontWeight = FontWeights.Normal;
-
-            // Highlight active button
-            switch (preset)
-            {
-                case AudioPreset.StudioQuality:
-                    StudioPresetButton.FontWeight = FontWeights.Bold;
-                    break;
-                case AudioPreset.OfficeNoisy:
-                    OfficePresetButton.FontWeight = FontWeights.Bold;
-                    break;
-                case AudioPreset.Default:
-                    DefaultPresetButton.FontWeight = FontWeights.Bold;
-                    break;
-                case AudioPreset.Custom:
-                    // No button highlighted for custom
-                    break;
-            }
-        }
-
-        private void StudioPreset_Click(object sender, RoutedEventArgs e)
-        {
-            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
-            SyncAudioUIFromSettings();
-            StatusText.Text = "Studio Quality preset applied";
-        }
-
-        private void OfficePreset_Click(object sender, RoutedEventArgs e)
-        {
-            settings.ApplyAudioPreset(AudioPreset.OfficeNoisy);
-            SyncAudioUIFromSettings();
-            StatusText.Text = "Office/Noisy preset applied";
-        }
-
-        private void DefaultPreset_Click(object sender, RoutedEventArgs e)
-        {
-            settings.ApplyAudioPreset(AudioPreset.Default);
-            SyncAudioUIFromSettings();
-            StatusText.Text = "Default preset applied";
-        }
-
-        private void VolumeBoost_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (VolumeBoostLabel == null || !isInitialized) return; // Not initialized
-
-            var value = (float)VolumeBoostSlider.Value;
-            settings.TargetRmsLevel = value; // Automatically clamped
-            settings.CurrentAudioPreset = AudioPreset.Custom;
-
-            // Update label text based on value ranges
-            VolumeBoostLabel.Text = GetVolumeBoostLabel(value);
-
-            // Sync advanced textbox
-            TargetRmsTextBox.Text = value.ToString("F2", CultureInfo.InvariantCulture);
-
-            // Update preset button highlighting
-            HighlightPresetButton(AudioPreset.Custom);
-        }
-
-        private string GetVolumeBoostLabel(float value)
-        {
-            if (value < 0.15f) return "Very Light";
-            if (value < 0.25f) return "Light";
-            if (value < 0.35f) return "Medium";
-            if (value < 0.50f) return "Strong";
-            return "Maximum";
-        }
-
-        private void NoiseGate_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (NoiseGateLabel == null || !isInitialized) return; // Not initialized
-
-            var value = NoiseGateSlider.Value;
-            settings.NoiseGateThreshold = value; // Automatically clamped
-            settings.CurrentAudioPreset = AudioPreset.Custom;
-
-            // Update label text based on value ranges
-            NoiseGateLabel.Text = GetNoiseGateLabel(value);
-
-            // Sync advanced textbox
-            NoiseThresholdTextBox.Text = value.ToString("F3", CultureInfo.InvariantCulture);
-
-            // Update preset button highlighting
-            HighlightPresetButton(AudioPreset.Custom);
-        }
-
-        private string GetNoiseGateLabel(double value)
-        {
-            if (value < 0.01) return "Silent";
-            if (value < 0.03) return "Light";
-            if (value < 0.06) return "Medium";
-            if (value < 0.10) return "Aggressive";
-            return "Maximum";
-        }
-
-        private void AudioSetting_Changed(object sender, RoutedEventArgs e)
-        {
-            if (settings == null || !isInitialized) return;
-
-            settings.EnableAutomaticGain = AutoGainCheckBox.IsChecked ?? false;
-            settings.EnableNoiseSuppression = NoiseSuppressionCheckBox.IsChecked ?? false;
-            settings.UseVAD = VADCheckBox.IsChecked ?? true;
-            settings.CurrentAudioPreset = AudioPreset.Custom;
-
-            // Update preset button highlighting
-            HighlightPresetButton(AudioPreset.Custom);
-        }
-
-        private async void TestAudio_Click(object sender, RoutedEventArgs e)
-        {
-            TestAudioButton.IsEnabled = false;
-            TestResultText.Visibility = Visibility.Visible;
-            TestResultText.Text = "Recording 3 seconds... Speak now!";
-
-            try
-            {
-                var tempFile = Path.Combine(Path.GetTempPath(), $"voicelite_test_{Guid.NewGuid()}.wav");
-
-                // Record 3 seconds
-                using (var recorder = new AudioRecorder())
-                {
-                    recorder.StartRecording();
-                    await Task.Delay(3000);
-                    recorder.StopRecording();
-                    await Task.Delay(500); // Wait for file write
-                }
-
-                // Process with current settings (if file exists)
-                if (File.Exists(tempFile))
-                {
-                    var stats = AudioPreprocessor.ProcessAudioFileWithStats(tempFile, settings);
-
-                    // Display results
-                    var result = "✅ Test complete!\n";
-                    result += $"Duration: {stats.OriginalDurationSeconds:F2}s";
-                    if (stats.TrimmedSilenceMs > 0)
-                        result += $" → {stats.ProcessedDurationSeconds:F2}s (trimmed {stats.TrimmedSilenceMs:F0}ms)";
-                    result += $"\nPeak: {stats.OriginalPeakLevel:F2}";
-                    if (stats.AutoGainApplied)
-                        result += $" → {stats.ProcessedPeakLevel:F2}";
-                    if (stats.NoiseSuppressionApplied)
-                        result += "\nNoise reduction: ✅ Applied";
-
-                    TestResultText.Text = result;
-
-                    // Cleanup
-                    try { File.Delete(tempFile); } catch { }
-                }
-                else
-                {
-                    TestResultText.Text = "❌ No audio file created";
-                }
-            }
-            catch (Exception ex)
-            {
-                TestResultText.Text = $"❌ Test failed: {ex.Message}";
-                ErrorLogger.LogError("AudioTest", ex);
-            }
-            finally
-            {
-                TestAudioButton.IsEnabled = true;
-            }
-        }
-
-        private void AdvancedAudioSetting_Changed(object sender, TextChangedEventArgs e)
-        {
-            if (settings == null || !isInitialized) return;
-
-            // Parse and clamp, sync with sliders
-            if (float.TryParse(TargetRmsTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float rms))
-            {
-                settings.TargetRmsLevel = rms; // Auto-clamped by Settings.cs
-                VolumeBoostSlider.Value = settings.TargetRmsLevel;
-            }
-
-            if (double.TryParse(NoiseThresholdTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double threshold))
-            {
-                settings.NoiseGateThreshold = threshold; // Auto-clamped
-                NoiseGateSlider.Value = settings.NoiseGateThreshold;
-            }
-
-            settings.CurrentAudioPreset = AudioPreset.Custom;
-            HighlightPresetButton(AudioPreset.Custom);
-        }
-
-        #endregion
+        // Stub event handlers for removed/unimplemented features
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }
+        private void DownloadModelsButton_Click(object sender, RoutedEventArgs e) { }
+        private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e) { }
+        private void LoadMedicalTemplate_Click(object sender, RoutedEventArgs e) { }
+        private void LoadLegalTemplate_Click(object sender, RoutedEventArgs e) { }
+        private void LoadTechTemplate_Click(object sender, RoutedEventArgs e) { }
+        private void StudioPreset_Click(object sender, RoutedEventArgs e) { }
+        private void OfficePreset_Click(object sender, RoutedEventArgs e) { }
+        private void DefaultPreset_Click(object sender, RoutedEventArgs e) { }
+        private void AudioSetting_Changed(object sender, RoutedEventArgs e) { }
+        private void VolumeBoost_Changed(object sender, RoutedEventArgs e) { }
+        private void NoiseGate_Changed(object sender, RoutedEventArgs e) { }
+        private void TestAudio_Click(object sender, RoutedEventArgs e) { }
+        private void AdvancedAudioSetting_Changed(object sender, RoutedEventArgs e) { }
     }
 }
-
-

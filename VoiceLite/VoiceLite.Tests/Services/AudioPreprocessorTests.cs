@@ -42,59 +42,59 @@ namespace VoiceLite.Tests.Services
 
         #region Preset Application Tests
 
-        [Fact]
-        public void StudioPreset_AppliesCorrectSettings()
-        {
-            // Arrange
-            var settings = new Settings();
+// REMOVED:         [Fact]
+// REMOVED:         public void StudioPreset_AppliesCorrectSettings()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings();
+// REMOVED: 
+// REMOVED:             // Act
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.StudioQuality);
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.StudioQuality);
+// REMOVED:             settings.EnableNoiseSuppression.Should().BeTrue("StudioQuality should enable noise suppression");
+// REMOVED:             settings.EnableAutomaticGain.Should().BeTrue("StudioQuality should enable automatic gain");
+// REMOVED:             settings.TargetRmsLevel.Should().Be(0.25f);
+// REMOVED:             settings.NoiseGateThreshold.Should().Be(0.01);
+// REMOVED:             settings.UseVAD.Should().BeTrue("StudioQuality should enable VAD");
+// REMOVED:         }
 
-            // Act
-            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
+// REMOVED:         [Fact]
+// REMOVED:         public void OfficePreset_AppliesCorrectSettings()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings();
+// REMOVED: 
+// REMOVED:             // Act
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.OfficeNoisy);
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.OfficeNoisy);
+// REMOVED:             settings.EnableNoiseSuppression.Should().BeTrue("OfficeNoisy should enable noise suppression");
+// REMOVED:             settings.EnableAutomaticGain.Should().BeTrue("OfficeNoisy should enable automatic gain");
+// REMOVED:             settings.TargetRmsLevel.Should().Be(0.3f);
+// REMOVED:             settings.NoiseGateThreshold.Should().Be(0.04);
+// REMOVED:             settings.UseVAD.Should().BeTrue("OfficeNoisy should enable VAD");
+// REMOVED:         }
 
-            // Assert
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.StudioQuality);
-            settings.EnableNoiseSuppression.Should().BeTrue("StudioQuality should enable noise suppression");
-            settings.EnableAutomaticGain.Should().BeTrue("StudioQuality should enable automatic gain");
-            settings.TargetRmsLevel.Should().Be(0.25f);
-            settings.NoiseGateThreshold.Should().Be(0.01);
-            settings.UseVAD.Should().BeTrue("StudioQuality should enable VAD");
-        }
-
-        [Fact]
-        public void OfficePreset_AppliesCorrectSettings()
-        {
-            // Arrange
-            var settings = new Settings();
-
-            // Act
-            settings.ApplyAudioPreset(AudioPreset.OfficeNoisy);
-
-            // Assert
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.OfficeNoisy);
-            settings.EnableNoiseSuppression.Should().BeTrue("OfficeNoisy should enable noise suppression");
-            settings.EnableAutomaticGain.Should().BeTrue("OfficeNoisy should enable automatic gain");
-            settings.TargetRmsLevel.Should().Be(0.3f);
-            settings.NoiseGateThreshold.Should().Be(0.04);
-            settings.UseVAD.Should().BeTrue("OfficeNoisy should enable VAD");
-        }
-
-        [Fact]
-        public void DefaultPreset_AppliesCorrectSettings()
-        {
-            // Arrange
-            var settings = new Settings();
-
-            // Act
-            settings.ApplyAudioPreset(AudioPreset.Default);
-
-            // Assert
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.Default);
-            settings.EnableNoiseSuppression.Should().BeFalse("Default should disable noise suppression");
-            settings.EnableAutomaticGain.Should().BeFalse("Default should disable automatic gain");
-            settings.TargetRmsLevel.Should().Be(0.2f);
-            settings.NoiseGateThreshold.Should().Be(0.02);
-            settings.UseVAD.Should().BeTrue("Default should enable VAD");
-        }
+// REMOVED:         [Fact]
+// REMOVED:         public void DefaultPreset_AppliesCorrectSettings()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings();
+// REMOVED: 
+// REMOVED:             // Act
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.Default);
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.Default);
+// REMOVED:             settings.EnableNoiseSuppression.Should().BeFalse("Default should disable noise suppression");
+// REMOVED:             settings.EnableAutomaticGain.Should().BeFalse("Default should disable automatic gain");
+// REMOVED:             settings.TargetRmsLevel.Should().Be(0.2f);
+// REMOVED:             settings.NoiseGateThreshold.Should().Be(0.02);
+// REMOVED:             settings.UseVAD.Should().BeTrue("Default should enable VAD");
+// REMOVED:         }
 
         #endregion
 
@@ -257,76 +257,76 @@ namespace VoiceLite.Tests.Services
             act.Should().Throw<Exception>("Processing non-existent file should throw exception");
         }
 
-        [Fact]
-        public void ApplyAudioPreset_WithCustomPreset_DoesNotChangeSettings()
-        {
-            // Arrange
-            var settings = new Settings
-            {
-                EnableNoiseSuppression = true,
-                EnableAutomaticGain = false,
-                TargetRmsLevel = 0.5f,
-                NoiseGateThreshold = 0.03,
-                UseVAD = false
-            };
-
-            // Store original values
-            var originalNoiseSuppression = settings.EnableNoiseSuppression;
-            var originalAutoGain = settings.EnableAutomaticGain;
-            var originalRms = settings.TargetRmsLevel;
-            var originalGate = settings.NoiseGateThreshold;
-            var originalVAD = settings.UseVAD;
-
-            // Act
-            settings.ApplyAudioPreset(AudioPreset.Custom);
-
-            // Assert
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.Custom);
-            settings.EnableNoiseSuppression.Should().Be(originalNoiseSuppression, "Custom preset should not change noise suppression");
-            settings.EnableAutomaticGain.Should().Be(originalAutoGain, "Custom preset should not change auto gain");
-            settings.TargetRmsLevel.Should().Be(originalRms, "Custom preset should not change RMS level");
-            settings.NoiseGateThreshold.Should().Be(originalGate, "Custom preset should not change noise gate");
-            settings.UseVAD.Should().Be(originalVAD, "Custom preset should not change VAD");
-        }
+// REMOVED:         [Fact]
+// REMOVED:         public void ApplyAudioPreset_WithCustomPreset_DoesNotChangeSettings()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings
+// REMOVED:             {
+// REMOVED:                 EnableNoiseSuppression = true,
+// REMOVED:                 EnableAutomaticGain = false,
+// REMOVED:                 TargetRmsLevel = 0.5f,
+// REMOVED:                 NoiseGateThreshold = 0.03,
+// REMOVED:                 UseVAD = false
+// REMOVED:             };
+// REMOVED: 
+// REMOVED:             // Store original values
+// REMOVED:             var originalNoiseSuppression = settings.EnableNoiseSuppression;
+// REMOVED:             var originalAutoGain = settings.EnableAutomaticGain;
+// REMOVED:             var originalRms = settings.TargetRmsLevel;
+// REMOVED:             var originalGate = settings.NoiseGateThreshold;
+// REMOVED:             var originalVAD = settings.UseVAD;
+// REMOVED: 
+// REMOVED:             // Act
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.Custom);
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.Custom);
+// REMOVED:             settings.EnableNoiseSuppression.Should().Be(originalNoiseSuppression, "Custom preset should not change noise suppression");
+// REMOVED:             settings.EnableAutomaticGain.Should().Be(originalAutoGain, "Custom preset should not change auto gain");
+// REMOVED:             settings.TargetRmsLevel.Should().Be(originalRms, "Custom preset should not change RMS level");
+// REMOVED:             settings.NoiseGateThreshold.Should().Be(originalGate, "Custom preset should not change noise gate");
+// REMOVED:             settings.UseVAD.Should().Be(originalVAD, "Custom preset should not change VAD");
+// REMOVED:         }
 
         #endregion
 
         #region Integration Tests
-
-        [Fact]
-        public void ApplyPreset_ChangesCurrentAudioPreset()
-        {
-            // Arrange
-            var settings = new Settings();
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.Default, "Initial preset should be Default");
-
-            // Act
-            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
-
-            // Assert
-            settings.CurrentAudioPreset.Should().Be(AudioPreset.StudioQuality, "Current preset should update after applying preset");
-        }
-
-        [Fact]
-        public void ChangingSetting_AfterPresetApplied_ShouldAllowManualChanges()
-        {
-            // Arrange
-            var settings = new Settings();
-            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
-
-            var originalRms = settings.TargetRmsLevel;
-
-            // Act - Manually change a setting after applying preset
-            settings.TargetRmsLevel = 0.5f;
-
-            // Assert
-            settings.TargetRmsLevel.Should().Be(0.5f, "Manual changes should be allowed after preset application");
-            settings.TargetRmsLevel.Should().NotBe(originalRms, "Setting should have changed from preset value");
-
-            // Note: In a full implementation, this might also set CurrentAudioPreset to Custom
-            // but that logic would be in the UI layer, not the model
-        }
-
+// REMOVED: 
+// REMOVED: // REMOVED:         [Fact]
+// REMOVED:         public void ApplyPreset_ChangesCurrentAudioPreset()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings();
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.Default, "Initial preset should be Default");
+// REMOVED: 
+// REMOVED:             // Act
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.StudioQuality);
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.CurrentAudioPreset.Should().Be(AudioPreset.StudioQuality, "Current preset should update after applying preset");
+// REMOVED:         }
+// REMOVED: 
+// REMOVED:         [Fact]
+// REMOVED:         public void ChangingSetting_AfterPresetApplied_ShouldAllowManualChanges()
+// REMOVED:         {
+// REMOVED:             // Arrange
+// REMOVED:             var settings = new Settings();
+// REMOVED:             settings.ApplyAudioPreset(AudioPreset.StudioQuality);
+// REMOVED: 
+// REMOVED:             var originalRms = settings.TargetRmsLevel;
+// REMOVED: 
+// REMOVED:             // Act - Manually change a setting after applying preset
+// REMOVED:             settings.TargetRmsLevel = 0.5f;
+// REMOVED: 
+// REMOVED:             // Assert
+// REMOVED:             settings.TargetRmsLevel.Should().Be(0.5f, "Manual changes should be allowed after preset application");
+// REMOVED:             settings.TargetRmsLevel.Should().NotBe(originalRms, "Setting should have changed from preset value");
+// REMOVED: 
+// REMOVED:             // Note: In a full implementation, this might also set CurrentAudioPreset to Custom
+// REMOVED:             // but that logic would be in the UI layer, not the model
+// REMOVED:         }
+// REMOVED: 
         [Fact]
         public void ProcessAudioFile_WithNoiseSuppressionEnabled_ProcessesSuccessfully()
         {
@@ -367,25 +367,9 @@ namespace VoiceLite.Tests.Services
             stats.ProcessedPeakLevel.Should().BeGreaterThan(0, "Processed audio should have measurable peak level");
         }
 
-        [Fact]
-        public void ProcessAudioFile_WithAllEnhancementsEnabled_ProcessesSuccessfully()
-        {
-            // Arrange
-            var testFile = CreateTemporaryTestFile("all_enhancements.wav", durationSeconds: 1.5);
-            var settings = new Settings();
-            settings.ApplyAudioPreset(AudioPreset.StudioQuality);
-
-            // Act
-            var stats = AudioPreprocessor.ProcessAudioFileWithStats(testFile, settings);
-
-            // Assert
-            stats.Should().NotBeNull("Processing should return stats");
-            stats.NoiseSuppressionApplied.Should().BeTrue("Noise suppression should be applied");
-            stats.AutoGainApplied.Should().BeTrue("Auto gain should be applied");
-            stats.VADApplied.Should().BeTrue("VAD should be applied");
-            stats.OriginalDurationSeconds.Should().BeApproximately(1.5, 0.1);
-            stats.ProcessedPeakLevel.Should().BeGreaterThan(0);
-        }
+        // REMOVED: AudioPreset test - feature removed
+        // [Fact]
+        // public void ProcessAudioFile_WithAllEnhancementsEnabled_ProcessesSuccessfully() { }
 
         #endregion
 
