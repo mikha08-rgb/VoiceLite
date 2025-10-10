@@ -542,7 +542,7 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.65 (current release - major simplification)
+- **Desktop App**: v1.0.66 (current release - radical simplification, 100% free)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
 
 ## Major Architecture Changes (v1.0.65)
@@ -574,7 +574,15 @@ Recording → Whisper transcription → Text injection. That's it.
 
 ## Changelog Highlights
 
-### v1.0.65 (Current Desktop Release - Major Simplification)
+### v1.0.66 (Current Desktop Release - Radical Simplification)
+- **📦 Official Release**: Simplified version now available on website
+- **🎯 100% Free**: All features unlocked, no tiers, no licensing complexity
+- **🧹 Clean Architecture**: Core-only features (~15,000 lines removed in v1.0.65)
+- **⚡ Performance**: Greedy decoding (5x faster), no preprocessing overhead
+- **🔒 Privacy**: Zero analytics, zero tracking, zero server dependencies
+- **✅ Distribution**: VoiceLite-Setup-1.0.66.exe available for download
+
+### v1.0.65 (Major Simplification - Internal)
 - **🧹 Radical Simplification**: Removed ~15,000 lines of code, deleted 9 major features
 - **Features Removed**:
   - ❌ VoiceShortcuts (custom dictionary, text replacements)
