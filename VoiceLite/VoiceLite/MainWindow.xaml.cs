@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -63,6 +64,9 @@ namespace VoiceLite
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
         private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
+
+        // CRITICAL FIX: Track all DispatcherTimers created for status messages to prevent memory leaks
+        private readonly List<System.Windows.Threading.DispatcherTimer> activeStatusTimers = new List<System.Windows.Threading.DispatcherTimer>();
 
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
@@ -169,15 +173,23 @@ namespace VoiceLite
                             if (response == MessageBoxResult.OK)
                             {
                                 // Re-run dependency installer
+                                // CRITICAL FIX: Add try-catch to fire-and-forget Task.Run
                                 _ = Task.Run(async () =>
                                 {
-                                    var retry = await DependencyChecker.CheckAndInstallDependenciesAsync();
-                                    if (retry.AllDependenciesMet)
+                                    try
                                     {
-                                        await Dispatcher.InvokeAsync(() =>
+                                        var retry = await DependencyChecker.CheckAndInstallDependenciesAsync();
+                                        if (retry.AllDependenciesMet)
                                         {
-                                            StatusText.Text = "Ready";
-                                        });
+                                            await Dispatcher.InvokeAsync(() =>
+                                            {
+                                                StatusText.Text = "Ready";
+                                            });
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        ErrorLogger.LogError("Dependency check retry failed", ex);
                                     }
                                 });
                             }
@@ -858,14 +870,31 @@ namespace VoiceLite
 
         private void UpdateStatus(string status, Brush color)
         {
-            StatusText.Text = status;
-            StatusText.Foreground = color;
+            // CRITICAL FIX: Protect all UI element accesses with null checks
+            if (StatusText is not null)
+            {
+                StatusText.Text = status;
+                StatusText.Foreground = color;
+            }
 
             // Update the status indicator ellipse color
-            if (StatusIndicator != null)
+            if (StatusIndicator is not null)
             {
                 StatusIndicator.Fill = color;
                 StatusIndicator.Opacity = 1.0;
+            }
+        }
+
+        // CRITICAL FIX: Helper method to safely update TranscriptionText with null protection
+        private void UpdateTranscriptionText(string text, Brush? foreground = null)
+        {
+            if (TranscriptionText is not null)
+            {
+                TranscriptionText.Text = text;
+                if (foreground is not null)
+                {
+                    TranscriptionText.Foreground = foreground;
+                }
             }
         }
 
@@ -1109,9 +1138,11 @@ namespace VoiceLite
 
                     // Auto-clear after 3 seconds and restore normal status
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
                     timer.Tick += (_, __) =>
                     {
                         timer.Stop();
+                        activeStatusTimers.Remove(timer); // Remove from tracking when complete
                         UpdateUIForCurrentMode(); // Restore normal status text
                     };
                     timer.Start();
@@ -1495,18 +1526,21 @@ namespace VoiceLite
         /// </summary>
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
-            if (isTranscribing)
-            {
-                ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing, ignoring");
-                return;
-            }
-
-            isTranscribing = true;
-
-            // Start stuck state recovery timer now that we have audio to process
-            StartStuckStateRecoveryTimer();
-
+            // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
+            {
+                if (isTranscribing)
+                {
+                    ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing, ignoring");
+                    return;
+                }
+
+                isTranscribing = true;
+
+                // Start stuck state recovery timer now that we have audio to process
+                StartStuckStateRecoveryTimer();
+
+                try
             {
                 var transcriber = whisperService;
                 if (transcriber == null)
@@ -1522,8 +1556,12 @@ namespace VoiceLite
 
                     if (!string.IsNullOrWhiteSpace(transcription))
                     {
-                        TranscriptionText.Text = transcription;
-                        TranscriptionText.Foreground = Brushes.Black;
+                        // CRITICAL FIX: Protect UI element access with null check
+                        if (TranscriptionText is not null)
+                        {
+                            TranscriptionText.Text = transcription;
+                            TranscriptionText.Foreground = Brushes.Black;
+                        }
                         UpdateStatus("Ready", Brushes.Green);
 
                         var historyItem = new TranscriptionHistoryItem
@@ -1570,8 +1608,8 @@ namespace VoiceLite
                     }
                     else
                     {
-                        TranscriptionText.Text = "(No speech detected)";
-                        TranscriptionText.Foreground = Brushes.Gray;
+                        // CRITICAL FIX: Use helper method with null protection
+                        UpdateTranscriptionText("(No speech detected)", Brushes.Gray);
                         UpdateStatus("Ready", Brushes.Green);
                     }
 
@@ -1594,8 +1632,8 @@ namespace VoiceLite
                 await Dispatcher.InvokeAsync(() =>
                 {
                     StopStuckStateRecoveryTimer();
-                    TranscriptionText.Text = "Transcription error";
-                    TranscriptionText.Foreground = Brushes.Red;
+                    // CRITICAL FIX: Use helper method with null protection
+                    UpdateTranscriptionText("Transcription error", Brushes.Red);
                     UpdateStatus("Error", Brushes.Red);
 
                     _ = Task.Run(async () =>
@@ -1636,6 +1674,26 @@ namespace VoiceLite
                     ErrorLogger.LogError($"Failed to delete temp audio file: {audioFilePath}", ex);
                 }
             }
+            }
+            catch (Exception outerEx)
+            {
+                // CRITICAL: Catch exceptions from guard clauses, timer start, and finally block
+                ErrorLogger.LogError("OnAudioFileReady: Catastrophic failure in audio processing", outerEx);
+
+                // Reset to safe state
+                isTranscribing = false;
+                StopStuckStateRecoveryTimer();
+
+                try
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateStatus("Error", Brushes.Red);
+                        UpdateTranscriptionText("Critical error", Brushes.Red);
+                    });
+                }
+                catch { /* Swallow UI update errors during catastrophic failure */ }
+            }
         }
 
         /// <summary>
@@ -1665,33 +1723,59 @@ namespace VoiceLite
 
         private async void OnMemoryAlert(object? sender, MemoryAlertEventArgs e)
         {
-            if (e.Level == MemoryAlertLevel.Critical || e.Level == MemoryAlertLevel.PotentialLeak)
+            // CRITICAL FIX: Wrap entire async void method in try-catch to prevent silent exceptions
+            try
             {
-                try
+                if (e.Level == MemoryAlertLevel.Critical || e.Level == MemoryAlertLevel.PotentialLeak)
                 {
-                    await Dispatcher.InvokeAsync(() =>
+                    try
                     {
-                        ErrorLogger.LogMessage($"Memory alert: {e.Message}");
-                        // Could show a warning to user if needed
-                    });
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            ErrorLogger.LogMessage($"Memory alert: {e.Message}");
+                            // Could show a warning to user if needed
+                        });
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        // Dispatcher shutting down during app close - this is normal, just log it
+                        ErrorLogger.LogMessage("OnMemoryAlert: Dispatcher shutting down (app closing)");
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("OnMemoryAlert: Unexpected exception", ex);
+                    }
                 }
-                catch (TaskCanceledException)
-                {
-                    // Dispatcher shutting down during app close - this is normal, just log it
-                    ErrorLogger.LogMessage("OnMemoryAlert: Dispatcher shutting down (app closing)");
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("OnMemoryAlert: Unexpected exception", ex);
-                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnMemoryAlert: Failed to process memory alert", ex);
             }
         }
 
         // MEMORY_FIX 2025-10-08: Handle zombie whisper.exe process detection
+        // CRITICAL FIX: Add Dispatcher protection for thread-safe UI access (called from background thread)
         private void OnZombieProcessDetected(object? sender, ZombieCleanupEventArgs e)
         {
-            ErrorLogger.LogWarning($"Zombie whisper.exe detected and killed: PID {e.ProcessId} ({e.MemoryMB}MB)");
-            // Could notify user via toast notification if needed
+            try
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        ErrorLogger.LogWarning($"Zombie whisper.exe detected and killed: PID {e.ProcessId} ({e.MemoryMB}MB)");
+                        // Future UI updates (toast notifications) will be thread-safe
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("OnZombieProcessDetected: UI update failed", ex);
+                    }
+                });
+            }
+            catch (TaskCanceledException)
+            {
+                // Dispatcher shutting down during app close - normal
+            }
         }
 
         #endregion
@@ -1970,6 +2054,18 @@ namespace VoiceLite
                 recordingElapsedTimer = null;
             }
 
+            // CRITICAL FIX: Dispose all active status timers to prevent memory leaks
+            foreach (var timer in activeStatusTimers.ToList()) // ToList() to avoid modification during iteration
+            {
+                try
+                {
+                    timer?.Stop();
+                    // Note: DispatcherTimer doesn't implement IDisposable, but stopping is sufficient
+                }
+                catch { /* Ignore disposal errors */ }
+            }
+            activeStatusTimers.Clear();
+
             // CRITICAL FIX: Kill any hung whisper.exe processes on shutdown
             // Prevents orphaned processes from consuming resources after app closes
             _ = KillHungWhisperProcessesAsync();
@@ -2078,6 +2174,12 @@ namespace VoiceLite
                     int count = settings.TranscriptionHistory?.Count ?? 0;
                     HistoryCountText.Text = count == 1 ? "1 item" : $"{count} items";
 
+                    // CRITICAL FIX: Clear ContextMenu references before clearing children to prevent GC leaks
+                    foreach (var child in HistoryItemsPanel.Children.OfType<Border>())
+                    {
+                        child.ContextMenu = null; // Clear reference to break circular dependency
+                    }
+
                     // Clear existing items
                     HistoryItemsPanel.Children.Clear();
 
@@ -2137,12 +2239,14 @@ namespace VoiceLite
                     System.Windows.Clipboard.SetText(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2229,12 +2333,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2342,12 +2448,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2415,12 +2523,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
+                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
+                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2622,6 +2732,12 @@ namespace VoiceLite
             {
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    // CRITICAL FIX: Clear ContextMenu references before clearing children to prevent GC leaks
+                    foreach (var child in HistoryItemsPanel.Children.OfType<Border>())
+                    {
+                        child.ContextMenu = null; // Clear reference to break circular dependency
+                    }
+
                     // Clear existing items
                     HistoryItemsPanel.Children.Clear();
 

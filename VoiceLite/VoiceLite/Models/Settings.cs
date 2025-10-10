@@ -90,8 +90,20 @@ namespace VoiceLite.Models
         // Audio enhancement settings (disabled - kept for compatibility)
         public bool EnableNoiseSuppression { get; set; } = false;
         public bool EnableAutomaticGain { get; set; } = false;
-        public float TargetRmsLevel { get; set; } = 0.2f;
-        public double NoiseGateThreshold { get; set; } = 0.005;
+
+        private float _targetRmsLevel = 0.2f;
+        public float TargetRmsLevel
+        {
+            get => _targetRmsLevel;
+            set => _targetRmsLevel = Math.Clamp(value, 0.05f, 0.95f);
+        }
+
+        private double _noiseGateThreshold = 0.005;
+        public double NoiseGateThreshold
+        {
+            get => _noiseGateThreshold;
+            set => _noiseGateThreshold = Math.Clamp(value, 0.001, 0.5);
+        }
 
         public bool StartWithWindows { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
