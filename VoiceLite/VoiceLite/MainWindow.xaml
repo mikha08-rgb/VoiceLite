@@ -187,48 +187,8 @@
             </Grid>
         </Border>
 
-        <!-- Two Buttons (VoiceShortcuts + Settings) -->
+        <!-- Settings Button -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button x:Name="VoiceShortcutsButton"
-                    Content="VoiceShortcuts"
-                    Height="36"
-                    Width="155"
-                    Margin="0,0,10,0"
-                    Background="White"
-                    Foreground="#4A4A4A"
-                    BorderBrush="#E0E0E0"
-                    BorderThickness="1"
-                    FontWeight="SemiBold"
-                    FontSize="13"
-                    Cursor="Hand"
-                    Click="VoiceShortcutsButton_Click"
-                    ToolTip="Manage custom word replacements">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#F5F5F5"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#E8E8E8"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-            </Button>
-
             <Button x:Name="SettingsButton"
                     Content="Settings"
                     Height="36"
