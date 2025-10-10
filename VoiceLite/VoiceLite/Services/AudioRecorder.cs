@@ -32,11 +32,6 @@ namespace VoiceLite.Services
         private const bool useMemoryBuffer = true; // QUICK WIN 1: Force memory mode to eliminate file I/O latency (50-100ms)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
 
-        // CRITICAL FIX: Instance tracking to prevent race conditions
-        private int waveInInstanceId = 0;
-        private int currentRecordingInstanceId = 0;
-
-
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
         public event EventHandler<byte[]>? AudioDataReady; // New event for memory buffer mode
@@ -264,11 +259,6 @@ namespace VoiceLite.Services
                         throw new InvalidOperationException("Previous recording session not fully cleaned up. Cannot start new session.");
                     }
 
-                    // CRITICAL FIX: Increment instance ID to track this new recording session
-                    waveInInstanceId++;
-                    currentRecordingInstanceId = waveInInstanceId;
-                    ErrorLogger.LogDebug($"StartRecording: New recording instance ID: {currentRecordingInstanceId}");
-
                     waveIn = new WaveInEvent
                     {
                         WaveFormat = new WaveFormat(16000, 16, 1),
@@ -310,9 +300,6 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            // CRITICAL FIX: Capture the instance ID at entry to detect stale callbacks
-            int callbackInstanceId;
-
             // Quick pre-lock check for obvious late callbacks
             if (!isRecording)
             {
@@ -327,33 +314,10 @@ namespace VoiceLite.Services
                 if (!isRecording)
                     return;
 
-                // CRITICAL FIX: Capture current recording instance ID under lock
-                callbackInstanceId = currentRecordingInstanceId;
-
-                // TIER 1.1: Validate instance ID to prevent audio buffer cross-contamination
-                // This check prevents stale callbacks from old recording sessions from mixing audio
-                if (sender is WaveInEvent senderWaveIn)
+                // Validate sender is current waveIn instance (prevents stale callbacks)
+                if (sender is WaveInEvent senderWaveIn && senderWaveIn != waveIn)
                 {
-                    // First check: sender must be the current waveIn instance
-                    if (senderWaveIn != waveIn)
-                    {
-                        ErrorLogger.LogDebug($"OnDataAvailable: Ignoring {e.BytesRecorded} bytes from old waveIn instance (object ref check)");
-                        return;
-                    }
-
-                    // TIER 1.1: Second check - validate callback instance ID matches current recording
-                    // This prevents NAudio's internal buffer callbacks from previous sessions
-                    // Even if waveIn is disposed, callbacks may still fire with buffered data
-                    if (callbackInstanceId != currentRecordingInstanceId)
-                    {
-                        ErrorLogger.LogWarning($"TIER 1.1: Ignoring stale callback from instance {callbackInstanceId} (current: {currentRecordingInstanceId})");
-                        return;
-                    }
-                }
-                else
-                {
-                    // Sender is not a WaveInEvent? This should never happen
-                    ErrorLogger.LogWarning($"OnDataAvailable: Unexpected sender type: {sender?.GetType().Name ?? "null"}");
+                    // Ignore callbacks from disposed instances
                     return;
                 }
 
