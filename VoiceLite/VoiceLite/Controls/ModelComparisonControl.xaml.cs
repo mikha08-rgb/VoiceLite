@@ -287,44 +287,15 @@ namespace VoiceLite.Controls
             if (result != MessageBoxResult.Yes)
                 return;
 
-            try
-            {
-                IsEnabled = false;
-                Mouse.OverrideCursor = Cursors.Wait;
-
-                var benchmarkService = new ModelBenchmarkService();
-                var benchmarkResult = await benchmarkService.BenchmarkModelAsync(selectedModel);
-
-                if (benchmarkResult.Success)
-                {
-                    var metrics = $"✅ {selectedModel.DisplayName} Test Results\n\n" +
-                                 $"⏱️ Transcription Time: {benchmarkResult.TranscriptionTime:F2}s\n" +
-                                 $"🎵 Audio Duration: {benchmarkResult.AudioDuration:F2}s\n" +
-                                 $"📊 Processing Ratio: {benchmarkResult.ProcessingRatio:F2}x realtime\n" +
-                                 $"💾 Peak Memory: {FormatMemory(benchmarkResult.PeakMemoryUsage)}\n\n" +
-                                 $"📝 Transcription:\n{benchmarkResult.TranscribedText}";
-
-                    MessageBox.Show(metrics, "Model Test Complete",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show($"❌ Test Failed\n\n{benchmarkResult.ErrorMessage}",
-                        "Test Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-
-                benchmarkService.Cleanup();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Test failed: {ex.Message}\n\nPlease check that the model is properly installed.",
-                    "Test Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                IsEnabled = true;
-                Mouse.OverrideCursor = null;
-            }
+            // SIMPLIFICATION: Removed ModelBenchmarkService - power user feature not essential to core functionality
+            // Users can test models by simply trying them during normal usage
+            MessageBox.Show(
+                "Model benchmarking has been removed to simplify the app.\n\n" +
+                "To test a model's performance, simply select it and use it during normal recording.\n" +
+                "You can switch back to your previous model anytime from Settings.",
+                "Feature Simplified",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         private string FormatMemory(long bytes)
