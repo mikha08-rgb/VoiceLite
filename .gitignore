@@ -44,6 +44,25 @@ secrets.txt
 api-keys.txt
 .vercel
 
+# Web app secrets (comprehensive)
+voicelite-web/.env
+voicelite-web/.env.*
+!voicelite-web/.env.example
+voicelite-web/*.bat
+
+# Claude settings
+.claude/*.local.json
+.claude/settings.local.json
+
+# Generated security reports and keys
+NEW_KEYS.txt
+GIT_HISTORY_AUDIT_REPORT.md
+DESKTOP_APP_KEY_UPDATE.md
+SECURITY_ROTATION_GUIDE.md
+PHASE_1_COMPLETION_REPORT.md
+secrets.txt
+bfg.jar
+
 # VC++ redistributable (downloaded during GitHub Actions build)
 VoiceLite/dependencies/
 VoiceLite/whisper_installer/

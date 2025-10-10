@@ -131,7 +131,8 @@ namespace VoiceLite.Services
 
                 var tcs = new TaskCompletionSource<bool>();
 
-                var process = new Process
+                // CRITICAL FIX: Use 'using' to ensure Process is disposed and prevent resource leak
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {

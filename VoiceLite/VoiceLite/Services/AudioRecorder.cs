@@ -580,29 +580,34 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
-            // CRIT-008 FIX: Stop timer BEFORE setting disposal flag to prevent race condition
-            // Timer callback checks isDisposed, so we must stop timer first
-            if (cleanupTimer != null)
-            {
-                try
-                {
-                    cleanupTimer.Stop();
-                    cleanupTimer.Dispose();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Timer already disposed, ignore
-                }
-                cleanupTimer = null;
-            }
-
-            // DISPOSAL SAFETY: Set flag to prevent any late callbacks from proceeding
-            // This must come AFTER timer.Stop() to prevent timer callback race condition
-            isDisposed = true;
-
+            // CRIT-007 FIX: Hold lock for entire disposal sequence to prevent TOCTOU race condition
+            // Previously checked isDisposed, then performed disposal logic outside lock
+            // This caused race conditions where multiple threads could enter disposal logic
             lock (lockObject)
             {
+                // Check-and-set must be atomic (within same lock acquisition)
+                if (isDisposed)
+                    return;
 
+                // Mark as disposed FIRST while holding lock
+                isDisposed = true;
+
+                // Stop and dispose timer (safe to do under lock, timer won't fire during disposal)
+                if (cleanupTimer != null)
+                {
+                    try
+                    {
+                        cleanupTimer.Stop();
+                        cleanupTimer.Dispose();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Timer already disposed, ignore
+                    }
+                    cleanupTimer = null;
+                }
+
+                // Stop recording if active
                 if (isRecording)
                 {
                     isRecording = false;
@@ -612,9 +617,11 @@ namespace VoiceLite.Services
                 // Minimal delay for cleanup
                 Thread.Sleep(10);
 
+                // Dispose wave file
                 waveFile?.Dispose();
                 waveFile = null;
 
+                // Detach event handlers
                 if (eventHandlersAttached && waveIn != null)
                 {
                     waveIn.DataAvailable -= OnDataAvailable;
@@ -622,10 +629,11 @@ namespace VoiceLite.Services
                     eventHandlersAttached = false;
                 }
 
+                // Dispose wave input device
                 waveIn?.Dispose();
                 waveIn = null;
 
-                // Final cleanup
+                // Final cleanup (safe - already marked disposed)
                 CleanupStaleAudioFiles();
             }
         }

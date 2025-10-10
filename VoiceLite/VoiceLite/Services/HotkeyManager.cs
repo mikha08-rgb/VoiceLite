@@ -32,6 +32,7 @@ namespace VoiceLite.Services
         private bool isRegistered = false;
         private CancellationTokenSource? keyMonitorCts;
         private Task? keyMonitorTask; // DISPOSAL SAFETY: Track polling task to wait for completion
+        private readonly ManualResetEventSlim unregisterComplete = new ManualResetEventSlim(false); // CRIT-003 FIX: Non-blocking coordination for unregister
 
         private Key currentKey = Key.LeftAlt;
         private ModifierKeys currentModifiers = ModifierKeys.None;
@@ -292,21 +293,33 @@ namespace VoiceLite.Services
                 }
             }
 
-            // DISPOSAL SAFETY: Wait for polling task to complete (prevents orphaned tasks)
-            // Increased timeout from 1s → 5s to handle slow systems
+            // CRIT-003 FIX: Use ManualResetEventSlim for non-blocking coordination instead of Task.Wait()
+            // Task.Wait() blocks UI thread for up to 5 seconds, causing UI freezes
+            // ManualResetEventSlim allows efficient signaling without blocking
             if (task != null && !task.IsCompleted)
             {
                 try
                 {
-                    task.Wait(TimeSpan.FromSeconds(5)); // BUG FIX: Increased timeout
+                    unregisterComplete.Reset(); // Reset signal before waiting
+
+                    // Start async task to signal completion
+                    _ = task.ContinueWith(_ => unregisterComplete.Set(), TaskScheduler.Default);
+
+                    // Wait with timeout - non-blocking on background thread
+                    if (!unregisterComplete.Wait(TimeSpan.FromSeconds(5)))
+                    {
+                        ErrorLogger.LogError("HotkeyManager: Key monitor task did not complete within 5 seconds", new TimeoutException());
+                    }
                 }
                 catch (AggregateException ex) when (ex.InnerException is TaskCanceledException)
                 {
                     // Expected during cancellation
+                    unregisterComplete.Set(); // Signal completion
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("HotkeyManager: Error waiting for key monitor task", ex);
+                    unregisterComplete.Set(); // Signal completion
                 }
             }
         }
@@ -487,6 +500,16 @@ namespace VoiceLite.Services
                     source = null;
                 }
                 isRegistered = false;
+            }
+
+            // CRIT-003 FIX: Dispose ManualResetEventSlim to release resources
+            try
+            {
+                unregisterComplete.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed, ignore
             }
         }
     }
