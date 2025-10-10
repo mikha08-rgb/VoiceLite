@@ -2060,9 +2060,6 @@ namespace VoiceLite
                 audioRecorder?.Dispose();
                 audioRecorder = null;
 
-                // Stop security protection
-                SecurityService.StopProtection();
-
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
             catch (Exception ex)
