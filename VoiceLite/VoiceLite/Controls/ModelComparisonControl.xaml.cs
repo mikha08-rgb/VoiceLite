@@ -257,7 +257,7 @@ namespace VoiceLite.Controls
             }
         }
 
-        private async void TestModel_Click(object sender, RoutedEventArgs e)
+        private void TestModel_Click(object sender, RoutedEventArgs e)
         {
             if (selectedModel == null)
             {
