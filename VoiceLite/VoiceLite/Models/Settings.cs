@@ -19,14 +19,6 @@ namespace VoiceLite.Models
         PreferPaste     // Paste when possible, type when necessary
     }
 
-    public enum AudioPreset
-    {
-        Default,
-        StudioQuality,
-        OfficeNoisy,
-        Custom
-    }
-
     public enum UIPreset
     {
         Default,        // Hybrid baseline - clean and balanced
@@ -95,38 +87,22 @@ namespace VoiceLite.Models
             get => _whisperTimeoutMultiplier;
             set => _whisperTimeoutMultiplier = Math.Clamp(value, 0.5, 10.0);
         }
-        // Audio Enhancement Settings
+        // Audio enhancement settings (disabled - kept for compatibility)
         public bool EnableNoiseSuppression { get; set; } = false;
         public bool EnableAutomaticGain { get; set; } = false;
-        private float _targetRmsLevel = 0.2f;
-        // BUG-004 FIX: Reduced from 0.02 (2%) to 0.005 (0.5%) to prevent silencing quiet speech
-        // Old threshold was too aggressive and cut off consonants and quiet speakers
-        private double _noiseGateThreshold = 0.005;
-        public AudioPreset CurrentAudioPreset { get; set; } = AudioPreset.Default;
-
-        public float TargetRmsLevel
-        {
-            get => _targetRmsLevel;
-            set => _targetRmsLevel = Math.Clamp(value, 0.05f, 0.95f); // Prevent clipping/silence
-        }
-
-        public double NoiseGateThreshold
-        {
-            get => _noiseGateThreshold;
-            set => _noiseGateThreshold = Math.Clamp(value, 0.001, 0.5); // Prevent over-gating
-        }
+        public float TargetRmsLevel { get; set; } = 0.2f;
+        public double NoiseGateThreshold { get; set; } = 0.005;
 
         public bool StartWithWindows { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
         public bool PlaySoundFeedback { get; set; } = false;
-        public bool ShowVisualIndicator { get; set; } = true;
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
 
-        // Accuracy Improvement Features - ALWAYS ON for best experience
+        // Whisper settings
         public bool UseTemperatureOptimization { get; set; } = true; // Use temperature 0.2 for better accuracy
         private float _whisperTemperature = 0.2f;
 
@@ -136,17 +112,18 @@ namespace VoiceLite.Models
             set => _whisperTemperature = Math.Clamp(value, 0.0f, 2.0f);
         }
 
-        // Optimal for accuracy (default is 1.0)
-        public bool UseContextPrompt { get; set; } = true; // Use recent transcriptions as context
-        public bool UseEnhancedDictionary { get; set; } = true; // Use enhanced technical term corrections
         public bool UseVAD { get; set; } = true; // Use Voice Activity Detection to trim silence
-        public bool EnableMetrics { get; set; } = false; // Track accuracy metrics (off by default for privacy)
+
+        // Legacy properties (kept for backwards compatibility with saved settings)
+        public bool EnableMetrics { get; set; } = false; // Unused - kept for deserialization
+        public bool UseContextPrompt { get; set; } = true; // Unused - kept for deserialization
+        public bool UseEnhancedDictionary { get; set; } = true; // Unused - kept for deserialization
+        public bool EnableCustomDictionary { get; set; } = true; // Unused - kept for deserialization
+        public List<object> CustomDictionaryEntries { get; set; } = new List<object>(); // Unused - kept for deserialization
 
         // Model Benchmark Cache
         public string? LastBenchmarkDate { get; set; }
         public Dictionary<string, ModelBenchmarkCache> BenchmarkCache { get; set; } = new Dictionary<string, ModelBenchmarkCache>();
-        public bool ShowModelComparison { get; set; } = true; // Show visual comparison by default
-        public bool PrioritizeSpeed { get; set; } = false; // For model recommendations
 
         // Transcription History
         private int _maxHistoryItems = 50;
@@ -174,48 +151,6 @@ namespace VoiceLite.Models
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
-
-        /// <summary>
-        /// Apply an audio preset to configure all audio enhancement settings.
-        /// </summary>
-        public void ApplyAudioPreset(AudioPreset preset)
-        {
-            CurrentAudioPreset = preset;
-
-            switch (preset)
-            {
-                case AudioPreset.StudioQuality:
-                    // Clear mic, quiet room - optimize for clarity
-                    EnableNoiseSuppression = true;
-                    EnableAutomaticGain = true;
-                    TargetRmsLevel = 0.25f;
-                    NoiseGateThreshold = 0.01;
-                    UseVAD = true;
-                    break;
-
-                case AudioPreset.OfficeNoisy:
-                    // Background noise, fans, typing - aggressive noise reduction
-                    EnableNoiseSuppression = true;
-                    EnableAutomaticGain = true;
-                    TargetRmsLevel = 0.3f;
-                    NoiseGateThreshold = 0.04;
-                    UseVAD = true;
-                    break;
-
-                case AudioPreset.Default:
-                    // Balanced settings - good for most scenarios
-                    EnableNoiseSuppression = false;
-                    EnableAutomaticGain = false;
-                    TargetRmsLevel = 0.2f;
-                    NoiseGateThreshold = 0.02;
-                    UseVAD = true;
-                    break;
-
-                case AudioPreset.Custom:
-                    // Do nothing - user has customized settings
-                    break;
-            }
-        }
     }
 
     public class ModelBenchmarkCache
