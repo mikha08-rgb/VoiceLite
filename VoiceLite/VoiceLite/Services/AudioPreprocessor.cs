@@ -495,12 +495,6 @@ namespace VoiceLite.Services
                     // Calculate and return trimmed milliseconds
                     var trimmedMs = (trimmedSamples * 1000.0) / waveFormat.SampleRate;
 
-                    // Log for metrics if enabled
-                    if (settings.EnableMetrics)
-                    {
-                        ErrorLogger.LogMessage($"VAD trimmed {trimmedMs:F0}ms of silence");
-                    }
-
                     return trimmedMs;
                 }
 
