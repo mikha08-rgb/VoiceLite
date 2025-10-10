@@ -29,6 +29,11 @@ whisper/*.dll
 # Tooling artifacts
 VoiceLite/.claude/
 
+# Claude AI workflows (proprietary - DO NOT COMMIT)
+.claude/
+CLAUDE.md
+CODEBASE_AUDIT_REPORT.md
+
 # Sensitive files - NEVER commit these!
 license-keys.txt
 PRODUCTION_KEYS.txt
