@@ -23,6 +23,8 @@ namespace VoiceLite.Services
         private volatile bool isWarmedUp = false;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private readonly CancellationTokenSource disposeCts = new();
+        private readonly CancellationTokenSource disposalCts = new CancellationTokenSource(); // CRITICAL FIX: Cancellation for semaphore during disposal
+        private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
 
@@ -291,7 +293,8 @@ namespace VoiceLite.Services
             try
             {
                 // Use semaphore to ensure only one transcription at a time
-                await transcriptionSemaphore.WaitAsync();
+                // CRITICAL FIX: Add cancellation token support to prevent deadlock during disposal
+                await transcriptionSemaphore.WaitAsync(disposalCts.Token);
                 semaphoreAcquired = true;
                 // Preprocess audio if needed
                 try
@@ -393,6 +396,8 @@ namespace VoiceLite.Services
                         {
                             try
                             {
+                                // CRIT-006 FIX: Add timeout to WaitForExit to prevent infinite hang
+                                // Previously called without timeout, could hang forever if process in zombie state
                                 return process.WaitForExit(5000); // Wait up to 5 seconds
                             }
                             catch
@@ -509,6 +514,14 @@ namespace VoiceLite.Services
                 {
                     transcriptionSemaphore.Release();
                 }
+
+                // CRITICAL FIX: Signal disposal completion to unblock Dispose() method
+                // Without this, Dispose() waits 5 seconds for timeout on every shutdown
+                try
+                {
+                    disposalComplete?.Set();
+                }
+                catch { /* Ignore if already disposed */ }
             }
         }
 
@@ -541,26 +554,26 @@ namespace VoiceLite.Services
 
             isDisposed = true;
 
-
-            // Cancel all background tasks (warmup tasks)
+            // CRITICAL FIX: Cancel all operations immediately
             try
             {
-                disposeCts.Cancel();
+                disposeCts.Cancel(); // Cancel warmup tasks
+                disposalCts.Cancel(); // Cancel semaphore waits to unblock transcriptions
             }
             catch { /* Ignore cancellation errors */ }
 
-            // Wait briefly for background tasks to complete
-            Thread.Sleep(200);
+            // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
+            // Old approach: Thread.Sleep(200) blocks UI thread
+            // New approach: Efficient signaling with max 5-second timeout
+            disposalComplete.Wait(TimeSpan.FromSeconds(5));
 
             CleanupProcess();
 
-            // Dispose semaphore safely with a small delay to prevent race conditions
+            // Dispose semaphore safely
             if (transcriptionSemaphore != null)
             {
                 try
                 {
-                    // Brief wait to ensure any Release() calls have completed
-                    Thread.Sleep(100);
                     transcriptionSemaphore.Dispose();
                 }
                 catch (ObjectDisposedException)
@@ -578,6 +591,19 @@ namespace VoiceLite.Services
             {
                 // Already disposed, ignore
             }
+
+            // CRITICAL FIX: Dispose new disposal coordination resources
+            try
+            {
+                disposalCts.Dispose();
+            }
+            catch (ObjectDisposedException) { }
+
+            try
+            {
+                disposalComplete.Dispose();
+            }
+            catch (ObjectDisposedException) { }
         }
     }
 }

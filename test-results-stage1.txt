@@ -1,0 +1,673 @@
+Build started 10/9/2025 8:41:52 PM.
+     1>Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" on node 1 (Restore target(s)).
+     1>_GetAllRestoreProjectPathItems:
+         Determining projects to restore...
+       Restore:
+         X.509 certificate chain validation will use the default trust store selected by .NET for code signing.
+         X.509 certificate chain validation will use the default trust store selected by .NET for timestamping.
+         Restoring packages for C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj...
+         Restoring packages for C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj...
+           GET https://api.nuget.org/v3/vulnerabilities/index.json
+           OK https://api.nuget.org/v3/vulnerabilities/index.json 47ms
+           GET https://api.nuget.org/v3-vulnerabilities/2025.10.08.05.30.15/vulnerability.base.json
+           GET https://api.nuget.org/v3-vulnerabilities/2025.10.08.05.30.15/2025.10.09.23.30.20/vulnerability.update.json
+           OK https://api.nuget.org/v3-vulnerabilities/2025.10.08.05.30.15/vulnerability.base.json 33ms
+           OK https://api.nuget.org/v3-vulnerabilities/2025.10.08.05.30.15/2025.10.09.23.30.20/vulnerability.update.json 66ms
+         Writing assets file to disk. Path: C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\obj\project.assets.json
+         Assets file has not changed. Skipping assets file writing. Path: C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\project.assets.json
+         Restored C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj (in 446 ms).
+         Restored C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj (in 446 ms).
+         
+         NuGet Config files used:
+             C:\Users\mishk\AppData\Roaming\NuGet\NuGet.Config
+             C:\Program Files (x86)\NuGet\Config\Microsoft.VisualStudio.FallbackLocation.config
+             C:\Program Files (x86)\NuGet\Config\Microsoft.VisualStudio.Offline.config
+         
+         Feeds used:
+             https://api.nuget.org/v3/index.json
+             C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\
+     1>Done Building Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (Restore target(s)).
+   1:7>Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" on node 1 (VSTest target(s)).
+     1>BuildProject:
+         Build started, please wait...
+   1:7>Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (1:7) is building "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (1:8) on node 1 (default targets).
+   1:8>Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (1:8) is building "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj" (2:6) on node 1 (default targets).
+     2>MainResourcesGeneration:
+       Skipping target "MainResourcesGeneration" because all output files are up-to-date with respect to the input files.
+       GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+       CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+       _GenerateSourceLinkFile:
+         Updating Source Link file 'obj\Debug\net8.0-windows\VoiceLite.sourcelink.json'.
+       CoreCompile:
+         C:\Program Files\dotnet\dotnet.exe exec "C:\Program Files\dotnet\sdk\9.0.305\Roslyn\bincore\csc.dll" /noconfig /unsafe- /checked- /nowarn:1701,1702,1701,1702 /fullpaths /nostdlib+ /errorreport:prompt /warn:8 /define:TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER /highentropyva+ /nullable:enable /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Accessibility.dll" /reference:C:\Users\mishk\.nuget\packages\h.inputsimulator\1.2.1\lib\netstandard2.0\H.InputSimulator.dll /reference:C:\Users\mishk\.nuget\packages\hardcodet.notifyicon.wpf\2.0.1\lib\net8.0-windows7.0\Hardcodet.NotifyIcon.Wpf.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.CSharp.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.Core.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.Forms.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Registry.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Registry.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.SystemEvents.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\mscorlib.dll" /reference:C:\Users\mishk\.nuget\packages\naudio.asio\2.2.1\lib\netstandard2.0\NAudio.Asio.dll /reference:C:\Users\mishk\.nuget\packages\naudio.core\2.2.1\lib\netstandard2.0\NAudio.Core.dll /reference:C:\Users\mishk\.nuget\packages\naudio\2.2.1\lib\net6.0-windows7.0\NAudio.dll /reference:C:\Users\mishk\.nuget\packages\naudio.midi\2.2.1\lib\netstandard2.0\NAudio.Midi.dll /reference:C:\Users\mishk\.nuget\packages\naudio.vorbis\1.5.0\lib\netstandard2.0\NAudio.Vorbis.dll /reference:C:\Users\mishk\.nuget\packages\naudio.wasapi\2.2.1\lib\netstandard2.0\NAudio.Wasapi.dll /reference:C:\Users\mishk\.nuget\packages\naudio.winforms\2.2.1\lib\netcoreapp3.1\NAudio.WinForms.dll /reference:C:\Users\mishk\.nuget\packages\naudio.winmm\2.2.1\lib\netstandard2.0\NAudio.WinMM.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\netstandard.dll" /reference:C:\Users\mishk\.nuget\packages\nvorbis\0.10.4\lib\netstandard2.0\NVorbis.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationCore.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Aero.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Aero2.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.AeroLite.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Classic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Luna.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Royale.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationUI.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\ReachFramework.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.AppContext.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Buffers.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.CodeDom.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Concurrent.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Immutable.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.NonGeneric.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Specialized.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.Annotations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.DataAnnotations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.EventBasedAsync.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.TypeConverter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Configuration.ConfigurationManager.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Configuration.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Console.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Core.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.Common.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.DataSetExtensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Contracts.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Debug.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.DiagnosticSource.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.EventLog.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.FileVersionInfo.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.PerformanceCounter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Process.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.StackTrace.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.TextWriterTraceListener.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Tools.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.TraceSource.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Tracing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.DirectoryServices.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.Common.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Drawing.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Dynamic.Runtime.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Formats.Asn1.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Formats.Tar.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.Calendars.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.Brotli.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.FileSystem.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.ZipFile.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.DriveInfo.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.Watcher.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.IsolatedStorage.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.MemoryMappedFiles.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.IO.Packaging.dll" /reference:C:\Users\mishk\.nuget\packages\system.io.pipelines\9.0.9\lib\net8.0\System.IO.Pipelines.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Pipes.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Pipes.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.UnmanagedMemoryStream.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Expressions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Parallel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Queryable.dll" /reference:C:\Users\mishk\.nuget\packages\system.management\8.0.0\lib\net8.0\System.Management.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Memory.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Http.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Http.Json.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.HttpListener.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Mail.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.NameResolution.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.NetworkInformation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Ping.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Quic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Requests.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Security.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.ServicePoint.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Sockets.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebClient.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebHeaderCollection.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebProxy.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebSockets.Client.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebSockets.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Numerics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Numerics.Vectors.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ObjectModel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Printing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.DispatchProxy.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.ILGeneration.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.Lightweight.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Metadata.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.TypeExtensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Resources.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.Reader.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.ResourceManager.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.Writer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.CompilerServices.Unsafe.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.CompilerServices.VisualC.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Handles.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.JavaScript.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.RuntimeInformation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Intrinsics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Loader.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Numerics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Formatters.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Json.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Claims.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Algorithms.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Cng.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Csp.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Encoding.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.OpenSsl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Pkcs.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.ProtectedData.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.X509Certificates.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Permissions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Principal.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Principal.Windows.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.SecureString.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ServiceModel.Web.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ServiceProcess.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.CodePages.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.Extensions.dll" /reference:C:\Users\mishk\.nuget\packages\system.text.encodings.web\9.0.9\lib\net8.0\System.Text.Encodings.Web.dll /reference:C:\Users\mishk\.nuget\packages\system.text.json\9.0.9\lib\net8.0\System.Text.Json.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.RegularExpressions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Threading.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Channels.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Overlapped.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Dataflow.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Parallel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Thread.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.ThreadPool.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Timer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Transactions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Transactions.Local.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ValueTuple.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Web.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Web.HttpUtility.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Controls.Ribbon.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Windows.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Design.Editors.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Input.Manipulations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Presentation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Xaml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.Linq.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.ReaderWriter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.Serialization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XDocument.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XmlDocument.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XmlSerializer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XPath.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XPath.XDocument.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationClient.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationClientSideProviders.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationProvider.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationTypes.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\WindowsBase.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\WindowsFormsIntegration.dll" /debug+ /debug:portable /filealign:512 /optimize- /out:obj\Debug\net8.0-windows\VoiceLite.dll /refout:obj\Debug\net8.0-windows\refint\VoiceLite.dll /resource:obj\Debug\net8.0-windows\VoiceLite.g.resources /target:winexe /warnaserror- /utf8output /win32icon:VoiceLite.ico /win32manifest:app.manifest /deterministic+ /sourcelink:obj\Debug\net8.0-windows\VoiceLite.sourcelink.json /langversion:12.0 /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\Controls\ModelComparisonControl.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\Controls\SimpleModelSelector.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\FirstRunDiagnosticWindow.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\MainWindow.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\SettingsWindowNew.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\App.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\VoiceLite_Content.g.cs" /embed:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs" /embed:"obj\Debug\net8.0-windows\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs" /embed:obj\Debug\net8.0-windows\VoiceLite.AssemblyInfo.cs /analyzerconfig:obj\Debug\net8.0-windows\VoiceLite.GeneratedMSBuildEditorConfig.editorconfig /analyzerconfig:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\analyzers\build\config\analysislevel_8_default.globalconfig" /analyzer:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll" /analyzer:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.NetAnalyzers.dll" /analyzer:C:\Users\mishk\.nuget\packages\system.text.json\9.0.9\analyzers\dotnet\roslyn4.4\cs\System.Text.Json.SourceGeneration.dll /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.ComInterfaceGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.JavaScript.JSImportGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.LibraryImportGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.SourceGeneration.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/System.Text.RegularExpressions.Generator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\analyzers/dotnet/System.Windows.Forms.Analyzers.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\analyzers/dotnet/cs/System.Windows.Forms.Analyzers.CSharp.dll" /additionalfile:app.manifest App.xaml.cs Controls\ModelComparisonControl.xaml.cs Controls\SimpleModelSelector.xaml.cs FirstRunDiagnosticWindow.xaml.cs Interfaces\IRecorder.cs Interfaces\ITextInjector.cs Interfaces\ITranscriber.cs MainWindow.xaml.cs Models\Settings.cs Models\TranscriptionHistoryItem.cs Models\WhisperModelInfo.cs Services\AudioPreprocessor.cs Services\AudioRecorder.cs Services\DependencyChecker.cs Services\ErrorLogger.cs Services\HotkeyManager.cs Services\MemoryMonitor.cs Services\PersistentWhisperService.cs Services\SoundService.cs Services\StartupDiagnostics.cs Services\SystemTrayManager.cs Services\TextInjector.cs Services\TranscriptionHistoryService.cs Services\ZombieProcessCleanupService.cs SettingsWindowNew.xaml.cs Utilities\HotkeyDisplayHelper.cs Utilities\RelativeTimeConverter.cs Utilities\StatusColors.cs Utilities\TextAnalyzer.cs Utilities\TimingConstants.cs Utilities\TruncateTextConverter.cs "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\Controls\ModelComparisonControl.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\Controls\SimpleModelSelector.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\FirstRunDiagnosticWindow.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\MainWindow.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\SettingsWindowNew.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\App.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\VoiceLite_Content.g.cs" "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs" "obj\Debug\net8.0-windows\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs" obj\Debug\net8.0-windows\VoiceLite.AssemblyInfo.cs /warnaserror+:NU1605,SYSLIB0011
+     2>C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\MainWindow.xaml.cs(40,42): warning CS0649: Field 'MainWindow.recordingCancellation' is never assigned to, and will always have its default value null [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj]
+     2>C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\SettingsWindowNew.xaml.cs(41,22): warning CS0414: The field 'SettingsWindowNew.isInitialized' is assigned but its value is never used [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj]
+         CompilerServer: server - server processed compilation - VoiceLite (net8.0-windows)
+       _CopyOutOfDateSourceItemsToOutputDirectory:
+       Building target "_CopyOutOfDateSourceItemsToOutputDirectory" partially, because some output files are out of date with respect to their input files.
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\apphost.exe" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.exe".
+       CopyFilesToOutputDirectory:
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll".
+         Copying reference assembly from "obj\Debug\net8.0-windows\refint\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\ref\VoiceLite.dll".
+         VoiceLite -> C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\VoiceLite.pdb" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.pdb".
+     2>Done Building Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj" (default targets).
+     1>GenerateTargetFrameworkMonikerAttribute:
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+       _GenerateSourceLinkFile:
+         Updating Source Link file 'obj\Debug\net8.0-windows\VoiceLite.Tests.sourcelink.json'.
+       CoreCompile:
+         C:\Program Files\dotnet\dotnet.exe exec "C:\Program Files\dotnet\sdk\9.0.305\Roslyn\bincore\csc.dll" /noconfig /unsafe- /checked- /nowarn:1701,1702,1701,1702 /fullpaths /nostdlib+ /errorreport:prompt /warn:8 /define:TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER /highentropyva+ /nullable:enable /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Accessibility.dll" /reference:C:\Users\mishk\.nuget\packages\castle.core\5.1.1\lib\net6.0\Castle.Core.dll /reference:C:\Users\mishk\.nuget\packages\fluentassertions\6.12.0\lib\net6.0\FluentAssertions.dll /reference:C:\Users\mishk\.nuget\packages\h.inputsimulator\1.2.1\lib\netstandard2.0\H.InputSimulator.dll /reference:C:\Users\mishk\.nuget\packages\hardcodet.notifyicon.wpf\2.0.1\lib\net8.0-windows7.0\Hardcodet.NotifyIcon.Wpf.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.CSharp.dll" /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.TestPlatform.CommunicationUtilities.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.TestPlatform.CoreUtilities.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.TestPlatform.CrossPlatEngine.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.TestPlatform.PlatformAbstractions.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.TestPlatform.Utilities.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.Core.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.VisualBasic.Forms.dll" /reference:C:\Users\mishk\.nuget\packages\microsoft.codecoverage\17.12.0\lib\netcoreapp3.1\Microsoft.VisualStudio.CodeCoverage.Shim.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.VisualStudio.TestPlatform.Common.dll /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\Microsoft.VisualStudio.TestPlatform.ObjectModel.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Registry.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.Registry.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\Microsoft.Win32.SystemEvents.dll" /reference:C:\Users\mishk\.nuget\packages\moq\4.20.70\lib\net6.0\Moq.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\mscorlib.dll" /reference:C:\Users\mishk\.nuget\packages\naudio.asio\2.2.1\lib\netstandard2.0\NAudio.Asio.dll /reference:C:\Users\mishk\.nuget\packages\naudio.core\2.2.1\lib\netstandard2.0\NAudio.Core.dll /reference:C:\Users\mishk\.nuget\packages\naudio\2.2.1\lib\net6.0-windows7.0\NAudio.dll /reference:C:\Users\mishk\.nuget\packages\naudio.midi\2.2.1\lib\netstandard2.0\NAudio.Midi.dll /reference:C:\Users\mishk\.nuget\packages\naudio.vorbis\1.5.0\lib\netstandard2.0\NAudio.Vorbis.dll /reference:C:\Users\mishk\.nuget\packages\naudio.wasapi\2.2.1\lib\netstandard2.0\NAudio.Wasapi.dll /reference:C:\Users\mishk\.nuget\packages\naudio.winforms\2.2.1\lib\netcoreapp3.1\NAudio.WinForms.dll /reference:C:\Users\mishk\.nuget\packages\naudio.winmm\2.2.1\lib\netstandard2.0\NAudio.WinMM.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\netstandard.dll" /reference:C:\Users\mishk\.nuget\packages\newtonsoft.json\13.0.1\lib\netstandard2.0\Newtonsoft.Json.dll /reference:C:\Users\mishk\.nuget\packages\nvorbis\0.10.4\lib\netstandard2.0\NVorbis.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationCore.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Aero.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Aero2.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.AeroLite.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Classic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Luna.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationFramework.Royale.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\PresentationUI.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\ReachFramework.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.AppContext.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Buffers.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.CodeDom.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Concurrent.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Immutable.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.NonGeneric.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Collections.Specialized.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.Annotations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.DataAnnotations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.EventBasedAsync.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ComponentModel.TypeConverter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Configuration.ConfigurationManager.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Configuration.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Console.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Core.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.Common.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.DataSetExtensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Data.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Contracts.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Debug.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.DiagnosticSource.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.EventLog.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.FileVersionInfo.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.PerformanceCounter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Process.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.StackTrace.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.TextWriterTraceListener.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Tools.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.TraceSource.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Diagnostics.Tracing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.DirectoryServices.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.Common.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Drawing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Drawing.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Dynamic.Runtime.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Formats.Asn1.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Formats.Tar.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.Calendars.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Globalization.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.Brotli.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.FileSystem.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Compression.ZipFile.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.DriveInfo.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.FileSystem.Watcher.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.IsolatedStorage.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.MemoryMappedFiles.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.IO.Packaging.dll" /reference:C:\Users\mishk\.nuget\packages\system.io.pipelines\9.0.9\lib\net8.0\System.IO.Pipelines.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Pipes.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.Pipes.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.IO.UnmanagedMemoryStream.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Expressions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Parallel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Linq.Queryable.dll" /reference:C:\Users\mishk\.nuget\packages\system.management\8.0.0\lib\net8.0\System.Management.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Memory.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Http.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Http.Json.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.HttpListener.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Mail.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.NameResolution.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.NetworkInformation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Ping.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Quic.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Requests.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Security.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.ServicePoint.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.Sockets.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebClient.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebHeaderCollection.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebProxy.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebSockets.Client.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Net.WebSockets.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Numerics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Numerics.Vectors.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ObjectModel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Printing.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.DispatchProxy.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.ILGeneration.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Emit.Lightweight.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Metadata.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Reflection.TypeExtensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Resources.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.Reader.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.ResourceManager.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Resources.Writer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.CompilerServices.Unsafe.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.CompilerServices.VisualC.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Handles.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.JavaScript.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.InteropServices.RuntimeInformation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Intrinsics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Loader.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Numerics.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Formatters.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Json.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Runtime.Serialization.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Claims.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Algorithms.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Cng.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Csp.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Encoding.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.OpenSsl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Pkcs.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.ProtectedData.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.X509Certificates.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Cryptography.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Security.Permissions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Principal.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.Principal.Windows.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Security.SecureString.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ServiceModel.Web.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ServiceProcess.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.CodePages.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.Encoding.Extensions.dll" /reference:C:\Users\mishk\.nuget\packages\system.text.encodings.web\9.0.9\lib\net8.0\System.Text.Encodings.Web.dll /reference:C:\Users\mishk\.nuget\packages\system.text.json\9.0.9\lib\net8.0\System.Text.Json.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Text.RegularExpressions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Threading.AccessControl.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Channels.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Overlapped.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Dataflow.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Tasks.Parallel.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Thread.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.ThreadPool.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Threading.Timer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Transactions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Transactions.Local.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.ValueTuple.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Web.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Web.HttpUtility.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Controls.Ribbon.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Windows.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Extensions.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Design.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Design.Editors.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Forms.Primitives.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Input.Manipulations.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Windows.Presentation.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\System.Xaml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.Linq.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.ReaderWriter.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.Serialization.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XDocument.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XmlDocument.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XmlSerializer.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XPath.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\ref\net8.0\System.Xml.XPath.XDocument.dll" /reference:C:\Users\mishk\.nuget\packages\microsoft.testplatform.testhost\17.12.0\lib\netcoreapp3.1\testhost.dll /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationClient.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationClientSideProviders.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationProvider.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\UIAutomationTypes.dll" /reference:"C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\ref\VoiceLite.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\WindowsBase.dll" /reference:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\ref\net8.0\WindowsFormsIntegration.dll" /reference:C:\Users\mishk\.nuget\packages\xunit.abstractions\2.0.3\lib\netstandard2.0\xunit.abstractions.dll /reference:C:\Users\mishk\.nuget\packages\xunit.assert\2.9.2\lib\net6.0\xunit.assert.dll /reference:C:\Users\mishk\.nuget\packages\xunit.extensibility.core\2.9.2\lib\netstandard1.1\xunit.core.dll /reference:C:\Users\mishk\.nuget\packages\xunit.extensibility.execution\2.9.2\lib\netstandard1.1\xunit.execution.dotnet.dll /debug+ /debug:portable /filealign:512 /optimize- /out:obj\Debug\net8.0-windows\VoiceLite.Tests.dll /refout:obj\Debug\net8.0-windows\refint\VoiceLite.Tests.dll /target:exe /warnaserror- /utf8output /deterministic+ /sourcelink:obj\Debug\net8.0-windows\VoiceLite.Tests.sourcelink.json /langversion:12.0 /embed:C:\Users\mishk\.nuget\packages\microsoft.net.test.sdk\17.12.0\build\netcoreapp3.1\Microsoft.NET.Test.Sdk.Program.cs /embed:obj\Debug\net8.0-windows\VoiceLite.Tests.GlobalUsings.g.cs /embed:"obj\Debug\net8.0-windows\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs" /embed:obj\Debug\net8.0-windows\VoiceLite.Tests.AssemblyInfo.cs /analyzerconfig:obj\Debug\net8.0-windows\VoiceLite.Tests.GeneratedMSBuildEditorConfig.editorconfig /analyzerconfig:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\analyzers\build\config\analysislevel_8_default.globalconfig" /analyzer:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll" /analyzer:"C:\Program Files\dotnet\sdk\9.0.305\Sdks\Microsoft.NET.Sdk\targets\..\analyzers\Microsoft.CodeAnalysis.NetAnalyzers.dll" /analyzer:C:\Users\mishk\.nuget\packages\system.text.json\9.0.9\analyzers\dotnet\roslyn4.4\cs\System.Text.Json.SourceGeneration.dll /analyzer:C:\Users\mishk\.nuget\packages\xunit.analyzers\1.16.0\analyzers\dotnet\cs\xunit.analyzers.dll /analyzer:C:\Users\mishk\.nuget\packages\xunit.analyzers\1.16.0\analyzers\dotnet\cs\xunit.analyzers.fixes.dll /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.ComInterfaceGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.JavaScript.JSImportGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.LibraryImportGenerator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/Microsoft.Interop.SourceGeneration.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Ref\8.0.20\analyzers/dotnet/cs/System.Text.RegularExpressions.Generator.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\analyzers/dotnet/System.Windows.Forms.Analyzers.dll" /analyzer:"C:\Program Files\dotnet\packs\Microsoft.WindowsDesktop.App.Ref\8.0.20\analyzers/dotnet/cs/System.Windows.Forms.Analyzers.CSharp.dll" AppProcessDetectionTests.cs Integration\AudioPipelineTests.cs MemoryLeakStressTest.cs MemoryLeakTest.cs Models\WhisperModelInfoTests.cs Resources\MainWindowDisposalTests.cs Resources\ResourceLifecycleTests.cs Services\AudioPreprocessorTests.cs Services\AudioRecorderTests.cs Services\DependencyCheckerTests.cs Services\HotkeyManagerTests.cs Services\MemoryMonitorTests.cs Services\StartupDiagnosticsTests.cs Services\SystemTrayManagerTests.cs Services\TextInjectorTests.cs Services\TranscriptionHistoryServiceTests.cs Services\WhisperErrorRecoveryTests.cs Services\WhisperServiceTests.cs UnitTest1.cs C:\Users\mishk\.nuget\packages\microsoft.net.test.sdk\17.12.0\build\netcoreapp3.1\Microsoft.NET.Test.Sdk.Program.cs obj\Debug\net8.0-windows\VoiceLite.Tests.GlobalUsings.g.cs "obj\Debug\net8.0-windows\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs" obj\Debug\net8.0-windows\VoiceLite.Tests.AssemblyInfo.cs /warnaserror+:NU1605,SYSLIB0011
+     1>C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\MemoryLeakTest.cs(74,42): warning CS8601: Possible null reference assignment. [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+     1>C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\MemoryLeakStressTest.cs(37,27): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread. [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         CompilerServer: server - server processed compilation - VoiceLite.Tests (net8.0-windows)
+       _CopyFilesMarkedCopyLocal:
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.pdb" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.pdb".
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+     1>C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 1 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+     1>C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 2 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+     1>C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 3 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+     1>C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 4 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+     1>C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 5 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll".
+         Touching "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\obj\Debug\net8.0-windows\VoiceLit.EA0D2F84.Up2Date".
+       _CopyOutOfDateSourceItemsToOutputDirectory:
+       Building target "_CopyOutOfDateSourceItemsToOutputDirectory" partially, because some output files are out of date with respect to their input files.
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.deps.json" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.deps.json".
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.runtimeconfig.json" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.runtimeconfig.json".
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\obj\Debug\net8.0-windows\apphost.exe" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.exe".
+       CopyFilesToOutputDirectory:
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\obj\Debug\net8.0-windows\VoiceLite.Tests.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.Tests.dll".
+         Copying reference assembly from "obj\Debug\net8.0-windows\refint\VoiceLite.Tests.dll" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\obj\Debug\net8.0-windows\ref\VoiceLite.Tests.dll".
+         VoiceLite.Tests -> C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.Tests.dll
+         Copying file from "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\obj\Debug\net8.0-windows\VoiceLite.Tests.pdb" to "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.Tests.pdb".
+     1>Done Building Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (default targets).
+     1>BuildProject:
+         Build completed.
+         
+Test run for C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.14.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.Tests.dll
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 8.0.20)
+[xUnit.net 00:00:00.04]   Discovering: VoiceLite.Tests
+[xUnit.net 00:00:00.07]   Discovered:  VoiceLite.Tests
+[xUnit.net 00:00:00.07]   Starting:    VoiceLite.Tests
+[xUnit.net 00:00:00.11]     VoiceLite.Tests.MemoryLeakTest.MainWindow_RepeatedOperations_NoMemoryLeak [SKIP]
+[xUnit.net 00:00:00.11]       Requires MainWindow instantiation - integration test only
+[xUnit.net 00:00:00.11]     VoiceLite.Tests.Services.WhisperServiceTests.TranscribeFromMemoryAsync_HandlesValidData [SKIP]
+[xUnit.net 00:00:00.11]       Integration test - requires real voice audio
+[xUnit.net 00:00:00.11]     VoiceLite.Tests.Services.SystemTrayManagerTests.UpdateAccountMenuText_UpdatesMenuItem [SKIP]
+[xUnit.net 00:00:00.11]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.11]     VoiceLite.Tests.Services.WhisperServiceTests.ConcurrentTranscriptions_HandledSafely [SKIP]
+[xUnit.net 00:00:00.11]       Integration test - requires real voice audio
+[xUnit.net 00:00:00.11]     VoiceLite.Tests.Services.SystemTrayManagerTests.ShowBalloonTip_DisplaysNotification [SKIP]
+[xUnit.net 00:00:00.11]       Requires WPF Window and UI thread
+  Skipped VoiceLite.Tests.MemoryLeakTest.MainWindow_RepeatedOperations_NoMemoryLeak [1 ms]
+  Error Message:
+   Requires MainWindow instantiation - integration test only
+
+  Skipped VoiceLite.Tests.Services.WhisperServiceTests.TranscribeFromMemoryAsync_HandlesValidData [1 ms]
+  Error Message:
+   Integration test - requires real voice audio
+
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.UpdateAccountMenuText_UpdatesMenuItem [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Skipped VoiceLite.Tests.Services.WhisperServiceTests.ConcurrentTranscriptions_HandledSafely [1 ms]
+  Error Message:
+   Integration test - requires real voice audio
+
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.ShowBalloonTip_DisplaysNotification [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.ShowMainWindow_RestoresWindowState [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+  Passed VoiceLite.Tests.SmokeTests.TestFramework_IsWorking [3 ms]
+  Passed VoiceLite.Tests.SmokeTests.AssemblyReference_CanAccessVoiceLiteTypes [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_PrioritizesModelNotFoundOverVCRuntime [5 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_VCRuntimeNotInstalled [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.Constructor_WithValidSettings_SetsAutoPasteToTrue [6 ms]
+  Passed VoiceLite.Tests.Services.SystemTrayManagerTests.Documentation_SystemTrayManagerRequiresUIAutomation [5 ms]
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.ShowMainWindow_RestoresWindowState [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.Dispose_CleansUpResources [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.AccountMenuClicked_RaisesEvent [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.MinimizeToTray_HidesWindowAndShowsBalloon [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.ExitMenuItem_ShutsDownApplication [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_WhisperExeNotFound [< 1 ms]
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.Dispose_CleansUpResources [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.AccountMenuClicked_RaisesEvent [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Passed VoiceLite.Tests.Resources.MainWindowDisposalTests.MainWindow_ChildWindowCreation_TracksInstancesInFields [5 ms]
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.MinimizeToTray_HidesWindowAndShowsBalloon [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_PrioritizesWhisperExeNotFound [< 1 ms]
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.ExitMenuItem_ShutsDownApplication [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.TrayDoubleClick_ShowsMainWindow [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.ReportBugMenuClicked_RaisesEvent [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and UI thread
+[xUnit.net 00:00:00.12]     VoiceLite.Tests.Services.SystemTrayManagerTests.Constructor_InitializesTrayIcon [SKIP]
+[xUnit.net 00:00:00.12]       Requires WPF Window and STA thread - cannot run in xUnit context
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.TrayDoubleClick_ShowsMainWindow [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.ReportBugMenuClicked_RaisesEvent [1 ms]
+  Error Message:
+   Requires WPF Window and UI thread
+
+  Skipped VoiceLite.Tests.Services.SystemTrayManagerTests.Constructor_InitializesTrayIcon [1 ms]
+  Error Message:
+   Requires WPF Window and STA thread - cannot run in xUnit context
+
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_AllDependenciesMet_WhenAllTrue [< 1 ms]
+  Passed VoiceLite.Tests.Resources.MainWindowDisposalTests.MainWindow_OnClosed_DisposesChildWindows [< 1 ms]
+  Passed VoiceLite.Tests.Resources.MainWindowDisposalTests.MainWindow_OnClosed_UnsubscribesAllEventHandlers [< 1 ms]
+  Passed VoiceLite.Tests.Resources.MainWindowDisposalTests.MainWindow_OnClosed_DisposesAllServices [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_SmartAutoMode_ShortText_ReturnsTrue(text: "This is a very long text that exceeds fifty charac"···, expected: False) [1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenTempFolderIssueTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_SmartAutoMode_ShortText_ReturnsTrue(text: "Hello world", expected: True) [< 1 ms]
+  Passed VoiceLite.Tests.AppProcessDetectionTests.IsProcessOwnedByVoiceLite_ReturnsTrueWhenExecutableResidesUnderRoot [< 1 ms]
+  Passed VoiceLite.Tests.MemoryLeakTest.ZombieProcessCleanupService_Dispose_Safe [7 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_AllPropertiesDefaultToFalse [< 1 ms]
+  Passed VoiceLite.Tests.AppProcessDetectionTests.IsProcessOwnedByVoiceLite_ReturnsFalseForExternalProcesses [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_WithSpecialCharacters_ReturnsTrue(text: "user#123") [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetAvailableModels_ReturnsAllFourModels [8 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_WithSpecialCharacters_ReturnsTrue(text: "test!") [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_WithSpecialCharacters_ReturnsTrue(text: "key$value") [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_WithSpecialCharacters_ReturnsTrue(text: "P@ssword") [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_NoIssues [2 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_WithLongText_TruncatesToMaxLength [10 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_CorruptModelFile [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenConflictingSoftwareTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenNoIssues [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenBlockedFilesIssueTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_DiskSpaceIssue [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.InjectText_WithNullOrWhitespace_DoesNotThrow(text: "   ") [2 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenAntivirusIssuesTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_BlockedFilesIssue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenWindowsVersionIssueTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.InjectText_WithNullOrWhitespace_DoesNotThrow(text: null) [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.InjectText_WithNullOrWhitespace_DoesNotThrow(text: "") [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSensitiveContent_ShortTextWithSpaces_ReturnsFalse [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_MissingFiles_DefaultsToEmptyList [1 ms]
+  Passed VoiceLite.Tests.MemoryLeakTest.MemoryMonitor_LogsWhisperProcessCount [5 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.AutoPaste_Property_CanBeSetAndRetrieved [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_AntivirusIssues [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_MultipleIssues [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_ProtectedFolderIssue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenPermissionIssuesTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_TempFolderIssue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_MissingFiles [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.AllModels_HaveValidProperties [5 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenCorruptModelFileTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenMissingFilesPresent [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_ConflictingSoftware [< 1 ms]
+  Passed VoiceLite.Tests.MemoryLeakTest.ZombieProcessCleanupService_MultipleDispose_Safe [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_WindowsVersionIssue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_PermissionIssues [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenDiskSpaceIssueTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_GetSummary_IncludesNewlinesBetweenIssues [< 1 ms]
+  Passed VoiceLite.Tests.Services.StartupDiagnosticsTests.DiagnosticResult_HasAnyIssues_WhenProtectedFolderIssueTrue [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_VeryHighRAM_ReturnsLargeModel [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.FileSizeDisplay_FormatsBytes_Correctly [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.FileSizeDisplay_FormatsGigabytes_Correctly [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.Constructor_WithNullSettings_ThrowsArgumentNullException [2 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.AccuracyRatingWidth_CalculatesCorrectly [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.VerifyMicrosoftSignature_WithInvalidBinary_Throws [9 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_AllDependenciesNotMet_WhenModelMissing [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_AlwaysPasteMode_ReturnsFalse [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_AllDependenciesNotMet_WhenVCRuntimeMissing [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.GetStatistics_ReturnsCorrectAggregations [5 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_AllDependenciesMet [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_ModelNotFound [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_AllDependenciesNotMet_WhenWhisperExeMissing [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_WhisperCannotRun [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_GetErrorMessage_PrioritizesVCRuntimeOverWhisperCanRun [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_AlphanumericOnly_ReturnsFalse(text: "12345") [< 1 ms]
+  Passed VoiceLite.Tests.Services.DependencyCheckerTests.DependencyCheckResult_AllDependenciesNotMet_WhenWhisperCannotRun [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_AlphanumericOnly_ReturnsFalse(text: "abc123") [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetAvailableModels_HasCorrectRatings [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSpecialChars_AlphanumericOnly_ReturnsFalse(text: "hello") [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_WhenHistoryDisabled_DoesNotAdd [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_PreferTypeMode_ReturnsExpectedResult(text: "short", expected: True) [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.SpeedRatingWidth_CalculatesCorrectly [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_PreferTypeMode_ReturnsExpectedResult(text: "This is a medium text that exceeds one hundred cha"···, expected: False) [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSensitiveContent_LongTextWithSpaces_ReturnsFalse [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_PreferPasteMode_ReturnsExpectedResult(text: "This is longer text", expected: False) [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_PreferPasteMode_ReturnsExpectedResult(text: "hi", expected: True) [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ContainsSensitiveContent_ShortTextWithSpecialChars_ReturnsTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.TextInjectorTests.ShouldUseTyping_AlwaysTypeMode_ReturnsTrue [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_ExceedingMaxItems_RemovesOldestUnpinned [4 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.AllModels_SupportMultilingual_ExceptBase [4 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_LowRAM_ReturnsBaseModel [< 1 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.HotkeyManager_UnregistersOnDispose [22 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetAvailableModels_SmallModelIsRecommended [1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_PrioritizeSpeedWithHighRAM_ReturnsSmallModel [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_HighRAM_ReturnsMediumModel [< 1 ms]
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFileWithStats_TracksWhichProcessingApplied [17 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetAvailableModels_HasCorrectDisplayNames [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetAvailableModels_ChecksIsInstalled [1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.FileSizeDisplay_FormatsMegabytes_Correctly [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_MediumRAM_ReturnsSmallModel [< 1 ms]
+  Passed VoiceLite.Tests.Models.WhisperModelInfoTests.GetRecommendedModel_PrioritizeSpeed_ReturnsBaseModel [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.TogglePin_ReordersHistory_PinnedItemsFirst [6 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.UnregisterCurrentHotkey_IsIdempotent [31 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.Dispose_CanBeInvokedMultipleTimes [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.GetUnpinnedItems_ReturnsOnlyUnpinnedItems [2 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_WithValidItem_InsertsAtBeginning [< 1 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.RegisterHotkey_WithModifierKey_DoesNotRequireWindowHandle [1 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.Constructor_UsesPushToTalkDefaults [< 1 ms]
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFileWithStats_ReturnsProcessedPeakLevel [8 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.RegisterHotkey_ReplacesExistingRegistration [1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.TogglePin_WithValidId_TogglesPinStatus [2 ms]
+  Passed VoiceLite.Tests.Services.HotkeyManagerTests.RegisterHotkey_WithStandardKeyRequiresWindowHandle [1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_ExceedingMaxItems_PreservesPinnedItems [2 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.Constructor_WithNullSettings_ThrowsArgumentNullException [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.ClearHistory_RemovesUnpinnedItems_PreservesPinned [2 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.Constructor_WithValidSettings_Succeeds [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_WithNullItem_ThrowsArgumentNullException [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.RemoveFromHistory_WithInvalidId_ReturnsFalse [< 1 ms]
+[xUnit.net 00:00:00.15]     VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetToNegative_ClampsToMinimum [FAIL]
+[xUnit.net 00:00:00.15]       Expected settings.TargetRmsLevel to be 0.05F because TargetRmsLevel should clamp negative values to minimum 0.05, but found -0.5F (difference of -0.55).
+[xUnit.net 00:00:00.15]       Stack Trace:
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+[xUnit.net 00:00:00.15]         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs(113,0): at VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetToNegative_ClampsToMinimum()
+[xUnit.net 00:00:00.15]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:00.15]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.15]     VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetToNegative_ClampsToMinimum [FAIL]
+[xUnit.net 00:00:00.15]       Expected settings.NoiseGateThreshold to be 0.001 because NoiseGateThreshold should clamp negative values to minimum 0.001, but found -0.1 (difference of -0.101).
+[xUnit.net 00:00:00.15]       Stack Trace:
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+[xUnit.net 00:00:00.15]         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs(139,0): at VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetToNegative_ClampsToMinimum()
+[xUnit.net 00:00:00.15]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:00.15]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.AddToHistory_WithMultipleItems_MaintainsNewestFirst [1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.TogglePin_WithInvalidId_ReturnsFalse [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.GetPinnedItems_ReturnsOnlyPinnedItems [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.ClearAllHistory_RemovesAllItems_IncludingPinned [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.Constructor_WithNullHistoryList_InitializesEmptyList [< 1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.RemoveFromHistory_WithValidId_RemovesItem [1 ms]
+  Passed VoiceLite.Tests.Services.TranscriptionHistoryServiceTests.GetStatistics_WithEmptyHistory_ReturnsZeroValues [< 1 ms]
+  Failed VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetToNegative_ClampsToMinimum [16 ms]
+  Error Message:
+   Expected settings.TargetRmsLevel to be 0.05F because TargetRmsLevel should clamp negative values to minimum 0.05, but found -0.5F (difference of -0.55).
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+   at VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetToNegative_ClampsToMinimum() in C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs:line 113
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetToNegative_ClampsToMinimum [2 ms]
+  Error Message:
+   Expected settings.NoiseGateThreshold to be 0.001 because NoiseGateThreshold should clamp negative values to minimum 0.001, but found -0.1 (difference of -0.101).
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+   at VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetToNegative_ClampsToMinimum() in C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs:line 139
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.15]     VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetAboveHalf_ClampsToMaximum [FAIL]
+[xUnit.net 00:00:00.15]       Expected settings.NoiseGateThreshold to be 0.5 because NoiseGateThreshold should clamp values above 0.5 to maximum 0.5, but found 0.8 (difference of 0.30000000000000004).
+[xUnit.net 00:00:00.15]       Stack Trace:
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+[xUnit.net 00:00:00.15]            at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+[xUnit.net 00:00:00.15]         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs(152,0): at VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetAboveHalf_ClampsToMaximum()
+[xUnit.net 00:00:00.15]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:00.15]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetAboveHalf_ClampsToMaximum [2 ms]
+  Error Message:
+   Expected settings.NoiseGateThreshold to be 0.5 because NoiseGateThreshold should clamp values above 0.5 to maximum 0.5, but found 0.8 (difference of 0.30000000000000004).
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+   at VoiceLite.Tests.Services.AudioPreprocessorTests.NoiseGateThreshold_WhenSetAboveHalf_ClampsToMaximum() in C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs:line 152
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.GetAvailableDevices_ReturnsDeviceList [60 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.BaselineMemory_RemainsConstant [126 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.StartRecording_SetsIsRecordingTrue [171 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.PeakMemory_NeverDecreasesOverTime [110 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.GetStatistics_AfterDispose_DoesNotThrow [5 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.MultipleDisposeCalls_DoNotThrow [2 ms]
+[xUnit.net 00:00:00.43]     VoiceLite.Tests.Services.WhisperServiceTests.TranscribeAsync_CancellationHandling [SKIP]
+[xUnit.net 00:00:00.43]       Integration test - requires real voice audio
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.IsRecording_InitiallyFalse [15 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.MemoryAlert_FiresOnCriticalMemory [2 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.Constructor_InitializesBaseline_Successfully [4 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.GetStatistics_BaselineIsPositive [3 ms]
+  Passed VoiceLite.Tests.Services.MemoryMonitorTests.GetStatistics_ReturnsValidData [3 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.StartRecording_WhenAlreadyRecording_DoesNothing [46 ms]
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.Dispose_CanBeCalledMultipleTimes [329 ms]
+  Skipped VoiceLite.Tests.Services.WhisperServiceTests.TranscribeAsync_CancellationHandling [1 ms]
+  Error Message:
+   Integration test - requires real voice audio
+
+[xUnit.net 00:00:00.43]     VoiceLite.Tests.Services.WhisperServiceTests.TranscribeAsync_ReturnsTranscriptionForValidAudio [SKIP]
+[xUnit.net 00:00:00.43]       Integration test - silent WAV causes whisper.exe exit code -1
+  Skipped VoiceLite.Tests.Services.WhisperServiceTests.TranscribeAsync_ReturnsTranscriptionForValidAudio [1 ms]
+  Error Message:
+   Integration test - silent WAV causes whisper.exe exit code -1
+
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.EmptyAudioFile_ReturnsEmptyString [328 ms]
+  Passed VoiceLite.Tests.MemoryLeakStressTest.ServiceDisposal_Performance_Fast [344 ms]
+  Standard Output Messages:
+ === Service Disposal Performance Benchmark ===
+ PersistentWhisperService: 316ms
+ AudioRecorder: 14ms
+ MemoryMonitor: 0ms
+ ZombieProcessCleanupService: 0ms
+ SoundService: 0ms
+ Total disposal time: 334ms
+
+
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFile_WithInvalidPath_ThrowsAppropriateException [453 ms]
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFile_WithAutomaticGainEnabled_ProcessesSuccessfully [6 ms]
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFileWithStats_ReturnsOriginalDuration [7 ms]
+[xUnit.net 00:00:00.74]     VoiceLite.Tests.MemoryLeakTest.ApiClient_DisposedOnAppExit [SKIP]
+[xUnit.net 00:00:00.74]       Requires MainWindow instantiation - integration test only
+[xUnit.net 00:00:00.74]     VoiceLite.Tests.Services.WhisperErrorRecoveryTests.ProcessTimeout_KillsProcessTreeGracefully [SKIP]
+[xUnit.net 00:00:00.74]       Timeout behavior is unreliable: Whisper processes silence very quickly, making it difficult to force a timeout in tests. Timeout killing IS tested in LargeAudioFile_HandlesTimeout with real processing time.
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFile_WithEmptyAudio_DoesNotCrash [4 ms]
+  Passed VoiceLite.Tests.MemoryLeakTest.PersistentWhisperService_UsesInstanceBasedTracking [629 ms]
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.Constructor_ThrowsWhenSettingsNull [315 ms]
+  Skipped VoiceLite.Tests.MemoryLeakTest.ApiClient_DisposedOnAppExit [1 ms]
+  Error Message:
+   Requires MainWindow instantiation - integration test only
+
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.CorruptedAudioFile_HandlesGracefully [316 ms]
+  Skipped VoiceLite.Tests.Services.WhisperErrorRecoveryTests.ProcessTimeout_KillsProcessTreeGracefully [1 ms]
+  Error Message:
+   Timeout behavior is unreliable: Whisper processes silence very quickly, making it difficult to force a timeout in tests. Timeout killing IS tested in LargeAudioFile_HandlesTimeout with real processing time.
+
+[xUnit.net 00:00:00.97]     VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetAboveOne_ClampsToMaximum [FAIL]
+[xUnit.net 00:00:00.97]       Expected settings.TargetRmsLevel to be 0.95F because TargetRmsLevel should clamp values above 1.0 to maximum 0.95, but found 1.5F (difference of 0.55).
+[xUnit.net 00:00:00.97]       Stack Trace:
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+[xUnit.net 00:00:00.97]            at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+[xUnit.net 00:00:00.97]         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs(126,0): at VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetAboveOne_ClampsToMaximum()
+[xUnit.net 00:00:00.97]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:00.97]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFileWithStats_WhenVADEnabled_ReturnsTrimmedSilenceMs [328 ms]
+  Passed VoiceLite.Tests.Services.AudioPreprocessorTests.ProcessAudioFile_WithNoiseSuppressionEnabled_ProcessesSuccessfully [6 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.MemoryStream_ProperlyDisposedAfterUse [842 ms]
+  Failed VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetAboveOne_ClampsToMaximum [3 ms]
+  Error Message:
+   Expected settings.TargetRmsLevel to be 0.95F because TargetRmsLevel should clamp values above 1.0 to maximum 0.95, but found 1.5F (difference of 0.55).
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Numeric.NumericAssertions`2.Be(T expected, String because, Object[] becauseArgs)
+   at VoiceLite.Tests.Services.AudioPreprocessorTests.TargetRmsLevel_WhenSetAboveOne_ClampsToMaximum() in C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Services\AudioPreprocessorTests.cs:line 126
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.ModelPathResolution_HandlesAllModelTypes [313 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.AudioRecorder_DisposePreventsResourceLeaks [186 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.ConcurrentDisposal_ThreadSafe [142 ms]
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.Constructor_InitializesWithValidSettings [315 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.TIER1_1_AudioBufferIsolation_NoContaminationBetweenSessions [1 s]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_RapidStartStop_NoDataCorruption [1 s]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.SetDevice_ChangesSelectedDevice [157 ms]
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.TranscribeAsync_ThrowsWhenFileNotFound [329 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.StopRecording_WhenNotRecording_DoesNothing [15 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.AudioRecorder_MultipleInstancesNoCrossContamination [407 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.Dispose_CleansUpResources [45 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.Dispose_MultipleCalls_DoesNotThrow [45 ms]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.TempFileCleanup_RemovesStaleFiles [202 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.StopRecording_SetsIsRecordingFalse [172 ms]
+  Passed VoiceLite.Tests.Services.WhisperServiceTests.TranscribeFromMemoryAsync_HandlesEmptyData [326 ms]
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.ConsecutiveCrashes_DoesNotLeakResources [1 s]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_DifferentRecordModes_WorkCorrectly(mode: PushToTalk) [574 ms]
+[xUnit.net 00:00:02.43]     VoiceLite.Tests.Services.WhisperErrorRecoveryTests.LargeAudioFile_HandlesTimeout [SKIP]
+[xUnit.net 00:00:02.43]       Integration test - requires real voice audio
+[xUnit.net 00:00:02.75]     VoiceLite.Tests.Services.WhisperErrorRecoveryTests.TranscriptionDuringDispose_HandlesGracefully [SKIP]
+[xUnit.net 00:00:02.75]       Flaky test - timing-dependent process cleanup, passes individually but fails in full suite
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.StopRecording_FiresAudioDataReadyEvent [383 ms]
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.MultipleDisposeCalls_DoesNotThrow [327 ms]
+  Skipped VoiceLite.Tests.Services.WhisperErrorRecoveryTests.LargeAudioFile_HandlesTimeout [1 ms]
+  Error Message:
+   Integration test - requires real voice audio
+
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_DifferentRecordModes_WorkCorrectly(mode: Toggle) [578 ms]
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.VeryShortAudio_DoesNotCrash [313 ms]
+  Skipped VoiceLite.Tests.Services.WhisperErrorRecoveryTests.TranscriptionDuringDispose_HandlesGracefully [1 ms]
+  Error Message:
+   Flaky test - timing-dependent process cleanup, passes individually but fails in full suite
+
+  Passed VoiceLite.Tests.Services.WhisperErrorRecoveryTests.MissingWhisperModel_ShowsClearError [3 ms]
+[xUnit.net 00:00:02.75]     VoiceLite.Tests.Services.WhisperErrorRecoveryTests.ConcurrentTranscriptions_QueuedCorrectly [SKIP]
+[xUnit.net 00:00:02.75]       Integration test - requires real voice audio
+[xUnit.net 00:00:03.01]     VoiceLite.Tests.MemoryLeakTest.ZombieProcessCleanupService_RunsEvery60Seconds [SKIP]
+[xUnit.net 00:00:03.01]       Long-running test (60+ seconds) - run manually
+[xUnit.net 00:00:03.34]     VoiceLite.Tests.Resources.ResourceLifecycleTests.WhisperService_DisposeCleansUpProcessPool [FAIL]
+[xUnit.net 00:00:03.34]       Expected afterDispose to be less than or equal to 16 because dispose should not spawn new whisper processes, but found 18 (difference of 2).
+[xUnit.net 00:00:03.34]       Stack Trace:
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+[xUnit.net 00:00:03.34]            at FluentAssertions.Numeric.NumericAssertions`2.BeLessThanOrEqualTo(T expected, String because, Object[] becauseArgs)
+[xUnit.net 00:00:03.34]         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Resources\ResourceLifecycleTests.cs(122,0): at VoiceLite.Tests.Resources.ResourceLifecycleTests.WhisperService_DisposeCleansUpProcessPool()
+[xUnit.net 00:00:03.34]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+[xUnit.net 00:00:03.34]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Skipped VoiceLite.Tests.Services.WhisperErrorRecoveryTests.ConcurrentTranscriptions_QueuedCorrectly [1 ms]
+  Error Message:
+   Integration test - requires real voice audio
+
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.MultipleStartStop_HandledCorrectly [630 ms]
+  Passed VoiceLite.Tests.MemoryLeakTest.ZombieProcessCleanupService_KillsZombieProcesses [2 s]
+  Skipped VoiceLite.Tests.MemoryLeakTest.ZombieProcessCleanupService_RunsEvery60Seconds [1 ms]
+  Error Message:
+   Long-running test (60+ seconds) - run manually
+
+  Failed VoiceLite.Tests.Resources.ResourceLifecycleTests.WhisperService_DisposeCleansUpProcessPool [1 s]
+  Error Message:
+   Expected afterDispose to be less than or equal to 16 because dispose should not spawn new whisper processes, but found 18 (difference of 2).
+  Stack Trace:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Numeric.NumericAssertions`2.BeLessThanOrEqualTo(T expected, String because, Object[] becauseArgs)
+   at VoiceLite.Tests.Resources.ResourceLifecycleTests.WhisperService_DisposeCleansUpProcessPool() in C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\Resources\ResourceLifecycleTests.cs:line 122
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.TempFilesCleanup_RemovesOldFiles [704 ms]
+  Passed VoiceLite.Tests.Services.AudioRecorderTests.Constructor_CreatesTemporaryDirectory [16 ms]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_ErrorRecovery_ContinuesAfterFailure [1 s]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_MultipleRecordingCycles_MaintainsStability [1 s]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.FileHandles_ReleasedAfterTranscription [3 s]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.SystemTrayManager_CleansUpIconOnDispose [< 1 ms]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_MemoryBufferMode_AvoidsDiskIO [1 s]
+  Passed VoiceLite.Tests.Resources.ResourceLifecycleTests.LongRunningOperation_CancellationCleansUpResources [328 ms]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.FullPipeline_RecordTranscribeInject_CompletesSuccessfully [1 s]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_LongRecording_HandlesLargeBuffer [3 s]
+  Passed VoiceLite.Tests.Integration.AudioPipelineTests.Pipeline_ConcurrentOperations_HandledSafely [607 ms]
+  Passed VoiceLite.Tests.MemoryLeakStressTest.TranscriptionCycle_500Iterations_Bounded [2 m 52 s]
+  Standard Output Messages:
+ === Transcription Cycle Stress Test (500x) ===
+ Start Time: 20:42:00
+ Initial Memory: 89MB
+ Iteration 50: 105MB (Δ16MB)
+ Iteration 100: 100MB (Δ11MB)
+ Iteration 150: 99MB (Δ10MB)
+ Iteration 200: 99MB (Δ10MB)
+ Iteration 250: 99MB (Δ10MB)
+ Iteration 300: 99MB (Δ10MB)
+ Iteration 350: 99MB (Δ10MB)
+ Iteration 400: 99MB (Δ10MB)
+ Iteration 450: 99MB (Δ10MB)
+ Iteration 500: 99MB (Δ10MB)
+ === Results ===
+ Iterations: 500
+ Duration: 172.1s
+ Initial Memory: 89MB
+ Final Memory: 95MB
+ Memory Growth: 6MB
+ Avg per cycle: 344.25ms
+
+
+[xUnit.net 00:02:52.59]     VoiceLite.Tests.MemoryLeakStressTest.MemoryMonitor_10Minutes_NoLeak [SKIP]
+[xUnit.net 00:02:52.59]       Long-running test (10 minutes) - run manually
+  Skipped VoiceLite.Tests.MemoryLeakStressTest.MemoryMonitor_10Minutes_NoLeak [1 ms]
+  Error Message:
+   Long-running test (10 minutes) - run manually
+
+[xUnit.net 00:02:54.61]     VoiceLite.Tests.MemoryLeakStressTest.ZombieProcessCleanupService_5Minutes_Stable [SKIP]
+[xUnit.net 00:02:54.61]       Long-running test (5 minutes) - run manually
+  Passed VoiceLite.Tests.MemoryLeakStressTest.ConcurrentServiceCreation_100Threads_ThreadSafe [2 s]
+  Standard Output Messages:
+ === Concurrent Service Creation Test (100 threads) ===
+ Start Time: 20:44:52
+ Initial Memory: 96MB
+ === Results ===
+ Threads: 100
+ Duration: 2.0s
+ Initial Memory: 96MB
+ Final Memory: 95MB
+ Memory Growth: -1MB
+ Exceptions: 0
+
+
+  Skipped VoiceLite.Tests.MemoryLeakStressTest.ZombieProcessCleanupService_5Minutes_Stable [1 ms]
+  Error Message:
+   Long-running test (5 minutes) - run manually
+
+[xUnit.net 00:03:26.08]   Finished:    VoiceLite.Tests
+  Passed VoiceLite.Tests.MemoryLeakStressTest.PersistentWhisperService_100Instances_NoLeak [31 s]
+  Standard Output Messages:
+ === PersistentWhisperService Stress Test ===
+ Start Time: 20:44:54
+ Initial Memory: 96MB
+ Iteration 10: 92MB (Δ-4MB) - 3.1s
+ Iteration 20: 88MB (Δ-8MB) - 6.3s
+ Iteration 30: 84MB (Δ-12MB) - 9.4s
+ Iteration 40: 84MB (Δ-12MB) - 12.6s
+ Iteration 50: 85MB (Δ-11MB) - 15.8s
+ Iteration 60: 84MB (Δ-12MB) - 18.9s
+ Iteration 70: 83MB (Δ-13MB) - 22.0s
+ Iteration 80: 83MB (Δ-13MB) - 25.2s
+ Iteration 90: 83MB (Δ-13MB) - 28.3s
+ Iteration 100: 83MB (Δ-13MB) - 31.5s
+ === Results ===
+ Initial Memory: 96MB
+ Final Memory: 82MB
+ Memory Growth: -14MB
+ Duration: 31.5s
+ Avg per instance: 31.46ms
+ Zombie whisper.exe processes: 0
+
+
+
+Test Run Failed.
+Total tests: 215
+     Passed: 187
+     Failed: 5
+    Skipped: 23
+ Total time: 3.4388 Minutes
+       _VSTestConsole:
+         MSB4181: The "VSTestTask" task returned false but did not log an error.
+     1>Done Building Project "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (VSTest target(s)) -- FAILED.
+
+Build FAILED.
+
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (VSTest target) (1:7) ->
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (default target) (1:8) ->
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj" (default target) (2:6) ->
+       (CoreCompile target) -> 
+         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\MainWindow.xaml.cs(40,42): warning CS0649: Field 'MainWindow.recordingCancellation' is never assigned to, and will always have its default value null [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj]
+         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\SettingsWindowNew.xaml.cs(41,22): warning CS0414: The field 'SettingsWindowNew.isInitialized' is assigned but its value is never used [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\VoiceLite.csproj]
+
+
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (VSTest target) (1:7) ->
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (default target) (1:8) ->
+         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\MemoryLeakTest.cs(74,42): warning CS8601: Possible null reference assignment. [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\MemoryLeakStressTest.cs(37,27): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread. [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+
+
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (VSTest target) (1:7) ->
+       "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj" (default target) (1:8) ->
+       (_CopyFilesMarkedCopyLocal target) -> 
+         C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 1 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 2 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 3 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 4 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+         C:\Program Files\dotnet\sdk\9.0.305\Microsoft.Common.CurrentVersion.targets(5093,5): warning MSB3026: Could not copy "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite\bin\Debug\net8.0-windows\VoiceLite.dll" to "bin\Debug\net8.0-windows\VoiceLite.dll". Beginning retry 5 in 1000ms. The process cannot access the file 'C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\bin\Debug\net8.0-windows\VoiceLite.dll' because it is being used by another process. The file is locked by: "testhost (30612)" [C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck\VoiceLite\VoiceLite.Tests\VoiceLite.Tests.csproj]
+
+    9 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:03:33.87
