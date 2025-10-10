@@ -79,12 +79,6 @@ namespace VoiceLite
         }
 
 
-        private void UpdateDictionaryCount()
-        {
-            // Custom dictionary feature removed
-            DictionaryCountText.Text = "Feature removed";
-        }
-
         private void SetupModelComparison()
         {
             if (!IsModelInstalled(settings.WhisperModel))
@@ -325,10 +319,6 @@ namespace VoiceLite
         // Stub event handlers for removed/unimplemented features
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }
         private void DownloadModelsButton_Click(object sender, RoutedEventArgs e) { }
-        private void ManageDictionaryButton_Click(object sender, RoutedEventArgs e) { }
-        private void LoadMedicalTemplate_Click(object sender, RoutedEventArgs e) { }
-        private void LoadLegalTemplate_Click(object sender, RoutedEventArgs e) { }
-        private void LoadTechTemplate_Click(object sender, RoutedEventArgs e) { }
         private void StudioPreset_Click(object sender, RoutedEventArgs e) { }
         private void OfficePreset_Click(object sender, RoutedEventArgs e) { }
         private void DefaultPreset_Click(object sender, RoutedEventArgs e) { }
