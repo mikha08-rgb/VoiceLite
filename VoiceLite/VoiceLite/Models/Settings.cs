@@ -114,17 +114,6 @@ namespace VoiceLite.Models
 
         public bool UseVAD { get; set; } = true; // Use Voice Activity Detection to trim silence
 
-        // Legacy properties (kept for backwards compatibility with saved settings)
-        public bool EnableMetrics { get; set; } = false; // Unused - kept for deserialization
-        public bool UseContextPrompt { get; set; } = true; // Unused - kept for deserialization
-        public bool UseEnhancedDictionary { get; set; } = true; // Unused - kept for deserialization
-        public bool EnableCustomDictionary { get; set; } = true; // Unused - kept for deserialization
-        public List<object> CustomDictionaryEntries { get; set; } = new List<object>(); // Unused - kept for deserialization
-
-        // Model Benchmark Cache
-        public string? LastBenchmarkDate { get; set; }
-        public Dictionary<string, ModelBenchmarkCache> BenchmarkCache { get; set; } = new Dictionary<string, ModelBenchmarkCache>();
-
         // Transcription History
         private int _maxHistoryItems = 50;
 
@@ -151,15 +140,6 @@ namespace VoiceLite.Models
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
-    }
-
-    public class ModelBenchmarkCache
-    {
-        public double TranscriptionTime { get; set; }
-        public double ProcessingRatio { get; set; }
-        public long PeakMemoryUsage { get; set; }
-        public DateTime CacheDate { get; set; }
-        public bool IsValid => CacheDate != default && (DateTime.Now - CacheDate).TotalDays < 30; // Cache valid for 30 days
     }
 
     public static class SettingsValidator

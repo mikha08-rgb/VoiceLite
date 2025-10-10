@@ -70,9 +70,8 @@ namespace VoiceLite
             // Audio Enhancement - sync UI from settings
             SyncAudioUIFromSettings();
 
-            // Custom Dictionary
-            EnableCustomDictionaryCheckBox.IsChecked = settings.EnableCustomDictionary;
-            UpdateDictionaryCount();
+            // Custom Dictionary - REMOVED (feature simplified away)
+            // UpdateDictionaryCount(); // Dead code
 
             // Current Model is set in SetupModelComparison
 
@@ -308,8 +307,7 @@ namespace VoiceLite
                 settings.SelectedMicrophoneName = selectedDevice.Name;
             }
 
-            // Custom Dictionary
-            settings.EnableCustomDictionary = EnableCustomDictionaryCheckBox.IsChecked ?? true;
+            // Custom Dictionary - REMOVED (feature simplified away)
 
             // Whisper Model is already saved when selected
 
