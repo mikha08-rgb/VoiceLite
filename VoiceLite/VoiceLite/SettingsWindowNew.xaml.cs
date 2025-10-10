@@ -34,11 +34,7 @@ namespace VoiceLite
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
 
-            DownloadModelsButton.Visibility = Visibility.Visible;
-            UpdateModelDownloadButton();
-
             LoadSettings();
-            SetupModelComparison();
             LoadVersionInfo();
         }
 
@@ -79,48 +75,6 @@ namespace VoiceLite
         }
 
 
-        private void SetupModelComparison()
-        {
-            if (!IsModelInstalled(settings.WhisperModel))
-            {
-                settings.WhisperModel = "ggml-tiny.bin";
-            }
-
-            SimpleModelSelector.SelectedModel = settings.WhisperModel;
-        }
-
-        private void UpdateModelDownloadButton()
-        {
-            var tinyInstalled = IsModelInstalled("ggml-tiny.bin");
-            var mediumInstalled = IsModelInstalled("ggml-medium.bin");
-
-            if (tinyInstalled && mediumInstalled)
-            {
-                DownloadModelsButton.Content = "All models installed";
-                DownloadModelsButton.IsEnabled = false;
-            }
-            else if (!tinyInstalled && !mediumInstalled)
-            {
-                DownloadModelsButton.Content = "Download Tiny + Medium Models (1.6GB)";
-                DownloadModelsButton.IsEnabled = true;
-            }
-            else if (!tinyInstalled)
-            {
-                DownloadModelsButton.Content = "Download Tiny Model (75MB)";
-                DownloadModelsButton.IsEnabled = true;
-            }
-            else // !mediumInstalled
-            {
-                DownloadModelsButton.Content = "Download Medium Model (1.5GB)";
-                DownloadModelsButton.IsEnabled = true;
-            }
-        }
-
-        private static bool IsModelInstalled(string fileName)
-        {
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", fileName);
-            return File.Exists(path) || File.Exists(path + ".enc");
-        }
 
         private void LoadMicrophones()
         {
@@ -235,25 +189,6 @@ namespace VoiceLite
         {
             // Invoke the test recording callback if provided
             testRecordingCallback?.Invoke();
-        }
-
-        private void SimpleModelSelector_ModelSelected(object sender, string modelFileName)
-        {
-            settings.WhisperModel = modelFileName;
-            StatusText.Text = $"Model changed to: {GetModelDisplayName(modelFileName)}";
-        }
-
-        private string GetModelDisplayName(string fileName)
-        {
-            switch (fileName)
-            {
-                case "ggml-tiny.bin": return "Fastest";
-                case "ggml-base.bin": return "Fast";
-                case "ggml-small.bin": return "Balanced";
-                case "ggml-medium.bin": return "Accurate";
-                case "ggml-large-v3.bin": return "Maximum";
-                default: return fileName;
-            }
         }
 
         private void ApplyButton_Click(object sender, RoutedEventArgs e)
