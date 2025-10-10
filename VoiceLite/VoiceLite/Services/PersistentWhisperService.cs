@@ -26,14 +26,6 @@ namespace VoiceLite.Services
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
 
-        // MEMORY_FIX 2025-10-08: Refactored from static to instance-based to prevent zombie leaks
-        // TIER 1.3: Instance-based process tracker to detect zombie whisper.exe processes
-        // OLD: private static readonly HashSet<int> activeProcessIds = new();
-        // OLD: private static readonly object processLock = new object();
-        private readonly HashSet<int> activeProcessIds = new();
-        private readonly object processLock = new object();
-
-
         public PersistentWhisperService(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -226,13 +218,6 @@ namespace VoiceLite.Services
                 using var process = new Process { StartInfo = processStartInfo };
                 process.Start();
 
-                // TIER 1.3: Track warmup process (temporary, using statement will auto-cleanup)
-                lock (processLock)
-                {
-                    activeProcessIds.Add(process.Id);
-                    ErrorLogger.LogDebug($"TIER 1.3: Tracked warmup process {process.Id}");
-                }
-
                 // Set high priority for warmup
                 // BUG FIX: Check if process is still running before accessing PriorityClass
                 try
@@ -248,13 +233,6 @@ namespace VoiceLite.Services
                 }
 
                 await process.WaitForExitAsync();
-
-                // TIER 1.3: Remove warmup process from tracker
-                lock (processLock)
-                {
-                    activeProcessIds.Remove(process.Id);
-                    ErrorLogger.LogDebug($"TIER 1.3: Removed warmup process {process.Id} from tracker");
-                }
 
                 // Warmup completed successfully (no timing logs to reduce noise)
                 isWarmedUp = true;
@@ -383,13 +361,6 @@ namespace VoiceLite.Services
 
                 process.Start();
 
-                // TIER 1.3: Track process ID to detect zombies
-                lock (processLock)
-                {
-                    activeProcessIds.Add(process.Id);
-                    ErrorLogger.LogDebug($"TIER 1.3: Tracked whisper.exe process {process.Id} (total active: {activeProcessIds.Count})");
-                }
-
                 // PERFORMANCE FIX: Use Normal priority instead of High to prevent UI thread starvation
                 // On systems with limited cores (2-4), HIGH priority Whisper can starve the UI thread
                 // causing the app to appear frozen during transcription
@@ -457,28 +428,6 @@ namespace VoiceLite.Services
                             });
                         }
 
-                        // TIER 1.3: Verify process was killed, log critical error if zombie detected
-                        try
-                        {
-                            if (!process.HasExited)
-                            {
-                                ErrorLogger.LogError($"TIER 1.3: ZOMBIE PROCESS DETECTED - whisper.exe PID {process.Id} survived Kill() attempts!", new Exception("Process refused to terminate"));
-                                // Don't remove from tracker - let disposal logging catch it
-                            }
-                            else
-                            {
-                                // Successfully killed - remove from tracker
-                                lock (processLock)
-                                {
-                                    activeProcessIds.Remove(process.Id);
-                                    ErrorLogger.LogDebug($"TIER 1.3: Removed killed process {process.Id} from tracker");
-                                }
-                            }
-                        }
-                        catch (Exception verifyEx)
-                        {
-                            ErrorLogger.LogError($"TIER 1.3: Failed to verify process {process.Id} termination", verifyEx);
-                        }
                     }
                     catch (Exception killEx)
                     {
@@ -541,33 +490,16 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // TIER 1.3: Remove process from tracker on normal exit
+                // Dispose process if created
                 if (process != null)
                 {
-                    try
-                    {
-                        int pid = process.Id;
-                        lock (processLock)
-                        {
-                            if (activeProcessIds.Remove(pid))
-                            {
-                                ErrorLogger.LogDebug($"TIER 1.3: Removed completed process {pid} from tracker (total active: {activeProcessIds.Count})");
-                            }
-                        }
-                    }
-                    catch (Exception trackEx)
-                    {
-                        ErrorLogger.LogError("TIER 1.3: Failed to remove process from tracker", trackEx);
-                    }
-
-                    // TIER 1.3: Manually dispose process (removed using statement for finally block access)
                     try
                     {
                         process.Dispose();
                     }
                     catch (Exception disposeEx)
                     {
-                        ErrorLogger.LogError("TIER 1.3: Failed to dispose process", disposeEx);
+                        ErrorLogger.LogError("Failed to dispose process", disposeEx);
                     }
                 }
 
@@ -621,58 +553,6 @@ namespace VoiceLite.Services
             Thread.Sleep(200);
 
             CleanupProcess();
-
-            // TIER 1.3: Check process tracker for zombies (more accurate than global search)
-            try
-            {
-                lock (processLock)
-                {
-                    if (activeProcessIds.Count > 0)
-                    {
-                        ErrorLogger.LogError($"TIER 1.3: ZOMBIE PROCESSES DETECTED - {activeProcessIds.Count} tracked whisper.exe process(es) not cleaned up!", new Exception("Zombie process leak detected"));
-                        ErrorLogger.LogWarning($"TIER 1.3: Zombie PIDs: {string.Join(", ", activeProcessIds)}");
-
-                        // Attempt to kill all tracked zombies
-                        foreach (var pid in activeProcessIds.ToList())
-                        {
-                            try
-                            {
-                                var zombieProcess = Process.GetProcessById(pid);
-                                ErrorLogger.LogWarning($"TIER 1.3: Force-killing zombie process {pid}");
-                                zombieProcess.Kill(entireProcessTree: true);
-                                zombieProcess.Dispose();
-                            }
-                            catch (ArgumentException)
-                            {
-                                // Process already exited - false positive in tracker
-                                ErrorLogger.LogDebug($"TIER 1.3: Tracked process {pid} already exited (false positive)");
-                            }
-                            catch (Exception killEx)
-                            {
-                                ErrorLogger.LogError($"TIER 1.3: Failed to kill zombie process {pid}", killEx);
-                            }
-                        }
-
-                        activeProcessIds.Clear();
-                    }
-                    else
-                    {
-                        ErrorLogger.LogDebug("TIER 1.3: No zombie processes in tracker - clean disposal");
-                    }
-                }
-
-                // QUICK WIN 3: Global check as secondary validation
-                var whisperProcesses = Process.GetProcessesByName("whisper");
-                if (whisperProcesses.Length > 0)
-                {
-                    ErrorLogger.LogWarning($"QUICK WIN 3: Global check found {whisperProcesses.Length} whisper.exe process(es) after disposal");
-                    ErrorLogger.LogWarning($"QUICK WIN 3: Process IDs: {string.Join(", ", whisperProcesses.Select(p => p.Id))}");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("TIER 1.3: Failed to check for zombie processes", ex);
-            }
 
             // Dispose semaphore safely with a small delay to prevent race conditions
             if (transcriptionSemaphore != null)
