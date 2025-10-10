@@ -1699,19 +1699,6 @@ namespace VoiceLite
             }
         }
 
-        private void DictionaryButton_Click(object sender, RoutedEventArgs e)
-        {
-            {
-                SaveSettings();
-            }
-        }
-
-        private void VoiceShortcutsButton_Click(object sender, RoutedEventArgs e)
-        {
-            {
-                SaveSettings();
-            }
-        }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1816,14 +1803,6 @@ namespace VoiceLite
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Handle Ctrl+D - Open dictionary
-            if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                DictionaryButton_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-                return;
-            }
-
             // Handle Ctrl+F - Toggle search box
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
             {
