@@ -32,7 +32,6 @@ namespace VoiceLite
         private ZombieProcessCleanupService? zombieCleanupService; // MEMORY_FIX 2025-10-08: Periodic zombie process cleanup
         private TranscriptionHistoryService? historyService;
         // SoundService removed per user request - no audio feedback
-        private SimpleTelemetry? telemetry; // Production telemetry
 
         // Recording state
         private DateTime recordingStartTime;
@@ -556,14 +555,9 @@ namespace VoiceLite
                 historyService = new TranscriptionHistoryService(settings);
                 // SoundService removed per user request - no audio feedback
 
-                // Initialize production telemetry (privacy-first, opt-in)
-                telemetry = new SimpleTelemetry(settings);
-                telemetry.TrackAppStart();
-                telemetry.TrackDailyActiveUser();
-
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
                 if (audioRecorder == null || whisperService == null || textInjector == null ||
-                    historyService == null || soundService == null)
+                    historyService == null)
                 {
                     throw new InvalidOperationException(
                         "Failed to initialize core services - one or more required services is null. " +
@@ -595,8 +589,6 @@ namespace VoiceLite
 
                 // Load and display existing history
                 _ = UpdateHistoryUI();
-
-                _ = RestoreAccountAsync();
             }
             catch (Exception ex)
             {
@@ -921,7 +913,6 @@ namespace VoiceLite
                 try
                 {
                     recorder.StartRecording();
-                    telemetry?.TrackHotkeyResponseEnd();
 
                     if (recorder.IsRecording)
                     {
@@ -999,9 +990,6 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                // TELEMETRY: Track hotkey response time start
-                telemetry?.TrackHotkeyResponseStart();
-
                 ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, isHotkeyMode={isHotkeyMode}");
 
                 // Debounce protection - ignore rapid key presses
@@ -1563,8 +1551,6 @@ namespace VoiceLite
 
                         var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
                         var wordCount = transcription.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
-                        telemetry?.TrackTranscriptionDuration((long)durationMs, settings.WhisperModel, wordCount, success: true);
-                        telemetry?.TrackFeatureAttempt("transcription", success: true);
 
                         _ = Task.Run(async () =>
                         {
@@ -1738,7 +1724,7 @@ namespace VoiceLite
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
 
-            currentSettingsWindow = new SettingsWindowNew(settings, null, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+            currentSettingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
             currentSettingsWindow.Owner = this;
 
             if (currentSettingsWindow.ShowDialog() == true)
@@ -1979,14 +1965,6 @@ namespace VoiceLite
         protected override void OnClosed(EventArgs e)
         {
             // Settings save already handled in OnClosing (async pattern)
-
-            // TELEMETRY: Track session metrics and upload final batch
-            try
-            {
-                telemetry?.TrackSessionEnd();
-                telemetry?.Dispose();
-            }
-            catch { /* Silent fail */ }
 
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
