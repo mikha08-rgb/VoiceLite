@@ -1346,8 +1346,12 @@ namespace VoiceLite
             // Force UI back to ready state
             try
             {
-                TranscriptionText.Text = "Processing timed out - app recovered";
-                TranscriptionText.Foreground = Brushes.Orange;
+                // PROFESSIONAL UX: Silent recovery - no popups during critical work
+                // Log the issue for debugging, show subtle status message that auto-clears
+                ErrorLogger.LogWarning("OnStuckStateRecovery: Silently recovering - resetting state and UI");
+
+                TranscriptionText.Text = "(Timeout - recovered)";
+                TranscriptionText.Foreground = Brushes.Gray;
                 UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
 
                 // Reset all state flags
@@ -1363,31 +1367,25 @@ namespace VoiceLite
                 recordingElapsedTimer?.Stop();
                 recordingElapsedTimer = null;
 
-                // Show user-friendly message (non-blocking async)
-                try
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        MessageBox.Show(
-                            "VoiceLite recovered from a stuck state.\n\n" +
-                            "The app was stuck processing for too long and has been reset.\n\n" +
-                            "If this happens frequently:\n" +
-                            "• Try using a smaller Whisper model\n" +
-                            "• Check if antivirus is blocking the app\n" +
-                            "• Restart VoiceLite",
-                            "Stuck State Recovery",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    });
-                }
-                catch (TaskCanceledException)
-                {
-                    // Dispatcher shutting down during app close - this is normal, just log it
-                    ErrorLogger.LogMessage("OnStuckStateRecovery: Dispatcher shutting down (app closing)");
-                }
-
                 // Reset UI to default mode
                 UpdateUIForCurrentMode();
+
+                // Auto-clear timeout message after 3 seconds
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(3000);
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            if (!isRecording && TranscriptionText.Text == "(Timeout - recovered)")
+                            {
+                                TranscriptionText.Text = "";
+                            }
+                        });
+                    }
+                    catch { /* Ignore cleanup errors */ }
+                });
             }
             catch (Exception innerEx)
             {
@@ -1621,6 +1619,10 @@ namespace VoiceLite
             finally
             {
                 isTranscribing = false;
+
+                // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
+                // This is the absolute last line of defense against stuck processing state
+                StopStuckStateRecoveryTimer();
 
                 try
                 {
