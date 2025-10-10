@@ -211,7 +211,8 @@ namespace VoiceLite.Services
                         return false;
                 }
 
-                var process = new Process
+                // CRITICAL FIX: Use 'using' to ensure Process is disposed and prevent resource leak
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
@@ -274,37 +275,38 @@ namespace VoiceLite.Services
 
         private static async Task<bool> InstallVCRuntimeAsync()
         {
+            // CRITICAL FIX: Ensure Window is properly closed in finally block to prevent resource leak
+            var progressWindow = new Window
+            {
+                Title = "Installing Dependencies",
+                Width = 400,
+                Height = 150,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Content = new System.Windows.Controls.StackPanel
+                {
+                    Margin = new Thickness(20),
+                    Children =
+                    {
+                        new System.Windows.Controls.TextBlock
+                        {
+                            Text = "Downloading Microsoft Visual C++ Runtime...",
+                            FontSize = 14,
+                            Margin = new Thickness(0, 10, 0, 10)
+                        },
+                        new System.Windows.Controls.ProgressBar
+                        {
+                            Height = 20,
+                            IsIndeterminate = true
+                        }
+                    }
+                }
+            };
+
+            progressWindow.Show();
+
             try
             {
                 var tempPath = Path.Combine(Path.GetTempPath(), "vc_redist.x64.exe");
-
-                var progressWindow = new Window
-                {
-                    Title = "Installing Dependencies",
-                    Width = 400,
-                    Height = 150,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    Content = new System.Windows.Controls.StackPanel
-                    {
-                        Margin = new Thickness(20),
-                        Children =
-                        {
-                            new System.Windows.Controls.TextBlock
-                            {
-                                Text = "Downloading Microsoft Visual C++ Runtime...",
-                                FontSize = 14,
-                                Margin = new Thickness(0, 10, 0, 10)
-                            },
-                            new System.Windows.Controls.ProgressBar
-                            {
-                                Height = 20,
-                                IsIndeterminate = true
-                            }
-                        }
-                    }
-                };
-
-                progressWindow.Show();
 
                 try
                 {

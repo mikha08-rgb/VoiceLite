@@ -3,7 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-VoiceLite is a production-ready Windows native speech-to-text application using OpenAI Whisper AI. It provides instant voice typing anywhere in Windows via global hotkey. The app is fully functional with comprehensive error handling, multiple Whisper models, and performance optimizations.
+VoiceLite is a **radically simplified** Windows native speech-to-text application using OpenAI Whisper AI. It provides instant voice typing anywhere in Windows via global hotkey.
+
+**Philosophy (v1.0.65+)**: Core-only, zero complexity. Just recording → Whisper → text injection. All non-essential features removed for reliability and maintainability.
 
 ## Common Development Commands
 
@@ -24,7 +26,7 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 
 ### Testing
 ```bash
-# Run all tests (292 total)
+# Run all tests (~200 total after v1.0.65 simplification)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
 # Run specific test
@@ -153,51 +155,68 @@ npm run keygen
    - Handles system tray integration
    - Visual state management for recording indicators
 
-2. **Service Layer** (`Services/`): Modular, single-responsibility services
-   - `AudioRecorder`: NAudio-based recording with noise suppression
-   - `PersistentWhisperService`: Main Whisper.cpp subprocess manager with warmup and process pooling
-   - `WhisperServerService`: Persistent HTTP server mode (5x faster, experimental) - uses server.exe with fallback to PersistentWhisperService
+2. **Service Layer** (`Services/`): **Radically simplified to core-only** (v1.0.65+)
+
+   **Active Services** (13 total):
+   - `AudioRecorder`: NAudio-based recording (noise suppression disabled for reliability)
+   - `PersistentWhisperService`: Main Whisper.cpp subprocess manager (greedy decoding for speed)
    - `TextInjector`: Text injection using InputSimulator (supports multiple modes)
    - `HotkeyManager`: Global hotkey registration via Win32 API
    - `SystemTrayManager`: System tray icon and context menu
-   - `AudioPreprocessor`: Audio enhancement (noise gate, gain control)
-   - `TranscriptionPostProcessor`: Text corrections and formatting (v1.0.24: Added customizable post-processing - capitalization, punctuation, filler word removal, contractions, grammar fixes)
-   - `TranscriptionHistoryService`: Manages transcription history with pinning and auto-cleanup
+   - `AudioPreprocessor`: Audio enhancement (disabled by default for reliability)
+   - `TranscriptionHistoryService`: Manages transcription history with pinning
    - `SoundService`: Custom UI sound effects (wood-tap-click.ogg)
-   - `ModelBenchmarkService`: Model performance testing
    - `MemoryMonitor`: Memory usage tracking
    - `ErrorLogger`: Centralized error logging
    - `StartupDiagnostics`: Comprehensive startup checks and auto-fixes
-   - _Legacy licensing components removed_: VoiceLite now ships as a fully free build
-   - `MetricsTracker`: Performance metrics collection
-   - `SecurityService`: Security and obfuscation helpers
    - `DependencyChecker`: Verify runtime dependencies
-   - `AnalyticsService`: Privacy-first opt-in analytics with SHA256 anonymous user IDs (v1.0.17+)
-   - `RecordingCoordinator`: Orchestrates recording workflow and state management (v1.0.18+)
+   - `ZombieProcessCleanupService`: Prevents orphaned whisper.exe processes (v1.0.65+)
+
+   **Removed Services** (v1.0.65 - major simplification):
+   - ❌ `WhisperServerService` - Experimental fast mode (reliability issues)
+   - ❌ `RecordingCoordinator` - State machine complexity removed
+   - ❌ `TranscriptionPostProcessor` - Text formatting removed
+   - ❌ `ModelBenchmarkService` - Benchmarking removed
+   - ❌ `AnalyticsService` - Analytics removed
+   - ❌ `LicenseService` - Licensing removed (100% free now)
+   - ❌ `AuthenticationService` - Authentication removed
+   - ❌ `SecurityService` - No longer needed
+   - ❌ `MetricsTracker` - Removed
 
 3. **Models** (`Models/`): Data structures and configuration
-   - `Settings`: User preferences with validation
+
+   **Active Models**:
+   - `Settings`: User preferences with validation (simplified, no analytics/licensing/formatting)
    - `TranscriptionResult`: Whisper output parsing
-   - `WhisperModelInfo`: Model metadata and benchmarking (Lite/Swift/Pro/Elite/Ultra)
+   - `WhisperModelInfo`: Model metadata (Lite/Pro/Elite/Ultra)
    - `TranscriptionHistoryItem`: History panel items with metadata
-   - `CustomDictionary`: VoiceShortcuts - custom word/phrase replacements with templates (Medical, Legal, Tech)
-   - `UserSession`: Session tracking and metrics
-   - `LicensePayload`: License validation structures
+
+   **Removed Models** (v1.0.65):
+   - ❌ `CustomDictionary` - VoiceShortcuts removed
+   - ❌ `UserSession` - Session tracking removed
+   - ❌ `LicensePayload` - Licensing removed
+   - ❌ `CRLPayload` - Certificate revocation removed
 
 4. **Interfaces** (`Interfaces/`): Contract definitions for dependency injection
    - `IRecorder`, `ITranscriber`, `ITextInjector`
 
-5. **UI Components**
-   - `MainWindow.xaml`: Main application window with recording status and history panel
-   - `SettingsWindow.xaml` / `SettingsWindowNew.xaml`: Settings UI with model selection
-   - `DictionaryManagerWindow.xaml`: VoiceShortcuts manager with template presets
-   - `LoginWindow.xaml`: Pro license activation window
-   - `AnalyticsConsentWindow.xaml`: First-run analytics opt-in dialog (v1.0.17+)
+5. **UI Components** (simplified v1.0.65+)
+
+   **Active UI**:
+   - `MainWindow.xaml`: Main application window with recording status and history panel (simplified)
+   - `SettingsWindowNew.xaml`: Settings UI with model selection (no formatting/analytics/licensing tabs)
    - `Controls/SimpleModelSelector`: Model selection control
    - `Controls/ModelComparisonControl`: Model comparison and selection UI
    - `Resources/ModernStyles.xaml`: WPF styling resources
    - `Utilities/RelativeTimeConverter`: Converter for "5 mins ago" timestamps
    - `Utilities/TruncateTextConverter`: Converter for text preview truncation
+
+   **Removed UI** (v1.0.65):
+   - ❌ `DictionaryManagerWindow.xaml` - VoiceShortcuts removed
+   - ❌ `LoginWindow.xaml` - Licensing removed
+   - ❌ `AnalyticsConsentWindow.xaml` - Analytics removed
+   - ❌ `FeedbackWindow.xaml` - Feedback removed
+   - ❌ `SettingsWindow.xaml` - Old settings UI removed
 
 ## Whisper Integration
 
@@ -209,101 +228,104 @@ npm run keygen
 - `ggml-large-v3.bin` (2.9GB): **Ultra** - Highest accuracy - Pro tier, manual download required and resource heavy
 
 ### Whisper Process Management
-- **PersistentWhisperService is the primary implementation** (WhisperService/WhisperProcessPool are deprecated)
-- Warmup process on startup using dummy audio file for reduced first-transcription latency
+- **PersistentWhisperService is the only implementation** (v1.0.65+)
+- **Greedy decoding for speed**: beam_size=1, best_of=1 (5x faster than v1.0.24's beam search)
 - Process spawned per transcription with automatic cleanup
 - Semaphore-based concurrency control (1 transcription at a time)
 - Automatic timeout handling with configurable multiplier
 - Temperature optimization (0.2) for better accuracy
-- Beam search parameters (beam_size=5, best_of=5)
 - Path caching for whisper.exe and model files
+- **ZombieProcessCleanupService**: Prevents orphaned whisper.exe processes (v1.0.65+)
 
-### Whisper Server Mode (Experimental)
-- **WhisperServerService**: Optional 5x performance boost via persistent HTTP server
-- Uses whisper.cpp's server.exe (342KB, ships with installer)
-- Keeps model loaded in memory, eliminating 2-second reload overhead per transcription
-- Enabled via Settings → Advanced → "Enable Whisper Server Mode"
-- Default: OFF (requires manual opt-in)
-- HTTP endpoint: POST /inference (multipart/form-data)
-- Port auto-detection (8080-8090 range)
-- Graceful fallback to PersistentWhisperService on failure
-- Requires app restart when toggled
-- Process lifecycle: Start on app launch, kill on app exit
-- Health check: Simple GET / request (3-second timeout)
+### Removed Features (v1.0.65)
+- ❌ **WhisperServerService removed** - Persistent HTTP server mode caused reliability issues
+- ❌ **Warmup process removed** - Added complexity, minimal benefit with greedy decoding
+- ❌ **Process pooling removed** - Single process per transcription is simpler and more reliable
 
 ### Whisper Command Format
 ```bash
+# Current (v1.0.65+): Greedy decoding for speed
+whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temperature 0.2 --beam-size 1 --best-of 1
+
+# Legacy (v1.0.24 and earlier): Beam search for accuracy
 whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temperature 0.2 --beam-size 5 --best-of 5
 ```
 
 **Language Support**: VoiceLite supports 99 languages via Whisper's multilingual capabilities. Default is English (`en`), but can be configured in settings.
 
-## Licensing & Freemium Model
+## Licensing & Distribution Model
 
-### Desktop App (Free Tier)
-- Desktop client is **100% free** with no usage caps
-- **Pro model (466MB)** ships with installer as free tier default (temporary growth promotion)
-- Lite model (75MB) kept as legacy fallback for compatibility
-- Works completely offline - no license validation required
-- No online authentication or tracking
-- All core features available (hotkeys, text injection, settings)
-- **Accuracy**: ~90-93% with Pro model (vs 80-85% with Lite)
+### Current Model (v1.0.65+)
+- **100% Free** - All features unlocked, no tiers, no licensing
+- **Simplified Distribution**: Desktop client ships with Pro model (466MB) as default
+- **No Server Dependencies**: Completely offline, no authentication, no tracking
+- **Open Source**: MIT License, auditable source code
 
-### Web-Based Pro Tier (Optional)
-- Stripe subscription managed via voicelite.app ($20/3mo or $99 lifetime)
-- Modern Next.js backend validates Pro subscriptions for premium models (Swift, Elite, Ultra)
-- Unlocks: Even better accuracy (93-97%), advanced models, priority support, early access
-- Backend platform: Next.js 15 + PostgreSQL + Prisma at `voicelite-web/`
-- Desktop app validates Pro licenses via Ed25519 cryptographic signatures
+### Legacy Features Removed (v1.0.65)
+- ❌ **Freemium licensing removed** - Was too complex, hurt user experience
+- ❌ **Pro tier removed** - All premium models now free (download from settings)
+- ❌ **License validation removed** - No Ed25519 signatures, no CRL checks
+- ❌ **Authentication removed** - No magic links, no OTP, no JWT sessions
 
-### Implementation Details
-- **Single Backend Architecture**: Modern Next.js platform at https://voicelite.app
-- Free tier: Pro model runs standalone without any server connection (temporary promotion)
-- Pro tier: Premium models require license validation via Ed25519 signed licenses
-- Recordings processed locally and discarded after transcription (both tiers)
-- License keys use Ed25519 cryptographic signing for tamper-proof security
-- Desktop app can function fully offline after premium models are downloaded
-- License validation includes Certificate Revocation List (CRL) checks
+### Web Backend (voicelite-web)
+- **Purpose**: Landing page, download links, feedback collection
+- **No Licensing**: Backend no longer validates licenses
+- **Telemetry Only**: Production monitoring for reliability (server-side only)
+- **Stripe Integration**: Remains for optional donations (not enforced)
 
 ## Key Technical Details
 
-### Dependencies (NuGet Packages)
+### Dependencies (NuGet Packages) - Simplified v1.0.65+
 - `NAudio` (2.2.1): Audio recording and processing
 - `NAudio.Vorbis` (1.5.0): OGG audio file support for sound effects
 - `H.InputSimulator` (1.2.1): Keyboard/mouse simulation for text injection
 - `Hardcodet.NotifyIcon.Wpf` (2.0.1): System tray integration
 - `System.Text.Json` (9.0.9): Settings persistence
 - `System.Management` (8.0.0): System information
-- `BouncyCastle.Cryptography` (2.4.0): License encryption and cryptographic operations
+
+**Removed Dependencies** (v1.0.65):
+- ❌ `BouncyCastle.Cryptography` (2.4.0): No longer needed (licensing removed)
 
 ### Test Dependencies (xUnit)
 - `xunit` (2.9.2): Test framework
 - `Moq` (4.20.70): Mocking framework
 - `FluentAssertions` (6.12.0): Assertion library
 
-### Performance Optimizations
-- Audio preprocessing with noise gate and AGC
-- Whisper process pooling for reduced latency
-- Smart text injection (clipboard for long text, typing for short)
-- Memory monitoring and cleanup
-- Cached model benchmarking
-- VAD (Voice Activity Detection) for silence trimming
+### Performance Optimizations (v1.0.65+)
+- **Greedy decoding**: beam_size=1, best_of=1 (5x faster than beam search)
+- **Raw audio**: Preprocessing disabled for reliability (simpler is faster)
+- **Smart text injection**: Clipboard for long text, typing for short
+- **Memory monitoring**: Automatic cleanup and leak prevention
+- **Zombie process cleanup**: Prevents orphaned whisper.exe processes
 
-### Settings & Configuration
+**Removed Optimizations** (v1.0.65 - simplicity over complexity):
+- ❌ Process pooling - Single process per transcription is simpler
+- ❌ Model benchmarking - Not needed with greedy decoding
+- ❌ VAD silence trimming - Added complexity, minimal benefit
+- ❌ Audio preprocessing - Disabled for reliability
+
+### Settings & Configuration (v1.0.65+)
 - **Settings stored in `%LOCALAPPDATA%\VoiceLite\settings.json`** (Local machine only, does NOT sync)
-- **WhisperServerService toggle**: `UseWhisperServer` (default: false) - requires app restart
-- **Privacy Note**: Changed from Roaming to Local AppData to prevent transcription history from syncing across PCs
-- AppData directory created automatically on first run
-- Automatic migration from old Roaming AppData location (one-time, transparent)
-- Settings migration from old Program Files location (if exists)
-- Default hotkey: Left Alt (customizable)
-- Default mode: Push-to-talk (not toggle)
-- Auto-paste enabled by default
-- Multiple text injection modes (SmartAuto, AlwaysType, AlwaysPaste, PreferType, PreferPaste)
-- Sound feedback disabled by default (wood-tap-click.ogg via NAudio.Vorbis)
-- **Transcription history**: Configurable max items (default 50), supports pinning, auto-cleanup
-- **VoiceShortcuts**: Pattern-based replacements with templates (Medical, Legal, Tech)
-- **Analytics**: Opt-in privacy-first analytics with SHA256 anonymous IDs (v1.0.17+), no PII collected
+- **Core Settings**:
+  - Default hotkey: Left Alt (customizable)
+  - Default mode: Push-to-talk (not toggle)
+  - Auto-paste enabled by default
+  - Multiple text injection modes (SmartAuto, AlwaysType, AlwaysPaste, PreferType, PreferPaste)
+  - Sound feedback disabled by default (wood-tap-click.ogg via NAudio.Vorbis)
+  - Transcription history: Configurable max items (default 50), supports pinning, auto-cleanup
+- **Performance Settings** (v1.0.65+):
+  - Beam size: 1 (greedy decoding, 5x faster)
+  - Best of: 1 (single sampling)
+  - Audio preprocessing: Disabled by default
+- **Privacy**: Changed from Roaming to Local AppData to prevent history syncing across PCs
+- **Migration**: Automatic migration from old Roaming AppData location (one-time, transparent)
+
+**Removed Settings** (v1.0.65):
+- ❌ `UseWhisperServer` - Server mode removed
+- ❌ `EnableAnalytics` - Analytics removed
+- ❌ VoiceShortcuts settings - Feature removed
+- ❌ Text formatting settings - Feature removed
+- ❌ License/Pro settings - Licensing removed
 
 ### Error Handling & Logging
 - Comprehensive error logging via `ErrorLogger` service
@@ -330,15 +352,17 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language [lang] --temper
 - Self-contained deployment supported
 - Post-build obfuscation in Release mode (ObfuscateRelease.bat)
 
-### Critical Implementation Details
-1. **Audio Format**: Must be 16kHz, 16-bit mono WAV for Whisper
+### Critical Implementation Details (v1.0.65+)
+1. **Audio Format**: Must be 16kHz, 16-bit mono WAV for Whisper (no preprocessing)
 2. **Hotkey Registration**: Uses Win32 API, may require admin for some keys
 3. **Text Injection**: May trigger antivirus warnings (false positives)
-4. **Process Management**: Whisper.exe path relative to executable location
-5. **Memory Management**: Automatic cleanup after transcription
-6. **Thread Safety**: Recording state protected by lock
-7. **Distribution Model**: Licensing removed – desktop client runs fully unlocked
-8. **Usage Tracking**: No freemium caps; recordings are processed locally and discarded
+4. **Process Management**: Whisper.exe spawned per transcription, automatic cleanup via ZombieProcessCleanupService
+5. **Memory Management**: Automatic cleanup, leak prevention, disposal tests
+6. **Thread Safety**: Recording state protected by lock, Dispatcher for UI updates
+7. **Distribution Model**: 100% free, no licensing, no authentication, no server dependencies
+8. **Privacy**: No analytics, no tracking, recordings processed locally and discarded immediately
+9. **Simplicity Philosophy**: Core-only features, removed all complexity (state machines, coordinators, formatters)
+10. **Performance**: Greedy decoding (beam_size=1) for 5x speed boost over beam search
 
 ### Testing Compatibility
 Works across all Windows applications:
@@ -381,66 +405,53 @@ The desktop application communicates with the modern Next.js backend at `voiceli
 
 ### Desktop App API Integration
 
-**Base URL**: `https://voicelite.app` (hardcoded in Release builds)
+**Base URL**: `https://voicelite.app`
 
-**Authentication Endpoints** (Magic Link + OTP):
-- `POST /api/auth/request` - Send magic link email to user
-- `POST /api/auth/otp` - Verify OTP code and create JWT session
-- `POST /api/auth/logout` - Revoke current session
+**Active Endpoints** (v1.0.65+):
+- `GET /` - Landing page, download links
+- `POST /api/feedback` - User feedback submission (rate limited)
+- `POST /api/metrics/upload` - Server-side telemetry for production monitoring (desktop app doesn't use this)
+- `GET /api/metrics/dashboard` - Internal metrics dashboard
 
-**License Endpoints** (Ed25519 Cryptographic Signatures):
-- `GET /api/me` - Get user profile + active licenses
-- `POST /api/licenses/activate` - Activate license on device (machine fingerprinting)
-- `POST /api/licenses/issue` - Issue cryptographically signed license file
-- `GET /api/licenses/crl` - Fetch Certificate Revocation List (CRL)
+**Removed Endpoints** (v1.0.65 - licensing removed):
+- ❌ `POST /api/auth/request` - Magic link authentication removed
+- ❌ `POST /api/auth/otp` - OTP verification removed
+- ❌ `POST /api/auth/logout` - Session management removed
+- ❌ `GET /api/me` - User profile removed
+- ❌ `POST /api/licenses/activate` - License activation removed
+- ❌ `POST /api/licenses/issue` - License issuance removed
+- ❌ `GET /api/licenses/crl` - CRL checks removed
+- ❌ `POST /api/analytics/event` - Desktop analytics removed
 
-**Analytics Endpoints** (Privacy-first opt-in):
-- `POST /api/analytics/event` - Submit anonymous analytics events (v1.0.17+)
-
-### Backend Technology Stack
+### Backend Technology Stack (v1.0.65+)
 - **Framework**: Next.js 15 (App Router) with React 19
 - **Database**: PostgreSQL (Supabase) with Prisma ORM
-- **Authentication**: Passwordless magic link + JWT sessions
-- **Security**: Ed25519 signatures, rate limiting (Upstash Redis), CSRF protection
-- **Payments**: Stripe (subscriptions + one-time payments)
-- **Email**: Resend for transactional emails
+- **Security**: Rate limiting (Upstash Redis), CSRF protection
+- **Payments**: Stripe (optional donations, not enforced)
 - **Deployment**: Vercel (serverless API routes)
+- **Telemetry**: Production monitoring (server-side only, desktop app doesn't send data)
 
-### License Validation Flow
+**Removed Backend Features** (v1.0.65):
+- ❌ **Authentication**: Magic link + JWT sessions removed
+- ❌ **Ed25519 signing**: License cryptography removed
+- ❌ **Email**: Resend integration removed (no transactional emails)
+- ❌ **Desktop analytics**: Desktop app no longer sends analytics events
 
-1. **Desktop App** → Fetches signed license via `POST /api/licenses/issue`
-2. **Server** → Signs license payload with Ed25519 private key
-3. **Desktop App** → Verifies signature using embedded public key (BouncyCastle.Cryptography)
-4. **Desktop App** → Checks CRL for revoked licenses via `GET /api/licenses/crl`
-5. **Desktop App** → Validates device fingerprint, expiry, grace period locally
-6. **Result** → License valid/invalid/expired/revoked (fully offline validation after initial fetch)
+### Telemetry System (Server-Side Only, v1.0.65+)
 
-### Analytics System (v1.0.17+)
+**Purpose**: Production monitoring for reliability (crashes, errors, performance)
 
-VoiceLite includes a **privacy-first, opt-in analytics system** that respects user privacy while providing insights into app usage.
+**Scope**: Server-side only - desktop app does NOT send telemetry
 
-**Privacy Features**:
-- **Opt-in only**: Users see consent dialog on first launch, must explicitly agree
-- **Anonymous IDs**: SHA256-hashed machine ID + timestamp (irreversible, no PII)
-- **No IP logging**: Backend does not store IP addresses
-- **No sensitive data**: No recording content, no file paths, no user names
-- **Local control**: Settings stored in `settings.json`, can be disabled anytime
-- **Fail-safe**: Analytics failures never break app functionality (silent failures)
+**Data Collected** (backend only):
+- API request metrics (latency, errors, rate limits)
+- Server performance (memory, CPU, response times)
+- Deployment health checks
 
-**Events Tracked**:
-- `APP_LAUNCHED`: App start events (tier, version, OS)
-- `TRANSCRIPTION_COMPLETED`: Aggregated daily (count, total words, model used)
-- `MODEL_CHANGED`: Model switches (old model → new model)
-- `SETTINGS_CHANGED`: Settings modifications (setting name only)
-- `ERROR_OCCURRED`: Error types for debugging (no stack traces or paths)
-- `PRO_UPGRADE`: Pro tier activations
-
-**Implementation**:
-- **Desktop**: `AnalyticsService.cs` sends events to backend API
-- **Backend**: `POST /api/analytics/event` stores in PostgreSQL via Prisma
-- **UI**: `AnalyticsConsentWindow.xaml` shows transparent consent dialog
-- **Settings**: `EnableAnalytics` property (null = not asked, false = opted out, true = opted in)
-- **Aggregation**: Transcriptions logged once per day, then every 10 transcriptions to reduce noise
+**Privacy**:
+- Desktop app: NO telemetry, NO analytics, NO tracking
+- Backend: Internal monitoring only, no user-identifiable data
+- No IP logging, no PII, no desktop app events
 
 ## Deployment & Distribution
 
@@ -531,12 +542,59 @@ The project underwent significant cleanup in October 2025:
 
 ## Version Information
 
-- **Desktop App**: v1.0.62 (current release)
+- **Desktop App**: v1.0.65 (current release - major simplification)
 - **Web App**: v0.1.0 (see voicelite-web/package.json)
+
+## Major Architecture Changes (v1.0.65)
+
+### Removed Features (~15,000 lines of code deleted)
+- ❌ **VoiceShortcuts** - Custom dictionary and text replacements
+- ❌ **TranscriptionPostProcessor** - Text formatting and corrections
+- ❌ **Analytics** - Desktop analytics and telemetry
+- ❌ **Licensing System** - Pro tier, authentication, Ed25519 signatures
+- ❌ **WhisperServerService** - Experimental fast mode via HTTP server
+- ❌ **RecordingCoordinator** - Complex state machine for recording workflow
+- ❌ **ModelBenchmarkService** - Performance testing and comparison
+- ❌ **SecurityService, MetricsTracker** - Unused complexity
+
+### Why The Simplification?
+1. **Reliability**: Fewer moving parts = fewer bugs
+2. **Maintainability**: ~15,000 lines removed, easier to debug
+3. **Performance**: Greedy decoding (5x faster), no preprocessing overhead
+4. **Privacy**: No analytics, no tracking, no server dependencies
+5. **User Experience**: Removed confusing Pro tier, licensing friction
+
+### What Remains? (Core-Only)
+Recording → Whisper transcription → Text injection. That's it.
+
+**13 Services** (down from ~25):
+- AudioRecorder, PersistentWhisperService, TextInjector, HotkeyManager, SystemTrayManager
+- AudioPreprocessor, TranscriptionHistoryService, SoundService, MemoryMonitor
+- ErrorLogger, StartupDiagnostics, DependencyChecker, ZombieProcessCleanupService
 
 ## Changelog Highlights
 
-### v1.0.62 (Current Desktop Release)
+### v1.0.65 (Current Desktop Release - Major Simplification)
+- **🧹 Radical Simplification**: Removed ~15,000 lines of code, deleted 9 major features
+- **Features Removed**:
+  - ❌ VoiceShortcuts (custom dictionary, text replacements)
+  - ❌ TranscriptionPostProcessor (text formatting, corrections)
+  - ❌ Analytics (desktop telemetry, consent dialogs)
+  - ❌ Licensing System (Pro tier, authentication, Ed25519)
+  - ❌ WhisperServerService (experimental HTTP server mode)
+  - ❌ RecordingCoordinator (complex state machine)
+  - ❌ ModelBenchmarkService (performance testing)
+  - ❌ SecurityService, MetricsTracker (unused complexity)
+  - ❌ FeedbackWindow, LoginWindow, AnalyticsConsentWindow, DictionaryManagerWindow
+- **⚡ Performance**: Greedy decoding (beam_size=1, best_of=1) for 5x speed boost
+- **🔒 Privacy**: No analytics, no tracking, no server dependencies
+- **💾 Dependencies**: Removed BouncyCastle.Cryptography (no longer needed)
+- **🛡️ Reliability**: ZombieProcessCleanupService prevents orphaned whisper.exe processes
+- **🎯 Philosophy**: Core-only features - just recording → Whisper → text injection
+- **✅ Tests**: ~200 tests passing (down from 292, removed obsolete tests)
+- **📦 Distribution**: 100% free, no tiers, all models available for download
+
+### v1.0.62
 - **🧹 Code Cleanup**: Deleted 196 lines of dead code from installers (InstallVCRuntimeIfNeeded function)
 - **✅ UX Improvements**: Updated initialization messages for accuracy ("will be installed during setup" vs "will now install")
 - **🔒 Edge Case Handling**: Added restart detection after VC++ Runtime installation (prevents "missing DLL" errors)

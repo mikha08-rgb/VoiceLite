@@ -148,7 +148,8 @@ namespace VoiceLite
                     item.Description = "Failed to verify VC++ Runtime installation";
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -225,7 +226,8 @@ namespace VoiceLite
                     item.Description = $"Failed to verify whisper.exe: {ex.Message}";
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -295,7 +297,8 @@ namespace VoiceLite
                     item.Description = "Failed to verify model files";
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -367,7 +370,8 @@ namespace VoiceLite
                     item.Description = "Could not check antivirus status";
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -421,7 +425,8 @@ namespace VoiceLite
                     };
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -472,7 +477,8 @@ namespace VoiceLite
                     item.Description = "Could not check disk space";
                 }
 
-                Dispatcher.Invoke(() => AddCheckItem(item));
+                // CRIT-001 FIX: Replace blocking Dispatcher.Invoke with async InvokeAsync to prevent deadlock
+                Dispatcher.InvokeAsync(() => AddCheckItem(item));
             });
         }
 
@@ -563,9 +569,19 @@ namespace VoiceLite
 
         private async void RerunButton_Click(object sender, RoutedEventArgs e)
         {
-            RerunButton.IsEnabled = false;
-            ContinueButton.IsEnabled = false;
-            await RunDiagnosticsAsync();
+            // CRITICAL FIX: Wrap entire async void method in try-catch to prevent crashes
+            try
+            {
+                RerunButton.IsEnabled = false;
+                ContinueButton.IsEnabled = false;
+                await RunDiagnosticsAsync();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Diagnostic rerun failed", ex);
+                RerunButton.IsEnabled = true;
+                MessageBox.Show($"Diagnostic check failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ContinueButton_Click(object sender, RoutedEventArgs e)
