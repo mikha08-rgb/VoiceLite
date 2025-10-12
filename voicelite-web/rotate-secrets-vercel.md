@@ -17,27 +17,27 @@ Keep this window open - you'll copy-paste these values when Vercel prompts you.
 
 ### 1. LICENSE_SIGNING_PRIVATE_B64
 ```
-***REMOVED***
+vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k
 ```
 
 ### 2. LICENSE_SIGNING_PUBLIC_B64
 ```
-***REMOVED***
+fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc
 ```
 
 ### 3. CRL_SIGNING_PRIVATE_B64
 ```
-***REMOVED***
+qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE
 ```
 
 ### 4. CRL_SIGNING_PUBLIC_B64
 ```
-***REMOVED***
+19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M
 ```
 
 ### 5. MIGRATION_SECRET
 ```
-***REMOVED***
+443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210
 ```
 
 ---
@@ -74,23 +74,23 @@ For each command below, **copy the value from above** and paste when prompted:
 ```bash
 # Add LICENSE_SIGNING_PRIVATE_B64
 vercel env add LICENSE_SIGNING_PRIVATE_B64 production
-# Paste: ***REMOVED***
+# Paste: vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k
 
 # Add LICENSE_SIGNING_PUBLIC_B64
 vercel env add LICENSE_SIGNING_PUBLIC_B64 production
-# Paste: ***REMOVED***
+# Paste: fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc
 
 # Add CRL_SIGNING_PRIVATE_B64
 vercel env add CRL_SIGNING_PRIVATE_B64 production
-# Paste: ***REMOVED***
+# Paste: qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE
 
 # Add CRL_SIGNING_PUBLIC_B64
 vercel env add CRL_SIGNING_PUBLIC_B64 production
-# Paste: ***REMOVED***
+# Paste: 19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M
 
 # Add MIGRATION_SECRET
 vercel env add MIGRATION_SECRET production
-# Paste: ***REMOVED***
+# Paste: 443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210
 ```
 
 ---
