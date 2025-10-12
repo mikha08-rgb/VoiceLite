@@ -17,7 +17,6 @@ function getStripeClient() {
 }
 
 const bodySchema = z.object({
-  plan: z.enum(['quarterly', 'lifetime']),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { plan, successUrl, cancelUrl } = bodySchema.parse(body);
+    const { successUrl, cancelUrl } = bodySchema.parse(body);
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {
@@ -56,23 +55,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required to start checkout' }, { status: 401 });
     }
 
-    const metadata = {
-      plan,
-    } as Record<string, string>;
-
-    const lineItemPrice = plan === 'quarterly'
-      ? process.env.STRIPE_QUARTERLY_PRICE_ID
-      : process.env.STRIPE_LIFETIME_PRICE_ID;
-
-    if (!lineItemPrice || lineItemPrice.includes('placeholder')) {
-      return NextResponse.json({ error: 'Stripe price not configured' }, { status: 500 });
-    }
-
+    // Simple one-time $20 payment - no subscription, no tiers
     const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
+      mode: 'payment', // One-time payment only
       line_items: [
         {
-          price: lineItemPrice,
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'VoiceLite',
+              description: 'One-time purchase - Lifetime access to VoiceLite',
+            },
+            unit_amount: 2000, // $20.00
+          },
           quantity: 1,
         },
       ],
@@ -80,19 +76,6 @@ export async function POST(request: NextRequest) {
       cancel_url: cancel,
       customer_email: customerEmail,
       client_reference_id: customerEmail,
-      metadata,
-    };
-
-    if (plan === 'quarterly') {
-      sessionPayload.mode = 'subscription';
-      sessionPayload.subscription_data = {
-        metadata,
-      };
-    } else {
-      sessionPayload.mode = 'payment';
-      sessionPayload.payment_intent_data = {
-        metadata,
-      };
     }
 
     const stripe = getStripeClient();

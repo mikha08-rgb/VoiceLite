@@ -36,9 +36,8 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (Small + Tiny models ONLY - Small is new free tier default, Tiny is legacy fallback)
-; CRITICAL FIX: Only include Small + Tiny models to keep installer size ~540MB (not 2.6GB with all models)
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-small.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
+; Whisper files (Tiny model ONLY - free tier default)
+; Freemium model: Tiny (75MB, free) ships with installer, Pro (466MB, $20) available via download
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\whisper.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
@@ -195,28 +194,7 @@ begin
   Result := True;
   AppPath := ExpandConstant('{app}');
 
-  // Check for Small model (Pro - 466MB)
-  SmallModelPath := AppPath + '\whisper\ggml-small.bin';
-  if FileExists(SmallModelPath) then
-  begin
-    SmallModelSize := GetFileSize(SmallModelPath);
-    // Small model should be ~460-470 MB (460MB = 482344960 bytes)
-    if (SmallModelSize < 400000000) or (SmallModelSize > 550000000) then
-    begin
-      Log('WARNING: Small model file size is suspicious: ' + IntToStr(SmallModelSize) + ' bytes (expected ~466MB)');
-      Result := False;
-    end
-    else
-    begin
-      Log('Small model verified: ' + IntToStr(SmallModelSize) + ' bytes');
-    end;
-  end
-  else
-  begin
-    Log('Small model not found (this is OK if Lite installer)');
-  end;
-
-  // Check for Tiny model (Lite - 75MB)
+  // Check for Tiny model (Free tier - 75MB)
   TinyModelPath := AppPath + '\whisper\ggml-tiny.bin';
   if FileExists(TinyModelPath) then
   begin

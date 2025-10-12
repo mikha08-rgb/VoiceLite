@@ -7,6 +7,18 @@ on:
       - 'VoiceLite/**'
       - 'voicelite-web/**'
       - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      test_category:
+        description: 'Test category to run'
+        required: false
+        default: 'Unit'
+        type: choice
+        options:
+          - Unit
+          - Hardware
+          - FileIO
+          - All
 
 jobs:
   test-desktop:
@@ -27,8 +39,12 @@ jobs:
     - name: Build solution
       run: dotnet build VoiceLite/VoiceLite.sln --configuration Debug --no-restore
 
-    - name: Run tests
-      run: dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --configuration Debug --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+    - name: Run fast tests (Unit category only)
+      run: |
+        $category = "${{ github.event.inputs.test_category || 'Unit' }}"
+        $filter = if ($category -eq 'All') { '' } else { "--filter `"Category=$category`"" }
+        dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --configuration Debug --no-build --verbosity normal $filter --logger "trx;LogFileName=test-results.trx"
+      shell: pwsh
 
     - name: Upload test results
       if: always()

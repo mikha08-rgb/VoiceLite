@@ -8,6 +8,7 @@ using Xunit;
 
 namespace VoiceLite.Tests.Services
 {
+    [Trait("Category", "Unit")]
     public class TranscriptionHistoryServiceTests
     {
         private Settings CreateTestSettings()

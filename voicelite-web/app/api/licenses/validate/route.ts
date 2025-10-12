@@ -1,64 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getLicenseByKey } from '@/lib/licensing';
-import { getSessionTokenFromRequest, getSessionFromToken } from '@/lib/auth/session';
-import { licenseRateLimit, checkRateLimit } from '@/lib/ratelimit';
+import { LicenseStatus } from '@prisma/client';
+
+/**
+ * POST /api/licenses/validate
+ *
+ * Simple license validation endpoint for desktop app.
+ * No authentication required - the license key itself is the auth.
+ * Returns whether the license is valid and what features it unlocks.
+ */
 
 const bodySchema = z.object({
-  licenseKey: z.string().min(10),
-  machineId: z.string().optional(),
+  licenseKey: z.string().min(10, 'License key must be at least 10 characters'),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
-    const sessionToken = getSessionTokenFromRequest(request);
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    const body = await request.json();
+    const { licenseKey } = bodySchema.parse(body);
 
-    const session = await getSessionFromToken(sessionToken);
-    if (!session) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    // Lookup license in database
+    const license = await getLicenseByKey(licenseKey);
 
-    // Rate limiting (30 requests per day per user)
-    const rateLimit = await checkRateLimit(session.userId, licenseRateLimit);
-    if (!rateLimit.allowed) {
+    if (!license) {
       return NextResponse.json(
-        { error: `Rate limit exceeded. Try again after ${rateLimit.reset.toLocaleTimeString()}.` },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.reset.getTime() - Date.now()) / 1000)) } }
+        {
+          valid: false,
+          error: 'License key not found',
+        },
+        { status: 404 }
       );
     }
 
-    const body = await request.json();
-    const { licenseKey, machineId } = bodySchema.parse(body);
+    // Check if license is active
+    const isActive = license.status === LicenseStatus.ACTIVE;
 
-    const license = await getLicenseByKey(licenseKey);
-    if (!license) {
-      return NextResponse.json({ valid: false }, { status: 200 });
+    // Check if expired (for subscription types - though we only use LIFETIME now)
+    let isExpired = false;
+    if (license.expiresAt) {
+      isExpired = new Date() > license.expiresAt;
     }
 
-    const activation = machineId
-      ? license.activations.find((item) => item.machineId === machineId)
-      : null;
+    const valid = isActive && !isExpired;
 
     return NextResponse.json({
-      valid: license.status === 'ACTIVE',
-      license: {
-        type: license.type,
-        status: license.status,
-        expiresAt: license.expiresAt,
-      },
-      activation: activation
-        ? {
-            status: activation.status,
-            lastValidatedAt: activation.lastValidatedAt,
-          }
-        : null,
+      valid,
+      status: license.status,
+      type: license.type,
+      expiresAt: license.expiresAt?.toISOString() ?? null,
+      email: license.user.email,
     });
   } catch (error) {
-    console.error('License validation failed', error);
-    return NextResponse.json({ error: 'Unable to validate' }, { status: 500 });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { valid: false, error: 'Invalid request', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error('License validation error:', error);
+    return NextResponse.json(
+      { valid: false, error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

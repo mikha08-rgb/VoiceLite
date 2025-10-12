@@ -25,6 +25,53 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel Name="ModelsPanel">
 
+                    <!-- Tiny Model (Free) -->
+                    <Border Background="#E3F2FD"
+                            CornerRadius="4"
+                            Padding="5"
+                            Margin="0,5">
+                        <RadioButton Name="TinyRadio"
+                                     GroupName="ModelSelection"
+                                     IsChecked="True"
+                                     Checked="ModelRadio_Checked"
+                                     Tag="ggml-tiny.bin">
+                            <StackPanel Orientation="Horizontal">
+                                <Grid Width="350">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Tiny"
+                                                       FontWeight="Bold"
+                                                       FontSize="14"/>
+                                            <TextBlock Text=" 🆓"
+                                                       FontSize="12"/>
+                                        </StackPanel>
+                                        <TextBlock Text="75 MB"
+                                                   FontSize="11"
+                                                   Foreground="Gray"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Free - good for basic voice typing"
+                                                   FontSize="12"
+                                                   Foreground="#606060"
+                                                   TextWrapping="Wrap"/>
+                                        <ProgressBar Height="4"
+                                                     Value="30"
+                                                     Maximum="100"
+                                                     Foreground="#2196F3"
+                                                     Background="#E0E0E0"
+                                                     Margin="0,3,50,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </RadioButton>
+                    </Border>
+
                     <!-- Swift Model -->
                     <RadioButton Name="BaseRadio"
                                  GroupName="ModelSelection"
@@ -63,53 +110,48 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <!-- Pro Model (Recommended) -->
-                    <Border Background="#E8F5E9"
-                            CornerRadius="4"
-                            Padding="5"
-                            Margin="0,5">
-                        <RadioButton Name="SmallRadio"
-                                     GroupName="ModelSelection"
-                                     IsChecked="True"
-                                     Checked="ModelRadio_Checked"
-                                     Tag="ggml-small.bin">
-                            <StackPanel Orientation="Horizontal">
-                                <Grid Width="350">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
+                    <!-- Pro Model (Requires License) -->
+                    <RadioButton Name="SmallRadio"
+                                 GroupName="ModelSelection"
+                                 Margin="0,5"
+                                 Checked="ModelRadio_Checked"
+                                 Tag="ggml-small.bin">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="350">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                                    <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Pro"
-                                                       FontWeight="Bold"
-                                                       FontSize="14"/>
-                                            <TextBlock Text=" ⭐"
-                                                       FontSize="12"
-                                                       Foreground="#4CAF50"/>
-                                        </StackPanel>
-                                        <TextBlock Text="466 MB"
-                                                   FontSize="11"
-                                                   Foreground="Gray"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="Best for most users - good speed &amp; accuracy"
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Pro"
+                                                   FontWeight="Bold"
+                                                   FontSize="14"/>
+                                        <TextBlock Text=" 🔒"
                                                    FontSize="12"
-                                                   Foreground="#606060"
-                                                   TextWrapping="Wrap"/>
-                                        <ProgressBar Height="4"
-                                                     Value="60"
-                                                     Maximum="100"
-                                                     Foreground="#4CAF50"
-                                                     Background="#E0E0E0"
-                                                     Margin="0,3,50,0"/>
+                                                   Foreground="#FF9800"/>
                                     </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </RadioButton>
-                    </Border>
+                                    <TextBlock Text="466 MB"
+                                               FontSize="11"
+                                               Foreground="Gray"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Requires Pro license - 5x better accuracy"
+                                               FontSize="12"
+                                               Foreground="#606060"
+                                               TextWrapping="Wrap"/>
+                                    <ProgressBar Height="4"
+                                                 Value="60"
+                                                 Maximum="100"
+                                                 Foreground="#FF9800"
+                                                 Background="#E0E0E0"
+                                                 Margin="0,3,50,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </RadioButton>
 
                     <!-- Elite Model -->
                     <RadioButton Name="MediumRadio"
