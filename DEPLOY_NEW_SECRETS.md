@@ -13,15 +13,15 @@
 cd voicelite-web
 
 # License signing keys
-echo "***REMOVED***" | vercel env add LICENSE_SIGNING_PRIVATE_B64 production
-echo "***REMOVED***" | vercel env add LICENSE_SIGNING_PUBLIC_B64 production
+echo "vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k" | vercel env add LICENSE_SIGNING_PRIVATE_B64 production
+echo "fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc" | vercel env add LICENSE_SIGNING_PUBLIC_B64 production
 
 # CRL signing keys
-echo "***REMOVED***" | vercel env add CRL_SIGNING_PRIVATE_B64 production
-echo "***REMOVED***" | vercel env add CRL_SIGNING_PUBLIC_B64 production
+echo "qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE" | vercel env add CRL_SIGNING_PRIVATE_B64 production
+echo "19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M" | vercel env add CRL_SIGNING_PUBLIC_B64 production
 
 # Migration secret
-echo "***REMOVED***" | vercel env add MIGRATION_SECRET production
+echo "443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210" | vercel env add MIGRATION_SECRET production
 ```
 
 ### Step 2: Deploy to Production
@@ -47,7 +47,7 @@ vercel deploy --prod
 private const string LICENSE_PUBLIC_KEY_B64 = "[old-key]";
 
 // NEW (MUST UPDATE)
-private const string LICENSE_PUBLIC_KEY_B64 = "***REMOVED***";
+private const string LICENSE_PUBLIC_KEY_B64 = "fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc";
 ```
 
 ### Rebuild and Release

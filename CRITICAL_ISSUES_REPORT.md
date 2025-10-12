@@ -69,9 +69,9 @@
 
 **Exposed Secrets**:
 ```bash
-LICENSE_SIGNING_PRIVATE="***REMOVED***"  # Ed25519 private key
-CRL_SIGNING_PRIVATE="***REMOVED***"      # CRL signing key
-MIGRATION_SECRET="***REMOVED***"
+LICENSE_SIGNING_PRIVATE="vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k"  # Ed25519 private key
+CRL_SIGNING_PRIVATE="qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE"      # CRL signing key
+MIGRATION_SECRET="443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210"
 ```
 
 **Attack Scenario**:

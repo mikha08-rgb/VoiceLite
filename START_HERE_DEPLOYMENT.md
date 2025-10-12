@@ -43,7 +43,7 @@ For each variable below:
 **Click:** Edit
 **Replace value with:**
 ```
-***REMOVED***
+vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k
 ```
 **Click:** Save
 
@@ -55,7 +55,7 @@ For each variable below:
 **Click:** Edit
 **Replace value with:**
 ```
-***REMOVED***
+fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc
 ```
 **Click:** Save
 
@@ -67,7 +67,7 @@ For each variable below:
 **Click:** Edit
 **Replace value with:**
 ```
-***REMOVED***
+qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE
 ```
 **Click:** Save
 
@@ -79,7 +79,7 @@ For each variable below:
 **Click:** Edit
 **Replace value with:**
 ```
-***REMOVED***
+19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M
 ```
 **Click:** Save
 
@@ -91,7 +91,7 @@ For each variable below:
 **Click:** Edit
 **Replace value with:**
 ```
-***REMOVED***
+443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210
 ```
 **Click:** Save
 
@@ -171,7 +171,7 @@ private const string LICENSE_PUBLIC_KEY_B64 = "...some old key...";
 
 **Replace the ENTIRE LINE with:**
 ```csharp
-private const string LICENSE_PUBLIC_KEY_B64 = "***REMOVED***";
+private const string LICENSE_PUBLIC_KEY_B64 = "fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc";
 ```
 
 **Save the file** (Ctrl+S or Cmd+S)
