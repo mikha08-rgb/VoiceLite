@@ -13,6 +13,7 @@ interface PricingCardProps {
   popular: boolean;
   bullets: string[];
   comingSoon?: boolean;
+  isFree?: boolean;
   onCheckout: (planId: string) => Promise<void>;
 }
 
@@ -24,6 +25,7 @@ export function PricingCard({
   popular,
   bullets,
   comingSoon = false,
+  isFree = false,
   onCheckout,
 }: PricingCardProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -92,6 +94,13 @@ export function PricingCard({
             </p>
           </div>
         </div>
+      ) : isFree ? (
+        <a
+          href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+          className="inline-flex w-full items-center justify-center rounded-xl border-2 border-purple-200 bg-white px-6 py-4 text-base font-semibold text-purple-700 shadow-md transition-all duration-300 hover:border-purple-300 hover:bg-purple-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:border-purple-800 dark:bg-stone-900/50 dark:text-purple-300 dark:hover:border-purple-700"
+        >
+          Download Free
+        </a>
       ) : (
         <RippleButton
           onClick={handleCheckout}
@@ -104,7 +113,7 @@ export function PricingCard({
           rippleColor={popular ? 'rgba(255, 255, 255, 0.4)' : 'rgba(124, 58, 237, 0.3)'}
         >
           <CreditCard className="mr-2 h-5 w-5" aria-hidden="true" />
-          {isLoading ? 'Redirecting...' : 'Get Started'}
+          {isLoading ? 'Redirecting...' : 'Get Pro'}
         </RippleButton>
       )}
     </article>

@@ -33,24 +33,26 @@ interface License {
 
 const plans = [
   {
-    id: 'quarterly',
-    name: 'Quarterly',
-    description: 'Full access billed every 3 months',
-    price: '$20 / 3 months',
-    priceId: 'quarterly',
-    popular: true,
-    bullets: ['Premium models (Swift, Elite, Ultra)', 'Advanced text formatting', 'VoiceShortcuts templates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
+    id: 'free',
+    name: 'Free',
+    description: 'Perfect for basic voice typing',
+    price: '$0',
+    priceId: 'free',
+    popular: false,
+    bullets: ['Tiny model (75MB, 80-85% accuracy)', 'Works in any Windows app', '99 languages supported', '100% offline', 'Basic transcription'],
+    comingSoon: false,
+    isFree: true,
   },
   {
-    id: 'lifetime',
-    name: 'Lifetime',
-    description: 'One-time payment, lifetime updates',
-    price: '$99 one-time',
-    priceId: 'lifetime',
-    popular: false,
-    bullets: ['Permanent license', 'All premium models', 'Advanced features', 'All future updates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
+    id: 'pro',
+    name: 'Pro',
+    description: 'One-time purchase - Unlock Pro model',
+    price: '$20 one-time',
+    priceId: 'pro',
+    popular: true,
+    bullets: ['Pro model (466MB, 90-93% accuracy)', 'All Free features', '5x better accuracy', 'Better technical term recognition', 'Lifetime license'],
+    comingSoon: false,
+    isFree: false,
   },
 ];
 
@@ -60,12 +62,16 @@ const faqItems = [
     answer: 'No. VoiceLite runs 100% offline on your PC using local Whisper AI models. Your voice never leaves your computer - no internet connection required for transcription.',
   },
   {
-    question: "What's the difference between free and Pro?",
-    answer: 'The free version includes the Pro model (466MB, ~90-93% accuracy). Pro tier unlocks premium models (Swift, Elite, Ultra) for even higher accuracy (93-97%), advanced features like VoiceShortcuts, text formatting presets, and priority support.',
+    question: 'What\'s the difference between Free and Pro?',
+    answer: 'Free version includes the Tiny model (75MB, 80-85% accuracy) which works great for basic voice typing. Pro ($20 one-time) unlocks the Pro model (466MB, 90-93% accuracy) with 5x better accuracy and superior recognition of technical terms, code, and jargon.',
   },
   {
-    question: 'Which Whisper model should I use?',
-    answer: 'Start with Pro (included free, 90-93% accuracy) for balanced speed and quality. Upgrade to Swift for faster processing, or Elite/Ultra (Pro tier) for maximum accuracy on technical jargon. All models run offline.',
+    question: 'Is the free version really free?',
+    answer: 'Yes! The free version is 100% functional with the Tiny model included. No trials, no limitations, no subscription. Download and use it forever for free.',
+  },
+  {
+    question: 'Which model should I use?',
+    answer: 'Start with Tiny model (free, 80-85% accuracy) for basic dictation. Upgrade to Pro model ($20, 90-93% accuracy) if you need better accuracy for technical terms, coding, or professional writing.',
   },
   {
     question: 'Does it work in games, Discord, VS Code?',
@@ -76,20 +82,16 @@ const faqItems = [
     answer: 'VoiceLite supports 99 languages via Whisper AI including English, Spanish, French, German, Chinese, Japanese, Arabic, and many more. All languages work 100% offline with the same accuracy and speed.',
   },
   {
-    question: 'Can I customize the transcribed text?',
-    answer: 'Yes! VoiceLite includes advanced text formatting: auto-capitalization, filler word removal (5 intensity levels), contractions, grammar fixes, and quick presets (Professional/Code/Casual). Use VoiceShortcuts to create custom phrase replacements with Medical/Legal/Tech templates.',
-  },
-  {
     question: 'How accurate is the transcription?',
-    answer: 'Accuracy depends on the model: Lite (80-85%), Pro (90-93%, free tier), Swift (90-93%), Elite (93-95%), Ultra (95-97%). Technical terms and code (useState, npm, git) are recognized well. Use text formatting features to fine-tune output.',
+    answer: 'Tiny model (free): 80-85% accuracy, great for basic dictation. Pro model ($20): 90-93% accuracy, excellent for technical terms and code. Both recognize technical terms like useState, npm, and git.',
   },
   {
     question: 'Can I use VoiceLite on multiple PCs?',
-    answer: 'Yes! Each license activates on up to 3 devices. Manage activations from your account dashboard. Deactivate old devices to free up slots.',
+    answer: 'Yes! Free version works on unlimited devices. Pro license activates on up to 3 devices. Manage activations from your account dashboard.',
   },
   {
-    question: 'Can I cancel my subscription anytime?',
-    answer: 'Absolutely. Cancel anytime from your account dashboard. No questions asked, no fees. Your license remains active until the end of your billing period.',
+    question: 'What do I get for the $20 payment?',
+    answer: 'Pro model unlock (466MB, 90-93% accuracy), 5x better accuracy than Free, superior technical term recognition, and support for continued development. One-time payment, lifetime license.',
   },
   {
     question: 'Is there a refund policy?',
@@ -362,13 +364,13 @@ export default function Home() {
       <section className="border-y border-stone-200 bg-stone-100/50 px-6 py-32 dark:border-stone-800 dark:bg-stone-950/50">
         <div className="mx-auto max-w-5xl space-y-16">
           <div className="space-y-5 text-center">
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Upgrade When You're Ready</h2>
+            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Choose Your Plan</h2>
             <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
-              Sign in, choose your plan, and get your license key instantly via email
+              Start free with Tiny model, upgrade to Pro for 5x better accuracy.
             </p>
           </div>
 
-          <div className="grid gap-10 md:grid-cols-2">
+          <div className="grid gap-8 md:grid-cols-2">
             <Suspense fallback={<div className="h-96 animate-pulse rounded-3xl bg-stone-200 dark:bg-stone-800" />}>
               {plans.map((plan) => (
                 <PricingCard
@@ -380,6 +382,7 @@ export default function Home() {
                   popular={plan.popular}
                   bullets={plan.bullets}
                   comingSoon={plan.comingSoon}
+                  isFree={plan.isFree}
                   onCheckout={handleCheckout}
                 />
               ))}

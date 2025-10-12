@@ -9,6 +9,7 @@ namespace VoiceLite.Tests.Resources
     /// Critical tests for MainWindow disposal - ensures proper cleanup of child windows,
     /// services, and event handlers to prevent memory leaks
     /// </summary>
+    [Trait("Category", "Unit")]
     public class MainWindowDisposalTests
     {
         /// <summary>

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace VoiceLite.Tests.Services
 {
+    [Trait("Category", "FileIO")]
     public class AudioPreprocessorTests : IDisposable
     {
         private readonly Settings _testSettings;

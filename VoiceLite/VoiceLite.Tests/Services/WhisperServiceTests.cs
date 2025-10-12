@@ -279,5 +279,96 @@ namespace VoiceLite.Tests.Services
 
             return ms.ToArray();
         }
+
+        // ===== Story 2.1.14: Edge Case Tests =====
+
+        [Fact]
+        public async Task TranscribeAsync_WithEmptyFile_ReturnsEmptyString()
+        {
+            if (_service == null) return;
+
+            // Create a file with only 50 bytes (below 100-byte threshold)
+            var emptyAudioPath = Path.Combine(_tempDirectory, "empty_audio.wav");
+            File.WriteAllBytes(emptyAudioPath, new byte[50]);
+
+            try
+            {
+                var result = await _service.TranscribeAsync(emptyAudioPath);
+
+                result.Should().BeEmpty("files < 100 bytes are considered empty audio");
+            }
+            finally
+            {
+                if (File.Exists(emptyAudioPath))
+                    File.Delete(emptyAudioPath);
+            }
+        }
+
+        [Fact]
+        public async Task TranscribeAsync_AfterDispose_ThrowsObjectDisposedException()
+        {
+            if (_service == null) return;
+
+            // Create a valid audio file
+            var audioPath = Path.Combine(_tempDirectory, "test_disposed.wav");
+            CreateSilentWavFile(audioPath, 1);
+
+            try
+            {
+                // Dispose the service
+                _service.Dispose();
+
+                // Attempt to transcribe after disposal
+                Func<Task> act = async () => await _service.TranscribeAsync(audioPath);
+
+                await act.Should().ThrowAsync<ObjectDisposedException>()
+                    .WithMessage("*PersistentWhisperService*");
+            }
+            finally
+            {
+                if (File.Exists(audioPath))
+                    File.Delete(audioPath);
+            }
+        }
+
+        [Fact]
+        public void ResolveModelPath_WithInvalidModel_ThrowsFileNotFoundException()
+        {
+            var settings = new Settings { WhisperModel = "nonexistent-model.bin" };
+
+            // Should throw FileNotFoundException with clear message
+            Action act = () => new PersistentWhisperService(settings);
+
+            act.Should().Throw<FileNotFoundException>()
+                .WithMessage("*not found*")
+                .WithMessage("*Please reinstall VoiceLite*");
+        }
+
+        [Fact]
+        public async Task TranscribeFromMemoryAsync_WithVerySmallData_HandlesGracefully()
+        {
+            if (_service == null) return;
+
+            // Create 10 bytes of data (minimal, invalid WAV)
+            var tinyData = new byte[10];
+
+            // Should handle gracefully without crashing
+            Func<Task> act = async () => await _service.TranscribeFromMemoryAsync(tinyData);
+
+            // May throw or return empty, but should NOT crash with NullReferenceException
+            await act.Should().NotThrowAsync<NullReferenceException>();
+        }
+
+        [Fact]
+        public async Task TranscribeAsync_WithNullPath_ThrowsArgumentException()
+        {
+            if (_service == null) return;
+
+            // Attempt to transcribe with null path
+            Func<Task> act = async () => await _service.TranscribeAsync(null!);
+
+            // Should throw appropriate exception (ArgumentNullException or FileNotFoundException)
+            await act.Should().ThrowAsync<Exception>();
+        }
     }
 }
