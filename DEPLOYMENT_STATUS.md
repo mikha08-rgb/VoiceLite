@@ -46,11 +46,11 @@
 
 | Variable Name | New Value | Status |
 |---------------|-----------|--------|
-| `LICENSE_SIGNING_PRIVATE_B64` | `***REMOVED***` | ⏳ Pending |
-| `LICENSE_SIGNING_PUBLIC_B64` | `***REMOVED***` | ⏳ Pending |
-| `CRL_SIGNING_PRIVATE_B64` | `***REMOVED***` | ⏳ Pending |
-| `CRL_SIGNING_PUBLIC_B64` | `***REMOVED***` | ⏳ Pending |
-| `MIGRATION_SECRET` | `***REMOVED***` | ⏳ Pending |
+| `LICENSE_SIGNING_PRIVATE_B64` | `vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k` | ⏳ Pending |
+| `LICENSE_SIGNING_PUBLIC_B64` | `fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc` | ⏳ Pending |
+| `CRL_SIGNING_PRIVATE_B64` | `qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE` | ⏳ Pending |
+| `CRL_SIGNING_PUBLIC_B64` | `19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M` | ⏳ Pending |
+| `MIGRATION_SECRET` | `443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210` | ⏳ Pending |
 
 **Steps:**
 1. Click the link above

@@ -14,27 +14,27 @@
 
    **LICENSE_SIGNING_PRIVATE_B64** → Replace with:
    ```
-   ***REMOVED***
+   vS89Zv4vrDNoM9zXm5aAsba-FwFq_zb9maVey2V7L5k
    ```
 
    **LICENSE_SIGNING_PUBLIC_B64** → Replace with:
    ```
-   ***REMOVED***
+   fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc
    ```
 
    **CRL_SIGNING_PRIVATE_B64** → Replace with:
    ```
-   ***REMOVED***
+   qmXC7vEDAK1XLsSHttTbAa_L71JDmJW_zeNcsPOhWZE
    ```
 
    **CRL_SIGNING_PUBLIC_B64** → Replace with:
    ```
-   ***REMOVED***
+   19Y5ul1S-ISjja7f827O5epfupvaBBMyhb_uVWLLf8M
    ```
 
    **MIGRATION_SECRET** → Replace with:
    ```
-   ***REMOVED***
+   443ed3297b3a26ba4684129e59c72c6b6ce4a944344ef2579df2bdeba7d54210
    ```
 
 3. **Check RESEND_API_KEY:**
@@ -111,7 +111,7 @@ After updating all secrets in Vercel dashboard:
 
 3. **Replace with:**
    ```csharp
-   private const string LICENSE_PUBLIC_KEY_B64 = "***REMOVED***";
+   private const string LICENSE_PUBLIC_KEY_B64 = "fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc";
    ```
 
 4. **Save the file**
@@ -234,7 +234,7 @@ RESEND_API_KEY                    Encrypted    Production
 **Fix:** Go back to Part 1B and configure Resend
 
 ### "License validation failed"
-**Fix:** Make sure desktop app has new public key (`***REMOVED***`)
+**Fix:** Make sure desktop app has new public key (`fRR5l40q-wt8ptAFcOGsWIBHtLDBjnb_T3Z9HMLwgCc`)
 
 ### "Vercel deployment failed"
 **Fix:** Check logs with `vercel logs --prod`
