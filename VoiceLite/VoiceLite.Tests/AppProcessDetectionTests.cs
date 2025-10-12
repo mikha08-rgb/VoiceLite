@@ -8,6 +8,7 @@ using Xunit;
 
 namespace VoiceLite.Tests
 {
+    [Trait("Category", "Unit")]
     public class AppProcessDetectionTests
     {
         private static readonly MethodInfo DetectionMethod = typeof(App).GetMethod(

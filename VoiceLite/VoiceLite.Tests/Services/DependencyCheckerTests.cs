@@ -8,6 +8,7 @@ using Xunit;
 
 namespace VoiceLite.Tests.Services
 {
+    [Trait("Category", "Unit")]
     public class DependencyCheckerTests
     {
         [Fact]

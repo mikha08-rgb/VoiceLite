@@ -15,6 +15,7 @@ namespace VoiceLite.Tests.Services
     /// Comprehensive error recovery tests for Whisper transcription service
     /// Tests crash scenarios, timeouts, OOM conditions, and graceful degradation
     /// </summary>
+    [Trait("Category", "Unit")]
     public class WhisperErrorRecoveryTests : IDisposable
     {
         private readonly Settings _settings;

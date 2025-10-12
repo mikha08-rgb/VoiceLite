@@ -2,13 +2,15 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using VoiceLite.Models;
 
 namespace VoiceLite.Controls
 {
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-small.bin";
+        private string selectedModel = "ggml-tiny.bin"; // Default to free Tiny model
+        private Settings? settings;
 
         public string SelectedModel
         {
@@ -23,17 +25,41 @@ namespace VoiceLite.Controls
         public SimpleModelSelector()
         {
             InitializeComponent();
+        }
+
+        public void Initialize(Settings currentSettings)
+        {
+            settings = currentSettings;
             CheckModelAvailability();
+            CheckLicenseGating();
         }
 
         private void CheckModelAvailability()
         {
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
 
+            CheckAndUpdateRadio(TinyRadio, Path.Combine(whisperPath, "ggml-tiny.bin"));
             CheckAndUpdateRadio(BaseRadio, Path.Combine(whisperPath, "ggml-base.bin"));
             CheckAndUpdateRadio(SmallRadio, Path.Combine(whisperPath, "ggml-small.bin"));
             CheckAndUpdateRadio(MediumRadio, Path.Combine(whisperPath, "ggml-medium.bin"));
             CheckAndUpdateRadio(LargeRadio, Path.Combine(whisperPath, "ggml-large-v3.bin"));
+        }
+
+        private void CheckLicenseGating()
+        {
+            if (settings == null) return;
+
+            // Pro model (ggml-small.bin) requires a valid license
+            bool hasValidLicense = settings.LicenseIsValid &&
+                                   !string.IsNullOrWhiteSpace(settings.LicenseKey);
+
+            if (!hasValidLicense)
+            {
+                // Disable Pro model if no valid license
+                SmallRadio.IsEnabled = false;
+                SmallRadio.Opacity = 0.5;
+                SmallRadio.ToolTip = "Requires Pro license. Get it for $20 at voicelite.app";
+            }
         }
 
         private void CheckAndUpdateRadio(RadioButton radio, string modelPath)
@@ -59,6 +85,28 @@ namespace VoiceLite.Controls
         {
             if (sender is RadioButton radio && radio.Tag is string modelFile)
             {
+                // Check if trying to select Pro model without license
+                if (modelFile == "ggml-small.bin" && settings != null)
+                {
+                    bool hasValidLicense = settings.LicenseIsValid &&
+                                           !string.IsNullOrWhiteSpace(settings.LicenseKey);
+
+                    if (!hasValidLicense)
+                    {
+                        MessageBox.Show(
+                            "Pro model requires a valid license key.\n\n" +
+                            "Get Pro for $20 at voicelite.app\n" +
+                            "Then enter your license key in Settings → Pro License",
+                            "Pro License Required",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+
+                        // Revert to Tiny model
+                        TinyRadio.IsChecked = true;
+                        return;
+                    }
+                }
+
                 selectedModel = modelFile;
                 UpdateTip(modelFile);
                 ModelSelected?.Invoke(this, modelFile);
@@ -69,11 +117,14 @@ namespace VoiceLite.Controls
         {
             switch (modelFile)
             {
+                case "ggml-tiny.bin":
+                    TipText.Text = "Free model - good for basic voice typing";
+                    break;
                 case "ggml-base.bin":
                     TipText.Text = "Good for simple dictation and casual use";
                     break;
                 case "ggml-small.bin":
-                    TipText.Text = "'Pro' offers the best experience for most users";
+                    TipText.Text = "'Pro' offers 5x better accuracy than Tiny";
                     break;
                 case "ggml-medium.bin":
                     TipText.Text = "Great for professional use when accuracy matters";
@@ -88,6 +139,9 @@ namespace VoiceLite.Controls
         {
             switch (selectedModel)
             {
+                case "ggml-tiny.bin":
+                    TinyRadio.IsChecked = true;
+                    break;
                 case "ggml-base.bin":
                     BaseRadio.IsChecked = true;
                     break;

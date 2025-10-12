@@ -71,6 +71,10 @@ namespace VoiceLite
 
             // Current Model is set in SetupModelComparison
 
+            // License Key
+            LicenseKeyTextBox.Text = settings.LicenseKey ?? "";
+            UpdateLicenseStatus();
+
             isInitialized = true;
         }
 
@@ -250,6 +254,103 @@ namespace VoiceLite
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
         private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
         private void SyncAudioUIFromSettings() { }
+
+        // License validation
+        private async void ValidateLicenseButton_Click(object sender, RoutedEventArgs e)
+        {
+            var licenseKey = LicenseKeyTextBox.Text?.Trim();
+
+            if (string.IsNullOrWhiteSpace(licenseKey))
+            {
+                ShowLicenseStatus("Please enter a license key", false);
+                return;
+            }
+
+            if (!LicenseValidator.IsValidFormat(licenseKey))
+            {
+                ShowLicenseStatus("Invalid format. Expected: VL-XXXXXX-XXXXXX-XXXXXX", false);
+                return;
+            }
+
+            ValidateLicenseButton.IsEnabled = false;
+            ValidateLicenseButton.Content = "Validating...";
+            ShowLicenseStatus("Validating license key...", null);
+
+            try
+            {
+                var response = await LicenseValidator.ValidateAsync(licenseKey);
+
+                if (response.valid)
+                {
+                    settings.LicenseKey = licenseKey;
+                    settings.LicenseIsValid = true;
+                    settings.LicenseValidatedAt = DateTime.UtcNow;
+                    ShowLicenseStatus($"✓ Valid Pro license ({response.email})", true);
+
+                    // Save immediately
+                    saveSettingsCallback?.Invoke();
+                }
+                else
+                {
+                    settings.LicenseIsValid = false;
+                    ShowLicenseStatus($"✗ {response.error ?? "License key not found"}", false);
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowLicenseStatus($"✗ Validation failed: {ex.Message}", false);
+            }
+            finally
+            {
+                ValidateLicenseButton.IsEnabled = true;
+                ValidateLicenseButton.Content = "Validate";
+            }
+        }
+
+        private void ShowLicenseStatus(string message, bool? isValid)
+        {
+            LicenseStatusText.Text = message;
+            LicenseStatusText.Visibility = Visibility.Visible;
+
+            if (isValid == true)
+            {
+                LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green);
+            }
+            else if (isValid == false)
+            {
+                LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
+            }
+            else
+            {
+                LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+            }
+        }
+
+        private void UpdateLicenseStatus()
+        {
+            if (!string.IsNullOrWhiteSpace(settings.LicenseKey) && settings.LicenseIsValid)
+            {
+                var daysAgo = settings.LicenseValidatedAt.HasValue
+                    ? (DateTime.UtcNow - settings.LicenseValidatedAt.Value).Days
+                    : 0;
+
+                ShowLicenseStatus($"✓ Pro license active (validated {daysAgo} days ago)", true);
+            }
+            else if (!string.IsNullOrWhiteSpace(settings.LicenseKey))
+            {
+                ShowLicenseStatus("License not validated. Click 'Validate' to check.", null);
+            }
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri,
+                UseShellExecute = true
+            });
+            e.Handled = true;
+        }
 
         // Stub event handlers for removed/unimplemented features
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }

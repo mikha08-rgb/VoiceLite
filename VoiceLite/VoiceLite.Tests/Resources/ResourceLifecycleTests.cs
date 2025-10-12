@@ -15,6 +15,7 @@ namespace VoiceLite.Tests.Resources
     /// Critical tests for resource lifecycle management - prevents memory leaks,
     /// file handle leaks, and ensures proper cleanup of audio streams and processes
     /// </summary>
+    [Trait("Category", "Hardware")]
     public class ResourceLifecycleTests : IDisposable
     {
         private readonly List<IDisposable> _disposables = new();

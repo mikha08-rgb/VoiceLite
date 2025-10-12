@@ -7,6 +7,7 @@ using Xunit;
 
 namespace VoiceLite.Tests.Services
 {
+    [Trait("Category", "Hardware")]
     public class MemoryMonitorTests : IDisposable
     {
         private MemoryMonitor? _monitor;

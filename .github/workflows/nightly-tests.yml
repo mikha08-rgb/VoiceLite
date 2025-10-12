@@ -1,0 +1,41 @@
+name: Nightly Full Test Suite
+
+on:
+  schedule:
+    # Run at 2 AM UTC daily
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test-desktop-full:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore VoiceLite/VoiceLite.sln
+
+    - name: Build solution
+      run: dotnet build VoiceLite/VoiceLite.sln --configuration Debug --no-restore
+
+    - name: Run all non-integration tests (Unit + Hardware + FileIO)
+      run: dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --configuration Debug --no-build --verbosity normal --filter "Category!=Integration&Category!=UI" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-test-results
+        path: VoiceLite/VoiceLite.Tests/TestResults/test-results.trx
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "::warning::Nightly test suite failed! Check test results artifact for details."
