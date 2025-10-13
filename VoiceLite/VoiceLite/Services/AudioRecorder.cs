@@ -375,6 +375,16 @@ namespace VoiceLite.Services
 
         private void OnRecordingStopped(object? sender, StoppedEventArgs e)
         {
+            // CRITICAL FIX (CRITICAL-2): Early exit if disposed
+            // NAudio's event can fire 50-100ms after Dispose() completes, causing ObjectDisposedException
+            if (isDisposed)
+            {
+#if DEBUG
+                ErrorLogger.LogMessage("OnRecordingStopped: Skipping - AudioRecorder already disposed");
+#endif
+                return;
+            }
+
             // NOTE: This event may not fire if we disposed the device immediately in StopRecording()
             // This is intentional - we want immediate cleanup, not event-based cleanup
             ErrorLogger.LogMessage($"OnRecordingStopped: Event fired at {DateTime.Now:HH:mm:ss.fff} - cleanup already handled in StopRecording()");
@@ -385,6 +395,15 @@ namespace VoiceLite.Services
                 // This event handler is just for logging/debugging purposes now
                 lock (lockObject)
                 {
+                    // CRITICAL FIX (CRITICAL-2): Re-check under lock (double-checked locking pattern)
+                    if (isDisposed)
+                    {
+#if DEBUG
+                        ErrorLogger.LogMessage("OnRecordingStopped: Skipping under lock - AudioRecorder already disposed");
+#endif
+                        return;
+                    }
+
                     ErrorLogger.LogMessage($"OnRecordingStopped: Current state - isRecording={isRecording}, waveIn={(waveIn == null ? "null" : "exists")}, waveFile={(waveFile == null ? "null" : "exists")}");
 
                     // Defensive cleanup in case StopRecording() didn't handle everything
@@ -393,6 +412,13 @@ namespace VoiceLite.Services
                         try
                         {
                             waveFile.Dispose();
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // CRITICAL FIX (CRITICAL-2): Already disposed - this is expected in race condition
+#if DEBUG
+                            ErrorLogger.LogMessage("OnRecordingStopped: waveFile already disposed (race condition handled)");
+#endif
                         }
                         catch { }
                         waveFile = null;
