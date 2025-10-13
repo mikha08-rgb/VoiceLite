@@ -10,7 +10,7 @@ using VoiceLite.Models;
 
 namespace VoiceLite.Services
 {
-    public class TextInjector : ITextInjector
+    public class TextInjector : ITextInjector, IDisposable
     {
         public bool AutoPaste { get; set; } = true;
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
@@ -22,6 +22,12 @@ namespace VoiceLite.Services
         // QUICK WIN 5: Track clipboard restoration failures for data-driven decision making
         private static int clipboardRestoreFailures = 0;
         private static int clipboardRestoreSuccesses = 0;
+
+        // CRITICAL FIX (CRITICAL-1): Track background tasks for proper disposal
+        // Prevents thread pool exhaustion from orphaned clipboard restore tasks
+        private readonly CancellationTokenSource disposalCts = new CancellationTokenSource();
+        private readonly System.Collections.Concurrent.ConcurrentBag<Task> pendingTasks = new System.Collections.Concurrent.ConcurrentBag<Task>();
+        private bool isDisposed = false;
 
         public TextInjector(Settings settings)
         {
@@ -281,14 +287,18 @@ namespace VoiceLite.Services
                     // BUG-007 FIX: Calculate CRC32 hash of transcription for reliable comparison
                     var transcriptionHash = CalculateCRC32(text);
 
-                    _ = Task.Run(async () =>
+                    // CRITICAL FIX (CRITICAL-1): Track background task and support cancellation
+                    var restoreTask = Task.Run(async () =>
                     {
                         try
                         {
+                            // CRITICAL FIX: Check for cancellation before starting work
+                            if (disposalCts.Token.IsCancellationRequested) return;
+
                             // QUICK WIN 2: Reduced delay from 300ms → 50ms
                             // Paste completes in <10ms on modern systems, 300ms created 5x larger race window
                             // This reduces chance of external clipboard modification and speeds up completion by 250ms
-                            await Task.Delay(50);
+                            await Task.Delay(50, disposalCts.Token);
 
                             // CRITICAL FIX: Check if clipboard was modified by user before restoring
                             // Only restore if clipboard still contains our transcription text
@@ -341,7 +351,7 @@ namespace VoiceLite.Services
                                         ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
 #endif
                                         if (attempt < 2)
-                                            await Task.Delay(50);
+                                            await Task.Delay(50, disposalCts.Token);
                                         else
                                         {
 #if DEBUG
@@ -374,13 +384,65 @@ namespace VoiceLite.Services
 #endif
                             }
                         }
+                        catch (TaskCanceledException)
+                        {
+                            // CRITICAL FIX: Disposal was requested - exit gracefully
+#if DEBUG
+                            ErrorLogger.LogMessage("Clipboard restore task cancelled (disposal requested)");
+#endif
+                            return;
+                        }
                         catch (Exception ex)
                         {
                             ErrorLogger.LogError("Background clipboard restore", ex);
                         }
-                    });
+                    }, disposalCts.Token);
+
+                    // CRITICAL FIX: Track task for disposal
+                    pendingTasks.Add(restoreTask);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            if (isDisposed) return;
+            isDisposed = true;
+
+            // Cancel all pending clipboard restore tasks
+            disposalCts.Cancel();
+
+            try
+            {
+                // Wait up to 2 seconds for tasks to complete
+                var tasksArray = pendingTasks.ToArray();
+                if (tasksArray.Length > 0)
+                {
+#if DEBUG
+                    ErrorLogger.LogMessage($"TextInjector disposing - waiting for {tasksArray.Length} clipboard tasks");
+#endif
+                    Task.WaitAll(tasksArray, TimeSpan.FromSeconds(2));
+                }
+            }
+            catch (AggregateException ex)
+            {
+                // Tasks were cancelled - this is expected
+                foreach (var inner in ex.InnerExceptions)
+                {
+                    if (!(inner is TaskCanceledException))
+                    {
+                        ErrorLogger.LogError("TextInjector disposal error", inner);
+                    }
+                }
+            }
+            finally
+            {
+                disposalCts.Dispose();
+            }
+
+#if DEBUG
+            ErrorLogger.LogMessage("TextInjector disposed - all clipboard tasks cancelled");
+#endif
         }
 
         private void PasteViaClipboard(string text)

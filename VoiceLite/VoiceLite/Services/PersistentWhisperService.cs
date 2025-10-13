@@ -554,13 +554,21 @@ namespace VoiceLite.Services
 
             isDisposed = true;
 
-            // CRITICAL FIX: Cancel all operations immediately
+            // CRITICAL FIX (CRITICAL-3): Cancel all operations immediately
             try
             {
                 disposeCts.Cancel(); // Cancel warmup tasks
                 disposalCts.Cancel(); // Cancel semaphore waits to unblock transcriptions
             }
             catch { /* Ignore cancellation errors */ }
+
+            // CRITICAL FIX (CRITICAL-3): Wait for semaphore waiters to exit BEFORE disposing semaphore
+            // After canceling disposalCts, threads waiting on transcriptionSemaphore.WaitAsync(disposalCts.Token)
+            // will receive TaskCanceledException. We MUST give them time to exit cleanly before disposing.
+            // Race condition: If we dispose semaphore while threads are still handling cancellation,
+            // they get ObjectDisposedException when trying to cleanup/release the semaphore.
+            // Solution: Wait 100ms after cancellation to let all waiters exit their finally blocks.
+            Thread.Sleep(100);
 
             // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
             // Old approach: Thread.Sleep(200) blocks UI thread
@@ -569,7 +577,8 @@ namespace VoiceLite.Services
 
             CleanupProcess();
 
-            // Dispose semaphore safely
+            // CRITICAL FIX (CRITICAL-3): Dispose semaphore safely AFTER all waiters have exited
+            // The 100ms sleep above ensures all threads have completed their cancellation handling
             if (transcriptionSemaphore != null)
             {
                 try
@@ -579,6 +588,7 @@ namespace VoiceLite.Services
                 catch (ObjectDisposedException)
                 {
                     // Already disposed, ignore
+                    ErrorLogger.LogMessage("PersistentWhisperService: Semaphore already disposed (unexpected)");
                 }
             }
 
