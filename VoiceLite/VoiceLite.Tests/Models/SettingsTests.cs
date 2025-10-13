@@ -24,7 +24,7 @@ namespace VoiceLite.Tests.Models
             settings.TextInjectionMode.Should().Be(TextInjectionMode.SmartAuto);
             settings.RecordHotkey.Should().Be(Key.LeftAlt);
             settings.HotkeyModifiers.Should().Be(ModifierKeys.None);
-            settings.WhisperModel.Should().Be("ggml-small.bin");
+            settings.WhisperModel.Should().Be("ggml-tiny.bin");
             settings.BeamSize.Should().Be(1);
             settings.BestOf.Should().Be(1);
             settings.WhisperTimeoutMultiplier.Should().Be(2.0);
@@ -225,7 +225,7 @@ namespace VoiceLite.Tests.Models
             var settings = new Settings();
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-small.bin");
+            settings.WhisperModel.Should().Be("ggml-tiny.bin");
         }
 
         [Fact]
@@ -251,7 +251,7 @@ namespace VoiceLite.Tests.Models
             settings.WhisperModel = "";
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-small.bin");
+            settings.WhisperModel.Should().Be("ggml-tiny.bin");
         }
 
         [Fact]
@@ -264,7 +264,7 @@ namespace VoiceLite.Tests.Models
             settings.WhisperModel = "   ";
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-small.bin");
+            settings.WhisperModel.Should().Be("ggml-tiny.bin");
         }
 
         #endregion
