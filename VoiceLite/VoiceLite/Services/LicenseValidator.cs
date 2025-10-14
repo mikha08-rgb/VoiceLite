@@ -13,10 +13,13 @@ namespace VoiceLite.Services
     {
         private const string API_BASE_URL = "https://voicelite.app";
         private const string VALIDATE_ENDPOINT = "/api/licenses/validate";
-        private static readonly HttpClient _httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(10)
-        };
+
+        // ARCH-002 FIX: Instance HttpClient for testability
+        private readonly HttpClient _httpClient;
+
+        // Singleton instance for backward compatibility with static callers
+        private static readonly Lazy<LicenseValidator> _instance = new Lazy<LicenseValidator>(() =>
+            new LicenseValidator(CreateDefaultHttpClient()));
 
         public class ValidationResponse
         {
@@ -29,11 +32,30 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Validates a license key with the server
+        /// Constructor for dependency injection (testable)
+        /// </summary>
+        public LicenseValidator(HttpClient httpClient)
+        {
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        }
+
+        /// <summary>
+        /// Creates default HttpClient with 10-second timeout
+        /// </summary>
+        private static HttpClient CreateDefaultHttpClient()
+        {
+            return new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+        }
+
+        /// <summary>
+        /// Validates a license key with the server (instance method)
         /// </summary>
         /// <param name="licenseKey">License key in format VL-XXXXXX-XXXXXX-XXXXXX</param>
         /// <returns>Validation response with status and details</returns>
-        public static async Task<ValidationResponse> ValidateAsync(string licenseKey)
+        public async Task<ValidationResponse> ValidateAsync(string licenseKey)
         {
             if (string.IsNullOrWhiteSpace(licenseKey))
             {
@@ -98,6 +120,14 @@ namespace VoiceLite.Services
                     error = $"Validation failed: {ex.Message}"
                 };
             }
+        }
+
+        /// <summary>
+        /// Static method for backward compatibility (uses singleton instance)
+        /// </summary>
+        public static Task<ValidationResponse> ValidateAsync_Static(string licenseKey)
+        {
+            return _instance.Value.ValidateAsync(licenseKey);
         }
 
         /// <summary>
