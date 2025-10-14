@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.0.66: Radical simplification - core-only features, 100% free
+; v1.0.67: API backend fixes + test coverage improvements
 ; Windows 10/11 (64-bit) compatible - detects VC++ Runtime if needed
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.66
+AppVersion=1.0.67
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.66
+OutputBaseFilename=VoiceLite-Setup-1.0.67
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
