@@ -1,0 +1,45 @@
+===========================================
+GIT BASH COMMANDS - TYPE THESE MANUALLY
+===========================================
+
+Just type these commands (don't copy/paste):
+
+1. cd /c/Users/mishk/Codingprojects/SpeakLite
+
+2. cd "HereWeGoAgain v3.3 Fuck"
+
+3. rm -rf /c/Users/mishk/Codingprojects/SpeakLite/VoiceLite-mirror.git
+
+4. git clone --mirror https://github.com/mikha08-rgb/VoiceLite.git /c/Users/mishk/Codingprojects/SpeakLite/VoiceLite-mirror.git
+
+5. cd /c/Users/mishk/Codingprojects/SpeakLite/VoiceLite-mirror.git
+
+6. java -jar /c/Users/mishk/Downloads/bfg.jar --replace-text ../secrets-to-redact.txt .
+
+(Note: If the path has "HereWeGoAgain v3.3 Fuck", you may need to adjust step 6)
+
+7. git reflog expire --expire=now --all
+
+8. git gc --prune=now --aggressive
+
+9. git log --all --full-history -p -S vS89Zv4vrDNoM9zXm5aAsba --oneline
+
+STOP! Check if output is EMPTY
+- If EMPTY: Continue to step 10
+- If SHOWS COMMITS: STOP HERE!
+
+10. git push --force --all
+
+11. git push --force --tags
+
+12. cd /c/Users/mishk/Codingprojects/SpeakLite
+
+13. cd "HereWeGoAgain v3.3 Fuck"
+
+14. git fetch origin
+
+15. git reset --hard origin/master
+
+16. git log --all --full-history -p -S vS89Zv4vrDNoM9zXm5aAsba --oneline
+
+===========================================

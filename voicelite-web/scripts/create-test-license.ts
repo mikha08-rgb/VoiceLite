@@ -1,5 +1,9 @@
+import { config } from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { nanoid } from 'nanoid';
+
+// Load environment variables from .env.local
+config({ path: '.env.local' });
 
 const prisma = new PrismaClient();
 

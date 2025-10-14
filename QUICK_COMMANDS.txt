@@ -1,0 +1,48 @@
+===========================================
+GIT HISTORY SCRUBBING - QUICK COMMANDS
+===========================================
+
+Copy/paste these commands ONE AT A TIME in Git Bash:
+
+1. cd "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck"
+
+2. rm -rf "C:\Users\mishk\Codingprojects\SpeakLite\VoiceLite-mirror.git"
+
+3. git clone --mirror https://github.com/mikha08-rgb/VoiceLite.git "C:\Users\mishk\Codingprojects\SpeakLite\VoiceLite-mirror.git"
+
+4. cd "C:\Users\mishk\Codingprojects\SpeakLite\VoiceLite-mirror.git"
+
+5. java -jar "C:\Users\mishk\Downloads\bfg.jar" --replace-text "../HereWeGoAgain v3.3 Fuck/secrets-to-redact.txt" .
+
+6. git reflog expire --expire=now --all
+
+7. git gc --prune=now --aggressive
+
+8. git log --all --full-history -p -S "vS89Zv4vrDNoM9zXm5aAsba" --oneline
+
+   EXPECTED: NOTHING (empty)
+   IF NOT EMPTY: STOP! DO NOT CONTINUE!
+
+9. git push --force --all
+
+10. git push --force --tags
+
+11. cd "C:\Users\mishk\Codingprojects\SpeakLite\HereWeGoAgain v3.3 Fuck"
+
+12. git fetch origin
+
+13. git reset --hard origin/master
+
+14. git log --all --full-history -p -S "vS89Zv4vrDNoM9zXm5aAsba" --oneline
+
+    EXPECTED: NOTHING
+
+VERIFY ON GITHUB:
+https://github.com/mikha08-rgb/VoiceLite/search?q=vS89Zv4vrDNoM9zXm5aAsba&type=commits
+
+EXPECTED: "No results"
+
+===========================================
+DURATION: 10 minutes
+RISK: HIGH (irreversible after step 9)
+===========================================
