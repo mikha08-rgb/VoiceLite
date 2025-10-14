@@ -96,10 +96,21 @@ namespace VoiceLite.Services
 
                                 if (taskkill != null)
                                 {
-                                    taskkill.WaitForExit(5000); // Wait max 5 seconds
+                                    // MEDIUM-1 FIX: Use non-blocking wait to prevent timer callback delays
+                                    // If multiple zombies exist, waiting 5s per zombie could block for long periods
+                                    var waitSucceeded = taskkill.WaitForExit(2000); // Reduced to 2s max
+
+                                    if (!waitSucceeded)
+                                    {
+                                        ErrorLogger.LogWarning($"ZombieProcessCleanupService: taskkill.exe timeout for PID {pid} (may still succeed)");
+                                    }
+                                    else
+                                    {
+                                        totalZombiesKilled++;
+                                        ErrorLogger.LogMessage($"ZombieProcessCleanupService: taskkill.exe succeeded for PID {pid}");
+                                    }
+
                                     taskkill.Dispose();
-                                    totalZombiesKilled++;
-                                    ErrorLogger.LogMessage($"ZombieProcessCleanupService: taskkill.exe succeeded for PID {pid}");
                                 }
                             }
                             catch (Exception taskkillEx)
