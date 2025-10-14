@@ -17,7 +17,7 @@ namespace VoiceLite.Services
 
         private readonly Timer monitorTimer;
         private readonly Timer gcTimer;
-        private readonly Process currentProcess; // Note: Process.GetCurrentProcess() doesn't need disposal
+        private readonly Process currentProcess; // HIGH-2 FIX: Process objects MUST be disposed (holds unmanaged handle)
         private long baselineMemory;
         private long peakMemory;
         private long lastMemory;
@@ -256,6 +256,21 @@ namespace VoiceLite.Services
         {
             lock (statsLock)
             {
+                // HIGH-2 FIX: Return cached values if disposed (Process object is disposed)
+                if (isDisposed)
+                {
+                    return new MemoryStatistics
+                    {
+                        CurrentMemoryMB = lastMemory / 1024 / 1024,
+                        PeakMemoryMB = peakMemory / 1024 / 1024,
+                        BaselineMemoryMB = baselineMemory / 1024 / 1024,
+                        GCMemoryMB = GC.GetTotalMemory(false) / 1024 / 1024,
+                        Gen0Collections = GC.CollectionCount(0),
+                        Gen1Collections = GC.CollectionCount(1),
+                        Gen2Collections = GC.CollectionCount(2)
+                    };
+                }
+
                 currentProcess.Refresh();
                 return new MemoryStatistics
                 {
@@ -277,6 +292,17 @@ namespace VoiceLite.Services
 
             monitorTimer?.Dispose();
             gcTimer?.Dispose();
+
+            // HIGH-2 FIX: Dispose Process object (holds unmanaged handle)
+            // Even though the process continues running, the Process object must be disposed
+            try
+            {
+                currentProcess?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("MemoryMonitor.Dispose: Failed to dispose currentProcess", ex);
+            }
 
             ErrorLogger.LogMessage("MemoryMonitor disposed");
         }

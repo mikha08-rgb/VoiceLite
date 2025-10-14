@@ -565,14 +565,12 @@ namespace VoiceLite.Services
             // CRITICAL FIX (CRITICAL-3): Wait for semaphore waiters to exit BEFORE disposing semaphore
             // After canceling disposalCts, threads waiting on transcriptionSemaphore.WaitAsync(disposalCts.Token)
             // will receive TaskCanceledException. We MUST give them time to exit cleanly before disposing.
-            // Race condition: If we dispose semaphore while threads are still handling cancellation,
-            // they get ObjectDisposedException when trying to cleanup/release the semaphore.
-            // Solution: Wait 100ms after cancellation to let all waiters exit their finally blocks.
-            Thread.Sleep(100);
+            // HIGH-1 FIX: Removed Thread.Sleep(100) - blocking the calling thread (likely UI thread)
+            // The ManualResetEventSlim.Wait() below already handles waiting with proper timeout
 
             // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
-            // Old approach: Thread.Sleep(200) blocks UI thread
-            // New approach: Efficient signaling with max 5-second timeout
+            // HIGH-1 FIX: This Wait() properly handles coordination with 5-second timeout
+            // Threads in finally blocks will signal disposalComplete, unblocking this wait
             disposalComplete.Wait(TimeSpan.FromSeconds(5));
 
             CleanupProcess();
