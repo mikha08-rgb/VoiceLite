@@ -901,5 +901,180 @@ namespace VoiceLite.Tests.Models
         }
 
         #endregion
+
+        #region License Properties Tests (Phase 2: TEST-001 Coverage)
+
+        [Fact]
+        public void LicenseKey_DefaultValue_IsNull()
+        {
+            // Arrange & Act
+            var settings = new Settings();
+
+            // Assert
+            settings.LicenseKey.Should().BeNull("Default license key should be null");
+        }
+
+        [Fact]
+        public void LicenseIsValid_DefaultValue_IsFalse()
+        {
+            // Arrange & Act
+            var settings = new Settings();
+
+            // Assert
+            settings.LicenseIsValid.Should().BeFalse("Default license should be invalid");
+        }
+
+        [Fact]
+        public void LicenseValidatedAt_DefaultValue_IsNull()
+        {
+            // Arrange & Act
+            var settings = new Settings();
+
+            // Assert
+            settings.LicenseValidatedAt.Should().BeNull("Default validation timestamp should be null");
+        }
+
+        [Fact]
+        public void LicenseKey_SetToValidFormat_Updates()
+        {
+            // Arrange
+            var settings = new Settings();
+
+            // Act
+            settings.LicenseKey = "VL-ABC123-DEF456-GHI789";
+
+            // Assert
+            settings.LicenseKey.Should().Be("VL-ABC123-DEF456-GHI789");
+        }
+
+        [Fact]
+        public void LicenseProperties_CanBeSetTogether()
+        {
+            // Arrange
+            var settings = new Settings();
+            var timestamp = DateTime.UtcNow;
+
+            // Act
+            settings.LicenseKey = "VL-TEST00-123456-789ABC";
+            settings.LicenseIsValid = true;
+            settings.LicenseValidatedAt = timestamp;
+
+            // Assert
+            settings.LicenseKey.Should().Be("VL-TEST00-123456-789ABC");
+            settings.LicenseIsValid.Should().BeTrue();
+            settings.LicenseValidatedAt.Should().Be(timestamp);
+        }
+
+        [Fact]
+        public void LicenseKey_Serialization_PreservesValue()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                LicenseKey = "VL-SERIAL-123456-789ABC",
+                LicenseIsValid = true,
+                LicenseValidatedAt = DateTime.UtcNow
+            };
+
+            // Act
+            var json = JsonSerializer.Serialize(settings);
+            var deserialized = JsonSerializer.Deserialize<Settings>(json);
+
+            // Assert
+            deserialized.Should().NotBeNull();
+            deserialized!.LicenseKey.Should().Be("VL-SERIAL-123456-789ABC", "License key should persist through serialization");
+            deserialized.LicenseIsValid.Should().BeTrue("License validity should persist through serialization");
+            deserialized.LicenseValidatedAt.Should().NotBeNull("Validation timestamp should persist through serialization");
+        }
+
+        [Fact]
+        public void LicenseValidatedAt_Serialization_PreservesTimestamp()
+        {
+            // Arrange
+            var originalTimestamp = new DateTime(2025, 10, 13, 12, 30, 45, DateTimeKind.Utc);
+            var settings = new Settings
+            {
+                LicenseKey = "VL-TIME00-123456-789ABC",
+                LicenseValidatedAt = originalTimestamp
+            };
+
+            // Act
+            var json = JsonSerializer.Serialize(settings);
+            var deserialized = JsonSerializer.Deserialize<Settings>(json);
+
+            // Assert
+            deserialized.Should().NotBeNull();
+            deserialized!.LicenseValidatedAt.Should().NotBeNull();
+            // JSON serialization may round milliseconds, so use tolerance
+            deserialized.LicenseValidatedAt!.Value.Should().BeCloseTo(originalTimestamp, TimeSpan.FromMilliseconds(1));
+        }
+
+        [Fact]
+        public void LicenseKey_NullValue_SerializesAndDeserializesCorrectly()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                LicenseKey = null,
+                LicenseIsValid = false,
+                LicenseValidatedAt = null
+            };
+
+            // Act
+            var json = JsonSerializer.Serialize(settings);
+            var deserialized = JsonSerializer.Deserialize<Settings>(json);
+
+            // Assert
+            deserialized.Should().NotBeNull();
+            deserialized!.LicenseKey.Should().BeNull("Null license key should serialize as null");
+            deserialized.LicenseIsValid.Should().BeFalse("Invalid license should serialize correctly");
+            deserialized.LicenseValidatedAt.Should().BeNull("Null timestamp should serialize as null");
+        }
+
+        [Fact]
+        public void Settings_BackwardCompatibility_LoadsWithoutLicenseFields()
+        {
+            // Arrange - simulate old settings JSON without license fields (pre-v1.0.66)
+            var oldJson = @"{
+                ""WhisperModel"": ""ggml-small.bin"",
+                ""BeamSize"": 1,
+                ""BestOf"": 1,
+                ""Language"": ""en"",
+                ""AutoPaste"": true
+            }";
+
+            // Act
+            var settings = JsonSerializer.Deserialize<Settings>(oldJson);
+
+            // Assert
+            settings.Should().NotBeNull("Old settings should deserialize successfully");
+            settings!.LicenseKey.Should().BeNull("Missing license key should default to null");
+            settings.LicenseIsValid.Should().BeFalse("Missing license validity should default to false");
+            settings.LicenseValidatedAt.Should().BeNull("Missing validation timestamp should default to null");
+            settings.WhisperModel.Should().Be("ggml-small.bin", "Other properties should load correctly");
+        }
+
+        [Fact]
+        public void SettingsValidator_LicenseProperties_ArePreserved()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                LicenseKey = "VL-VALID0-123456-789ABC",
+                LicenseIsValid = true,
+                LicenseValidatedAt = DateTime.UtcNow
+            };
+
+            // Act
+            var validated = SettingsValidator.ValidateAndRepair(settings);
+
+            // Assert
+            validated.Should().NotBeNull();
+            validated.LicenseKey.Should().Be("VL-VALID0-123456-789ABC", "Validator should not modify license key");
+            validated.LicenseIsValid.Should().BeTrue("Validator should preserve license validity");
+            validated.LicenseValidatedAt.Should().NotBeNull("Validator should preserve validation timestamp");
+        }
+
+        #endregion
     }
 }
