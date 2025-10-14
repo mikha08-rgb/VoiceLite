@@ -1,10 +1,12 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using VoiceLite.Services;
+using VoiceLite.Tests.Helpers;
 using Xunit;
 
 namespace VoiceLite.Tests.Services
@@ -73,32 +75,33 @@ namespace VoiceLite.Tests.Services
 
         #endregion
 
-        #region Async Validation Tests (Require HttpClient Mocking)
+        #region Async Validation Tests (Now with HttpClient Mocking!)
 
-        // NOTE: The following tests document expected behavior for ValidateAsync().
-        // They are currently SKIPPED because LicenseValidator uses a static HttpClient
-        // that's difficult to mock without refactoring to use IHttpClientFactory.
-        //
-        // RECOMMENDATION: Refactor LicenseValidator to accept IHttpClientFactory
-        // for better testability. See ARCH-002 in CRITICAL_ISSUES_REPORT.md.
-
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_ValidLicenseKey_ReturnsValidTrue()
         {
             // Arrange
             var licenseKey = "VL-VALID0-123456-789ABC";
-
-            // Expected API response:
-            // {
-            //   "valid": true,
-            //   "status": "ACTIVE",
-            //   "type": "LIFETIME",
-            //   "email": "test@example.com",
-            //   "expiresAt": null
-            // }
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = true,
+                    status = "ACTIVE",
+                    type = "LIFETIME",
+                    email = "test@example.com",
+                    expiresAt = (string)null
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeTrue("Valid license key should return valid=true");
@@ -109,49 +112,64 @@ namespace VoiceLite.Tests.Services
             response.error.Should().BeNullOrEmpty("Valid response should have no error");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_InvalidLicenseKey_ReturnsValidFalse()
         {
             // Arrange
             var licenseKey = "VL-INVALID-123456-789ABC";
-
-            // Expected API response:
-            // {
-            //   "valid": false,
-            //   "error": "License key not found"
-            // }
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = false,
+                    error = "License key not found"
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Invalid license key should return valid=false");
             response.error.Should().Be("License key not found");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_ExpiredLicense_ReturnsValidFalse()
         {
             // Arrange
             var licenseKey = "VL-EXPIRED-123456-789ABC";
-
-            // Expected API response:
-            // {
-            //   "valid": false,
-            //   "status": "ACTIVE",
-            //   "type": "TRIAL",
-            //   "email": "test@example.com",
-            //   "expiresAt": "2023-01-01T00:00:00Z"
-            // }
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = false,
+                    status = "ACTIVE",
+                    type = "TRIAL",
+                    email = "test@example.com",
+                    expiresAt = "2023-01-01T00:00:00Z"
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Expired license should return valid=false");
             response.status.Should().Be("ACTIVE");
             response.expiresAt.Should().NotBeNull();
-            // expiresAt is a string, need to parse it first
             if (!string.IsNullOrEmpty(response.expiresAt))
             {
                 var expiry = DateTime.Parse(response.expiresAt);
@@ -159,142 +177,207 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_RevokedLicense_ReturnsValidFalse()
         {
             // Arrange
             var licenseKey = "VL-REVOKED-123456-789ABC";
-
-            // Expected API response:
-            // {
-            //   "valid": false,
-            //   "status": "REVOKED",
-            //   "type": "LIFETIME",
-            //   "email": "banned@example.com"
-            // }
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = false,
+                    status = "REVOKED",
+                    type = "LIFETIME",
+                    email = "banned@example.com"
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Revoked license should return valid=false");
             response.status.Should().Be("REVOKED");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_NetworkTimeout_ReturnsUserFriendlyMessage()
         {
             // Arrange
             var licenseKey = "VL-TIMEOUT-123456-789ABC";
-
-            // Simulate: HttpClient timeout exception
+            var mockHandler = new MockHttpMessageHandler((Func<HttpRequestMessage, Task<HttpResponseMessage>>)(req =>
+            {
+                throw new TaskCanceledException("Request timed out");
+            }));
+            var httpClient = new HttpClient(mockHandler) { Timeout = TimeSpan.FromMilliseconds(1) };
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Timeout should return valid=false");
-            response.error.Should().Contain("timeout", "Error message should mention timeout");
+            response.error.Should().Contain("timed out", "Error message should mention timeout");
             response.error.Should().Contain("internet", "Error should suggest checking internet connection");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_NetworkError_ReturnsErrorMessage()
         {
             // Arrange
             var licenseKey = "VL-NETWORK-123456-789ABC";
-
-            // Simulate: Network unreachable, DNS failure, connection refused
+            var mockHandler = new MockHttpMessageHandler((Func<HttpRequestMessage, Task<HttpResponseMessage>>)(req =>
+            {
+                throw new HttpRequestException("Network unreachable");
+            }));
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Network error should return valid=false");
             response.error.Should().NotBeNullOrEmpty("Error message should be populated");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_404NotFound_ReturnsLicenseNotFound()
         {
             // Arrange
             var licenseKey = "VL-NOTFOUND-123456-789ABC";
-
-            // Simulate: API returns 404 status code
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("404 should return valid=false");
             response.error.Should().Be("License key not found", "404 should return specific error");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_MalformedJSON_ReturnsInvalidResponse()
         {
             // Arrange
             var licenseKey = "VL-BADJSON-123456-789ABC";
-
-            // Simulate: API returns invalid JSON (e.g., HTML error page)
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<html>Error</html>", Encoding.UTF8, "text/html")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("Malformed JSON should return valid=false");
-            response.error.Should().Contain("Invalid response", "Error should indicate deserialization failure");
+            response.error.Should().Contain("Validation failed", "Error should indicate validation failure");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_ServerError_Returns500Error()
         {
             // Arrange
             var licenseKey = "VL-SERVER-123456-789ABC";
-
-            // Simulate: API returns 500 Internal Server Error
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = false,
+                    error = "Internal server error"
+                });
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
 
             // Act
-            var response = await LicenseValidator.ValidateAsync(licenseKey);
+            var response = await validator.ValidateAsync(licenseKey);
 
             // Assert
             response.valid.Should().BeFalse("500 error should return valid=false");
             response.error.Should().NotBeNullOrEmpty("Error message should be populated");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_EmptyLicenseKey_ReturnsError()
         {
+            // Arrange
+            var mockHandler = new MockHttpMessageHandler(req => new HttpResponseMessage(HttpStatusCode.OK));
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
+
             // Act
-            var response = await LicenseValidator.ValidateAsync("");
+            var response = await validator.ValidateAsync("");
 
             // Assert
             response.valid.Should().BeFalse("Empty license key should return valid=false");
             response.error.Should().Be("License key is empty");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_NullLicenseKey_ReturnsError()
         {
+            // Arrange
+            var mockHandler = new MockHttpMessageHandler(req => new HttpResponseMessage(HttpStatusCode.OK));
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
+
             // Act
-            var response = await LicenseValidator.ValidateAsync(null);
+            var response = await validator.ValidateAsync(null);
 
             // Assert
             response.valid.Should().BeFalse("Null license key should return valid=false");
             response.error.Should().Be("License key is empty");
         }
 
-        [Fact(Skip = "Requires HttpClient mocking - LicenseValidator uses static HttpClient")]
+        [Fact]
         public async Task ValidateAsync_ConcurrentRequests_HandledSafely()
         {
             // Arrange
             var licenseKey = "VL-CONCURRENT-123456-789ABC";
+            var mockHandler = new MockHttpMessageHandler(req =>
+            {
+                var responseJson = JsonSerializer.Serialize(new
+                {
+                    valid = true,
+                    status = "ACTIVE",
+                    type = "LIFETIME",
+                    email = "test@example.com"
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+                };
+            });
+            var httpClient = new HttpClient(mockHandler);
+            var validator = new LicenseValidator(httpClient);
             var tasks = new Task<LicenseValidator.ValidationResponse>[10];
 
             // Act - Fire 10 concurrent validation requests
             for (int i = 0; i < 10; i++)
             {
-                tasks[i] = LicenseValidator.ValidateAsync(licenseKey);
+                tasks[i] = validator.ValidateAsync(licenseKey);
             }
 
             var results = await Task.WhenAll(tasks);
@@ -374,7 +457,6 @@ namespace VoiceLite.Tests.Services
 
             // Assert - This documents the expected response structure
             Assert.NotNull(response);
-            // Note: Actual validation requires HttpClient mocking
         }
 
         /// <summary>
@@ -394,7 +476,6 @@ namespace VoiceLite.Tests.Services
 
             // Assert - This documents the expected error response structure
             Assert.NotNull(response);
-            // Note: Actual validation requires HttpClient mocking
         }
 
         #endregion

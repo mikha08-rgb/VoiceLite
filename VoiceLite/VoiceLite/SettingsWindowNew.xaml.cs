@@ -278,7 +278,7 @@ namespace VoiceLite
 
             try
             {
-                var response = await LicenseValidator.ValidateAsync(licenseKey);
+                var response = await LicenseValidator.ValidateAsync_Static(licenseKey);
 
                 if (response.valid)
                 {
