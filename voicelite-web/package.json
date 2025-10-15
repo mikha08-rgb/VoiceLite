@@ -26,6 +26,7 @@
     "@upstash/ratelimit": "^2.0.6",
     "@upstash/redis": "^1.35.4",
     "canvas-confetti": "^1.9.3",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.544.0",
     "nanoid": "^5.0.7",
     "next": "15.5.4",
@@ -36,9 +37,11 @@
     "resend": "^6.1.0",
     "stripe": "^18.5.0",
     "swagger-ui-react": "^5.29.2",
+    "tailwind-merge": "^3.3.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.6.2",
     "@types/react": "^19",
