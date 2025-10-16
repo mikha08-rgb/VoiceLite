@@ -21,7 +21,6 @@ export {
   CardFooter,
   type CardProps,
 } from './card';
-export { Navigation, type NavigationProps, type NavItem } from './navigation';
 export { Input, Textarea, SearchInput, type InputProps, type TextareaProps, type SearchInputProps } from './input';
 export { VideoPlayer, type VideoPlayerProps } from './video-player';
 export { Accordion, type AccordionProps, type AccordionItem } from './accordion';
