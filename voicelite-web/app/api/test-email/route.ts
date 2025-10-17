@@ -8,7 +8,7 @@ export async function GET() {
     console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
 
     await sendMagicLinkEmail({
-      email: 'mikhail.lev08@gmail.com',
+      email: 'test@example.com',
       magicLinkUrl: 'https://test.com/link',
       otpCode: '12345678',
       deepLinkUrl: 'voicelite://test',
