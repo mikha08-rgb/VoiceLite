@@ -215,6 +215,192 @@ namespace VoiceLite
             }
         }
 
+        /// <summary>
+        /// Simple license validation for free vs paid model.
+        /// Checks local license first (offline), allows free version without license.
+        /// </summary>
+        private async Task<bool> ValidateLicenseAsync()
+        {
+            try
+            {
+                // Step 1: Check if we have a valid paid license (offline - instant)
+                if (SimpleLicenseStorage.HasValidLicense(out var storedLicense))
+                {
+                    ErrorLogger.LogMessage($"Valid paid license found for {storedLicense?.Email}");
+                    UpdateStatus("License: Pro", Brushes.Green);
+                    return true;
+                }
+
+                // Step 2: No paid license - prompt user: Activate Pro or Use Free
+                UpdateStatus("Choose version...", Brushes.Orange);
+
+                var userChoice = await Dispatcher.InvokeAsync(() =>
+                {
+                    var inputDialog = new Window
+                    {
+                        Title = "Welcome to VoiceLite",
+                        Width = 550,
+                        Height = 300,
+                        WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                        ResizeMode = ResizeMode.NoResize,
+                        Owner = this
+                    };
+
+                    var stackPanel = new StackPanel { Margin = new Thickness(20) };
+
+                    stackPanel.Children.Add(new TextBlock
+                    {
+                        Text = "Welcome to VoiceLite!",
+                        FontSize = 18,
+                        FontWeight = FontWeights.Bold,
+                        Margin = new Thickness(0, 0, 0, 10)
+                    });
+
+                    stackPanel.Children.Add(new TextBlock
+                    {
+                        Text = "Choose how you'd like to use VoiceLite:",
+                        Margin = new Thickness(0, 0, 0, 15),
+                        FontSize = 13
+                    });
+
+                    // License key input
+                    var textBox = new TextBox
+                    {
+                        Margin = new Thickness(0, 0, 0, 15),
+                        Padding = new Thickness(5),
+                        FontSize = 14,
+                        Name = "LicenseKeyInput"
+                    };
+                    textBox.SetValue(System.Windows.Controls.TextBox.TextProperty, "");
+
+                    var licenseLabel = new TextBlock
+                    {
+                        Text = "Enter your Pro license key:",
+                        Margin = new Thickness(0, 0, 0, 5),
+                        FontSize = 12
+                    };
+
+                    stackPanel.Children.Add(licenseLabel);
+                    stackPanel.Children.Add(textBox);
+
+                    var buttonPanel = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Margin = new Thickness(0, 10, 0, 0)
+                    };
+
+                    var activateButton = new Button
+                    {
+                        Content = "Activate Pro",
+                        Width = 120,
+                        Height = 32,
+                        Margin = new Thickness(0, 0, 10, 0),
+                        Tag = "activate"
+                    };
+                    activateButton.Click += (s, e) => {
+                        inputDialog.Tag = new { Action = "activate", Key = textBox.Text };
+                        inputDialog.DialogResult = true;
+                        inputDialog.Close();
+                    };
+
+                    var freeButton = new Button
+                    {
+                        Content = "Use Free Version",
+                        Width = 120,
+                        Height = 32,
+                        Tag = "free"
+                    };
+                    freeButton.Click += (s, e) => {
+                        inputDialog.Tag = new { Action = "free", Key = (string?)null };
+                        inputDialog.DialogResult = true;
+                        inputDialog.Close();
+                    };
+
+                    buttonPanel.Children.Add(activateButton);
+                    buttonPanel.Children.Add(freeButton);
+                    stackPanel.Children.Add(buttonPanel);
+
+                    inputDialog.Content = stackPanel;
+
+                    inputDialog.ShowDialog();
+                    return inputDialog.Tag;
+                });
+
+                // Handle user choice
+                if (userChoice == null)
+                {
+                    // User closed dialog (X button) - default to free
+                    ErrorLogger.LogMessage("User closed license dialog - using free version");
+                    UpdateStatus("Free Version", Brushes.Gray);
+                    return true;
+                }
+
+                var choice = userChoice.GetType().GetProperty("Action")?.GetValue(userChoice)?.ToString();
+                var licenseKey = userChoice.GetType().GetProperty("Key")?.GetValue(userChoice)?.ToString();
+
+                if (choice == "free")
+                {
+                    // User chose free version
+                    ErrorLogger.LogMessage("User chose free version");
+                    UpdateStatus("Free Version", Brushes.Gray);
+                    return true;
+                }
+
+                // User wants to activate Pro
+                if (string.IsNullOrWhiteSpace(licenseKey))
+                {
+                    MessageBox.Show(
+                        "Please enter a license key to activate Pro, or click 'Use Free Version'.",
+                        "License Key Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return await ValidateLicenseAsync(); // Try again
+                }
+
+                // Step 3: Validate license key with server (first time only)
+                UpdateStatus("Validating license...", Brushes.Orange);
+
+                var validator = new LicenseValidator(new System.Net.Http.HttpClient());
+                var result = await validator.ValidateAsync(licenseKey);
+
+                if (!result.valid)
+                {
+                    MessageBox.Show(
+                        $"License validation failed:\n\n{result.error}\n\n" +
+                        "Please check your license key and try again.",
+                        "Invalid License",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return false;
+                }
+
+                // Step 4: Save license locally (never need to validate again!)
+                SimpleLicenseStorage.SaveLicense(licenseKey, result.email ?? "Unknown", result.type ?? "LIFETIME");
+
+                MessageBox.Show(
+                    $"License activated successfully!\n\nEmail: {result.email}\n\n" +
+                    "VoiceLite will now work offline.",
+                    "Success",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                ErrorLogger.LogMessage($"License activated for {result.email}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("License validation failed", ex);
+                MessageBox.Show(
+                    $"Failed to validate license:\n\n{ex.Message}\n\n" +
+                    "Please check your internet connection and try again.",
+                    "Validation Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
+            }
+        }
+
         private string GetAppDataDirectory()
         {
             return Path.Combine(
@@ -348,6 +534,10 @@ namespace VoiceLite
 
                         // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
                         // UI Preset is now hardcoded to Compact - migration code removed
+
+                        // MIGRATION 4: Reset slow performance settings to fast defaults (v1.0.68+)
+                        // Automatically migrate users from old slow settings (BeamSize=5, BestOf=5)
+                        MigrateSlowPerformanceSettings();
 
                         // Verify whisper model exists
                         ValidateWhisperModel();
@@ -619,6 +809,10 @@ namespace VoiceLite
 
                 // Step 1: Check dependencies (runs in background)
                 await CheckDependenciesAsync();
+
+                // Step 1.5: Check license status (free vs pro)
+                // This never blocks - user can always use free version
+                await ValidateLicenseAsync();
 
                 // Step 2: Initialize services (runs in background)
                 await InitializeServicesAsync();
@@ -1996,6 +2190,68 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("ValidateWhisperModel", ex);
+            }
+        }
+
+        /// <summary>
+        /// MIGRATION 4: Reset slow performance settings to fast defaults (v1.0.68+)
+        /// Automatically migrates users from old slow settings (BeamSize=5, BestOf=5)
+        /// to new fast defaults (BeamSize=1, BestOf=1) for 5x faster transcription.
+        /// Also migrates to Tiny model for consistency.
+        /// </summary>
+        private void MigrateSlowPerformanceSettings()
+        {
+            bool settingsChanged = false;
+
+            try
+            {
+                // Migrate BeamSize from 5 → 1 (5x faster, greedy decoding)
+                if (settings.BeamSize > 1)
+                {
+                    ErrorLogger.LogMessage($"⚡ Migrating BeamSize from {settings.BeamSize} → 1 (5x faster)");
+                    settings.BeamSize = 1;
+                    settingsChanged = true;
+                }
+
+                // Migrate BestOf from 5 → 1 (5x faster, single sampling)
+                if (settings.BestOf > 1)
+                {
+                    ErrorLogger.LogMessage($"⚡ Migrating BestOf from {settings.BestOf} → 1 (5x faster)");
+                    settings.BestOf = 1;
+                    settingsChanged = true;
+                }
+
+                // Migrate model to Tiny for everyone (6x faster)
+                // Small/Medium/Large models are now Pro-only features
+                if (settings.WhisperModel == "ggml-small.bin" ||
+                    settings.WhisperModel == "ggml-medium.bin" ||
+                    settings.WhisperModel == "ggml-large-v3.bin")
+                {
+                    ErrorLogger.LogMessage($"⚡ Migrating model from {settings.WhisperModel} → ggml-tiny.bin");
+                    settings.WhisperModel = "ggml-tiny.bin";
+                    settingsChanged = true;
+                }
+
+                // Save migrated settings immediately (synchronous to avoid deadlock)
+                // Note: We don't use SaveSettingsAsync here to avoid UI thread deadlock during startup
+                if (settingsChanged)
+                {
+                    try
+                    {
+                        string settingsPath = GetSettingsPath();
+                        var json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                        System.IO.File.WriteAllText(settingsPath, json);
+                        ErrorLogger.LogMessage("✅ Performance settings migrated to fast defaults");
+                    }
+                    catch (Exception saveEx)
+                    {
+                        ErrorLogger.LogError("Failed to save migrated settings", saveEx);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to migrate performance settings (non-critical)", ex);
             }
         }
 
