@@ -511,6 +511,7 @@ export default function HomePage() {
                 🎤 <span>VoiceLite</span>
               </div>
               <p className="text-sm leading-relaxed">Stop typing. Start speaking. Private voice-to-text for Windows.</p>
+              <p className="text-xs text-stone-500">Operated by Basement Hustle LLC</p>
               <p className="text-sm">
                 <strong className="text-white">Contact:</strong>{' '}
                 <a href="mailto:support@voicelite.app" className="transition-colors hover:text-blue-400">
@@ -609,7 +610,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-stone-800 pt-8 text-sm md:flex-row">
-            <p>© 2025 VoiceLite. MIT License. Built by indie developer.</p>
+            <p>© 2025 VoiceLite by Basement Hustle LLC. MIT License.</p>
             <div className="flex gap-4">
               <a
                 href="https://github.com/mikha08-rgb/VoiceLite"
