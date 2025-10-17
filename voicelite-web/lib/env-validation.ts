@@ -138,6 +138,14 @@ const envSchema = z.object({
   // Node Environment
   // -----------------------------------------------------------------------------
   NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
+
+  // -----------------------------------------------------------------------------
+  // Private Page Access (Optional)
+  // -----------------------------------------------------------------------------
+  PRIVATE_PAGE_KEY: z
+    .string()
+    .min(1, 'PRIVATE_PAGE_KEY must be at least 1 character')
+    .optional(),
 });
 
 export function validateEnvironment() {
