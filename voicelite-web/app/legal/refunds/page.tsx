@@ -45,7 +45,7 @@ export default function RefundPolicyPage() {
             <ol>
               <li>
                 <strong>Email our support team</strong> at{' '}
-                <a href="mailto:support@voicelite.app">support@voicelite.app</a>
+                <a href="mailto:basementhustleLLC@gmail.com">basementhustleLLC@gmail.com</a>
               </li>
               <li>
                 Include your <strong>license key</strong> or the <strong>email address</strong> used for purchase
@@ -99,7 +99,7 @@ export default function RefundPolicyPage() {
               </li>
             </ul>
             <p>
-              Alternatively, email <a href="mailto:support@voicelite.app">support@voicelite.app</a> and we'll cancel it for you.
+              Alternatively, email <a href="mailto:basementhustleLLC@gmail.com">basementhustleLLC@gmail.com</a> and we'll cancel it for you.
             </p>
           </section>
 
@@ -123,7 +123,7 @@ export default function RefundPolicyPage() {
             <h2>Questions?</h2>
             <p>
               If you have any questions about our refund policy, please reach out to us at{' '}
-              <a href="mailto:support@voicelite.app">support@voicelite.app</a>. We're here to help!
+              <a href="mailto:basementhustleLLC@gmail.com">basementhustleLLC@gmail.com</a>. We're here to help!
             </p>
           </section>
 

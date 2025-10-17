@@ -368,7 +368,7 @@ export default function HomePage() {
               </div>
 
               <div className="text-center">
-                <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">$20</div>
+                <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">$20 USD</div>
                 <p className="mt-2 text-base text-stone-600 dark:text-stone-400">one-time payment</p>
               </div>
 
@@ -511,11 +511,13 @@ export default function HomePage() {
                 🎤 <span>VoiceLite</span>
               </div>
               <p className="text-sm leading-relaxed">Stop typing. Start speaking. Private voice-to-text for Windows.</p>
-              <p className="text-xs text-stone-500">Operated by Basement Hustle LLC</p>
+              <p className="text-xs text-stone-500">
+                <strong className="text-stone-400">Basement Hustle LLC</strong>
+              </p>
               <p className="text-sm">
                 <strong className="text-white">Contact:</strong>{' '}
-                <a href="mailto:support@voicelite.app" className="transition-colors hover:text-blue-400">
-                  support@voicelite.app
+                <a href="mailto:basementhustleLLC@gmail.com" className="transition-colors hover:text-blue-400">
+                  basementhustleLLC@gmail.com
                 </a>
               </p>
             </div>
@@ -603,6 +605,11 @@ export default function HomePage() {
                 <li>
                   <a href="/legal/refunds" className="transition-colors hover:text-blue-400">
                     Refund Policy
+                  </a>
+                </li>
+                <li>
+                  <a href="/business-info" className="transition-colors hover:text-blue-400">
+                    Business Information
                   </a>
                 </li>
               </ul>

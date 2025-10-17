@@ -96,8 +96,8 @@ export default function TermsOfService() {
               <li><strong>7-Day Money-Back Guarantee:</strong> Full refund if requested within 7 days of first purchase</li>
               <li>Refunds are not provided for partial months</li>
               <li>Refund requests must be sent to{' '}
-                <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
-                  contact@voicelite.app
+                <a href="mailto:basementhustleLLC@gmail.com" className="text-blue-600 hover:underline">
+                  basementhustleLLC@gmail.com
                 </a>
               </li>
               <li>Refunds are processed within 5-10 business days</li>
@@ -217,8 +217,8 @@ export default function TermsOfService() {
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Governing Law</h2>
             <p className="text-gray-700">
-              These Terms are governed by the laws of [Your State/Country], without regard to conflict of law
-              principles. Any disputes shall be resolved in the courts of [Your Jurisdiction].
+              These Terms are governed by the laws of Illinois, United States, without regard to conflict of law
+              principles. Any disputes shall be resolved in the courts of Illinois.
             </p>
           </section>
 
@@ -237,8 +237,8 @@ export default function TermsOfService() {
             </p>
             <p className="text-gray-700">
               <strong>Email:</strong>{' '}
-              <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
-                contact@voicelite.app
+              <a href="mailto:basementhustleLLC@gmail.com" className="text-blue-600 hover:underline">
+                basementhustleLLC@gmail.com
               </a>
               <br />
               <strong>Website:</strong>{' '}

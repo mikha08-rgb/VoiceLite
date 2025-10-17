@@ -18,12 +18,12 @@ export default function robots(): MetadataRoute.Robots {
           '/terms',
           '/privacy',
           '/legal/refunds',
+          '/business-info',
         ],
         disallow: [
           '/api/',
           '/admin/',
           '/checkout/',
-          '/basement-hustle-llc', // Confidential corporate info page
         ],
       },
     ],

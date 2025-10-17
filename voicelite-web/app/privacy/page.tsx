@@ -134,8 +134,8 @@ export default function PrivacyPolicy() {
             </ul>
             <p className="text-gray-700">
               To exercise these rights, email us at{' '}
-              <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
-                contact@voicelite.app
+              <a href="mailto:basementhustleLLC@gmail.com" className="text-blue-600 hover:underline">
+                basementhustleLLC@gmail.com
               </a>
               . We will respond within 30 days.
             </p>
@@ -156,8 +156,8 @@ export default function PrivacyPolicy() {
               VoiceLite is not intended for users under 13 years old. We do not knowingly collect personal
               information from children. If you believe we have collected data from a child, contact us
               immediately at{' '}
-              <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
-                contact@voicelite.app
+              <a href="mailto:basementhustleLLC@gmail.com" className="text-blue-600 hover:underline">
+                basementhustleLLC@gmail.com
               </a>
               .
             </p>
@@ -179,8 +179,8 @@ export default function PrivacyPolicy() {
             </p>
             <p className="text-gray-700">
               <strong>Email:</strong>{' '}
-              <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
-                contact@voicelite.app
+              <a href="mailto:basementhustleLLC@gmail.com" className="text-blue-600 hover:underline">
+                basementhustleLLC@gmail.com
               </a>
               <br />
               <strong>Website:</strong>{' '}
