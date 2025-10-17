@@ -67,6 +67,7 @@ SECURITY_ROTATION_GUIDE.md
 PHASE_1_COMPLETION_REPORT.md
 secrets.txt
 bfg.jar
+DEPLOYMENT_GUIDE_TEST_MODE.md
 
 # VC++ redistributable (downloaded during GitHub Actions build)
 VoiceLite/dependencies/
