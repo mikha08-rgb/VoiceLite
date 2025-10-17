@@ -349,7 +349,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+                href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.67/VoiceLite-Setup-1.0.67.exe"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -505,12 +505,18 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-stone-200 bg-stone-900 px-6 py-16 text-stone-400 dark:border-stone-800">
         <div className="container mx-auto max-w-7xl">
-          <div className="grid gap-12 md:grid-cols-4">
+          <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-4 md:col-span-2">
               <div className="flex items-center gap-2 text-xl font-bold text-white">
                 🎤 <span>VoiceLite</span>
               </div>
               <p className="text-sm leading-relaxed">Stop typing. Start speaking. Private voice-to-text for Windows.</p>
+              <p className="text-sm">
+                <strong className="text-white">Contact:</strong>{' '}
+                <a href="mailto:support@voicelite.app" className="transition-colors hover:text-blue-400">
+                  support@voicelite.app
+                </a>
+              </p>
             </div>
 
             <div>
@@ -575,6 +581,27 @@ export default function HomePage() {
                 <li>
                   <a href="/feedback" className="transition-colors hover:text-blue-400">
                     Support
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-white">Legal</h4>
+              <ul className="space-y-3 text-sm">
+                <li>
+                  <a href="/terms" className="transition-colors hover:text-blue-400">
+                    Terms of Service
+                  </a>
+                </li>
+                <li>
+                  <a href="/privacy" className="transition-colors hover:text-blue-400">
+                    Privacy Policy
+                  </a>
+                </li>
+                <li>
+                  <a href="/legal/refunds" className="transition-colors hover:text-blue-400">
+                    Refund Policy
                   </a>
                 </li>
               </ul>
