@@ -349,7 +349,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.67/VoiceLite-Setup-1.0.67.exe"
+                href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.68/VoiceLite-Setup-1.0.68.exe"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
