@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getLicenseByKey } from '@/lib/licensing';
 import { LicenseStatus } from '@prisma/client';
+import { validationRateLimit, checkRateLimit, getClientIp } from '@/lib/ratelimit';
 
 /**
  * POST /api/licenses/validate
@@ -9,6 +10,8 @@ import { LicenseStatus } from '@prisma/client';
  * Simple license validation endpoint for desktop app.
  * No authentication required - the license key itself is the auth.
  * Returns whether the license is valid and what features it unlocks.
+ *
+ * SECURITY: Rate limited to 100 requests per hour per IP to prevent brute force
  */
 
 const bodySchema = z.object({
@@ -16,6 +19,30 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // SECURITY FIX: Add rate limiting to prevent brute force license key enumeration
+  const clientIp = getClientIp(request);
+  const rateLimitResult = await checkRateLimit(clientIp, validationRateLimit);
+
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      {
+        valid: false,
+        error: 'Too many validation attempts',
+        message: 'Please wait before trying again.',
+        retryAfter: rateLimitResult.reset.toISOString(),
+      },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.getTime().toString(),
+          'Retry-After': Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString(),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { licenseKey } = bodySchema.parse(body);
