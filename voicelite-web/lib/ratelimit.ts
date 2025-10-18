@@ -100,6 +100,19 @@ export const activationRateLimit = redis
   : null;
 
 /**
+ * License validation rate limiter: 100 requests per hour per IP
+ * Used for /api/licenses/validate to prevent brute force license key enumeration
+ */
+export const validationRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(100, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:validation',
+    })
+  : null;
+
+/**
  * Helper to check rate limit and return appropriate response
  * @param identifier - User identifier (email, userId, etc.)
  * @param limiter - Rate limiter instance
@@ -181,6 +194,7 @@ export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 1000); // 5/minute
 export const fallbackActivationLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
+export const fallbackValidationLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 /**
  * Extract IP address from Next.js request
@@ -217,5 +231,6 @@ if (!isConfigured) {
     fallbackLicenseLimit.cleanup();
     fallbackCheckoutLimit.cleanup();
     fallbackActivationLimit.cleanup();
+    fallbackValidationLimit.cleanup();
   }, 10 * 60 * 1000);
 }
