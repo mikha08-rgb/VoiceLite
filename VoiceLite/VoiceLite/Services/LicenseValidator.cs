@@ -9,17 +9,20 @@ namespace VoiceLite.Services
     /// <summary>
     /// Validates VoiceLite Pro license keys via API call to voicelite.app
     /// </summary>
-    public class LicenseValidator
+    // AUDIT FIX (RESOURCE-CRIT-2): Implement IDisposable for HttpClient cleanup
+    public class LicenseValidator : IDisposable
     {
         private const string API_BASE_URL = "https://voicelite.app";
         private const string VALIDATE_ENDPOINT = "/api/licenses/validate";
 
         // ARCH-002 FIX: Instance HttpClient for testability
         private readonly HttpClient _httpClient;
+        private readonly bool _ownsHttpClient;
+        private bool _disposed = false;
 
         // Singleton instance for backward compatibility with static callers
         private static readonly Lazy<LicenseValidator> _instance = new Lazy<LicenseValidator>(() =>
-            new LicenseValidator(CreateDefaultHttpClient()));
+            new LicenseValidator());
 
         public class ValidationResponse
         {
@@ -32,22 +35,21 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Constructor for dependency injection (testable)
+        /// Constructor for dependency injection (caller owns HttpClient)
         /// </summary>
         public LicenseValidator(HttpClient httpClient)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _ownsHttpClient = false;  // Caller will dispose
         }
 
         /// <summary>
-        /// Creates default HttpClient with 10-second timeout
+        /// Private constructor for singleton (we own HttpClient)
         /// </summary>
-        private static HttpClient CreateDefaultHttpClient()
+        private LicenseValidator()
         {
-            return new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(10)
-            };
+            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            _ownsHttpClient = true;  // We must dispose
         }
 
         /// <summary>
@@ -145,6 +147,21 @@ namespace VoiceLite.Services
                    parts[1].Length == 6 &&
                    parts[2].Length == 6 &&
                    parts[3].Length == 6;
+        }
+
+        /// <summary>
+        /// AUDIT FIX (RESOURCE-CRIT-2): Dispose of HttpClient if owned by this instance
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            if (_ownsHttpClient)
+            {
+                try { _httpClient?.Dispose(); } catch { }
+            }
+
+            _disposed = true;
         }
     }
 }

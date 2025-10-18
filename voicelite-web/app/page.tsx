@@ -7,6 +7,32 @@ import Link from 'next/link';
 export default function HomePage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+
+  const handleCheckout = async () => {
+    setIsCheckoutLoading(true);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          successUrl: `${window.location.origin}/checkout/success`,
+          cancelUrl: `${window.location.origin}/checkout/cancel`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Failed to start checkout. Please try again.');
+      setIsCheckoutLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-white dark:bg-stone-950">
@@ -349,7 +375,9 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.68/VoiceLite-Setup-1.0.68.exe"
+                href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -399,12 +427,14 @@ export default function HomePage() {
                 </li>
               </ul>
 
-              <a
-                href="/api/checkout"
-                className="block w-full rounded-lg bg-blue-600 px-8 py-4 text-center text-lg font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              <button
+                type="button"
+                onClick={handleCheckout}
+                disabled={isCheckoutLoading}
+                className="block w-full rounded-lg bg-blue-600 px-8 py-4 text-center text-lg font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Get Pro - $20
-              </a>
+                {isCheckoutLoading ? 'Starting checkout...' : 'Get Pro - $20'}
+              </button>
 
               <div className="space-y-4 border-t border-stone-200 pt-8 text-center dark:border-stone-800">
                 <div className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-900 dark:border-green-800 dark:bg-green-950/50 dark:text-green-100">

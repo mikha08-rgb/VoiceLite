@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { getSessionTokenFromRequest, getSessionFromToken } from '@/lib/auth/session';
 import { validateOrigin, getCsrfErrorResponse } from '@/lib/csrf';
+import { checkoutRateLimit, checkRateLimit, getClientIp } from '@/lib/ratelimit';
 
 // Lazy initialization of Stripe client
 // During build time, env vars may not be set, so we initialize on first use
@@ -27,6 +26,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(getCsrfErrorResponse(), { status: 403 });
   }
 
+  // Rate limiting: 5 requests per minute per IP
+  const clientIp = getClientIp(request);
+  const rateLimitResult = await checkRateLimit(clientIp, checkoutRateLimit);
+
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      {
+        error: 'Too many checkout requests',
+        message: 'Please wait a moment before trying again.',
+        retryAfter: rateLimitResult.reset.toISOString(),
+      },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.getTime().toString(),
+          'Retry-After': Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString(),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { successUrl, cancelUrl } = bodySchema.parse(body);
@@ -41,21 +63,7 @@ export async function POST(request: NextRequest) {
     const success = successUrl ?? `${baseUrl}/checkout/success`;
     const cancel = cancelUrl ?? `${baseUrl}/checkout/cancel`;
 
-    const sessionToken = getSessionTokenFromRequest(request);
-    let customerEmail: string | undefined;
-    if (sessionToken) {
-      const session = await getSessionFromToken(sessionToken);
-      if (session) {
-        const user = await prisma.user.findUnique({ where: { id: session.userId } });
-        customerEmail = user?.email;
-      }
-    }
-
-    if (!customerEmail) {
-      return NextResponse.json({ error: 'Authentication required to start checkout' }, { status: 401 });
-    }
-
-    // Simple one-time $20 payment - no subscription, no tiers
+    // Simple one-time $20 payment - no auth required, Stripe collects email
     const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       mode: 'payment', // One-time payment only
@@ -64,8 +72,8 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'VoiceLite',
-              description: 'One-time purchase - Lifetime access to VoiceLite',
+              name: 'VoiceLite Pro',
+              description: 'One-time purchase - Lifetime access to VoiceLite Pro features',
             },
             unit_amount: 2000, // $20.00
           },
@@ -74,8 +82,8 @@ export async function POST(request: NextRequest) {
       ],
       success_url: success,
       cancel_url: cancel,
-      customer_email: customerEmail,
-      client_reference_id: customerEmail,
+      // Let Stripe collect customer email during checkout
+      billing_address_collection: 'required',
     }
 
     const stripe = getStripeClient();
