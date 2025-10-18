@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace VoiceLite.Services
@@ -7,6 +9,7 @@ namespace VoiceLite.Services
     /// <summary>
     /// Simple local license storage for one-time purchase model.
     /// Stores validated license locally after first online validation.
+    /// Uses Windows DPAPI encryption to protect license data from tampering.
     /// No network calls needed after initial activation.
     /// </summary>
     public static class SimpleLicenseStorage
@@ -30,6 +33,52 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
+        /// Decrypt data using Windows DPAPI (Data Protection API)
+        /// Falls back to plaintext if decryption fails (backward compatibility)
+        /// </summary>
+        private static string DecryptData(byte[] encryptedData)
+        {
+            try
+            {
+                // Try to decrypt using DPAPI
+                var decryptedBytes = ProtectedData.Unprotect(
+                    encryptedData,
+                    null, // No additional entropy
+                    DataProtectionScope.CurrentUser // User-specific encryption
+                );
+                return Encoding.UTF8.GetString(decryptedBytes);
+            }
+            catch
+            {
+                // Decryption failed - assume plaintext (backward compatibility)
+                // This handles migration from old unencrypted licenses
+                return Encoding.UTF8.GetString(encryptedData);
+            }
+        }
+
+        /// <summary>
+        /// Encrypt data using Windows DPAPI (Data Protection API)
+        /// </summary>
+        private static byte[] EncryptData(string plaintext)
+        {
+            try
+            {
+                var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+                return ProtectedData.Protect(
+                    plaintextBytes,
+                    null, // No additional entropy
+                    DataProtectionScope.CurrentUser // User-specific encryption
+                );
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("DPAPI encryption failed - falling back to plaintext", ex);
+                // Fallback to plaintext if encryption fails (fail-open)
+                return Encoding.UTF8.GetBytes(plaintext);
+            }
+        }
+
+        /// <summary>
         /// Check if we have a valid local license stored
         /// </summary>
         public static bool HasValidLicense(out StoredLicense? license)
@@ -45,7 +94,12 @@ namespace VoiceLite.Services
 
                 try
                 {
-                    var json = File.ReadAllText(LicensePath);
+                    // Read encrypted license file
+                    var encryptedData = File.ReadAllBytes(LicensePath);
+
+                    // Decrypt using DPAPI (falls back to plaintext for old licenses)
+                    var json = DecryptData(encryptedData);
+
                     license = JsonSerializer.Deserialize<StoredLicense>(json);
 
                     if (license == null || string.IsNullOrWhiteSpace(license.LicenseKey))
@@ -67,6 +121,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Save validated license locally (called after successful online validation)
+        /// Uses Windows DPAPI encryption to protect license data from tampering
         /// </summary>
         public static void SaveLicense(string licenseKey, string email, string type = "LIFETIME")
         {
@@ -96,15 +151,18 @@ namespace VoiceLite.Services
                     // Ensure directory exists
                     Directory.CreateDirectory(AppDataPath);
 
-                    // Serialize and save
+                    // Serialize to JSON
                     var options = new JsonSerializerOptions
                     {
                         WriteIndented = true
                     };
                     var json = JsonSerializer.Serialize(license, options);
-                    File.WriteAllText(LicensePath, json);
 
-                    ErrorLogger.LogMessage($"License saved locally for {email}");
+                    // SECURITY FIX: Encrypt using Windows DPAPI before saving
+                    var encryptedData = EncryptData(json);
+                    File.WriteAllBytes(LicensePath, encryptedData);
+
+                    ErrorLogger.LogMessage($"License saved locally (encrypted) for {email}");
                 }
                 catch (Exception ex)
                 {

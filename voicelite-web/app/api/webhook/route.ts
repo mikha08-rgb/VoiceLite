@@ -102,14 +102,39 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     stripePaymentIntentId: paymentIntentId,
   });
 
-  // Send license email (even for existing licenses - user may have lost email)
-  await sendLicenseEmail({
-    email,
-    licenseKey: license.licenseKey,
-    plan: 'lifetime',
-  });
+  // CRITICAL: Wrap email send in try-catch to prevent customer from losing license if email fails
+  // If email fails, customer still paid and license is valid - we log for manual recovery
+  try {
+    await sendLicenseEmail({
+      email,
+      licenseKey: license.licenseKey,
+      plan: 'lifetime',
+    });
 
-  console.log(`License ${license.licenseKey} issued/resent to ${email}`);
+    // Mark email as sent in database
+    await prisma.license.update({
+      where: { id: license.id },
+      data: { emailSent: true },
+    });
+
+    console.log(`License ${license.licenseKey} issued/resent to ${email}`);
+  } catch (emailError) {
+    // CRITICAL ERROR: Email failed but customer paid - log for manual recovery
+    console.error('CRITICAL: License email failed to send - manual intervention required!');
+    console.error(`License Key: ${license.licenseKey}`);
+    console.error(`Email: ${email}`);
+    console.error(`Payment Intent: ${paymentIntentId}`);
+    console.error('Email Error:', emailError);
+
+    // Mark email as failed in database for admin dashboard
+    await prisma.license.update({
+      where: { id: license.id },
+      data: { emailSent: false },
+    });
+
+    // Still return success to Stripe (prevent retries)
+    // Admin must manually send license key to customer
+  }
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {
