@@ -11,6 +11,9 @@ namespace VoiceLite.Services
     /// </summary>
     public static class SimpleLicenseStorage
     {
+        // BUG FIX: File lock for thread-safe operations
+        private static readonly object _fileLock = new object();
+
         private static readonly string AppDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite"
@@ -31,30 +34,34 @@ namespace VoiceLite.Services
         /// </summary>
         public static bool HasValidLicense(out StoredLicense? license)
         {
-            license = null;
-
-            if (!File.Exists(LicensePath))
+            lock (_fileLock) // BUG FIX: Thread-safe file access
             {
-                return false;
-            }
+                license = null;
 
-            try
-            {
-                var json = File.ReadAllText(LicensePath);
-                license = JsonSerializer.Deserialize<StoredLicense>(json);
-
-                if (license == null || string.IsNullOrWhiteSpace(license.LicenseKey))
+                if (!File.Exists(LicensePath))
                 {
                     return false;
                 }
 
-                // License is valid if it exists and has required fields
-                return true;
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Failed to read stored license", ex);
-                return false;
+                try
+                {
+                    var json = File.ReadAllText(LicensePath);
+                    license = JsonSerializer.Deserialize<StoredLicense>(json);
+
+                    if (license == null || string.IsNullOrWhiteSpace(license.LicenseKey))
+                    {
+                        license = null; // BUG FIX: Set to null before returning to prevent null reference exceptions
+                        return false;
+                    }
+
+                    // License is valid if it exists and has required fields
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Failed to read stored license", ex);
+                    return false;
+                }
             }
         }
 
@@ -63,33 +70,47 @@ namespace VoiceLite.Services
         /// </summary>
         public static void SaveLicense(string licenseKey, string email, string type = "LIFETIME")
         {
-            try
+            // BUG FIX #3: Input validation - fail fast on invalid data
+            if (string.IsNullOrWhiteSpace(licenseKey))
             {
-                var license = new StoredLicense
-                {
-                    LicenseKey = licenseKey,
-                    Email = email,
-                    ValidatedAt = DateTime.UtcNow,
-                    Type = type
-                };
-
-                // Ensure directory exists
-                Directory.CreateDirectory(AppDataPath);
-
-                // Serialize and save
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                };
-                var json = JsonSerializer.Serialize(license, options);
-                File.WriteAllText(LicensePath, json);
-
-                ErrorLogger.LogMessage($"License saved locally for {email}");
+                throw new ArgumentException("License key cannot be null or empty", nameof(licenseKey));
             }
-            catch (Exception ex)
+
+            if (string.IsNullOrWhiteSpace(email))
             {
-                ErrorLogger.LogError("Failed to save license", ex);
-                throw;
+                throw new ArgumentException("Email cannot be null or empty", nameof(email));
+            }
+
+            lock (_fileLock) // BUG FIX #2: Thread-safe file access
+            {
+                try
+                {
+                    var license = new StoredLicense
+                    {
+                        LicenseKey = licenseKey,
+                        Email = email,
+                        ValidatedAt = DateTime.UtcNow,
+                        Type = type
+                    };
+
+                    // Ensure directory exists
+                    Directory.CreateDirectory(AppDataPath);
+
+                    // Serialize and save
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+                    var json = JsonSerializer.Serialize(license, options);
+                    File.WriteAllText(LicensePath, json);
+
+                    ErrorLogger.LogMessage($"License saved locally for {email}");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Failed to save license", ex);
+                    throw;
+                }
             }
         }
 
@@ -98,17 +119,20 @@ namespace VoiceLite.Services
         /// </summary>
         public static void DeleteLicense()
         {
-            try
+            lock (_fileLock) // BUG FIX: Thread-safe file access
             {
-                if (File.Exists(LicensePath))
+                try
                 {
-                    File.Delete(LicensePath);
-                    ErrorLogger.LogMessage("Local license deleted");
+                    if (File.Exists(LicensePath))
+                    {
+                        File.Delete(LicensePath);
+                        ErrorLogger.LogMessage("Local license deleted");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Failed to delete license", ex);
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Failed to delete license", ex);
+                }
             }
         }
 
