@@ -35,7 +35,7 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.LeftAlt; // Default hotkey for recording
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
-        private string _whisperModel = "ggml-tiny.bin"; // Free tier default (temporary promotion for growth)
+        private string _whisperModel = "ggml-base.bin"; // Default to Base model for better first impression (still free, better accuracy than Tiny)
         private int _beamSize = 1; // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (greedy decoding)
         private int _bestOf = 1;   // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (single sampling)
         private double _whisperTimeoutMultiplier = 2.0;
@@ -67,7 +67,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-base.bin" : value;
         }
 
         public int BeamSize
@@ -108,7 +108,7 @@ namespace VoiceLite.Models
         public bool StartWithWindows { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
-        public bool PlaySoundFeedback { get; set; } = false;
+        public bool PlaySoundFeedback { get; set; } = true; // PRODUCTION: Changed to true for better first-time user experience
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
@@ -149,11 +149,6 @@ namespace VoiceLite.Models
         // First-Run Experience
         public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
         public bool HasSeenFirstRunDiagnostics { get; set; } = false; // Show first-run diagnostic window after installation
-
-        // License Key (for Pro model access)
-        public string? LicenseKey { get; set; } = null; // VL-XXXXXX-XXXXXX-XXXXXX format
-        public DateTime? LicenseValidatedAt { get; set; } = null; // Last successful validation timestamp
-        public bool LicenseIsValid { get; set; } = false; // Cached validation result
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
