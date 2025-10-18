@@ -17,11 +17,11 @@ export default function CheckoutCancelPage() {
 
           <div className="bg-stone-100 dark:bg-stone-800 p-4 rounded-lg space-y-2">
             <p className="font-semibold text-stone-900 dark:text-stone-100">
-              VoiceLite is 100% free
+              💡 Try the Free Version
             </p>
             <p className="text-sm">
               You can still use VoiceLite with the Tiny model (included in the free download).
-              The $20 payment is optional to unlock the Pro model and support development.
+              Upgrade to Pro anytime for $20 to unlock all 4 advanced models (90-98% accuracy).
             </p>
           </div>
         </div>
@@ -34,7 +34,9 @@ export default function CheckoutCancelPage() {
             ← Back to Home
           </Link>
           <a
-            href="https://github.com/yourusername/voicelite/releases/latest"
+            href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex-1 inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Download Free Version

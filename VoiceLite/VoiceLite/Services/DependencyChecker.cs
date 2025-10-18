@@ -275,37 +275,39 @@ namespace VoiceLite.Services
 
         private static async Task<bool> InstallVCRuntimeAsync()
         {
-            // CRITICAL FIX: Ensure Window is properly closed in finally block to prevent resource leak
-            var progressWindow = new Window
-            {
-                Title = "Installing Dependencies",
-                Width = 400,
-                Height = 150,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Content = new System.Windows.Controls.StackPanel
-                {
-                    Margin = new Thickness(20),
-                    Children =
-                    {
-                        new System.Windows.Controls.TextBlock
-                        {
-                            Text = "Downloading Microsoft Visual C++ Runtime...",
-                            FontSize = 14,
-                            Margin = new Thickness(0, 10, 0, 10)
-                        },
-                        new System.Windows.Controls.ProgressBar
-                        {
-                            Height = 20,
-                            IsIndeterminate = true
-                        }
-                    }
-                }
-            };
-
-            progressWindow.Show();
+            // AUDIT FIX (RESOURCE-CRIT): Ensure window cleanup even on exception
+            Window? progressWindow = null;
 
             try
             {
+                progressWindow = new Window
+                {
+                    Title = "Installing Dependencies",
+                    Width = 400,
+                    Height = 150,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    Content = new System.Windows.Controls.StackPanel
+                    {
+                        Margin = new Thickness(20),
+                        Children =
+                        {
+                            new System.Windows.Controls.TextBlock
+                            {
+                                Text = "Downloading Microsoft Visual C++ Runtime...",
+                                FontSize = 14,
+                                Margin = new Thickness(0, 10, 0, 10)
+                            },
+                            new System.Windows.Controls.ProgressBar
+                            {
+                                Height = 20,
+                                IsIndeterminate = true
+                            }
+                        }
+                    }
+                };
+
+                progressWindow.Show();
+
                 var tempPath = Path.Combine(Path.GetTempPath(), "vc_redist.x64.exe");
 
                 try
@@ -394,6 +396,23 @@ namespace VoiceLite.Services
                     MessageBoxImage.Warning);
 
                 return false;
+            }
+            finally
+            {
+                // AUDIT FIX (RESOURCE-CRIT): Ensure window cleanup even on exception
+                try
+                {
+                    if (progressWindow?.IsVisible == true)
+                    {
+                        progressWindow.Close();
+                    }
+                    progressWindow?.Dispatcher.InvokeShutdown();
+                }
+                catch (Exception cleanupEx)
+                {
+                    // Log cleanup errors but don't throw
+                    ErrorLogger.LogWarning($"Failed to cleanup progress window: {cleanupEx.Message}");
+                }
             }
         }
 

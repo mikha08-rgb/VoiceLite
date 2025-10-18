@@ -211,31 +211,48 @@ namespace VoiceLite.Services
 
             // MEMORY_FIX 2025-10-08: Enhanced logging - check for zombie whisper.exe processes
             var whisperProcesses = Process.GetProcessesByName("whisper");
-            var whisperCount = whisperProcesses.Length;
-            var whisperMemoryMB = 0L;
-            foreach (var proc in whisperProcesses)
+            try
             {
-                try
+                var whisperCount = whisperProcesses.Length;
+                var whisperMemoryMB = 0L;
+
+                foreach (var proc in whisperProcesses)
                 {
-                    proc.Refresh();
-                    whisperMemoryMB += proc.WorkingSet64 / 1024 / 1024;
-                    proc.Dispose();
+                    try
+                    {
+                        using (proc) // AUDIT FIX: Ensures disposal even on exception
+                        {
+                            proc.Refresh();
+                            whisperMemoryMB += proc.WorkingSet64 / 1024 / 1024;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogWarning($"Failed to read whisper process info: {ex.Message}");
+                    }
                 }
-                catch { }
+
+                ErrorLogger.LogMessage(
+                    $"Memory Stats - Working Set: {workingSetMB}MB | " +
+                    $"GC Memory: {gcMemoryMB}MB | " +
+                    $"Peak: {peakMemory / 1024 / 1024}MB | " +
+                    $"GC Counts: G0={gen0}, G1={gen1}, G2={gen2} | " +
+                    $"Whisper Processes: {whisperCount} ({whisperMemoryMB}MB)");
+
+                // CRITICAL: Alert if zombie whisper.exe detected
+                if (whisperCount > 0)
+                {
+                    OnMemoryAlert(MemoryAlertLevel.Warning, workingSetMB,
+                        $"Zombie whisper.exe processes detected: {whisperCount} processes using {whisperMemoryMB}MB");
+                }
             }
-
-            ErrorLogger.LogMessage(
-                $"Memory Stats - Working Set: {workingSetMB}MB | " +
-                $"GC Memory: {gcMemoryMB}MB | " +
-                $"Peak: {peakMemory / 1024 / 1024}MB | " +
-                $"GC Counts: G0={gen0}, G1={gen1}, G2={gen2} | " +
-                $"Whisper Processes: {whisperCount} ({whisperMemoryMB}MB)");
-
-            // CRITICAL: Alert if zombie whisper.exe detected
-            if (whisperCount > 0)
+            finally
             {
-                OnMemoryAlert(MemoryAlertLevel.Warning, workingSetMB,
-                    $"Zombie whisper.exe processes detected: {whisperCount} processes using {whisperMemoryMB}MB");
+                // AUDIT FIX: Defensive cleanup in case foreach didn't complete
+                foreach (var proc in whisperProcesses)
+                {
+                    try { proc?.Dispose(); } catch { }
+                }
             }
         }
 

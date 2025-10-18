@@ -20,8 +20,9 @@ namespace VoiceLite.Services
         private readonly Settings settings;
 
         // QUICK WIN 5: Track clipboard restoration failures for data-driven decision making
-        private static int clipboardRestoreFailures = 0;
-        private static int clipboardRestoreSuccesses = 0;
+        // AUDIT FIX (CRITICAL-TS): Use long for thread-safe Interlocked operations
+        private static long clipboardRestoreFailures = 0;
+        private static long clipboardRestoreSuccesses = 0;
 
         // CRITICAL FIX (CRITICAL-1): Track background tasks for proper disposal
         // Prevents thread pool exhaustion from orphaned clipboard restore tasks
@@ -362,17 +363,19 @@ namespace VoiceLite.Services
                                 }
 
                                 // QUICK WIN 5: Track restoration success/failure for metrics
+                                // AUDIT FIX (CRITICAL-TS): Thread-safe static field access with Interlocked
                                 if (restoreSucceeded)
                                 {
                                     System.Threading.Interlocked.Increment(ref clipboardRestoreSuccesses);
                                 }
                                 else
                                 {
-                                    int failures = System.Threading.Interlocked.Increment(ref clipboardRestoreFailures);
+                                    long failures = System.Threading.Interlocked.Increment(ref clipboardRestoreFailures);
                                     // Log every 10 failures to track problem severity
                                     if (failures % 10 == 0)
                                     {
-                                        ErrorLogger.LogWarning($"QUICK WIN 5: Clipboard restoration has failed {failures} times (successes: {clipboardRestoreSuccesses})");
+                                        long successes = System.Threading.Interlocked.Read(ref clipboardRestoreSuccesses);
+                                        ErrorLogger.LogWarning($"QUICK WIN 5: Clipboard restoration has failed {failures} times (successes: {successes})");
                                     }
                                 }
                             }

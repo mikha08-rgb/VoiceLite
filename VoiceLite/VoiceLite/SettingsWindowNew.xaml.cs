@@ -66,14 +66,8 @@ namespace VoiceLite
             // Audio Enhancement - sync UI from settings
             SyncAudioUIFromSettings();
 
-            // Custom Dictionary - REMOVED (feature simplified away)
-            // UpdateDictionaryCount(); // Dead code
-
-            // Current Model is set in SetupModelComparison
-
-            // License Key
-            LicenseKeyTextBox.Text = settings.LicenseKey ?? "";
-            UpdateLicenseStatus();
+            // License Status (Read-Only)
+            UpdateLicenseStatusDisplay();
 
             isInitialized = true;
         }
@@ -240,14 +234,6 @@ namespace VoiceLite
                 settings.SelectedMicrophoneName = selectedDevice.Name;
             }
 
-            // Custom Dictionary - REMOVED (feature simplified away)
-
-            // Whisper Model is already saved when selected
-
-            // Advanced settings removed from UI (still work via settings.json)
-
-            // Audio Enhancement - already saved via event handlers, no need to duplicate
-
             // Hotkey (already saved on change)
         }
 
@@ -255,90 +241,18 @@ namespace VoiceLite
         private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
         private void SyncAudioUIFromSettings() { }
 
-        // License validation
-        private async void ValidateLicenseButton_Click(object sender, RoutedEventArgs e)
+        // License Status Display (Read-Only)
+        private void UpdateLicenseStatusDisplay()
         {
-            var licenseKey = LicenseKeyTextBox.Text?.Trim();
-
-            if (string.IsNullOrWhiteSpace(licenseKey))
+            if (SimpleLicenseStorage.HasValidLicense(out var storedLicense))
             {
-                ShowLicenseStatus("Please enter a license key", false);
-                return;
-            }
-
-            if (!LicenseValidator.IsValidFormat(licenseKey))
-            {
-                ShowLicenseStatus("Invalid format. Expected: VL-XXXXXX-XXXXXX-XXXXXX", false);
-                return;
-            }
-
-            ValidateLicenseButton.IsEnabled = false;
-            ValidateLicenseButton.Content = "Validating...";
-            ShowLicenseStatus("Validating license key...", null);
-
-            try
-            {
-                var response = await LicenseValidator.ValidateAsync_Static(licenseKey);
-
-                if (response.valid)
-                {
-                    settings.LicenseKey = licenseKey;
-                    settings.LicenseIsValid = true;
-                    settings.LicenseValidatedAt = DateTime.UtcNow;
-                    ShowLicenseStatus($"✓ Valid Pro license ({response.email})", true);
-
-                    // Save immediately
-                    saveSettingsCallback?.Invoke();
-                }
-                else
-                {
-                    settings.LicenseIsValid = false;
-                    ShowLicenseStatus($"✗ {response.error ?? "License key not found"}", false);
-                }
-            }
-            catch (Exception ex)
-            {
-                ShowLicenseStatus($"✗ Validation failed: {ex.Message}", false);
-            }
-            finally
-            {
-                ValidateLicenseButton.IsEnabled = true;
-                ValidateLicenseButton.Content = "Validate";
-            }
-        }
-
-        private void ShowLicenseStatus(string message, bool? isValid)
-        {
-            LicenseStatusText.Text = message;
-            LicenseStatusText.Visibility = Visibility.Visible;
-
-            if (isValid == true)
-            {
+                LicenseStatusText.Text = $"✓ Pro License Active";
                 LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green);
-            }
-            else if (isValid == false)
-            {
-                LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
             }
             else
             {
+                LicenseStatusText.Text = "Free Version";
                 LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
-            }
-        }
-
-        private void UpdateLicenseStatus()
-        {
-            if (!string.IsNullOrWhiteSpace(settings.LicenseKey) && settings.LicenseIsValid)
-            {
-                var daysAgo = settings.LicenseValidatedAt.HasValue
-                    ? (DateTime.UtcNow - settings.LicenseValidatedAt.Value).Days
-                    : 0;
-
-                ShowLicenseStatus($"✓ Pro license active (validated {daysAgo} days ago)", true);
-            }
-            else if (!string.IsNullOrWhiteSpace(settings.LicenseKey))
-            {
-                ShowLicenseStatus("License not validated. Click 'Validate' to check.", null);
             }
         }
 
@@ -352,7 +266,7 @@ namespace VoiceLite
             e.Handled = true;
         }
 
-        // Stub event handlers for removed/unimplemented features
+        // Event handlers for UI elements
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }
         private void DownloadModelsButton_Click(object sender, RoutedEventArgs e) { }
         private void StudioPreset_Click(object sender, RoutedEventArgs e) { }

@@ -1,80 +1,174 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSessionTokenFromRequest, getSessionFromToken } from '@/lib/auth/session';
-import { getLicenseByKey, recordLicenseActivation } from '@/lib/licensing';
-import { checkRateLimit, licenseRateLimit } from '@/lib/ratelimit';
-import { validateOrigin, getCsrfErrorResponse } from '@/lib/csrf';
+import { prisma } from '@/lib/prisma';
+import { LicenseStatus } from '@prisma/client';
+import { recordLicenseActivation } from '@/lib/licensing';
+import { activationRateLimit, checkRateLimit, getClientIp } from '@/lib/ratelimit';
+
+/**
+ * POST /api/licenses/activate
+ *
+ * Activate a license on a new device.
+ * Enforces device limits to prevent piracy.
+ * No authentication required - the license key itself is the auth.
+ */
 
 const bodySchema = z.object({
-  licenseKey: z.string().min(10),
-  machineId: z.string().min(6),
+  licenseKey: z.string().min(10, 'License key is required'),
+  machineId: z.string().min(10, 'Machine ID is required'),
   machineLabel: z.string().optional(),
-  machineHash: z.string().optional(),
 });
 
-const MAX_ACTIVATIONS = 3;
+// License key format validation
+const LICENSE_KEY_REGEX = /^VL-[A-Z0-9]{6}-[A-Z0-9]{6}-[A-Z0-9]{6}$/;
 
 export async function POST(request: NextRequest) {
-  // CSRF protection
-  if (!validateOrigin(request)) {
-    return NextResponse.json(getCsrfErrorResponse(), { status: 403 });
+  // Rate limiting: 10 requests per hour per IP
+  const clientIp = getClientIp(request);
+  const rateLimitResult = await checkRateLimit(clientIp, activationRateLimit);
+
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Too many activation attempts',
+        message: 'Please wait before trying again.',
+        retryAfter: rateLimitResult.reset.toISOString(),
+      },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': rateLimitResult.reset.getTime().toString(),
+          'Retry-After': Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString(),
+        },
+      }
+    );
   }
 
   try {
-    const sessionToken = getSessionTokenFromRequest(request);
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
-    const session = await getSessionFromToken(sessionToken);
-    if (!session) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
-    // Rate limit: 30 license operations per day per user
-    const rateLimit = await checkRateLimit(session.userId, licenseRateLimit);
-    if (!rateLimit.allowed) {
-      return NextResponse.json({ error: 'Daily license operation limit reached' }, { status: 429 });
-    }
-
     const body = await request.json();
-    const { licenseKey, machineId, machineLabel, machineHash } = bodySchema.parse(body);
+    const { licenseKey, machineId, machineLabel } = bodySchema.parse(body);
 
-    const license = await getLicenseByKey(licenseKey);
+    // Validate license key format
+    if (!LICENSE_KEY_REGEX.test(licenseKey)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid license key format',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Find license
+    const license = await prisma.license.findUnique({
+      where: { licenseKey },
+      include: { activations: true },
+    });
+
     if (!license) {
-      return NextResponse.json({ error: 'License not found' }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'License key not found',
+        },
+        { status: 404 }
+      );
     }
 
-    if (license.userId !== session.userId) {
-      return NextResponse.json({ error: 'License does not belong to this account' }, { status: 403 });
+    // Check if license is active
+    if (license.status !== LicenseStatus.ACTIVE) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This license has been canceled or expired',
+        },
+        { status: 403 }
+      );
     }
 
-    const activeActivations = license.activations.filter((activation) => activation.status === 'ACTIVE');
-    const existing = activeActivations.find((activation) => activation.machineId === machineId);
+    // Check if this machine is already activated
+    const existingActivation = license.activations.find(
+      (a) => a.machineId === machineId
+    );
 
-    if (!existing && activeActivations.length >= MAX_ACTIVATIONS) {
-      return NextResponse.json({ error: 'Activation limit reached' }, { status: 409 });
+    if (existingActivation) {
+      // Already activated, update lastValidatedAt
+      await recordLicenseActivation({
+        licenseId: license.id,
+        machineId,
+        machineLabel,
+      });
+
+      return NextResponse.json({
+        success: true,
+        license: {
+          type: license.type,
+          email: license.email,
+        },
+        activatedDevices: license.activations.length,
+        maxDevices: license.maxDevices,
+        message: 'License already activated on this device',
+      });
     }
 
-    const activation = await recordLicenseActivation({
+    // Check device limit
+    if (license.activations.length >= license.maxDevices) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This license is already activated on ${license.maxDevices} devices (maximum allowed). Please deactivate it on another device first, or contact support@voicelite.app for help.`,
+          activatedDevices: license.activations.length,
+          maxDevices: license.maxDevices,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Create new activation
+    await recordLicenseActivation({
       licenseId: license.id,
       machineId,
       machineLabel,
-      machineHash,
     });
 
+    console.log(
+      `License ${licenseKey} activated on device ${machineLabel || machineId} (${
+        license.activations.length + 1
+      }/${license.maxDevices})`
+    );
+
     return NextResponse.json({
-      ok: true,
-      activation: {
-        id: activation.id,
-        status: activation.status,
+      success: true,
+      license: {
+        type: license.type,
+        email: license.email,
       },
+      activatedDevices: license.activations.length + 1,
+      maxDevices: license.maxDevices,
+      message: 'License activated successfully',
     });
   } catch (error) {
-    console.error('License activation failed', error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request',
+          details: error.issues,
+        },
+        { status: 400 }
+      );
     }
-    return NextResponse.json({ error: 'Unable to activate license' }, { status: 500 });
+
+    console.error('License activation error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Internal server error',
+      },
+      { status: 500 }
+    );
   }
 }

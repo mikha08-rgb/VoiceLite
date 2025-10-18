@@ -25,6 +25,7 @@ namespace VoiceLite.Services
         private readonly CancellationTokenSource disposeCts = new();
         private readonly CancellationTokenSource disposalCts = new CancellationTokenSource(); // CRITICAL FIX: Cancellation for semaphore during disposal
         private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
+        private readonly object disposeLock = new object(); // AUDIT FIX: Lock for TOCTOU protection
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
 
@@ -234,10 +235,27 @@ namespace VoiceLite.Services
                     ErrorLogger.LogMessage($"Failed to set Whisper warmup process priority: {ex.Message}");
                 }
 
-                await process.WaitForExitAsync();
-
-                // Warmup completed successfully (no timing logs to reduce noise)
-                isWarmedUp = true;
+                // AUDIT FIX (ERROR-CRIT-3): Add timeout to prevent infinite hang
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                    // Warmup completed successfully (no timing logs to reduce noise)
+                    isWarmedUp = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    ErrorLogger.LogWarning("Warmup timed out after 120 seconds - killing process");
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception killEx)
+                    {
+                        ErrorLogger.LogError("Failed to kill hung warmup process", killEx);
+                    }
+                    // Don't set isWarmedUp = true - warmup failed
+                }
             }
             catch (Exception ex)
             {
@@ -286,7 +304,8 @@ namespace VoiceLite.Services
             }
 
             // BUG FIX (CRIT-004): Track semaphore acquisition to prevent double-release
-            // CRITICAL: WaitAsync must be inside try block to ensure proper cleanup in all exception paths
+            // AUDIT FIX (CRITICAL-2): Move WaitAsync BEFORE try block to prevent semaphore corruption
+            // If cancellation occurs during WaitAsync, finally block should NOT release semaphore
             bool semaphoreAcquired = false;
             Process? process = null; // TIER 1.3: Declare at method scope for finally block access
 
@@ -296,6 +315,15 @@ namespace VoiceLite.Services
                 // CRITICAL FIX: Add cancellation token support to prevent deadlock during disposal
                 await transcriptionSemaphore.WaitAsync(disposalCts.Token);
                 semaphoreAcquired = true;
+            }
+            catch (OperationCanceledException)
+            {
+                // Disposal in progress - exit gracefully without releasing semaphore
+                return string.Empty;
+            }
+
+            try
+            {
                 // Preprocess audio if needed
                 try
                 {
@@ -454,7 +482,7 @@ namespace VoiceLite.Services
                             "1. Wait a moment and try again (second attempt is usually faster)\n" +
                             "2. Run 'Fix Antivirus Issues' from your desktop to add VoiceLite exclusions\n" +
                             "3. Close other applications to free up RAM\n" +
-                            "4. Consider using the Tiny model in Settings (smaller, loads faster)");
+                            "4. Try Base or Tiny models for faster processing (lower quality)");
                     }
                     else
                     {
@@ -549,12 +577,19 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
-            if (isDisposed)
-                return;
+            // AUDIT FIX (CRITICAL-3): Add lock to prevent TOCTOU race condition
+            // Previously: Two threads could both see isDisposed=false, both proceed with disposal
+            lock (disposeLock)
+            {
+                if (isDisposed)
+                    return;
 
-            isDisposed = true;
+                isDisposed = true;
+            }
 
-            // CRITICAL FIX (CRITICAL-3): Cancel all operations immediately
+            // CRITICAL FIX (AUDIT FIX): Fire-and-forget disposal to prevent 5-second UI freeze
+            // Previously: disposalComplete.Wait() blocked UI thread for 5 seconds on shutdown
+            // New approach: Cancel operations and cleanup in background, return immediately
             try
             {
                 disposeCts.Cancel(); // Cancel warmup tasks
@@ -562,56 +597,42 @@ namespace VoiceLite.Services
             }
             catch { /* Ignore cancellation errors */ }
 
-            // CRITICAL FIX (CRITICAL-3): Wait for semaphore waiters to exit BEFORE disposing semaphore
-            // After canceling disposalCts, threads waiting on transcriptionSemaphore.WaitAsync(disposalCts.Token)
-            // will receive TaskCanceledException. We MUST give them time to exit cleanly before disposing.
-            // HIGH-1 FIX: Removed Thread.Sleep(100) - blocking the calling thread (likely UI thread)
-            // The ManualResetEventSlim.Wait() below already handles waiting with proper timeout
-
-            // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
-            // HIGH-1 FIX: This Wait() properly handles coordination with 5-second timeout
-            // Threads in finally blocks will signal disposalComplete, unblocking this wait
-            disposalComplete.Wait(TimeSpan.FromSeconds(5));
-
-            CleanupProcess();
-
-            // CRITICAL FIX (CRITICAL-3): Dispose semaphore safely AFTER all waiters have exited
-            // The 100ms sleep above ensures all threads have completed their cancellation handling
-            if (transcriptionSemaphore != null)
+            // Fire-and-forget background cleanup to avoid blocking UI thread
+            // QUALITY REVIEW FIX: Add ContinueWith to observe task exceptions and add null checks
+            Task.Run(() =>
             {
                 try
                 {
-                    transcriptionSemaphore.Dispose();
+                    // Wait for active transcriptions to complete (5s max)
+                    disposalComplete?.Wait(TimeSpan.FromSeconds(5));
+
+                    CleanupProcess();
+
+                    // CRITICAL FIX (CRITICAL-3): Dispose semaphore safely AFTER all waiters have exited
+                    try { transcriptionSemaphore?.Dispose(); }
+                    catch (ObjectDisposedException)
+                    {
+                        ErrorLogger.LogMessage("PersistentWhisperService: Semaphore already disposed (unexpected)");
+                    }
+
+                    // Dispose cancellation token sources with null checks
+                    try { disposeCts?.Dispose(); } catch (ObjectDisposedException) { }
+                    try { disposalCts?.Dispose(); } catch (ObjectDisposedException) { }
+                    try { disposalComplete?.Dispose(); } catch (ObjectDisposedException) { }
                 }
-                catch (ObjectDisposedException)
+                catch (Exception ex)
                 {
-                    // Already disposed, ignore
-                    ErrorLogger.LogMessage("PersistentWhisperService: Semaphore already disposed (unexpected)");
+                    // Log disposal errors but don't throw (we're in fire-and-forget task)
+                    ErrorLogger.LogError("PersistentWhisperService background disposal failed", ex);
                 }
-            }
-
-            // Dispose cancellation token source
-            try
+            }).ContinueWith(t =>
             {
-                disposeCts.Dispose();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Already disposed, ignore
-            }
-
-            // CRITICAL FIX: Dispose new disposal coordination resources
-            try
-            {
-                disposalCts.Dispose();
-            }
-            catch (ObjectDisposedException) { }
-
-            try
-            {
-                disposalComplete.Dispose();
-            }
-            catch (ObjectDisposedException) { }
+                // QUALITY REVIEW FIX: Observer for unhandled task exceptions
+                if (t.IsFaulted && t.Exception != null)
+                {
+                    ErrorLogger.LogError("PersistentWhisperService disposal task faulted", t.Exception);
+                }
+            }, TaskScheduler.Default);
         }
     }
 }

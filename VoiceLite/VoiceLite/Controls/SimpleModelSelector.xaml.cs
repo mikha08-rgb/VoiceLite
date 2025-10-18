@@ -115,13 +115,13 @@ namespace VoiceLite.Controls
             switch (modelFile)
             {
                 case "ggml-tiny.bin":
-                    TipText.Text = "Free model - good for basic voice typing";
+                    TipText.Text = "Fastest model - lower accuracy, good for quick notes";
                     break;
                 case "ggml-base.bin":
-                    TipText.Text = "Good for simple dictation and casual use";
+                    TipText.Text = "Free default - good balance of speed and accuracy";
                     break;
                 case "ggml-small.bin":
-                    TipText.Text = "'Pro' offers 5x better accuracy than Tiny";
+                    TipText.Text = "'Small' offers even better accuracy than Base";
                     break;
                 case "ggml-medium.bin":
                     TipText.Text = "Great for professional use when accuracy matters";

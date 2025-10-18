@@ -1,5 +1,6 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { NextRequest } from 'next/server';
 
 /**
  * Rate limiting configuration for VoiceLite API endpoints.
@@ -69,6 +70,32 @@ export const profileRateLimit = redis
       limiter: Ratelimit.slidingWindow(100, '1 h'),
       analytics: true,
       prefix: 'ratelimit:profile',
+    })
+  : null;
+
+/**
+ * Checkout rate limiter: 5 requests per minute per IP
+ * Used for /api/checkout to prevent spam session creation
+ */
+export const checkoutRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '1 m'),
+      analytics: true,
+      prefix: 'ratelimit:checkout',
+    })
+  : null;
+
+/**
+ * License activation rate limiter: 10 requests per hour per IP
+ * Used for /api/licenses/activate to prevent brute force
+ */
+export const activationRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:activation',
     })
   : null;
 
@@ -152,6 +179,35 @@ class InMemoryRateLimiter {
 export const fallbackEmailLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
 export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
+export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 1000); // 5/minute
+export const fallbackActivationLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
+
+/**
+ * Extract IP address from Next.js request
+ * Handles various deployment environments (Vercel, localhost, etc.)
+ */
+export function getClientIp(request: NextRequest): string {
+  // Vercel provides x-forwarded-for
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  // Cloudflare uses cf-connecting-ip
+  const cfIp = request.headers.get('cf-connecting-ip');
+  if (cfIp) {
+    return cfIp;
+  }
+
+  // Standard x-real-ip header
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp;
+  }
+
+  // Fallback for localhost/development
+  return request.ip || '127.0.0.1';
+}
 
 // Cleanup fallback limiters every 10 minutes
 if (!isConfigured) {
@@ -159,5 +215,7 @@ if (!isConfigured) {
     fallbackEmailLimit.cleanup();
     fallbackOtpLimit.cleanup();
     fallbackLicenseLimit.cleanup();
+    fallbackCheckoutLimit.cleanup();
+    fallbackActivationLimit.cleanup();
   }, 10 * 60 * 1000);
 }

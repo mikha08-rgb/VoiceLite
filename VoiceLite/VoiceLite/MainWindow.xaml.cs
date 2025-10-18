@@ -1015,14 +1015,14 @@ namespace VoiceLite
         private string GetModelDisplayName(string modelPath)
         {
             if (string.IsNullOrEmpty(modelPath))
-                return "Tiny (Free)";
+                return "Base (Free)";
 
             // Extract model name from path
             string modelName = modelPath.ToLower();
             if (modelName.Contains("tiny"))
-                return "Tiny (Free)";
+                return "Tiny";
             else if (modelName.Contains("base"))
-                return "Base";
+                return "Base (Free)";
             else if (modelName.Contains("small"))
                 return "Small";
             else if (modelName.Contains("medium"))
@@ -1030,7 +1030,7 @@ namespace VoiceLite
             else if (modelName.Contains("large"))
                 return "Large";
             else
-                return "Tiny (Free)"; // Default fallback
+                return "Base (Free)"; // Default fallback
         }
 
         private void UpdateUIForCurrentMode()

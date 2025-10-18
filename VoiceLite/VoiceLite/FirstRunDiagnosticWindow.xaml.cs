@@ -13,15 +13,39 @@ using VoiceLite.Services;
 
 namespace VoiceLite
 {
-    public partial class FirstRunDiagnosticWindow : Window
+    // AUDIT FIX (LEAK-CRIT-2): Implement IDisposable to allow using statement and ensure handle cleanup
+    public partial class FirstRunDiagnosticWindow : Window, IDisposable
     {
         private readonly List<DiagnosticCheckItem> _checkItems = new();
         private bool _allChecksPassed = false;
+        private bool _disposed = false;
 
         public FirstRunDiagnosticWindow()
         {
             InitializeComponent();
             Loaded += async (s, e) => await RunDiagnosticsAsync();
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Close the window if it's still open
+                    if (IsLoaded)
+                    {
+                        Close();
+                    }
+                }
+                _disposed = true;
+            }
         }
 
         private async Task RunDiagnosticsAsync()
@@ -246,23 +270,23 @@ namespace VoiceLite
                     var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                     var whisperDir = System.IO.Path.Combine(baseDir, "whisper");
 
-                    var tinyModel = System.IO.Path.Combine(whisperDir, "ggml-tiny.bin");
+                    var baseModel = System.IO.Path.Combine(whisperDir, "ggml-base.bin");
                     var smallModel = System.IO.Path.Combine(whisperDir, "ggml-small.bin");
 
                     var modelsFound = new List<string>();
 
-                    if (File.Exists(tinyModel))
+                    if (File.Exists(baseModel))
                     {
-                        var size = new FileInfo(tinyModel).Length / (1024 * 1024);
-                        if (size >= 60 && size <= 90) // 60-90 MB range
-                            modelsFound.Add($"Lite ({size} MB)");
+                        var size = new FileInfo(baseModel).Length / (1024 * 1024);
+                        if (size >= 140 && size <= 160) // ~145 MB range for Base
+                            modelsFound.Add($"Base ({size} MB)");
                     }
 
                     if (File.Exists(smallModel))
                     {
                         var size = new FileInfo(smallModel).Length / (1024 * 1024);
                         if (size >= 400 && size <= 550) // 400-550 MB range
-                            modelsFound.Add($"Pro ({size} MB)");
+                            modelsFound.Add($"Small ({size} MB)");
                     }
 
                     if (modelsFound.Count > 0)

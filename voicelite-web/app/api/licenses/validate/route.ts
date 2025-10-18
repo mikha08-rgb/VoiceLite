@@ -48,8 +48,7 @@ export async function POST(request: NextRequest) {
       valid,
       status: license.status,
       type: license.type,
-      expiresAt: license.expiresAt?.toISOString() ?? null,
-      email: license.user.email,
+      email: license.email,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

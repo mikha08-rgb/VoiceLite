@@ -29,8 +29,8 @@ export default function CheckoutSuccessPage() {
             <ol className="text-sm space-y-1 list-decimal list-inside">
               <li>Check your email for the license key</li>
               <li>Download VoiceLite if you haven't already</li>
-              <li>Open Settings in the app</li>
-              <li>Enter your license key to unlock Pro model</li>
+              <li>Launch VoiceLite - you'll see the activation dialog</li>
+              <li>Enter your license key to unlock all Pro models</li>
             </ol>
           </div>
         </div>
@@ -43,7 +43,9 @@ export default function CheckoutSuccessPage() {
             ← Back to Home
           </Link>
           <a
-            href="https://github.com/yourusername/voicelite/releases/latest"
+            href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex-1 inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Download VoiceLite
