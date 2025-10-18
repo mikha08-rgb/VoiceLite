@@ -34,21 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if license is active
-    const isActive = license.status === LicenseStatus.ACTIVE;
-
-    // Check if expired (for subscription types - though we only use LIFETIME now)
-    let isExpired = false;
-    if (license.expiresAt) {
-      isExpired = new Date() > license.expiresAt;
-    }
-
-    const valid = isActive && !isExpired;
+    // Note: We only support LIFETIME licenses currently, no expiration
+    const valid = license.status === LicenseStatus.ACTIVE;
 
     return NextResponse.json({
       valid,
       status: license.status,
       type: license.type,
-      email: license.email,
+      // Email removed for privacy - not needed by desktop app
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
