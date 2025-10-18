@@ -133,6 +133,41 @@ namespace VoiceLite.Services
                 _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
             };
 
+            // CRITICAL SECURITY FIX: Server-side model gating to prevent piracy
+            // Check if user is trying to use Pro models (Small, Medium, Large) without a valid license
+            // This prevents bypass by editing Settings.json directly
+            var proModels = new[] { "ggml-small.bin", "ggml-medium.bin", "ggml-large-v3.bin" };
+            if (proModels.Contains(modelFile))
+            {
+                bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
+
+                if (!hasValidLicense)
+                {
+                    // Security violation: User tried to use Pro model without license
+                    ErrorLogger.LogMessage($"SECURITY: Attempt to use Pro model '{modelFile}' without valid license - falling back to Base model");
+
+                    // Fallback to Base model (free tier) instead of blocking completely
+                    modelFile = "ggml-base.bin";
+
+                    // Update settings to prevent repeated attempts
+                    settings.WhisperModel = "ggml-base.bin";
+
+                    // Show warning to user (will be logged and displayed by MainWindow)
+                    throw new UnauthorizedAccessException(
+                        "Pro Model Requires License\n\n" +
+                        $"The '{settings.WhisperModel}' model requires a Pro license.\n\n" +
+                        "Free tier includes:\n" +
+                        "• Tiny model (fastest, lower accuracy)\n" +
+                        "• Base model (good balance)\n\n" +
+                        "Pro tier unlocks:\n" +
+                        "• Small model (better accuracy)\n" +
+                        "• Medium model (professional quality)\n" +
+                        "• Large model (maximum accuracy)\n\n" +
+                        "Get Pro for $29.99 at voicelite.app\n\n" +
+                        "Your model selection has been reset to Base.");
+                }
+            }
+
             // Check standard model locations
             var modelPath = Path.Combine(baseDir, "whisper", modelFile);
             if (File.Exists(modelPath))

@@ -31,12 +31,16 @@ model License {
   stripeCustomerId      String?
   stripePaymentIntentId String?   @unique
   maxDevices            Int       @default(3) // Device limit for piracy prevention
+  emailSent             Boolean   @default(false) // Track if license email was successfully sent
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   activations           LicenseActivation[]
 
   @@index([email])
   @@index([stripeCustomerId])
+  @@index([email, status]) // Composite index for common query pattern
+  @@index([stripePaymentIntentId]) // Index for webhook lookups
+  @@index([emailSent]) // Index for admin queries to find failed email sends
 }
 
 // Device activation tracking
@@ -51,6 +55,7 @@ model LicenseActivation {
 
   @@unique([licenseId, machineId]) // One activation per device
   @@index([licenseId])
+  @@index([machineId]) // Index for machine lookups
 }
 
 // Webhook event idempotency tracking
