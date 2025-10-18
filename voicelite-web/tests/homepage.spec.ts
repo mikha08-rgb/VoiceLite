@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('VoiceLite Homepage - Freemium Model', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:3003');
+    await page.goto('http://localhost:3000');
   });
 
   test('should load homepage successfully', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('VoiceLite Homepage - Freemium Model', () => {
 
     // Check Pro tier exists
     await expect(page.getByRole('heading', { name: 'Pro', exact: true })).toBeVisible();
-    await expect(page.getByText('$20', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('$20 USD')).toBeVisible();
     await expect(page.getByText('All 4 Pro models')).toBeVisible();
     await expect(page.getByText('90-98% accuracy')).toBeVisible();
 
@@ -41,15 +41,17 @@ test.describe('VoiceLite Homepage - Freemium Model', () => {
   });
 
   test('should have correct download links', async ({ page }) => {
+    await page.locator('#pricing').scrollIntoViewIfNeeded();
+
     // Free tier download button (GitHub)
     const freeDownload = page.getByRole('link', { name: 'Download Free' });
     await expect(freeDownload).toBeVisible();
     await expect(freeDownload).toHaveAttribute('href', /github\.com.*releases\/latest/);
 
-    // Pro tier purchase button (Stripe checkout)
-    const proButton = page.getByRole('link', { name: 'Get Pro - $20' });
+    // Pro tier purchase button (now a button, not a link)
+    const proButton = page.getByRole('button', { name: 'Get Pro - $20' });
     await expect(proButton).toBeVisible();
-    await expect(proButton).toHaveAttribute('href', '/api/checkout');
+    // Button is verified by role, no need to check type attribute
   });
 
   test('should display 30-day money-back guarantee on Pro tier', async ({ page }) => {

@@ -125,7 +125,7 @@ namespace VoiceLite.Services
                     if (waveIn.WaveFormat != null) // Check if device is initialized
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(10); // Minimal delay for NAudio buffer flush
+                        // AUDIT FIX: Removed Thread.Sleep(10) - NAudio doesn't require delay, blocks UI thread
                     }
                 }
                 catch (Exception ex)
@@ -523,7 +523,7 @@ namespace VoiceLite.Services
                     try
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(10); // Brief pause to let stop complete
+                        // AUDIT FIX: Removed Thread.Sleep(10) - unnecessary delay that blocks calling thread
 
                         // Detach handlers before disposal
                         if (eventHandlersAttached)
@@ -640,8 +640,7 @@ namespace VoiceLite.Services
                     waveIn?.StopRecording();
                 }
 
-                // Minimal delay for cleanup
-                Thread.Sleep(10);
+                // AUDIT FIX: Removed Thread.Sleep(10) - blocks UI thread during app shutdown
 
                 // Dispose wave file
                 waveFile?.Dispose();

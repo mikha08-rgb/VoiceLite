@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { LicenseType } from '@prisma/client';
 import { sendLicenseEmail } from '@/lib/email';
 import {
-  upsertLicenseFromStripe,
-  updateLicenseStatusBySubscriptionId,
+  createLicenseFromStripe,
   revokeLicense,
-  recordLicenseEvent,
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
@@ -64,13 +61,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session);
-        break;
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object as Stripe.Charge);
@@ -88,7 +79,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ received: true, eventId: event.id });
 }
 
-async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const email = session.customer_email || session.customer_details?.email;
   const stripeCustomerId = (session.customer as string) ?? '';
 
@@ -96,88 +87,29 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     throw new Error('Missing customer email or ID on checkout session');
   }
 
-  const plan = session.metadata?.plan ?? (session.mode === 'subscription' ? 'quarterly' : 'lifetime');
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id;
 
-  if (plan === 'quarterly') {
-    const subscriptionId = session.subscription as string | undefined;
-    if (!subscriptionId) {
-      throw new Error('Missing subscription id for quarterly plan');
-    }
-    const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as any;
-    const currentPeriodEnd = subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000)
-      : undefined;
-
-    const license = await upsertLicenseFromStripe({
-      email,
-      type: LicenseType.SUBSCRIPTION,
-      stripeCustomerId,
-      stripeSubscriptionId: subscriptionId,
-      subscriptionStatus: subscription.status,
-      periodEndsAt: currentPeriodEnd,
-    });
-
-    await sendLicenseEmail({
-      email,
-      licenseKey: license.licenseKey,
-      plan: 'subscription',
-    });
-  } else {
-    const paymentIntentId = typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : session.payment_intent?.id;
-
-    if (!paymentIntentId) {
-      throw new Error('Missing payment intent for lifetime plan');
-    }
-
-    const license = await upsertLicenseFromStripe({
-      email,
-      type: LicenseType.LIFETIME,
-      stripeCustomerId,
-      stripePaymentIntentId: paymentIntentId,
-    });
-
-    await sendLicenseEmail({
-      email,
-      licenseKey: license.licenseKey,
-      plan: 'lifetime',
-    });
+  if (!paymentIntentId) {
+    throw new Error('Missing payment intent for payment');
   }
-}
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  // Type assertion needed due to Stripe API version differences
-  const sub = subscription as any;
-  const periodEnd = sub.current_period_end
-    ? new Date(sub.current_period_end * 1000)
-    : undefined;
-
-  await updateLicenseStatusBySubscriptionId(subscription.id, subscription.status, periodEnd);
-
-  // Record event
-  const license = await prisma.license.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
+  // Create or get existing license (handles duplicate purchases)
+  const license = await createLicenseFromStripe({
+    email,
+    stripeCustomerId,
+    stripePaymentIntentId: paymentIntentId,
   });
-  if (license) {
-    await recordLicenseEvent(license.id, 'subscription_updated', {
-      status: subscription.status,
-      periodEnd: periodEnd?.toISOString(),
-    });
-  }
-}
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  await updateLicenseStatusBySubscriptionId(subscription.id, 'canceled');
-
-  const license = await prisma.license.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
+  // Send license email (even for existing licenses - user may have lost email)
+  await sendLicenseEmail({
+    email,
+    licenseKey: license.licenseKey,
+    plan: 'lifetime',
   });
-  if (license) {
-    await recordLicenseEvent(license.id, 'subscription_deleted', {
-      deletedAt: new Date().toISOString(),
-    });
-  }
+
+  console.log(`License ${license.licenseKey} issued/resent to ${email}`);
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge) {
@@ -195,7 +127,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   });
 
   if (license) {
-    await revokeLicense(license.id, 'charge_refunded');
-    console.log(`License ${license.id} revoked due to charge refund`);
+    await revokeLicense(license.id);
+    console.log(`License ${license.licenseKey} revoked due to charge refund`);
   }
 }

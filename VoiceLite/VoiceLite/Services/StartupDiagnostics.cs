@@ -96,10 +96,24 @@ namespace VoiceLite.Services
                     "WRSA" // Webroot
                 };
 
-                var runningAV = Process.GetProcesses()
-                    .Where(p => avProcesses.Contains(p.ProcessName, StringComparer.OrdinalIgnoreCase))
-                    .Select(p => p.ProcessName)
-                    .ToList();
+                // AUDIT FIX (RESOURCE-CRIT-4): Dispose all Process objects
+                Process[] allProcesses = Process.GetProcesses();
+                List<string> runningAV;
+                try
+                {
+                    runningAV = allProcesses
+                        .Where(p => avProcesses.Contains(p.ProcessName, StringComparer.OrdinalIgnoreCase))
+                        .Select(p => p.ProcessName)
+                        .ToList();
+                }
+                finally
+                {
+                    // Dispose ALL processes, not just matched ones
+                    foreach (var p in allProcesses)
+                    {
+                        try { p.Dispose(); } catch { }
+                    }
+                }
 
                 if (runningAV.Any())
                 {
@@ -305,11 +319,25 @@ namespace VoiceLite.Services
                     "Synergy" // Keyboard/mouse sharing software
                 };
 
-                var running = Process.GetProcesses()
-                    .Where(p => conflictingProcesses.Any(cp =>
-                        p.ProcessName.IndexOf(cp, StringComparison.OrdinalIgnoreCase) >= 0))
-                    .Select(p => p.ProcessName)
-                    .ToList();
+                // AUDIT FIX (RESOURCE-CRIT-4): Dispose all Process objects
+                Process[] allProcesses = Process.GetProcesses();
+                List<string> running;
+                try
+                {
+                    running = allProcesses
+                        .Where(p => conflictingProcesses.Any(cp =>
+                            p.ProcessName.IndexOf(cp, StringComparison.OrdinalIgnoreCase) >= 0))
+                        .Select(p => p.ProcessName)
+                        .ToList();
+                }
+                finally
+                {
+                    // Dispose ALL processes, not just matched ones
+                    foreach (var p in allProcesses)
+                    {
+                        try { p.Dispose(); } catch { }
+                    }
+                }
 
                 if (running.Any())
                 {
