@@ -21,7 +21,22 @@ function getStripeClient() {
 }
 
 export async function POST(request: NextRequest) {
-  const stripe = getStripeClient();
+  // PRODUCTION FIX: Gracefully handle unconfigured Stripe instead of crashing
+  // This allows the web platform to deploy without Stripe (for testing database, email, etc.)
+  let stripe;
+  try {
+    stripe = getStripeClient();
+  } catch (error) {
+    console.error('Stripe webhook called but Stripe is not configured:', error);
+    return NextResponse.json(
+      {
+        error: 'Stripe not configured',
+        message: 'Payment processing is not yet enabled'
+      },
+      { status: 503 } // Service Unavailable
+    );
+  }
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
