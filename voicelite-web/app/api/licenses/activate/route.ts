@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
         success: true,
         license: {
           type: license.type,
-          email: license.email,
         },
         activatedDevices: license.activations.length,
         maxDevices: license.maxDevices,
@@ -114,29 +113,54 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check device limit
-    if (license.activations.length >= license.maxDevices) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `This license is already activated on ${license.maxDevices} devices (maximum allowed). Please deactivate it on another device first, or contact support@voicelite.app for help.`,
-          activatedDevices: license.activations.length,
-          maxDevices: license.maxDevices,
-        },
-        { status: 403 }
-      );
-    }
+    // Use transaction to prevent race condition on device limit check
+    // This ensures atomic check-and-create operation
+    const result = await prisma.$transaction(async (tx) => {
+      // Re-fetch license within transaction to get fresh activation count
+      const currentLicense = await tx.license.findUnique({
+        where: { id: license.id },
+        include: { activations: true },
+      });
 
-    // Create new activation
-    await recordLicenseActivation({
-      licenseId: license.id,
-      machineId,
-      machineLabel,
+      if (!currentLicense) {
+        throw new Error('License not found');
+      }
+
+      // Check device limit with fresh data
+      if (currentLicense.activations.length >= currentLicense.maxDevices) {
+        return {
+          success: false,
+          error: `This license is already activated on ${currentLicense.maxDevices} devices (maximum allowed). Please deactivate it on another device first, or contact support@voicelite.app for help.`,
+          activatedDevices: currentLicense.activations.length,
+          maxDevices: currentLicense.maxDevices,
+        };
+      }
+
+      // Create activation - unique constraint will prevent duplicates
+      const activation = await tx.licenseActivation.create({
+        data: {
+          licenseId: currentLicense.id,
+          machineId,
+          machineLabel,
+          lastValidatedAt: new Date(),
+        },
+      });
+
+      return {
+        success: true,
+        activation,
+        activatedDevices: currentLicense.activations.length + 1,
+      };
     });
+
+    // Handle transaction result
+    if (!result.success) {
+      return NextResponse.json(result, { status: 403 });
+    }
 
     console.log(
       `License ${licenseKey} activated on device ${machineLabel || machineId} (${
-        license.activations.length + 1
+        result.activatedDevices
       }/${license.maxDevices})`
     );
 
@@ -144,9 +168,8 @@ export async function POST(request: NextRequest) {
       success: true,
       license: {
         type: license.type,
-        email: license.email,
       },
-      activatedDevices: license.activations.length + 1,
+      activatedDevices: result.activatedDevices,
       maxDevices: license.maxDevices,
       message: 'License activated successfully',
     });
