@@ -11,15 +11,13 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio",
-    "keygen": "tsx scripts/keygen.ts"
+    "db:studio": "prisma studio"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.1.0",
-    "@noble/ed25519": "^3.0.0",
     "@prisma/client": "^6.1.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/swagger-ui-react": "^5.18.0",
