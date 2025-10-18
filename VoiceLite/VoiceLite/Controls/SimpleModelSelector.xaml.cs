@@ -3,13 +3,14 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using VoiceLite.Models;
+using VoiceLite.Services;
 
 namespace VoiceLite.Controls
 {
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-tiny.bin"; // Default to free Tiny model
+        private string selectedModel = "ggml-base.bin"; // Default to Base model for better first impression (still free, better accuracy)
         private Settings? settings;
 
         public string SelectedModel
@@ -47,11 +48,8 @@ namespace VoiceLite.Controls
 
         private void CheckLicenseGating()
         {
-            if (settings == null) return;
-
             // Pro model (ggml-small.bin) requires a valid license
-            bool hasValidLicense = settings.LicenseIsValid &&
-                                   !string.IsNullOrWhiteSpace(settings.LicenseKey);
+            bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
 
             if (!hasValidLicense)
             {
@@ -86,23 +84,22 @@ namespace VoiceLite.Controls
             if (sender is RadioButton radio && radio.Tag is string modelFile)
             {
                 // Check if trying to select Pro model without license
-                if (modelFile == "ggml-small.bin" && settings != null)
+                if (modelFile == "ggml-small.bin")
                 {
-                    bool hasValidLicense = settings.LicenseIsValid &&
-                                           !string.IsNullOrWhiteSpace(settings.LicenseKey);
+                    bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
 
                     if (!hasValidLicense)
                     {
                         MessageBox.Show(
                             "Pro model requires a valid license key.\n\n" +
                             "Get Pro for $20 at voicelite.app\n" +
-                            "Then enter your license key in Settings → Pro License",
+                            "Then restart the app to activate your license.",
                             "Pro License Required",
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
 
-                        // Revert to Tiny model
-                        TinyRadio.IsChecked = true;
+                        // Revert to Base model (better quality than Tiny)
+                        BaseRadio.IsChecked = true;
                         return;
                     }
                 }

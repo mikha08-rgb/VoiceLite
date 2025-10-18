@@ -41,6 +41,8 @@ namespace VoiceLite
         private CancellationTokenSource? recordingCancellation;
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
+        // AUDIT FIX (CRITICAL-TS-3): SemaphoreSlim for async synchronization to prevent race condition
+        private readonly SemaphoreSlim transcriptionSemaphore = new SemaphoreSlim(1, 1);
 
         // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
         // More reliable than time-based check (works on slow PCs with 10+ second startup)
@@ -89,6 +91,34 @@ namespace VoiceLite
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+        }
+
+        /// <summary>
+        /// Check for Pro license on startup. If no license exists, show activation dialog.
+        /// </summary>
+        private async Task CheckLicenseOnStartupAsync()
+        {
+            await Task.CompletedTask; // Make method async-compatible
+
+            // Check if user already has a Pro license
+            if (!SimpleLicenseStorage.HasValidLicense(out _))
+            {
+                // No license found - show activation dialog
+                // AUDIT FIX (LEAK-CRIT-2): Using statement ensures window disposal
+                using (var dialog = new LicenseActivationDialog())
+                {
+                    var result = dialog.ShowDialog();
+
+                    if (result == true)
+                    {
+                        // User activated Pro - license is now stored
+                        // App will continue with Pro features unlocked
+                        StatusText.Text = "Pro activated!";
+                        StatusText.Foreground = Brushes.Green;
+                    }
+                    // If result is false or null, user chose "Use Free" - continue with Free version
+                }
+            }
         }
 
         private async Task CheckDependenciesAsync()
@@ -807,12 +837,11 @@ namespace VoiceLite
                 // Old code ran diagnostics/services in fire-and-forget tasks, causing race conditions
                 // New code ensures proper ordering: diagnostics → services → hotkey → UI updates
 
+                // Step 0: Check for Pro license on first launch
+                await CheckLicenseOnStartupAsync();
+
                 // Step 1: Check dependencies (runs in background)
                 await CheckDependenciesAsync();
-
-                // Step 1.5: Check license status (free vs pro)
-                // This never blocks - user can always use free version
-                await ValidateLicenseAsync();
 
                 // Step 2: Initialize services (runs in background)
                 await InitializeServicesAsync();
@@ -901,18 +930,21 @@ namespace VoiceLite
                     // Small delay to let the main window fully load
                     await Task.Delay(500);
 
-                    var diagnosticWindow = new FirstRunDiagnosticWindow();
-                    diagnosticWindow.Owner = this;
-                    var result = diagnosticWindow.ShowDialog();
-
-                    // Mark as seen regardless of dialog result
-                    settings.HasSeenFirstRunDiagnostics = true;
-                    SaveSettings();
-
-                    // If user closed dialog with critical issues, log it
-                    if (result != true)
+                    // AUDIT FIX (LEAK-CRIT-2): Using statement ensures window disposal
+                    using (var diagnosticWindow = new FirstRunDiagnosticWindow())
                     {
-                        ErrorLogger.LogMessage("First-run diagnostics completed with issues or user closed early");
+                        diagnosticWindow.Owner = this;
+                        var result = diagnosticWindow.ShowDialog();
+
+                        // Mark as seen regardless of dialog result
+                        settings.HasSeenFirstRunDiagnostics = true;
+                        SaveSettings();
+
+                        // If user closed dialog with critical issues, log it
+                        if (result != true)
+                        {
+                            ErrorLogger.LogMessage("First-run diagnostics completed with issues or user closed early");
+                        }
                     }
                 }
             }
@@ -1596,20 +1628,35 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
 
                 // Auto-clear timeout message after 3 seconds
+                // AUDIT FIX (ERROR-CRIT): Proper exception handling for fire-and-forget task
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         await Task.Delay(3000);
-                        await Dispatcher.InvokeAsync(() =>
+
+                        try
                         {
-                            if (!isRecording && TranscriptionText.Text == "(Timeout - recovered)")
+                            await Dispatcher.InvokeAsync(() =>
                             {
-                                TranscriptionText.Text = "";
-                            }
-                        });
+                                // AUDIT FIX (ERROR-CRIT): Add null check to prevent NRE
+                                if (!isRecording && TranscriptionText?.Text == "(Timeout - recovered)")
+                                {
+                                    TranscriptionText.Text = "";
+                                }
+                            });
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            // App shutting down - expected, log for diagnostics
+                            ErrorLogger.LogMessage("Auto-clear text canceled (app shutdown)");
+                        }
                     }
-                    catch { /* Ignore cleanup errors */ }
+                    catch (Exception ex)
+                    {
+                        // AUDIT FIX (ERROR-CRIT): Log unexpected errors instead of silent swallow
+                        ErrorLogger.LogError("CRITICAL: Auto-clear text task failed", ex);
+                    }
                 });
             }
             catch (Exception innerEx)
@@ -1678,31 +1725,44 @@ namespace VoiceLite
 
         private async void OnAutoTimeout(object? sender, System.Timers.ElapsedEventArgs e)
         {
+            // AUDIT FIX (CRITICAL-TS): Prevent lock-during-await deadlock
             ErrorLogger.LogMessage("OnAutoTimeout: Auto-timeout triggered - stopping recording for safety");
 
             try
             {
-                await Dispatcher.InvokeAsync(() =>
+                // Quick check without holding lock during dispatcher call
+                bool shouldStop = false;
+
+                lock (recordingLock)
                 {
-                    lock (recordingLock)
+                    shouldStop = isRecording;
+                }
+
+                if (shouldStop)
+                {
+                    await Dispatcher.InvokeAsync(() =>
                     {
-                        if (isRecording)
+                        // Now acquire lock on UI thread safely
+                        lock (recordingLock)
                         {
-                            // Show timeout warning
-                            UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
+                            if (isRecording)  // Re-check inside lock (double-check pattern)
+                            {
+                                // Show timeout warning
+                                UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
 
-                            // Audio feedback for timeout
-                            // Sound removed per user request
+                                // Audio feedback for timeout
+                                // Sound removed per user request
 
-                            StopRecording(false);
-                            StopAutoTimeoutTimer();
-
-                            // Show message to user
-                            MessageBox.Show("Recording automatically stopped after 5 minutes for safety.\n\nThis prevents forgotten hot microphones.",
-                                "Auto-Timeout", MessageBoxButton.OK, MessageBoxImage.Information);
+                                StopRecording(false);
+                                StopAutoTimeoutTimer();
+                            }
                         }
-                    }
-                });
+
+                        // Show message to user AFTER releasing lock
+                        MessageBox.Show("Recording automatically stopped after 5 minutes for safety.\n\nThis prevents forgotten hot microphones.",
+                            "Auto-Timeout", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                }
             }
             catch (TaskCanceledException)
             {
@@ -1723,151 +1783,161 @@ namespace VoiceLite
             // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
             {
-                if (isTranscribing)
+                // AUDIT FIX (CRITICAL-TS-3): Use SemaphoreSlim for async synchronization
+                // Previously: bool flag had race condition allowing double transcription
+                if (!await transcriptionSemaphore.WaitAsync(0))
                 {
-                    ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing, ignoring");
+                    ErrorLogger.LogWarning("OnAudioFileReady: Transcription already in progress, ignoring");
                     return;
                 }
 
                 isTranscribing = true;
 
-                // Start stuck state recovery timer now that we have audio to process
-                StartStuckStateRecoveryTimer();
-
                 try
-            {
-                var transcriber = whisperService;
-                if (transcriber == null)
                 {
-                    throw new InvalidOperationException("Whisper service not initialized");
-                }
+                    // Start stuck state recovery timer now that we have audio to process
+                    StartStuckStateRecoveryTimer();
 
-                var transcription = await transcriber.TranscribeAsync(audioFilePath);
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    StopStuckStateRecoveryTimer();
-
-                    if (!string.IsNullOrWhiteSpace(transcription))
+                    try
                     {
-                        // CRITICAL FIX: Protect UI element access with null check
-                        if (TranscriptionText is not null)
+                        var transcriber = whisperService;
+                        if (transcriber == null)
                         {
-                            TranscriptionText.Text = transcription;
-                            TranscriptionText.Foreground = Brushes.Black;
-                        }
-                        UpdateStatus("Ready", Brushes.Green);
-
-                        var historyItem = new TranscriptionHistoryItem
-                        {
-                            Text = transcription,
-                            Timestamp = DateTime.Now,
-                            ModelUsed = settings.WhisperModel
-                        };
-                        historyService?.AddToHistory(historyItem);
-                        _ = UpdateHistoryUI();
-                        _ = Task.Run(() => SaveSettingsAsync());
-
-                        if (settings.AutoPaste)
-                        {
-                            try
-                            {
-                                textInjector?.InjectText(transcription);
-                            }
-                            catch (Exception ex)
-                            {
-                                ErrorLogger.LogError("Text injection failed", ex);
-                            }
+                            throw new InvalidOperationException("Whisper service not initialized");
                         }
 
-                        var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
-                        var wordCount = transcription.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+                        var transcription = await transcriber.TranscribeAsync(audioFilePath);
 
-                        _ = Task.Run(async () =>
+                        await Dispatcher.InvokeAsync(() =>
                         {
-                            try
+                            StopStuckStateRecoveryTimer();
+
+                            if (!string.IsNullOrWhiteSpace(transcription))
                             {
-                                await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
-                                await Dispatcher.InvokeAsync(() =>
+                                // CRITICAL FIX: Protect UI element access with null check
+                                if (TranscriptionText is not null)
                                 {
-                                    if (!isRecording)
+                                    TranscriptionText.Text = transcription;
+                                    TranscriptionText.Foreground = Brushes.Black;
+                                }
+                                UpdateStatus("Ready", Brushes.Green);
+
+                                var historyItem = new TranscriptionHistoryItem
+                                {
+                                    Text = transcription,
+                                    Timestamp = DateTime.Now,
+                                    ModelUsed = settings.WhisperModel
+                                };
+                                historyService?.AddToHistory(historyItem);
+                                _ = UpdateHistoryUI();
+                                _ = Task.Run(() => SaveSettingsAsync());
+
+                                if (settings.AutoPaste)
+                                {
+                                    try
                                     {
-                                        UpdateUIForCurrentMode();
-                                        UpdateStatus("Ready", Brushes.Green);
+                                        textInjector?.InjectText(transcription);
                                     }
+                                    catch (Exception ex)
+                                    {
+                                        ErrorLogger.LogError("Text injection failed", ex);
+                                    }
+                                }
+
+                                var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
+                                var wordCount = transcription.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        await Task.Delay(TimingConstants.TranscriptionTextResetDelayMs);
+                                        await Dispatcher.InvokeAsync(() =>
+                                        {
+                                            if (!isRecording)
+                                            {
+                                                UpdateUIForCurrentMode();
+                                                UpdateStatus("Ready", Brushes.Green);
+                                            }
+                                        });
+                                    }
+                                    catch { }
                                 });
                             }
-                            catch { }
+                            else
+                            {
+                                // CRITICAL FIX: Use helper method with null protection
+                                UpdateTranscriptionText("(No speech detected)", Brushes.Gray);
+                                UpdateStatus("Ready", Brushes.Green);
+                            }
+
+                            lock (recordingLock)
+                            {
+                                if (!audioRecorder?.IsRecording ?? true)
+                                {
+                                    if (!(settings.Mode == RecordMode.PushToTalk && isHotkeyMode))
+                                    {
+                                        isHotkeyMode = false;
+                                        StopAutoTimeoutTimer();
+                                    }
+                                }
+                            }
                         });
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        // CRITICAL FIX: Use helper method with null protection
-                        UpdateTranscriptionText("(No speech detected)", Brushes.Gray);
-                        UpdateStatus("Ready", Brushes.Green);
-                    }
-
-                    lock (recordingLock)
-                    {
-                        if (!audioRecorder?.IsRecording ?? true)
+                        ErrorLogger.LogError("OnAudioFileReady", ex);
+                        await Dispatcher.InvokeAsync(() =>
                         {
-                            if (!(settings.Mode == RecordMode.PushToTalk && isHotkeyMode))
-                            {
-                                isHotkeyMode = false;
-                                StopAutoTimeoutTimer();
-                            }
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("OnAudioFileReady", ex);
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    StopStuckStateRecoveryTimer();
-                    // CRITICAL FIX: Use helper method with null protection
-                    UpdateTranscriptionText("Transcription error", Brushes.Red);
-                    UpdateStatus("Error", Brushes.Red);
+                            StopStuckStateRecoveryTimer();
+                            // CRITICAL FIX: Use helper method with null protection
+                            UpdateTranscriptionText("Transcription error", Brushes.Red);
+                            UpdateStatus("Error", Brushes.Red);
 
-                    _ = Task.Run(async () =>
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await Task.Delay(3000);
+                                    await Dispatcher.InvokeAsync(() =>
+                                    {
+                                        if (!isRecording)
+                                        {
+                                            UpdateUIForCurrentMode();
+                                            UpdateStatus("Ready", Brushes.Green);
+                                        }
+                                    });
+                                }
+                                catch { }
+                            });
+                        });
+                    }
+                    finally
                     {
+                        isTranscribing = false;
+
+                        // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
+                        // This is the absolute last line of defense against stuck processing state
+                        StopStuckStateRecoveryTimer();
+
                         try
                         {
-                            await Task.Delay(3000);
-                            await Dispatcher.InvokeAsync(() =>
+                            if (File.Exists(audioFilePath))
                             {
-                                if (!isRecording)
-                                {
-                                    UpdateUIForCurrentMode();
-                                    UpdateStatus("Ready", Brushes.Green);
-                                }
-                            });
+                                File.Delete(audioFilePath);
+                            }
                         }
-                        catch { }
-                    });
-                });
-            }
-            finally
-            {
-                isTranscribing = false;
-
-                // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
-                // This is the absolute last line of defense against stuck processing state
-                StopStuckStateRecoveryTimer();
-
-                try
-                {
-                    if (File.Exists(audioFilePath))
-                    {
-                        File.Delete(audioFilePath);
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogError($"Failed to delete temp audio file: {audioFilePath}", ex);
+                        }
                     }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    ErrorLogger.LogError($"Failed to delete temp audio file: {audioFilePath}", ex);
+                    // AUDIT FIX (CRITICAL-TS-3): Always release semaphore to prevent deadlock
+                    transcriptionSemaphore.Release();
                 }
-            }
             }
             catch (Exception outerEx)
             {
@@ -1991,6 +2061,20 @@ namespace VoiceLite
             var oldMode = settings.Mode;
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
+
+            // AUDIT FIX (LEAK): Dispose old settings window before creating new one
+            if (currentSettingsWindow != null)
+            {
+                try
+                {
+                    currentSettingsWindow.Close();
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogWarning($"Failed to close old settings window: {ex.Message}");
+                }
+                currentSettingsWindow = null;
+            }
 
             currentSettingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
             currentSettingsWindow.Owner = this;
@@ -2221,14 +2305,14 @@ namespace VoiceLite
                     settingsChanged = true;
                 }
 
-                // Migrate model to Tiny for everyone (6x faster)
+                // Migrate model to Base for everyone (still free, better quality than Tiny)
                 // Small/Medium/Large models are now Pro-only features
                 if (settings.WhisperModel == "ggml-small.bin" ||
                     settings.WhisperModel == "ggml-medium.bin" ||
                     settings.WhisperModel == "ggml-large-v3.bin")
                 {
-                    ErrorLogger.LogMessage($"⚡ Migrating model from {settings.WhisperModel} → ggml-tiny.bin");
-                    settings.WhisperModel = "ggml-tiny.bin";
+                    ErrorLogger.LogMessage($"⚡ Migrating model from {settings.WhisperModel} → ggml-base.bin (better quality default)");
+                    settings.WhisperModel = "ggml-base.bin";
                     settingsChanged = true;
                 }
 
@@ -2380,10 +2464,17 @@ namespace VoiceLite
                 hotkeyManager?.Dispose();
                 hotkeyManager = null;
 
+                // AUDIT FIX (LEAK-CRIT-1): Dispose TextInjector to prevent memory leak
+                // TextInjector has background tasks and CancellationTokenSource that must be cleaned up
+                textInjector?.Dispose();
+                textInjector = null;
+
                 // SoundService removed per user request - no disposal needed
 
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
                 try { saveSettingsSemaphore?.Dispose(); } catch { }
+                // AUDIT FIX (CRITICAL-TS-3): Dispose transcription semaphore
+                try { transcriptionSemaphore?.Dispose(); } catch { }
 
                 // Dispose cancellation token
                 try { recordingCancellation?.Dispose(); } catch { }
