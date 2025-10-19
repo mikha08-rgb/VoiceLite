@@ -127,9 +127,15 @@ export async function checkRateLimit(
   remaining: number;
   reset: Date;
 }> {
-  // If rate limiting not configured, allow all requests
+  // SECURITY FIX: Fail closed in production when rate limiting not configured
   if (!limiter) {
-    console.warn('Rate limiting not configured (missing Upstash credentials)');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('CRITICAL: Rate limiting not configured in production (missing Upstash credentials)');
+      throw new Error('Rate limiting is required in production. Please configure Upstash Redis.');
+    }
+
+    // Development mode: allow requests but warn
+    console.warn('Rate limiting not configured (missing Upstash credentials) - DEVELOPMENT MODE');
     return {
       allowed: true,
       limit: 999,
@@ -147,54 +153,6 @@ export async function checkRateLimit(
     reset: new Date(reset),
   };
 }
-
-/**
- * In-memory fallback rate limiter (not recommended for production with multiple instances)
- * Used as fallback when Upstash is not configured
- */
-class InMemoryRateLimiter {
-  private requests: Map<string, { count: number; resetAt: number }> = new Map();
-
-  constructor(private maxRequests: number, private windowMs: number) {}
-
-  async check(identifier: string): Promise<boolean> {
-    const now = Date.now();
-    const record = this.requests.get(identifier);
-
-    if (!record || now > record.resetAt) {
-      this.requests.set(identifier, {
-        count: 1,
-        resetAt: now + this.windowMs,
-      });
-      return true;
-    }
-
-    if (record.count >= this.maxRequests) {
-      return false;
-    }
-
-    record.count++;
-    return true;
-  }
-
-  // Cleanup old entries periodically
-  cleanup() {
-    const now = Date.now();
-    for (const [key, record] of this.requests.entries()) {
-      if (now > record.resetAt) {
-        this.requests.delete(key);
-      }
-    }
-  }
-}
-
-// Fallback limiters (in-memory, single-instance only)
-export const fallbackEmailLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
-export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
-export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
-export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 1000); // 5/minute
-export const fallbackActivationLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
-export const fallbackValidationLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 /**
  * Extract IP address from Next.js request
@@ -219,18 +177,6 @@ export function getClientIp(request: NextRequest): string {
     return realIp;
   }
 
-  // Fallback for localhost/development
-  return request.ip || '127.0.0.1';
-}
-
-// Cleanup fallback limiters every 10 minutes
-if (!isConfigured) {
-  setInterval(() => {
-    fallbackEmailLimit.cleanup();
-    fallbackOtpLimit.cleanup();
-    fallbackLicenseLimit.cleanup();
-    fallbackCheckoutLimit.cleanup();
-    fallbackActivationLimit.cleanup();
-    fallbackValidationLimit.cleanup();
-  }, 10 * 60 * 1000);
+  // Fallback for localhost/development (Next.js 15+ doesn't expose request.ip)
+  return '127.0.0.1';
 }

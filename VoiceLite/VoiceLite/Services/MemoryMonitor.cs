@@ -310,6 +310,9 @@ namespace VoiceLite.Services
             monitorTimer?.Dispose();
             gcTimer?.Dispose();
 
+            // SECURITY FIX: Clear event handler to prevent memory leak
+            MemoryAlert = null;
+
             // HIGH-2 FIX: Dispose Process object (holds unmanaged handle)
             // Even though the process continues running, the Process object must be disposed
             try
