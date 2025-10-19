@@ -96,8 +96,7 @@ export async function POST(request: NextRequest) {
         email: email,
         type: 'LIFETIME',
         status: 'ACTIVE',
-        purchaseDate: new Date(),
-        // activatedAt, machineId, machineLabel will be set when user activates
+        // createdAt and updatedAt are set automatically by Prisma
       },
     })
 
