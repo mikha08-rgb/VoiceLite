@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     // Create license in database
     const license = await prisma.license.create({
       data: {
-        key: licenseKey,
+        licenseKey: licenseKey,
         email: email,
         type: 'LIFETIME',
         status: 'ACTIVE',
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     // AUDIT LOG
     console.log('✅ Test license generated:', {
-      key: license.key,
+      key: license.licenseKey,
       email: license.email,
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV,
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Test license generated successfully',
       license: {
-        key: license.key,
+        key: license.licenseKey,
         email: license.email,
         type: license.type,
         status: license.status,
