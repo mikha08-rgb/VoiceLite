@@ -457,6 +457,9 @@ namespace VoiceLite.Services
                 if (waveFile != null)
                 {
                     ErrorLogger.LogMessage("StopRecording: Flushing and closing wave file IMMEDIATELY for this session");
+                    // CRITICAL FIX: Capture memory stream reference for finally block disposal
+                    MemoryStream? streamToDispose = null;
+
                     try
                     {
                         waveFile.Flush();
@@ -464,22 +467,13 @@ namespace VoiceLite.Services
                         // QUICK WIN 1: Memory buffer is always used (const true)
                         if (audioMemoryStream != null)
                         {
+                            streamToDispose = audioMemoryStream; // Capture for guaranteed disposal
+
                             waveFile.Dispose(); // Must dispose to finalize WAV headers
                             waveFile = null;
 
                             // Get the complete WAV data from memory
-                            var audioData = audioMemoryStream.ToArray();
-
-                            // CRITICAL: Dispose memory stream immediately after getting data
-                            try
-                            {
-                                audioMemoryStream.Dispose();
-                            }
-                            catch { }
-                            finally
-                            {
-                                audioMemoryStream = null;
-                            }
+                            var audioData = streamToDispose.ToArray();
 
                             if (audioData.Length > 100) // Only process if there's actual audio
                             {
@@ -504,12 +498,14 @@ namespace VoiceLite.Services
                     catch (Exception ex)
                     {
                         ErrorLogger.LogMessage($"StopRecording: Error disposing wave file - {ex.Message}");
-
-                        // CRITICAL: Ensure cleanup even on error
                         waveFile = null;
-                        if (audioMemoryStream != null)
+                    }
+                    finally
+                    {
+                        // CRITICAL: ALWAYS dispose memory stream, even if exceptions occurred
+                        if (streamToDispose != null)
                         {
-                            try { audioMemoryStream.Dispose(); } catch { }
+                            try { streamToDispose.Dispose(); } catch { }
                             audioMemoryStream = null;
                         }
                     }
@@ -646,6 +642,10 @@ namespace VoiceLite.Services
                 waveFile?.Dispose();
                 waveFile = null;
 
+                // Dispose memory stream
+                audioMemoryStream?.Dispose();
+                audioMemoryStream = null;
+
                 // Detach event handlers
                 if (eventHandlersAttached && waveIn != null)
                 {
@@ -657,6 +657,10 @@ namespace VoiceLite.Services
                 // Dispose wave input device
                 waveIn?.Dispose();
                 waveIn = null;
+
+                // SECURITY FIX: Clear event handlers to prevent memory leaks
+                AudioFileReady = null;
+                AudioDataReady = null;
 
                 // Final cleanup (safe - already marked disposed)
                 CleanupStaleAudioFiles();

@@ -84,7 +84,8 @@ namespace VoiceLite.Services
 
                             try
                             {
-                                var taskkill = Process.Start(new ProcessStartInfo
+                                // AUDIT FIX: Use 'using' statement to ensure Process disposal even if null
+                                using var taskkill = Process.Start(new ProcessStartInfo
                                 {
                                     FileName = "taskkill",
                                     Arguments = $"/F /T /PID {pid}",
@@ -109,8 +110,6 @@ namespace VoiceLite.Services
                                         totalZombiesKilled++;
                                         ErrorLogger.LogMessage($"ZombieProcessCleanupService: taskkill.exe succeeded for PID {pid}");
                                     }
-
-                                    taskkill.Dispose();
                                 }
                             }
                             catch (Exception taskkillEx)
@@ -171,6 +170,9 @@ namespace VoiceLite.Services
                 cleanupTimer?.Dispose();
             }
             catch { }
+
+            // SECURITY FIX: Clear event handler to prevent memory leak
+            ZombieDetected = null;
 
             ErrorLogger.LogMessage($"ZombieProcessCleanupService disposed - killed {totalZombiesKilled} zombie(s) during session");
         }

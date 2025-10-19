@@ -20,6 +20,13 @@ namespace VoiceLite.Services
         private readonly bool _ownsHttpClient;
         private bool _disposed = false;
 
+        // Static shared HttpClient (Microsoft best practice for singleton pattern)
+        // This prevents socket exhaustion and is properly managed by the runtime
+        private static readonly HttpClient _sharedHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(10)
+        };
+
         // Singleton instance for backward compatibility with static callers
         private static readonly Lazy<LicenseValidator> _instance = new Lazy<LicenseValidator>(() =>
             new LicenseValidator());
@@ -44,12 +51,12 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Private constructor for singleton (we own HttpClient)
+        /// Private constructor for singleton (uses shared HttpClient)
         /// </summary>
         private LicenseValidator()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            _ownsHttpClient = true;  // We must dispose
+            _httpClient = _sharedHttpClient;
+            _ownsHttpClient = false;  // Shared instance, don't dispose
         }
 
         /// <summary>
@@ -89,7 +96,28 @@ namespace VoiceLite.Services
                     };
                 }
 
+                // AUDIT FIX: Check for null response content before reading
+                if (response.Content == null)
+                {
+                    return new ValidationResponse
+                    {
+                        valid = false,
+                        error = "Empty response from server"
+                    };
+                }
+
                 var responseBody = await response.Content.ReadAsStringAsync();
+
+                // AUDIT FIX: Validate response body before deserialization
+                if (string.IsNullOrWhiteSpace(responseBody))
+                {
+                    return new ValidationResponse
+                    {
+                        valid = false,
+                        error = "Invalid response from server"
+                    };
+                }
+
                 var validationResponse = JsonSerializer.Deserialize<ValidationResponse>(responseBody);
 
                 return validationResponse ?? new ValidationResponse
@@ -142,8 +170,12 @@ namespace VoiceLite.Services
 
             // Expected format: VL-XXXXXX-XXXXXX-XXXXXX (6 chars per segment)
             var parts = licenseKey.Trim().Split('-');
-            return parts.Length == 4 &&
-                   parts[0] == "VL" &&
+
+            // SECURITY FIX: Check length before accessing array elements
+            if (parts.Length != 4)
+                return false;
+
+            return parts[0] == "VL" &&
                    parts[1].Length == 6 &&
                    parts[2].Length == 6 &&
                    parts[3].Length == 6;

@@ -91,6 +91,13 @@ namespace VoiceLite
                     content
                 );
 
+                // AUDIT FIX: Check for null response content before reading
+                if (response.Content == null)
+                {
+                    ShowError("Empty response from server. Please try again.");
+                    return;
+                }
+
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -101,7 +108,13 @@ namespace VoiceLite
 
                     if (root.TryGetProperty("success", out var successProp) && successProp.GetBoolean())
                     {
-                        var email = root.GetProperty("license").GetProperty("email").GetString() ?? "";
+                        // SECURITY FIX: Use TryGetProperty to prevent crash on malformed JSON
+                        string email = "";
+                        if (root.TryGetProperty("license", out var licenseProp) &&
+                            licenseProp.TryGetProperty("email", out var emailProp))
+                        {
+                            email = emailProp.GetString() ?? "";
+                        }
 
                         // Save license locally
                         SimpleLicenseStorage.SaveLicense(licenseKey, email, "LIFETIME");
@@ -199,7 +212,8 @@ namespace VoiceLite
         {
             try
             {
-                Process.Start(new ProcessStartInfo
+                // AUDIT FIX: Use 'using' to ensure Process disposal
+                using var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = e.Uri.AbsoluteUri,
                     UseShellExecute = true

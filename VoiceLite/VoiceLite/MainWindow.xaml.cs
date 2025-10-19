@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -43,6 +44,8 @@ namespace VoiceLite
         private readonly object recordingLock = new object();
         // AUDIT FIX (CRITICAL-TS-3): SemaphoreSlim for async synchronization to prevent race condition
         private readonly SemaphoreSlim transcriptionSemaphore = new SemaphoreSlim(1, 1);
+        // SECURITY FIX: Queue transcriptions instead of dropping them to prevent data loss
+        private readonly ConcurrentQueue<string> pendingTranscriptions = new ConcurrentQueue<string>();
 
         // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
         // More reliable than time-based check (works on slow PCs with 10+ second startup)
@@ -80,17 +83,77 @@ namespace VoiceLite
         public MainWindow()
         {
             InitializeComponent();
+
+            // CRITICAL FIX: Install global exception handlers FIRST
+            // This catches any unhandled exceptions from async void methods
+            InstallGlobalExceptionHandlers();
+
             LoadSettings();
 
             // Start with Ready state - initialization happens in background
-            StatusText.Text = "Ready";
-            StatusText.Foreground = Brushes.Green;
+            // CRITICAL FIX: Use Dispatcher to ensure thread-safe UI updates even in constructor
+            Dispatcher.InvokeAsync(() =>
+            {
+                StatusText.Text = "Ready";
+                StatusText.Foreground = Brushes.Green;
+            });
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+        }
+
+        /// <summary>
+        /// CRITICAL: Install global exception handlers to prevent app crashes from unhandled async void exceptions
+        /// </summary>
+        private static bool _globalHandlersInstalled = false;
+        private void InstallGlobalExceptionHandlers()
+        {
+            if (_globalHandlersInstalled) return;
+            _globalHandlersInstalled = true;
+
+            // Catch unhandled exceptions from any thread
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                ErrorLogger.LogError("FATAL: Unhandled exception in AppDomain", ex ?? new Exception("Unknown exception"));
+
+                // Show error dialog on UI thread
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    MessageBox.Show(
+                        $"A critical error occurred:\n\n{ex?.Message}\n\nVoiceLite will now close.\n\nPlease check the error log for details.",
+                        "Fatal Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+
+                    Environment.Exit(1);
+                }));
+            };
+
+            // Catch unobserved task exceptions (fire-and-forget tasks)
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                ErrorLogger.LogError("Unobserved task exception", e.Exception);
+                e.SetObserved(); // Prevent app crash, just log it
+            };
+
+            // Catch exceptions from WPF Dispatcher (UI thread exceptions)
+            Application.Current.DispatcherUnhandledException += (s, e) =>
+            {
+                ErrorLogger.LogError("Unhandled Dispatcher exception", e.Exception);
+
+                // Try to recover from UI exceptions instead of crashing
+                e.Handled = true;
+
+                MessageBox.Show(
+                    $"An error occurred:\n\n{e.Exception.Message}\n\nThe app will try to continue.",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            };
         }
 
         /// <summary>
@@ -391,7 +454,9 @@ namespace VoiceLite
                 // Step 3: Validate license key with server (first time only)
                 UpdateStatus("Validating license...", Brushes.Orange);
 
-                var validator = new LicenseValidator(new System.Net.Http.HttpClient());
+                // SECURITY FIX: Dispose HttpClient properly to prevent socket exhaustion
+                using var httpClient = new System.Net.Http.HttpClient();
+                using var validator = new LicenseValidator(httpClient);
                 var result = await validator.ValidateAsync(licenseKey);
 
                 if (!result.valid)
@@ -699,31 +764,57 @@ namespace VoiceLite
                         }
                     });
 
-                    // TIER 1.4: Use async file I/O to prevent UI thread blocking (was 50ms)
-                    // Write to temp file first, then rename (rename is atomic on Windows)
-                    string tempPath = settingsPath + ".tmp";
-                    await File.WriteAllTextAsync(tempPath, json);
+                    // CRITICAL FIX: Atomic file write pattern with File.Replace
+                    // Use unique temp filename to prevent conflicts
+                    string tempPath = settingsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
-                    // BUG-010 FIX: Verify temp file is valid JSON before replacing original
-                    // Prevents data loss if app crashes during serialization
                     try
                     {
-                        var testLoad = JsonSerializer.Deserialize<Settings>(await File.ReadAllTextAsync(tempPath));
-                        if (testLoad == null)
+                        // Write to temp file
+                        await File.WriteAllTextAsync(tempPath, json);
+
+                        // BUG-010 FIX: Verify temp file is valid JSON before replacing original
+                        try
                         {
-                            throw new InvalidDataException("Settings deserialized to null");
+                            var testLoad = JsonSerializer.Deserialize<Settings>(await File.ReadAllTextAsync(tempPath));
+                            if (testLoad == null)
+                            {
+                                throw new InvalidDataException("Settings deserialized to null");
+                            }
+                        }
+                        catch (Exception validationEx)
+                        {
+                            throw new InvalidOperationException("Settings save failed - temp file validation failed", validationEx);
+                        }
+
+                        // CRITICAL FIX: Use File.Replace for truly atomic write
+                        // This is safer than File.Move because it creates a backup
+                        if (File.Exists(settingsPath))
+                        {
+                            string backupPath = settingsPath + ".bak";
+
+                            // Replace atomically with backup
+                            File.Replace(tempPath, settingsPath, backupPath);
+
+                            // Clean up successful backup
+                            try { File.Delete(backupPath); } catch { /* Keep backup on error */ }
+                        }
+                        else
+                        {
+                            // First time save - just move
+                            File.Move(tempPath, settingsPath);
                         }
                     }
-                    catch (Exception validationEx)
+                    finally
                     {
-                        // Delete corrupt temp file
-                        try { File.Delete(tempPath); } catch { }
-                        throw new InvalidOperationException("Settings save failed - temp file validation failed", validationEx);
+                        // Always clean up temp file if it still exists
+                        try
+                        {
+                            if (File.Exists(tempPath))
+                                File.Delete(tempPath);
+                        }
+                        catch { /* Ignore cleanup errors */ }
                     }
-
-                    // BUG-008 FIX: Use File.Move with overwrite to handle race conditions
-                    // Prevents "file already exists" error if another thread recreated the file
-                    File.Move(tempPath, settingsPath, overwrite: true);
 
                     ErrorLogger.LogMessage($"Settings saved to: {settingsPath}");
                 }
@@ -959,8 +1050,16 @@ namespace VoiceLite
 
         private async void CheckAnalyticsConsentAsync()
         {
-            // Analytics removed - no action needed
-            await Task.CompletedTask;
+            try
+            {
+                // Analytics removed - no action needed
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("CheckAnalyticsConsentAsync failed", ex);
+                // Don't rethrow - async void exceptions can't be caught by caller
+            }
         }
 
         private string GetHotkeyDisplayString()
@@ -1096,6 +1195,13 @@ namespace VoiceLite
 
         private void UpdateStatus(string status, Brush color)
         {
+            // AUDIT FIX: Thread-safe UI updates - marshal to UI thread if called from background thread
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.InvokeAsync(() => UpdateStatus(status, color));
+                return;
+            }
+
             // CRITICAL FIX: Protect all UI element accesses with null checks
             if (StatusText is not null)
             {
@@ -1783,11 +1889,19 @@ namespace VoiceLite
             // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
             {
+                // SECURITY FIX: Queue transcription instead of dropping it
+                pendingTranscriptions.Enqueue(audioFilePath);
+
                 // AUDIT FIX (CRITICAL-TS-3): Use SemaphoreSlim for async synchronization
-                // Previously: bool flag had race condition allowing double transcription
+                // If transcription is already in progress, the worker will process the queue
                 if (!await transcriptionSemaphore.WaitAsync(0))
                 {
-                    ErrorLogger.LogWarning("OnAudioFileReady: Transcription already in progress, ignoring");
+                    var queueSize = pendingTranscriptions.Count;
+                    ErrorLogger.LogWarning($"OnAudioFileReady: Transcription in progress, queued ({queueSize} pending)");
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateStatus($"Queued ({queueSize} pending)", Brushes.Orange);
+                    });
                     return;
                 }
 
@@ -1795,18 +1909,21 @@ namespace VoiceLite
 
                 try
                 {
-                    // Start stuck state recovery timer now that we have audio to process
-                    StartStuckStateRecoveryTimer();
-
-                    try
+                    // SECURITY FIX: Process all queued transcriptions
+                    while (pendingTranscriptions.TryDequeue(out var currentAudioFilePath))
                     {
-                        var transcriber = whisperService;
-                        if (transcriber == null)
-                        {
-                            throw new InvalidOperationException("Whisper service not initialized");
-                        }
+                        // Start stuck state recovery timer now that we have audio to process
+                        StartStuckStateRecoveryTimer();
 
-                        var transcription = await transcriber.TranscribeAsync(audioFilePath);
+                        try
+                        {
+                            var transcriber = whisperService;
+                            if (transcriber == null)
+                            {
+                                throw new InvalidOperationException("Whisper service not initialized");
+                            }
+
+                            var transcription = await transcriber.TranscribeAsync(currentAudioFilePath);
 
                         await Dispatcher.InvokeAsync(() =>
                         {
@@ -1830,17 +1947,53 @@ namespace VoiceLite
                                 };
                                 historyService?.AddToHistory(historyItem);
                                 _ = UpdateHistoryUI();
-                                _ = Task.Run(() => SaveSettingsAsync());
 
-                                if (settings.AutoPaste)
+                                // CRITICAL FIX: Properly await settings save with error handling
+                                _ = Task.Run(async () =>
                                 {
                                     try
                                     {
-                                        textInjector?.InjectText(transcription);
+                                        await SaveSettingsAsync();
                                     }
                                     catch (Exception ex)
                                     {
-                                        ErrorLogger.LogError("Text injection failed", ex);
+                                        ErrorLogger.LogError("Settings auto-save failed", ex);
+                                    }
+                                });
+
+                                // CRITICAL FIX: Defensive text injection with disposal protection
+                                if (settings.AutoPaste)
+                                {
+                                    var injector = textInjector; // Defensive copy
+                                    if (injector != null)
+                                    {
+                                        try
+                                        {
+                                            injector.InjectText(transcription);
+                                        }
+                                        catch (ObjectDisposedException)
+                                        {
+                                            // App shutting down - fallback to clipboard
+                                            ErrorLogger.LogWarning("Text injector disposed during paste - app shutting down, copied to clipboard instead");
+                                            try
+                                            {
+                                                Clipboard.SetText(transcription);
+                                            }
+                                            catch (Exception clipEx)
+                                            {
+                                                ErrorLogger.LogError("Clipboard fallback failed", clipEx);
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            ErrorLogger.LogError("Text injection failed", ex);
+                                            // Try clipboard fallback
+                                            try
+                                            {
+                                                Clipboard.SetText(transcription);
+                                            }
+                                            catch { /* Ignore clipboard errors */ }
+                                        }
                                     }
                                 }
 
@@ -1873,7 +2026,10 @@ namespace VoiceLite
 
                             lock (recordingLock)
                             {
-                                if (!audioRecorder?.IsRecording ?? true)
+                                // SECURITY FIX: Fix nullable conditional operator precedence
+                                // Old: !audioRecorder?.IsRecording ?? true (confusing precedence)
+                                // New: explicit null check with correct logic
+                                if (audioRecorder == null || !audioRecorder.IsRecording)
                                 {
                                     if (!(settings.Mode == RecordMode.PushToTalk && isHotkeyMode))
                                     {
@@ -1911,27 +2067,33 @@ namespace VoiceLite
                                 catch { }
                             });
                         });
-                    }
-                    finally
-                    {
-                        isTranscribing = false;
-
-                        // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
-                        // This is the absolute last line of defense against stuck processing state
-                        StopStuckStateRecoveryTimer();
-
-                        try
+                        }
+                        finally
                         {
-                            if (File.Exists(audioFilePath))
+                            // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
+                            // This is the absolute last line of defense against stuck processing state
+                            StopStuckStateRecoveryTimer();
+
+                            // Clean up the audio file for this transcription
+                            try
                             {
-                                File.Delete(audioFilePath);
+                                if (File.Exists(currentAudioFilePath))
+                                {
+                                    File.Delete(currentAudioFilePath);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorLogger.LogError($"Failed to delete temp audio file: {currentAudioFilePath}", ex);
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            ErrorLogger.LogError($"Failed to delete temp audio file: {audioFilePath}", ex);
-                        }
-                    }
+                    } // End of while loop processing queue
+                }
+                catch (Exception processingEx)
+                {
+                    // Handle queue processing errors
+                    ErrorLogger.LogError("Error processing transcription queue", processingEx);
+                    isTranscribing = false;
                 }
                 finally
                 {
@@ -2223,12 +2385,6 @@ namespace VoiceLite
                 {
                     if (isRecording)
                     {
-                        // Audio feedback for cancel
-                        if (settings.PlaySoundFeedback)
-                        {
-                            // Sound removed per user request
-                        }
-
                         // Cancel the recording
                         StopRecording(true);
                         StopAutoTimeoutTimer();
@@ -2255,7 +2411,7 @@ namespace VoiceLite
                     "small" => "ggml-small.bin",
                     "medium" => "ggml-medium.bin",
                     "large" => "ggml-large-v3.bin",
-                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
+                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
                 };
 
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
@@ -2305,14 +2461,14 @@ namespace VoiceLite
                     settingsChanged = true;
                 }
 
-                // Migrate model to Base for everyone (still free, better quality than Tiny)
-                // Small/Medium/Large models are now Pro-only features
-                if (settings.WhisperModel == "ggml-small.bin" ||
+                // Migrate Pro models to Tiny for free users (Base/Small/Medium/Large now require Pro)
+                if (settings.WhisperModel == "ggml-base.bin" ||
+                    settings.WhisperModel == "ggml-small.bin" ||
                     settings.WhisperModel == "ggml-medium.bin" ||
                     settings.WhisperModel == "ggml-large-v3.bin")
                 {
-                    ErrorLogger.LogMessage($"⚡ Migrating model from {settings.WhisperModel} → ggml-base.bin (better quality default)");
-                    settings.WhisperModel = "ggml-base.bin";
+                    ErrorLogger.LogMessage($"⚡ Migrating model from {settings.WhisperModel} → ggml-tiny.bin (free tier default)");
+                    settings.WhisperModel = "ggml-tiny.bin";
                     settingsChanged = true;
                 }
 
@@ -2343,29 +2499,48 @@ namespace VoiceLite
         // v1.0.56 CRITICAL FIX: Prevent deadlock on app close
         // Old approach: SaveSettingsInternalAsync().Wait() blocks UI thread for 5-30 seconds
         // New approach: Use async OnClosing to await settings save without blocking
-        private bool isClosingHandled = false;
+        private bool _isClosing = false;
 
         protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (!isClosingHandled)
+            // CRITICAL FIX: Prevent re-entrance and recursive Close() calls
+            if (_isClosing)
             {
-                e.Cancel = true; // Prevent immediate close
-                isClosingHandled = true;
+                // Already closing - allow the close to proceed
+                base.OnClosing(e);
+                return;
+            }
 
+            // Check minimize to tray preference
+            if (MinimizeCheckBox?.IsChecked == true && !_isClosing)
+            {
+                e.Cancel = true;
+                systemTrayManager?.MinimizeToTray();
+                return;
+            }
+
+            // Start closing process
+            _isClosing = true;
+            e.Cancel = true; // We'll handle close manually after async operations
+
+            try
+            {
                 // CRITICAL FIX (BUG-002 + v1.0.56): Flush pending settings save BEFORE disposal
-                // NOW ASYNC - no UI thread blocking!
                 if (settingsSaveTimer != null && settingsSaveTimer.IsEnabled)
                 {
                     settingsSaveTimer.Stop();
-                    await SaveSettingsInternalAsync(); // NO .Wait() - async all the way
+                    await SaveSettingsInternalAsync();
                     ErrorLogger.LogMessage("v1.0.56 FIX: Flushed pending settings save on app close (async, no blocking)");
                 }
-
-                SaveSettings(); // Belt-and-suspenders: call debounced save too (will be no-op if timer null)
-
-                base.OnClosing(e);
-                Close(); // Now actually close the window
             }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Final settings save failed during shutdown", ex);
+            }
+
+            // Now actually close - use Application.Shutdown to avoid recursive calls
+            base.OnClosing(e);
+            Application.Current.Shutdown();
         }
 
         protected override void OnClosed(EventArgs e)
