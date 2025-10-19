@@ -82,8 +82,11 @@ export async function POST(request: NextRequest) {
       ],
       success_url: success,
       cancel_url: cancel,
-      // Let Stripe collect customer email during checkout
+      // Explicitly collect customer email and billing address
+      customer_email: undefined, // Let customer enter email
       billing_address_collection: 'required',
+      // Collect email in Stripe Checkout
+      customer_creation: 'always',
     }
 
     const stripe = getStripeClient();
