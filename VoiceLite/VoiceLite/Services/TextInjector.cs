@@ -413,29 +413,26 @@ namespace VoiceLite.Services
             isDisposed = true;
 
             // Cancel all pending clipboard restore tasks
-            disposalCts.Cancel();
+            try { disposalCts.Cancel(); } catch { /* Already cancelled */ }
 
             try
             {
-                // AUDIT FIX: Use fire-and-forget instead of blocking Task.WaitAll to prevent UI freeze on shutdown
+                // CRITICAL-4 FIX: Wait for tasks with timeout before disposing CancellationTokenSource
                 var tasksArray = pendingTasks.ToArray();
                 if (tasksArray.Length > 0)
                 {
 #if DEBUG
-                    ErrorLogger.LogMessage($"TextInjector disposing - fire-and-forget cleanup for {tasksArray.Length} clipboard tasks");
+                    ErrorLogger.LogMessage($"TextInjector disposing - waiting for {tasksArray.Length} clipboard tasks");
 #endif
-                    // Fire-and-forget cleanup - don't block UI thread during app shutdown
-                    _ = Task.Run(async () =>
+                    // Wait with 2-second timeout to prevent indefinite blocking
+                    try
                     {
-                        try
-                        {
-                            await Task.WhenAll(tasksArray).ConfigureAwait(false);
-                        }
-                        catch (Exception ex)
-                        {
-                            ErrorLogger.LogError("TextInjector background cleanup failed", ex);
-                        }
-                    });
+                        Task.WaitAll(tasksArray, TimeSpan.FromSeconds(2));
+                    }
+                    catch (AggregateException)
+                    {
+                        // Expected - tasks were cancelled
+                    }
                 }
             }
             catch (Exception ex)
@@ -445,7 +442,8 @@ namespace VoiceLite.Services
             }
             finally
             {
-                disposalCts.Dispose();
+                // NOW safe to dispose CancellationTokenSource after tasks have acknowledged cancellation
+                try { disposalCts.Dispose(); } catch { /* Already disposed */ }
             }
 
 #if DEBUG

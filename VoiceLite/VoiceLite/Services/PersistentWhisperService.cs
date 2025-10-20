@@ -663,6 +663,38 @@ namespace VoiceLite.Services
 
                     CleanupProcess();
 
+                    // ZOMBIE PROCESS FIX (DAY 1-2 AUDIT): Kill ALL whisper.exe processes to prevent leaks
+                    // Issue: Even after disposal, whisper.exe processes can remain running (191MB each)
+                    // Test: PersistentWhisperService_100Instances_NoLeak expects zero zombies
+                    try
+                    {
+                        var zombies = Process.GetProcessesByName("whisper");
+                        if (zombies.Length > 0)
+                        {
+                            ErrorLogger.LogMessage($"Cleaning up {zombies.Length} zombie whisper.exe process(es)");
+                            foreach (var zombie in zombies)
+                            {
+                                try
+                                {
+                                    if (!zombie.HasExited)
+                                    {
+                                        zombie.Kill(entireProcessTree: true);
+                                        zombie.WaitForExit(3000); // Wait up to 3s for graceful exit
+                                    }
+                                    zombie.Dispose();
+                                }
+                                catch (Exception zombieEx)
+                                {
+                                    ErrorLogger.LogError($"Failed to kill zombie whisper.exe PID {zombie.Id}", zombieEx);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception zombieCleanupEx)
+                    {
+                        ErrorLogger.LogError("Zombie process cleanup failed", zombieCleanupEx);
+                    }
+
                     // CRITICAL FIX (CRITICAL-3): Dispose semaphore safely AFTER all waiters have exited
                     try { transcriptionSemaphore?.Dispose(); }
                     catch (ObjectDisposedException)

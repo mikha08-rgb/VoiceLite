@@ -22,8 +22,8 @@ namespace VoiceLite.Tests.Models
             // Assert
             settings.Mode.Should().Be(RecordMode.PushToTalk);
             settings.TextInjectionMode.Should().Be(TextInjectionMode.SmartAuto);
-            settings.RecordHotkey.Should().Be(Key.LeftAlt);
-            settings.HotkeyModifiers.Should().Be(ModifierKeys.None);
+            settings.RecordHotkey.Should().Be(Key.Z);
+            settings.HotkeyModifiers.Should().Be(ModifierKeys.Shift);
             settings.WhisperModel.Should().Be("ggml-tiny.bin"); // UPDATED: Changed default to Tiny model (freemium)
             settings.BeamSize.Should().Be(1);
             settings.BestOf.Should().Be(1);
@@ -156,13 +156,13 @@ namespace VoiceLite.Tests.Models
         #region Hotkey Tests
 
         [Fact]
-        public void RecordHotkey_DefaultValue_IsLeftAlt()
+        public void RecordHotkey_DefaultValue_IsZ()
         {
             // Arrange & Act
             var settings = new Settings();
 
             // Assert
-            settings.RecordHotkey.Should().Be(Key.LeftAlt);
+            settings.RecordHotkey.Should().Be(Key.Z);
         }
 
         [Fact]
@@ -179,7 +179,7 @@ namespace VoiceLite.Tests.Models
         }
 
         [Fact]
-        public void RecordHotkey_InvalidValue_DefaultsToLeftAlt()
+        public void RecordHotkey_InvalidValue_DefaultsToZ()
         {
             // Arrange
             var settings = new Settings();
@@ -188,17 +188,17 @@ namespace VoiceLite.Tests.Models
             settings.RecordHotkey = (Key)99999;
 
             // Assert
-            settings.RecordHotkey.Should().Be(Key.LeftAlt);
+            settings.RecordHotkey.Should().Be(Key.Z);
         }
 
         [Fact]
-        public void HotkeyModifiers_DefaultValue_IsNone()
+        public void HotkeyModifiers_DefaultValue_IsShift()
         {
             // Arrange & Act
             var settings = new Settings();
 
             // Assert
-            settings.HotkeyModifiers.Should().Be(ModifierKeys.None);
+            settings.HotkeyModifiers.Should().Be(ModifierKeys.Shift);
         }
 
         [Fact]

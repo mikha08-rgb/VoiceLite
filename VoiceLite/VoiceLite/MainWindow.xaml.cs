@@ -77,6 +77,13 @@ namespace VoiceLite
         // CRITICAL FIX: Track all DispatcherTimers created for status messages to prevent memory leaks
         private readonly List<System.Windows.Threading.DispatcherTimer> activeStatusTimers = new List<System.Windows.Threading.DispatcherTimer>();
 
+        // STATIC EVENT HANDLER FIX (DAY 1-2 AUDIT): Store handlers for cleanup during disposal
+        // Issue: Anonymous lambda handlers cannot be unsubscribed, causing memory leaks
+        // Test: Static event handlers should be unsubscribed in Dispose() to prevent MainWindow from staying in memory
+        private UnhandledExceptionEventHandler? _unhandledExceptionHandler;
+        private EventHandler<UnobservedTaskExceptionEventArgs>? _unobservedTaskHandler;
+        private System.Windows.Threading.DispatcherUnhandledExceptionEventHandler? _dispatcherUnhandledHandler;
+
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
 
@@ -122,8 +129,11 @@ namespace VoiceLite
             if (_globalHandlersInstalled) return;
             _globalHandlersInstalled = true;
 
+            // STATIC EVENT HANDLER FIX (DAY 1-2 AUDIT): Store handlers in fields for cleanup
+            // Create named handlers instead of anonymous lambdas so we can unsubscribe them later
+
             // Catch unhandled exceptions from any thread
-            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            _unhandledExceptionHandler = (s, e) =>
             {
                 var ex = e.ExceptionObject as Exception;
                 ErrorLogger.LogError("FATAL: Unhandled exception in AppDomain", ex ?? new Exception("Unknown exception"));
@@ -140,16 +150,18 @@ namespace VoiceLite
                     Environment.Exit(1);
                 }));
             };
+            AppDomain.CurrentDomain.UnhandledException += _unhandledExceptionHandler;
 
             // Catch unobserved task exceptions (fire-and-forget tasks)
-            TaskScheduler.UnobservedTaskException += (s, e) =>
+            _unobservedTaskHandler = (s, e) =>
             {
                 ErrorLogger.LogError("Unobserved task exception", e.Exception);
                 e.SetObserved(); // Prevent app crash, just log it
             };
+            TaskScheduler.UnobservedTaskException += _unobservedTaskHandler;
 
             // Catch exceptions from WPF Dispatcher (UI thread exceptions)
-            Application.Current.DispatcherUnhandledException += (s, e) =>
+            _dispatcherUnhandledHandler = (s, e) =>
             {
                 ErrorLogger.LogError("Unhandled Dispatcher exception", e.Exception);
 
@@ -162,6 +174,7 @@ namespace VoiceLite
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             };
+            Application.Current.DispatcherUnhandledException += _dispatcherUnhandledHandler;
         }
 
         /// <summary>
@@ -1978,10 +1991,10 @@ namespace VoiceLite
                     return;
                 }
 
-                isTranscribing = true;
-
+                // CRITICAL-2 FIX: Move isTranscribing inside try block to prevent semaphore leak
                 try
                 {
+                    isTranscribing = true;
                     // SECURITY FIX: Process all queued transcriptions
                     while (pendingTranscriptions.TryDequeue(out var currentAudioFilePath))
                     {
@@ -2776,6 +2789,24 @@ namespace VoiceLite
                 if (memoryMonitor != null)
                 {
                     memoryMonitor.MemoryAlert -= OnMemoryAlert;
+                }
+
+                // STATIC EVENT HANDLER FIX (DAY 1-2 AUDIT): Unsubscribe static event handlers
+                // Issue: These hold references to MainWindow, preventing garbage collection
+                if (_unhandledExceptionHandler != null)
+                {
+                    AppDomain.CurrentDomain.UnhandledException -= _unhandledExceptionHandler;
+                    _unhandledExceptionHandler = null;
+                }
+                if (_unobservedTaskHandler != null)
+                {
+                    TaskScheduler.UnobservedTaskException -= _unobservedTaskHandler;
+                    _unobservedTaskHandler = null;
+                }
+                if (_dispatcherUnhandledHandler != null && Application.Current != null)
+                {
+                    Application.Current.DispatcherUnhandledException -= _dispatcherUnhandledHandler;
+                    _dispatcherUnhandledHandler = null;
                 }
 
                 // MEMORY_FIX 2025-10-08: Unsubscribe zombie cleanup service

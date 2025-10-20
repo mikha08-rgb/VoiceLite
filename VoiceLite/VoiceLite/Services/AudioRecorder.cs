@@ -475,22 +475,22 @@ namespace VoiceLite.Services
                             // Get the complete WAV data from memory
                             var audioData = streamToDispose.ToArray();
 
-                            if (audioData.Length > 100) // Only process if there's actual audio
+                            ErrorLogger.LogMessage($"StopRecording: Memory buffer contains {audioData.Length} bytes");
+
+                            // EVENT FIX (DAY 1-2 AUDIT): ALWAYS fire AudioDataReady event, even for small/empty audio
+                            // Issue: Tests fail because event doesn't fire when audio < 100 bytes
+                            // Test: StopRecording_FiresAudioDataReadyEvent expects event to fire regardless of audio size
+                            // Rationale: Let caller decide what to do with empty audio, don't silently skip
+                            AudioDataReady?.Invoke(this, audioData);
+
+                            // Only save to file if audio data is significant AND there are file listeners
+                            if (audioData.Length > 100 && AudioFileReady != null)
                             {
-                                ErrorLogger.LogMessage($"StopRecording: Memory buffer contains {audioData.Length} bytes");
-
-                                // Notify listeners with the audio data
-                                AudioDataReady?.Invoke(this, audioData);
-
-                                // Optionally save to temp file for compatibility with existing code
-                                if (AudioFileReady != null)
-                                {
-                                    SaveMemoryBufferToTempFile(audioData);
-                                }
+                                SaveMemoryBufferToTempFile(audioData);
                             }
-                            else
+                            else if (audioData.Length <= 100)
                             {
-                                ErrorLogger.LogMessage("StopRecording: Skipping empty memory buffer");
+                                ErrorLogger.LogMessage("StopRecording: Skipping file save for small/empty audio (< 100 bytes)");
                             }
                         }
                         // QUICK WIN 1: File-based recording code removed (memory mode is enforced)
