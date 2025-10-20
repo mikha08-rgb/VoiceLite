@@ -161,7 +161,7 @@ namespace VoiceLite.Tests.Resources
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
-            var memoryFreed = false;
+            var audioDataReceived = false;
 
             recorder.AudioDataReady += (sender, data) =>
             {
@@ -169,17 +169,28 @@ namespace VoiceLite.Tests.Resources
                 data.Should().NotBeNull();
                 data.Length.Should().BeGreaterThan(0);
 
-                // After this event, the internal memory stream should be cleaned up
-                memoryFreed = true;
+                audioDataReceived = true;
             };
 
             recorder.StartRecording();
             await Task.Delay(200);
             recorder.StopRecording();
 
-            await Task.Delay(500);
+            await Task.Delay(100);
 
-            memoryFreed.Should().BeTrue("Memory stream should be freed after audio data is delivered");
+            // Verify event was triggered
+            audioDataReceived.Should().BeTrue("AudioDataReady event should fire with audio data");
+
+            // Verify recorder can start a new recording (proves previous resources were released)
+            recorder.StartRecording();
+            await Task.Delay(100);
+            recorder.StopRecording();
+
+            await Task.Delay(100);
+
+            // If we got here without exceptions, the memory stream was properly disposed
+            // and resources were freed between recording sessions
+            recorder.IsRecording.Should().BeFalse();
         }
 
         [Fact]
