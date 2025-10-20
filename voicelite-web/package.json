@@ -20,6 +20,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.1.0",
     "@prisma/client": "^6.1.0",
+    "@sentry/nextjs": "^10.20.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/swagger-ui-react": "^5.18.0",
     "@upstash/ratelimit": "^2.0.6",
