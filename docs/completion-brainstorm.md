@@ -99,7 +99,7 @@ Before creating the PRD, please fill in what's left to complete VoiceLite:
 1. **Fill in the lists above** with what YOU know needs to be done
 2. **Prioritize** - what's critical vs nice-to-have?
 3. **Estimate** - roughly how big is each item? (Small/Medium/Large)
-4. I'll create a PRD and break it into epics/stories using BMAD
+4. Create a PRD and break it into epics/stories
 
 ## Questions to Consider
 
@@ -110,4 +110,4 @@ Before creating the PRD, please fill in what's left to complete VoiceLite:
 
 ---
 
-**Once you fill this in, I'll create the full PRD and architecture docs for BMAD!**
+**Once you fill this in, I'll create the full PRD and architecture docs!**

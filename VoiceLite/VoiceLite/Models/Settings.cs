@@ -33,8 +33,8 @@ namespace VoiceLite.Models
 
         private RecordMode _mode = RecordMode.PushToTalk;
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
-        private Key _recordHotkey = Key.LeftAlt; // Default hotkey for recording
-        private ModifierKeys _hotkeyModifiers = ModifierKeys.None;
+        private Key _recordHotkey = Key.Z; // Default hotkey for recording (Shift+Z)
+        private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
         private string _whisperModel = "ggml-tiny.bin"; // Default to Tiny model (free tier, pre-installed)
         private int _beamSize = 1; // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (greedy decoding)
         private int _bestOf = 1;   // PERFORMANCE: Changed from 5 to 1 for 5x faster transcription (single sampling)
@@ -55,7 +55,7 @@ namespace VoiceLite.Models
         public Key RecordHotkey
         {
             get => _recordHotkey;
-            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.LeftAlt;
+            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.Z;
         }
 
         public ModifierKeys HotkeyModifiers

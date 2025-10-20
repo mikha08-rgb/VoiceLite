@@ -395,9 +395,9 @@ These are explicitly **NOT** in scope for v1.0:
 
 1. Review this PRD
 2. Create architecture.md from CLAUDE.md
-3. Use SM agent to break into stories
+3. Break down into manageable stories
 4. Start with Epic 1 (Code Quality)
-5. Work through epics systematically using BMAD workflow
+5. Work through epics systematically
 
 ---
 

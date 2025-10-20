@@ -1,0 +1,876 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\playwright.config.ts",
+    "rootDir": "C:/Users/mishk/Codingprojects/SpeakLite/HereWeGoAgain v3.3 Fuck/voicelite-web/tests",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 8
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "C:/Users/mishk/Codingprojects/SpeakLite/HereWeGoAgain v3.3 Fuck/voicelite-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 8
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/mishk/Codingprojects/SpeakLite/HereWeGoAgain v3.3 Fuck/voicelite-web/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.1",
+    "workers": 8,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "webhook-security-unit.spec.ts",
+      "file": "webhook-security-unit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Webhook Security Tests (Unit)",
+          "file": "webhook-security-unit.spec.ts",
+          "line": 58,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "1. Signature Verification",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 69,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should reject webhook with missing signature",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 3150,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.947Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-22bbb1939e1724c0b3fc",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 70,
+                  "column": 9
+                },
+                {
+                  "title": "should reject webhook with invalid signature format",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 1,
+                          "parallelIndex": 1,
+                          "status": "passed",
+                          "duration": 3167,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.929Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-adbaa21ee25e997bd3d9",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 87,
+                  "column": 9
+                },
+                {
+                  "title": "should reject webhook with wrong signature secret",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 2,
+                          "parallelIndex": 2,
+                          "status": "passed",
+                          "duration": 3143,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.952Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-3acded7f5e8cb471d8b1",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 104,
+                  "column": 9
+                },
+                {
+                  "title": "should reject webhook with tampered payload (signature mismatch)",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 3,
+                          "parallelIndex": 3,
+                          "status": "passed",
+                          "duration": 3132,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.966Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-17d6ceafaf992ccb2e99",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 125,
+                  "column": 9
+                },
+                {
+                  "title": "should reject webhook with timestamp manipulation",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 4,
+                          "parallelIndex": 4,
+                          "status": "passed",
+                          "duration": 3170,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.924Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-e1a225630f5cfb777d71",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 147,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "2. Replay Attack Prevention",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 174,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should reject events older than 5 minutes",
+                  "ok": false,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 5,
+                          "parallelIndex": 5,
+                          "status": "failed",
+                          "duration": 3145,
+                          "error": {
+                            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Event too old\"\u001b[39m\nReceived: \u001b[31m\"Invalid signature\"\u001b[39m",
+                            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Event too old\"\u001b[39m\nReceived: \u001b[31m\"Invalid signature\"\u001b[39m\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:195:26",
+                            "location": {
+                              "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                              "column": 26,
+                              "line": 195
+                            },
+                            "snippet": "\u001b[0m \u001b[90m 193 |\u001b[39m       expect(response\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m400\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 194 |\u001b[39m       \u001b[36mconst\u001b[39m json \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m response\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 195 |\u001b[39m       expect(json\u001b[33m.\u001b[39merror)\u001b[33m.\u001b[39mtoBe(\u001b[32m'Event too old'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 196 |\u001b[39m       expect(json\u001b[33m.\u001b[39mreceived)\u001b[33m.\u001b[39mtoBe(\u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 197 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 198 |\u001b[39m\u001b[0m"
+                          },
+                          "errors": [
+                            {
+                              "location": {
+                                "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                                "column": 26,
+                                "line": 195
+                              },
+                              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Event too old\"\u001b[39m\nReceived: \u001b[31m\"Invalid signature\"\u001b[39m\n\n  193 |       expect(response.status()).toBe(400);\n  194 |       const json = await response.json();\n> 195 |       expect(json.error).toBe('Event too old');\n      |                          ^\n  196 |       expect(json.received).toBe(true);\n  197 |     });\n  198 |\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:195:26"
+                            }
+                          ],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.951Z",
+                          "annotations": [],
+                          "attachments": [],
+                          "errorLocation": {
+                            "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                            "column": 26,
+                            "line": 195
+                          }
+                        }
+                      ],
+                      "status": "unexpected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-1275e3c5dc67c74c4618",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 175,
+                  "column": 9
+                },
+                {
+                  "title": "should accept events at exactly 5 minute boundary",
+                  "ok": false,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 6,
+                          "parallelIndex": 6,
+                          "status": "failed",
+                          "duration": 3158,
+                          "error": {
+                            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected value: \u001b[32m400\u001b[39m\nReceived array: \u001b[31m[200, 503]\u001b[39m",
+                            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected value: \u001b[32m400\u001b[39m\nReceived array: \u001b[31m[200, 503]\u001b[39m\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:224:26",
+                            "location": {
+                              "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                              "column": 26,
+                              "line": 224
+                            },
+                            "snippet": "\u001b[0m \u001b[90m 222 |\u001b[39m       \u001b[90m// Should accept (5 minutes is within limit, >5 minutes is rejected)\u001b[39m\n \u001b[90m 223 |\u001b[39m       \u001b[90m// Note: This will fail with 503 if DATABASE_URL is not set, which is expected\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 224 |\u001b[39m       expect([\u001b[35m200\u001b[39m\u001b[33m,\u001b[39m \u001b[35m503\u001b[39m])\u001b[33m.\u001b[39mtoContain(response\u001b[33m.\u001b[39mstatus())\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 225 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 226 |\u001b[39m\n \u001b[90m 227 |\u001b[39m     test(\u001b[32m'should reject future events (clock skew attack)'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                          },
+                          "errors": [
+                            {
+                              "location": {
+                                "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                                "column": 26,
+                                "line": 224
+                              },
+                              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected value: \u001b[32m400\u001b[39m\nReceived array: \u001b[31m[200, 503]\u001b[39m\n\n  222 |       // Should accept (5 minutes is within limit, >5 minutes is rejected)\n  223 |       // Note: This will fail with 503 if DATABASE_URL is not set, which is expected\n> 224 |       expect([200, 503]).toContain(response.status());\n      |                          ^\n  225 |     });\n  226 |\n  227 |     test('should reject future events (clock skew attack)', async ({ request }) => {\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:224:26"
+                            }
+                          ],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.936Z",
+                          "annotations": [],
+                          "attachments": [],
+                          "errorLocation": {
+                            "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                            "column": 26,
+                            "line": 224
+                          }
+                        }
+                      ],
+                      "status": "unexpected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-4952113d352cd352c488",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 199,
+                  "column": 9
+                },
+                {
+                  "title": "should reject future events (clock skew attack)",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 7,
+                          "parallelIndex": 7,
+                          "status": "passed",
+                          "duration": 7897,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:31.950Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-81527049f3085a8d2a5c",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 227,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "3. Request Validation",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 252,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should reject empty request body",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 4,
+                          "parallelIndex": 4,
+                          "status": "passed",
+                          "duration": 190,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.120Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-5e1985bda9f6e66dec0f",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 253,
+                  "column": 9
+                },
+                {
+                  "title": "should reject malformed JSON",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 2,
+                          "parallelIndex": 2,
+                          "status": "passed",
+                          "duration": 63,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.120Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-92389544d1b2968f1201",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 265,
+                  "column": 9
+                },
+                {
+                  "title": "should handle very large payloads gracefully",
+                  "ok": false,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "failed",
+                          "duration": 4732,
+                          "error": {
+                            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m500\u001b[39m",
+                            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m500\u001b[39m\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:303:33",
+                            "location": {
+                              "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                              "column": 33,
+                              "line": 303
+                            },
+                            "snippet": "\u001b[0m \u001b[90m 301 |\u001b[39m       \u001b[90m// Should either accept (200/503) or reject with proper error\u001b[39m\n \u001b[90m 302 |\u001b[39m       expect(response\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeGreaterThanOrEqual(\u001b[35m200\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 303 |\u001b[39m       expect(response\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m500\u001b[39m)\u001b[33m;\u001b[39m \u001b[90m// Should not crash server\u001b[39m\n \u001b[90m     |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 304 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 305 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 306 |\u001b[39m\u001b[0m"
+                          },
+                          "errors": [
+                            {
+                              "location": {
+                                "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                                "column": 33,
+                                "line": 303
+                              },
+                              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m500\u001b[39m\nReceived:   \u001b[31m500\u001b[39m\n\n  301 |       // Should either accept (200/503) or reject with proper error\n  302 |       expect(response.status()).toBeGreaterThanOrEqual(200);\n> 303 |       expect(response.status()).toBeLessThan(500); // Should not crash server\n      |                                 ^\n  304 |     });\n  305 |   });\n  306 |\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:303:33"
+                            }
+                          ],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.120Z",
+                          "annotations": [],
+                          "attachments": [],
+                          "errorLocation": {
+                            "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                            "column": 33,
+                            "line": 303
+                          }
+                        }
+                      ],
+                      "status": "unexpected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-82d2140b794d0422495d",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 280,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "4. Content-Type Handling",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 307,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should accept application/json content-type",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 3,
+                          "parallelIndex": 3,
+                          "status": "passed",
+                          "duration": 189,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.121Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-79c100593c4e4e7ad4f8",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 308,
+                  "column": 9
+                },
+                {
+                  "title": "should handle missing content-type header",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 1,
+                          "parallelIndex": 1,
+                          "status": "passed",
+                          "duration": 186,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.123Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-2418655bbb150aac6518",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 326,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "5. HTTP Method Validation",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 343,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should reject GET requests",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 8,
+                          "parallelIndex": 6,
+                          "status": "passed",
+                          "duration": 29,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.752Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-e5bf32d9490839dd7469",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 344,
+                  "column": 9
+                },
+                {
+                  "title": "should reject PUT requests",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 9,
+                          "parallelIndex": 5,
+                          "status": "passed",
+                          "duration": 30,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.755Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-771ba1b3ee22ddc86fc8",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 349,
+                  "column": 9
+                },
+                {
+                  "title": "should reject DELETE requests",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 2,
+                          "parallelIndex": 2,
+                          "status": "passed",
+                          "duration": 157,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.190Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-5c671e4a947518a7e9f5",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 356,
+                  "column": 9
+                },
+                {
+                  "title": "should only accept POST requests",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 4,
+                          "parallelIndex": 4,
+                          "status": "passed",
+                          "duration": 150,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.317Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-07ab442fa6fefc2ea498",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 361,
+                  "column": 9
+                }
+              ]
+            },
+            {
+              "title": "6. Performance & DoS Protection",
+              "file": "webhook-security-unit.spec.ts",
+              "line": 378,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "should respond within reasonable time (<1 second)",
+                  "ok": false,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 1,
+                          "parallelIndex": 1,
+                          "status": "failed",
+                          "duration": 4534,
+                          "error": {
+                            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m1000\u001b[39m\nReceived:   \u001b[31m4529\u001b[39m",
+                            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m1000\u001b[39m\nReceived:   \u001b[31m4529\u001b[39m\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:394:28",
+                            "location": {
+                              "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                              "column": 28,
+                              "line": 394
+                            },
+                            "snippet": "\u001b[0m \u001b[90m 392 |\u001b[39m       \u001b[36mconst\u001b[39m responseTime \u001b[33m=\u001b[39m \u001b[33mDate\u001b[39m\u001b[33m.\u001b[39mnow() \u001b[33m-\u001b[39m startTime\u001b[33m;\u001b[39m\n \u001b[90m 393 |\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 394 |\u001b[39m       expect(responseTime)\u001b[33m.\u001b[39mtoBeLessThan(\u001b[35m1000\u001b[39m)\u001b[33m;\u001b[39m \u001b[90m// Should respond in <1 second\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 395 |\u001b[39m       expect(response\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBeGreaterThanOrEqual(\u001b[35m200\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 396 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 397 |\u001b[39m\u001b[0m"
+                          },
+                          "errors": [
+                            {
+                              "location": {
+                                "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                                "column": 28,
+                                "line": 394
+                              },
+                              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: < \u001b[32m1000\u001b[39m\nReceived:   \u001b[31m4529\u001b[39m\n\n  392 |       const responseTime = Date.now() - startTime;\n  393 |\n> 394 |       expect(responseTime).toBeLessThan(1000); // Should respond in <1 second\n      |                            ^\n  395 |       expect(response.status()).toBeGreaterThanOrEqual(200);\n  396 |     });\n  397 |\n    at C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts:394:28"
+                            }
+                          ],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.318Z",
+                          "annotations": [],
+                          "attachments": [],
+                          "errorLocation": {
+                            "file": "C:\\Users\\mishk\\Codingprojects\\SpeakLite\\HereWeGoAgain v3.3 Fuck\\voicelite-web\\tests\\webhook-security-unit.spec.ts",
+                            "column": 28,
+                            "line": 394
+                          }
+                        }
+                      ],
+                      "status": "unexpected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-52880f16841be40c0243",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 379,
+                  "column": 9
+                },
+                {
+                  "title": "should handle rapid sequential requests without crashing",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 30000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 3,
+                          "parallelIndex": 3,
+                          "status": "passed",
+                          "duration": 4547,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2025-10-20T03:24:35.319Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "2d9df9d2b8d534275269-a8a532fd25ac7f2e27ed",
+                  "file": "webhook-security-unit.spec.ts",
+                  "line": 398,
+                  "column": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-20T03:24:23.702Z",
+    "duration": 16330.541,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}

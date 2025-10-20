@@ -53,7 +53,10 @@ api-keys.txt
 voicelite-web/.env
 voicelite-web/.env.*
 !voicelite-web/.env.example
+!voicelite-web/.env.production.template
 voicelite-web/*.bat
+voicelite-web/migrate.bat
+voicelite-web/push-db.bat
 
 # Claude settings
 .claude/*.local.json
