@@ -20,7 +20,11 @@ using System.Text.Json;
 
 namespace VoiceLite
 {
-    public partial class MainWindow : Window
+    /// <summary>
+    /// MainWindow with proper IDisposable implementation to prevent memory leaks.
+    /// MEMORY_FIX 2025-10-19: Implements IDisposable pattern for all managed resources.
+    /// </summary>
+    public partial class MainWindow : Window, IDisposable
     {
         #region Fields & Properties
 
@@ -75,6 +79,10 @@ namespace VoiceLite
 
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
+
+        // MEMORY_FIX 2025-10-19: IDisposable pattern implementation
+        private bool _disposed = false;
+        private readonly object _disposeLock = new object();
 
         #endregion
 
@@ -2672,9 +2680,39 @@ namespace VoiceLite
 
         protected override void OnClosed(EventArgs e)
         {
-            // Settings save already handled in OnClosing (async pattern)
+            // MEMORY_FIX 2025-10-19: Call Dispose() to properly clean up all resources
+            Dispose();
+            base.OnClosed(e);
+        }
 
-            // MEMORY FIX: Dispose all timers properly
+        /// <summary>
+        /// IDisposable implementation - proper cleanup of all managed resources.
+        /// MEMORY_FIX 2025-10-19: Prevents memory leaks from IDisposable services.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected implementation of Dispose pattern.
+        /// </summary>
+        /// <param name="disposing">True if called from Dispose(), false if called from finalizer</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            lock (_disposeLock)
+            {
+                if (_disposed) return; // Double-check inside lock
+                _disposed = true;
+
+                if (!disposing) return; // Only dispose managed resources if disposing=true
+
+                // Settings save already handled in OnClosing (async pattern)
+
+                // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
             autoTimeoutTimer = null;
 
@@ -2787,14 +2825,16 @@ namespace VoiceLite
                 audioRecorder?.Dispose();
                 audioRecorder = null;
 
+                // Note: historyService doesn't implement IDisposable (stateless service)
+                historyService = null;
+
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("OnClosed cleanup", ex);
+                ErrorLogger.LogError("Dispose cleanup", ex);
             }
-
-            base.OnClosed(e);
+            }
         }
 
 
