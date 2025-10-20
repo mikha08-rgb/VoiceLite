@@ -47,6 +47,15 @@ namespace VoiceLite.Controls
             CheckAndUpdateRadio(LargeRadio, Path.Combine(whisperPath, "ggml-large-v3.bin"));
         }
 
+        /// <summary>
+        /// Public method to refresh license gating after license status changes.
+        /// Called when a Pro license is activated to immediately unlock Pro models.
+        /// </summary>
+        public void RefreshLicenseGating()
+        {
+            CheckLicenseGating();
+        }
+
         private void CheckLicenseGating()
         {
             // Pro models (Base, Small, Medium, Large) require a valid license
@@ -72,6 +81,15 @@ namespace VoiceLite.Controls
                 LargeRadio.IsEnabled = false;
                 LargeRadio.Opacity = 0.5;
                 LargeRadio.ToolTip = tooltip;
+            }
+            else
+            {
+                // Re-enable all Pro models when license is active
+                // But check if they're downloaded first
+                CheckAndUpdateRadio(BaseRadio, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin"));
+                CheckAndUpdateRadio(SmallRadio, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-small.bin"));
+                CheckAndUpdateRadio(MediumRadio, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-medium.bin"));
+                CheckAndUpdateRadio(LargeRadio, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-large-v3.bin"));
             }
         }
 

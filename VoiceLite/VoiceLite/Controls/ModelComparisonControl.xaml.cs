@@ -52,6 +52,16 @@ namespace VoiceLite.Controls
             LoadCurrentModel();
         }
 
+        /// <summary>
+        /// Refresh license gating after Pro license activation.
+        /// This reloads the model list to show all Pro models.
+        /// </summary>
+        public void RefreshLicenseGating()
+        {
+            LoadModels();
+            LoadCurrentModel();
+        }
+
         private void LoadModels()
         {
             try
