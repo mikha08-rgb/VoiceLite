@@ -76,8 +76,10 @@ Source: "VoiceLite\bin\Release\net8.0-windows\VoiceLite.deps.json"; DestDir: "{a
 ; Dependencies
 Source: "VoiceLite\bin\Release\net8.0-windows\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper Files (Encrypted models will be included)
-Source: "VoiceLite\bin\Release\net8.0-windows\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+; Whisper Files (only tiny model and executables - other models downloaded in-app)
+Source: "VoiceLite\bin\Release\net8.0-windows\whisper\*.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\whisper\*.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
 
 ; Visual C++ Runtime Redistributable (optional - comment out if not available)
 ; Source: "vcredist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
