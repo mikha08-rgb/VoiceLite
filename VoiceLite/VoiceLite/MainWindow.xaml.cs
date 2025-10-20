@@ -170,17 +170,82 @@ namespace VoiceLite
                 // AUDIT FIX (LEAK-CRIT-2): Using statement ensures window disposal
                 using (var dialog = new LicenseActivationDialog())
                 {
+                    dialog.OnLicenseActivated = ReloadLicenseStatus;
                     var result = dialog.ShowDialog();
 
                     if (result == true)
                     {
-                        // User activated Pro - license is now stored
-                        // App will continue with Pro features unlocked
+                        // User activated Pro - license is now stored and UI has been reloaded
                         StatusText.Text = "Pro activated!";
                         StatusText.Foreground = Brushes.Green;
                     }
                     // If result is false or null, user chose "Use Free" - continue with Free version
                 }
+            }
+        }
+
+        /// <summary>
+        /// Reload license status without restarting the app.
+        /// This is called after successful license activation to immediately unlock Pro features.
+        /// </summary>
+        public void ReloadLicenseStatus()
+        {
+            try
+            {
+                // Check if we now have a valid license
+                if (SimpleLicenseStorage.HasValidLicense(out var license))
+                {
+                    ErrorLogger.LogMessage($"License reloaded: Pro license activated for {license?.Email ?? "unknown"}");
+
+                    // Update UI on main thread
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "VoiceLite Pro";
+                        StatusText.Foreground = Brushes.Green;
+                        UpdateStatus("License: Pro", Brushes.Green);
+
+                        // AUDIT FIX (CRITICAL-1): Prevent TOCTOU race condition
+                        // Cache reference to avoid window being closed between null check and method call
+                        var settingsWindow = currentSettingsWindow;
+                        if (settingsWindow != null && settingsWindow.IsLoaded)
+                        {
+                            try
+                            {
+                                settingsWindow.RefreshLicenseStatus();
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                // Window was closed during refresh - safe to ignore
+                                ErrorLogger.LogMessage("Settings window closed during license refresh");
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorLogger.LogWarning($"Failed to refresh settings window: {ex.Message}");
+                            }
+                        }
+                    });
+
+                    // Show success notification
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(
+                            "Pro license activated successfully!\n\n" +
+                            "All Whisper models are now unlocked.\n" +
+                            "You can select any model from the dropdown.",
+                            "Activation Successful",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information
+                        );
+                    });
+                }
+                else
+                {
+                    ErrorLogger.LogWarning("ReloadLicenseStatus called but no valid license found");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to reload license status", ex);
             }
         }
 
@@ -2223,6 +2288,7 @@ namespace VoiceLite
             var oldMode = settings.Mode;
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
+            var oldModel = settings.WhisperModel; // Capture old model for change detection
 
             // AUDIT FIX (LEAK): Dispose old settings window before creating new one
             if (currentSettingsWindow != null)
@@ -2263,12 +2329,73 @@ namespace VoiceLite
                 bool wasRecording = isRecording;
                 bool wasHotkeyMode = isHotkeyMode;
 
+                // Check if model changed
+                bool modelChanged = oldModel != settings.WhisperModel;
+
                 // Only recreate if service is null (never had one)
                 // Model switching is handled by the service itself in most cases
                 if (whisperService == null)
                 {
                     ErrorLogger.LogMessage($"Creating initial Whisper service with model: {settings.WhisperModel}");
                     whisperService = new PersistentWhisperService(settings);
+                }
+                else if (modelChanged)
+                {
+                    // Model changed - update the cached model path
+                    // AUDIT FIX (MEDIUM-3): Handle exceptions from UpdateModel()
+                    try
+                    {
+                        ErrorLogger.LogMessage($"Model changed from {oldModel} to {settings.WhisperModel} - updating service");
+
+                        // Cast to PersistentWhisperService to access UpdateModel()
+                        if (whisperService is PersistentWhisperService persistentService)
+                        {
+                            persistentService.UpdateModel();
+                        }
+                        else
+                        {
+                            ErrorLogger.LogWarning("Whisper service is not PersistentWhisperService - cannot update model dynamically");
+                        }
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        ErrorLogger.LogError($"Model file not found: {settings.WhisperModel}", ex);
+                        MessageBox.Show(
+                            $"Could not switch to {settings.WhisperModel}.\n\n" +
+                            $"The model file is missing. Please download it from Settings → AI Models.\n\n" +
+                            $"Reverting to {oldModel}.",
+                            "Model Switch Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning
+                        );
+                        settings.WhisperModel = oldModel; // Revert to old model
+                        SaveSettings();
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        ErrorLogger.LogError($"License check failed for model: {settings.WhisperModel}", ex);
+                        MessageBox.Show(
+                            $"Cannot use {settings.WhisperModel} - Pro license required.\n\n" +
+                            $"Reverting to {oldModel}.",
+                            "License Required",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information
+                        );
+                        settings.WhisperModel = oldModel; // Revert to old model
+                        SaveSettings();
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("Failed to update Whisper model", ex);
+                        MessageBox.Show(
+                            $"Failed to switch model: {ex.Message}\n\nReverting to {oldModel}.",
+                            "Model Switch Failed",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error
+                        );
+                        settings.WhisperModel = oldModel; // Revert to old model
+                        SaveSettings();
+                    }
                 }
                 else
                 {

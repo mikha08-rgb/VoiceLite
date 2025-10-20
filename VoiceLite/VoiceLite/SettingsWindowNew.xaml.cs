@@ -252,6 +252,21 @@ namespace VoiceLite
         private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
         private void SyncAudioUIFromSettings() { }
 
+        /// <summary>
+        /// Public method to refresh license status after Pro license activation.
+        /// Called by MainWindow when license is activated to immediately update the UI.
+        /// </summary>
+        public void RefreshLicenseStatus()
+        {
+            UpdateLicenseStatusDisplay();
+
+            // Refresh the model comparison control to show all Pro models
+            if (ModelComparisonControl != null)
+            {
+                ModelComparisonControl.RefreshLicenseGating();
+            }
+        }
+
         // License Status Display (Read-Only)
         private void UpdateLicenseStatusDisplay()
         {

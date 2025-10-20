@@ -26,6 +26,7 @@ namespace VoiceLite.Services
         private readonly CancellationTokenSource disposalCts = new CancellationTokenSource(); // CRITICAL FIX: Cancellation for semaphore during disposal
         private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
         private readonly object disposeLock = new object(); // AUDIT FIX: Lock for TOCTOU protection
+        private readonly object modelLock = new object(); // AUDIT FIX (CRITICAL-2): Thread safety for model path access
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
 
@@ -385,8 +386,13 @@ namespace VoiceLite.Services
                     await WarmUpWhisperAsync();
                 }
 
-                var modelPath = cachedModelPath ?? ResolveModelPath();
-                var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                // AUDIT FIX (CRITICAL-2): Thread-safe read of cached model path
+                string modelPath, whisperExePath;
+                lock (modelLock)
+                {
+                    modelPath = cachedModelPath ?? ResolveModelPath();
+                    whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                }
 
                 // Build arguments using user settings for optimal accuracy/speed balance
                 // NOTE: --temperature is not supported in this version of whisper.exe (removed)
@@ -592,6 +598,35 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("PersistentWhisperService.CleanupProcess", ex);
+            }
+        }
+
+        /// <summary>
+        /// Update the cached model path when user changes model in settings.
+        /// Must be called after changing settings.WhisperModel to ensure next transcription uses the new model.
+        /// AUDIT FIX (CRITICAL-2): Thread-safe model updates with locking
+        /// </summary>
+        public void UpdateModel()
+        {
+            try
+            {
+                lock (modelLock) // AUDIT FIX: Prevent race condition with transcription threads
+                {
+                    ErrorLogger.LogMessage($"Updating Whisper model from cached '{cachedModelPath}' to '{settings.WhisperModel}'");
+
+                    // Refresh the cached model path
+                    cachedModelPath = ResolveModelPath();
+
+                    // Reset warmup flag to force model reload on next transcription
+                    isWarmedUp = false;
+
+                    ErrorLogger.LogMessage($"Model updated successfully: {cachedModelPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to update Whisper model", ex);
+                throw; // AUDIT FIX (MEDIUM-3): Propagate exception to caller
             }
         }
 

@@ -16,6 +16,12 @@ namespace VoiceLite
         private const string API_BASE_URL = "https://voicelite.app/api";
         private bool _disposed = false;
 
+        /// <summary>
+        /// Callback to refresh license status in MainWindow after successful activation.
+        /// This allows Pro features to be unlocked immediately without requiring app restart.
+        /// </summary>
+        public Action? OnLicenseActivated { get; set; }
+
         public LicenseActivationDialog()
         {
             InitializeComponent();
@@ -119,15 +125,8 @@ namespace VoiceLite
                         // Save license locally
                         SimpleLicenseStorage.SaveLicense(licenseKey, email, "LIFETIME");
 
-                        // Show success message
-                        MessageBox.Show(
-                            "Pro license activated successfully!\n\n" +
-                            "All Whisper models are now unlocked.\n" +
-                            "The app will restart to apply changes.",
-                            "Activation Successful",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information
-                        );
+                        // Reload license status in MainWindow immediately (no restart needed)
+                        OnLicenseActivated?.Invoke();
 
                         DialogResult = true;
                         Close();
