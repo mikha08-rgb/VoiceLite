@@ -43,9 +43,7 @@ export default function CheckoutSuccessPage() {
             ← Back to Home
           </Link>
           <a
-            href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/api/download"
             className="flex-1 inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             Download VoiceLite

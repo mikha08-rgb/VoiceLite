@@ -259,7 +259,7 @@ export default function HomePage() {
                 2
               </div>
               <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Hold Hotkey & Speak</h3>
-              <p className="leading-relaxed text-stone-600 dark:text-stone-400">Press Left Alt, say what you want to type, release</p>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">Press Shift + Z (customizable), say what you want to type, release</p>
             </div>
 
             <div className="space-y-6 text-center">
@@ -375,9 +375,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/api/download"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -567,9 +565,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <a
-                    href="https://github.com/mikha08-rgb/VoiceLite/releases"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="/api/download"
                     className="transition-colors hover:text-blue-400"
                   >
                     Download
