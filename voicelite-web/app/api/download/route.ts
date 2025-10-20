@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Professional download endpoint for VoiceLite installer
+ * Direct download endpoint for VoiceLite installer
  *
  * Features:
- * - Analytics tracking (optional)
- * - Download counter
- * - Redirect to latest installer
- * - Clean user experience (no GitHub redirect visible)
+ * - Direct download from Vercel (no redirects)
+ * - Analytics tracking
+ * - Clean UX - instant download on click
  */
 
-// Latest installer URL (hosted on GitHub releases)
-const LATEST_INSTALLER_URL = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.70/VoiceLite-Setup-1.0.69.exe';
-const INSTALLER_VERSION = 'v1.0.70';
+const INSTALLER_VERSION = 'v1.0.68';
+const INSTALLER_FILENAME = 'VoiceLite-Setup.exe';
 
 export async function GET(request: NextRequest) {
   try {
-    // Track download (optional - add analytics here)
+    // Track download
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const referrer = request.headers.get('referer') || 'direct';
 
@@ -27,23 +25,21 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    // Redirect to the installer file
-    // This happens so fast users won't see GitHub URL
-    return NextResponse.redirect(LATEST_INSTALLER_URL, 302);
+    // Direct download from /public folder
+    // Files in /public are served at root: /VoiceLite-Setup.exe
+    const downloadUrl = new URL(`/${INSTALLER_FILENAME}`, request.url);
+
+    return NextResponse.redirect(downloadUrl, 302);
   } catch (error) {
     console.error('[Download] Error serving installer:', error);
 
-    // Fallback to GitHub releases page if direct download fails
-    return NextResponse.redirect(
-      'https://github.com/mikha08-rgb/VoiceLite/releases/latest',
-      302
-    );
+    // Fallback: direct link to public file
+    return NextResponse.redirect(`/${INSTALLER_FILENAME}`, 302);
   }
 }
 
 /**
  * Download stats endpoint (optional)
- * GET /api/download/stats
  */
 export async function POST(request: NextRequest) {
   // Future: Track successful downloads
