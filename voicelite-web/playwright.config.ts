@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from .env.local for tests
-dotenv.config({ path: '.env.local' });
+// Load environment variables from .env.test for tests
+dotenv.config({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests',
