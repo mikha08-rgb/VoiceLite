@@ -152,7 +152,8 @@ namespace VoiceLite
                         item.FixAction = "Download VC++ Runtime";
                         item.OnFix = () =>
                         {
-                            Process.Start(new ProcessStartInfo
+                            // AUDIT FIX: Use 'using' to ensure Process disposal
+                            using var process = Process.Start(new ProcessStartInfo
                             {
                                 FileName = "https://aka.ms/vs/17/release/vc_redist.x64.exe",
                                 UseShellExecute = true
@@ -235,7 +236,8 @@ namespace VoiceLite
                         item.FixAction = "Download VoiceLite";
                         item.OnFix = () =>
                         {
-                            Process.Start(new ProcessStartInfo
+                            // AUDIT FIX: Use 'using' to ensure Process disposal
+                            using var process = Process.Start(new ProcessStartInfo
                             {
                                 FileName = "https://github.com/mikha08-rgb/VoiceLite/releases/latest",
                                 UseShellExecute = true
@@ -363,7 +365,7 @@ namespace VoiceLite
                                         UseShellExecute = true,
                                         Verb = "runas" // Request admin
                                     };
-                                    Process.Start(startInfo);
+                                    using var process = Process.Start(startInfo);
                                 }
                                 catch (Exception ex)
                                 {
@@ -484,7 +486,7 @@ namespace VoiceLite
                             item.FixAction = "Help";
                             item.OnFix = () =>
                             {
-                                Process.Start("cleanmgr.exe");
+                                using var process = Process.Start("cleanmgr.exe");
                             };
                         }
                     }

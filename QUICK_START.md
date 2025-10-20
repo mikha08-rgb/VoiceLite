@@ -2,7 +2,7 @@
 
 ## Your Current Status:
 ✅ **App is SECURE** - Anti-debug, obfuscated, encrypted models
-✅ **Licensing WORKS** - Multi-tier system ready
+✅ **Licensing WORKS** - Two-tier system (Free + Pro) ready
 ✅ **Payment UI DONE** - Professional purchase flow
 ✅ **Installer READY** - Inno Setup configured
 
@@ -49,10 +49,9 @@ curl http://localhost:3000/api/check
 
 ### Use Stripe (Instant Approval)
 1. Sign up: https://stripe.com
-2. Create Payment Links:
-   - Personal: $29.99 → https://buy.stripe.com/xxx
-   - Professional: $59.99 → https://buy.stripe.com/yyy
-   - Business: $199.99 → https://buy.stripe.com/zzz
+2. Create Payment Link:
+   - Pro: $20 one-time → https://buy.stripe.com/xxx
+   (Note: Old 3-tier pricing model removed in favor of simple Free + Pro)
 
 3. Create Google Form for license delivery:
    - Field 1: Email (from Stripe receipt)
@@ -142,42 +141,29 @@ Save this as `index.html`:
 
         <div class="price-grid">
             <div class="price-card">
-                <h3>Personal</h3>
-                <p class="price">$29.99</p>
-                <p>Perfect for personal use</p>
+                <h3>Free</h3>
+                <p class="price">$0</p>
+                <p>Forever free</p>
                 <ul style="text-align: left; padding-left: 20px;">
-                    <li>1 device activation</li>
-                    <li>All Whisper models</li>
-                    <li>Lifetime updates</li>
-                    <li>Email support</li>
+                    <li>Tiny model (80-85% accuracy)</li>
+                    <li>Local transcription</li>
+                    <li>No time limits</li>
+                    <li>Privacy-focused</li>
                 </ul>
-                <a href="YOUR_STRIPE_LINK_1" class="buy-btn">Buy Personal</a>
+                <a href="https://voicelite.app" class="buy-btn">Download Free</a>
             </div>
 
             <div class="price-card" style="border: 3px solid #667eea;">
-                <h3>Professional</h3>
-                <p class="price">$59.99</p>
-                <p>For professionals & businesses</p>
+                <h3>Pro</h3>
+                <p class="price">$20</p>
+                <p>One-time payment</p>
                 <ul style="text-align: left; padding-left: 20px;">
-                    <li>3 device activations</li>
-                    <li>Commercial use allowed</li>
+                    <li>All AI models (up to 98% accuracy)</li>
+                    <li>Base, Small, Medium, Large models</li>
+                    <li>Lifetime updates</li>
                     <li>Priority support</li>
-                    <li>Advanced features</li>
                 </ul>
-                <a href="YOUR_STRIPE_LINK_2" class="buy-btn">Buy Professional</a>
-            </div>
-
-            <div class="price-card">
-                <h3>Business</h3>
-                <p class="price">$199.99</p>
-                <p>For teams & organizations</p>
-                <ul style="text-align: left; padding-left: 20px;">
-                    <li>5 users</li>
-                    <li>Unlimited devices</li>
-                    <li>Priority support</li>
-                    <li>Volume licensing</li>
-                </ul>
-                <a href="YOUR_STRIPE_LINK_3" class="buy-btn">Buy Business</a>
+                <a href="https://voicelite.app" class="buy-btn">Buy Pro</a>
             </div>
         </div>
 

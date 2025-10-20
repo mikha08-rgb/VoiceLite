@@ -14,6 +14,11 @@
     <FileVersion>1.0.68.0</FileVersion>
   </PropertyGroup>
 
+  <!-- Expose internal members to test project for mock license validation -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceLite.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="H.InputSimulator" Version="1.2.1" />
     <PackageReference Include="NAudio" Version="2.2.1" />

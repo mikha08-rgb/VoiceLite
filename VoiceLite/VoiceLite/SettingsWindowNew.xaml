@@ -13,6 +13,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -25,8 +26,27 @@
             </Grid>
         </Border>
 
+        <!-- License Status Banner -->
+        <Border Grid.Row="1" Name="LicenseBanner" Padding="15,10" Background="#E8F5E9">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Name="LicenseBannerIcon" Text="✓" FontSize="16" FontWeight="Bold" Foreground="#4CAF50" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="1" Name="LicenseBannerText" Text="Pro License Active" FontSize="14" FontWeight="SemiBold" Foreground="#2E7D32" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Name="LicenseBannerUpgrade" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed">
+                    <Hyperlink NavigateUri="https://voicelite.app" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#1976D2">
+                        <Run Text="Upgrade to Pro →"/>
+                    </Hyperlink>
+                </TextBlock>
+            </Grid>
+        </Border>
+
         <!-- Tabbed Content -->
-        <TabControl Grid.Row="1"
+        <TabControl Grid.Row="2"
                     Name="SettingsTabControl"
                     TabStripPlacement="Top"
                     Margin="0"
@@ -113,10 +133,6 @@
                                             ToolTip="Click to start/stop recording test"/>
                                 </StackPanel>
 
-                                <CheckBox Name="PlaySoundFeedbackCheckBox"
-                                          Content="Play sound feedback (beep on record start/stop)"
-                                          Margin="0,10,0,5"/>
-
                                 <CheckBox Name="AutoPasteCheckBox"
                                           Content="Auto-paste transcribed text (Ctrl+V)"
                                           IsChecked="True"
@@ -174,10 +190,39 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- AI Models Tab (Pro Only) -->
+            <TabItem Header="AI Models" Name="ModelsTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <!-- Info Banner -->
+                        <Border Background="#E3F2FD"
+                                CornerRadius="4"
+                                Padding="15"
+                                Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock Text="📊 AI Model Selection"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="#1976D2"
+                                           Margin="0,0,0,5"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Foreground="#1976D2">
+                                    Choose the AI model that best fits your needs. Larger models provide better accuracy but require more RAM and processing time. Tiny model comes pre-installed - other models can be downloaded on demand.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Model Comparison & Download Control -->
+                        <controls:ModelComparisonControl x:Name="ModelComparisonControl"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
 
         <!-- Footer with Buttons -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Background="#F5F5F5"
                 BorderBrush="#E0E0E0"
                 BorderThickness="0,1,0,0">

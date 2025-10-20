@@ -4,11 +4,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-using System.Windows.Media;
 using VoiceLite.Models;
 using VoiceLite.Services;
 
@@ -37,13 +37,40 @@ namespace VoiceLite.Controls
             InitializeComponent();
             whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
             LoadModels();
+            LoadCurrentModel();
+
+            // Refresh selected model when control becomes visible
+            this.Loaded += (s, e) => LoadCurrentModel();
+        }
+
+        /// <summary>
+        /// Refresh the UI to show the currently selected model
+        /// Call this when the control is shown after being hidden
+        /// </summary>
+        public void RefreshSelectedModel()
+        {
+            LoadCurrentModel();
         }
 
         private void LoadModels()
         {
             try
             {
-                models = WhisperModelInfo.GetAvailableModels(whisperPath);
+                var allModels = WhisperModelInfo.GetAvailableModels(whisperPath);
+
+                // Filter models based on license status
+                bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
+                if (hasValidLicense)
+                {
+                    // Pro users see all models
+                    models = allModels;
+                }
+                else
+                {
+                    // Free users only see Tiny model
+                    models = allModels.Where(m => m.FileName == "ggml-tiny.bin").ToList();
+                }
+
                 ModelsItemsControl.ItemsSource = models;
 
                 // Calculate total installed size
@@ -56,6 +83,42 @@ namespace VoiceLite.Controls
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading models: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadCurrentModel()
+        {
+            try
+            {
+                // Load current model from settings file
+                var appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "VoiceLite"
+                );
+                var settingsPath = Path.Combine(appDataPath, "settings.json");
+
+                if (File.Exists(settingsPath))
+                {
+                    var json = File.ReadAllText(settingsPath);
+                    var settings = JsonSerializer.Deserialize<Settings>(json);
+
+                    if (settings != null)
+                    {
+                        var fileName = settings.WhisperModel;
+
+                        // Find and select the current model
+                        var currentModel = models.FirstOrDefault(m => m.FileName == fileName);
+                        if (currentModel != null && currentModel.IsInstalled)
+                        {
+                            selectedModel = currentModel;
+                            UpdateSelection();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to load current model selection", ex);
             }
         }
 
@@ -139,50 +202,79 @@ namespace VoiceLite.Controls
 
             selectedModel = model;
             UpdateSelection();
+
+            // Save selection to settings
+            try
+            {
+                var appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "VoiceLite"
+                );
+                var settingsPath = Path.Combine(appDataPath, "settings.json");
+
+                if (File.Exists(settingsPath))
+                {
+                    var json = File.ReadAllText(settingsPath);
+                    var settings = JsonSerializer.Deserialize<Settings>(json);
+
+                    if (settings != null)
+                    {
+                        settings.WhisperModel = model.FileName;
+
+                        // Save back to file
+                        var options = new JsonSerializerOptions { WriteIndented = true };
+                        var updatedJson = JsonSerializer.Serialize(settings, options);
+                        File.WriteAllText(settingsPath, updatedJson);
+
+                        ErrorLogger.LogMessage($"Model changed to {model.DisplayName} ({model.FileName})");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to save model selection", ex);
+            }
+
             ModelSelected?.Invoke(this, model);
             TestModelButton.IsEnabled = true;
         }
 
         private void UpdateSelection()
         {
-            // Update visual selection state
-            foreach (var item in ModelsItemsControl.Items)
+            // Update IsSelected property on all models
+            foreach (var model in models)
             {
-                var container = ModelsItemsControl.ItemContainerGenerator.ContainerFromItem(item) as ContentPresenter;
-                if (container != null)
-                {
-                    var border = FindVisualChild<Border>(container);
-                    if (border != null)
-                    {
-                        var model = item as WhisperModelInfo;
-                        if (model == selectedModel)
-                        {
-                            border.Style = FindResource("SelectedCardStyle") as Style;
-                            // Update button text for selected model
-                            var button = FindVisualChild<Button>(border);
-                            if (button != null)
-                            {
-                                button.Content = "Selected ✓";
-                                button.IsEnabled = false;
-                            }
-                        }
-                        else if (model?.IsInstalled == true)
-                        {
-                            border.Style = FindResource("ModelCardStyle") as Style;
-                            var button = FindVisualChild<Button>(border);
-                            if (button != null)
-                            {
-                                button.Content = "Select";
-                                button.IsEnabled = true;
-                            }
-                        }
-                    }
-                }
+                model.IsSelected = (model == selectedModel);
             }
+
+            // Refresh the ItemsControl to update visual state
+            ModelsItemsControl.Items.Refresh();
         }
 
         private async void DownloadModel(WhisperModelInfo model)
         {
+            // SECURITY: Check if downloading a Pro model (Base, Small, Medium, Large)
+            var proModels = new[] { "ggml-base.bin", "ggml-small.bin", "ggml-medium.bin", "ggml-large-v3.bin" };
+            if (proModels.Contains(model.FileName))
+            {
+                bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
+                if (!hasValidLicense)
+                {
+                    MessageBox.Show(
+                        $"{model.DisplayName} model requires a Pro license.\n\n" +
+                        "Free tier includes:\n" +
+                        "• Tiny model only (pre-installed)\n\n" +
+                        "Pro tier unlocks:\n" +
+                        "• Base, Small, Medium, Large models\n" +
+                        "• Model downloads\n\n" +
+                        "Get Pro for $20 at voicelite.app",
+                        "Pro License Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+            }
+
             var result = MessageBox.Show(
                 $"Download {model.DisplayName} model?\n\n" +
                 $"Size: {model.FileSizeDisplay}\n" +
@@ -198,10 +290,13 @@ namespace VoiceLite.Controls
             try
             {
                 // Determine download URL based on model
+                // All models hosted on GitHub releases for professional in-app experience (except Large - exceeds 2GB limit)
                 string? downloadUrl = model.FileName switch
                 {
+                    "ggml-base.bin" => "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-base.bin",
+                    "ggml-small.bin" => "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-small.bin",
                     "ggml-medium.bin" => "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin",
-                    // Large model (2.9GB) exceeds GitHub's 2GB limit - fallback to Hugging Face
+                    // Large model (2.9GB) exceeds GitHub's 2GB file size limit - fallback to Hugging Face
                     "ggml-large-v3.bin" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
                     _ => null
                 };
@@ -316,19 +411,18 @@ namespace VoiceLite.Controls
             UpdateRecommendation();
         }
 
-        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild)
-                    return typedChild;
+            // Manually scroll the ScrollViewer
+            var scrollViewer = sender as ScrollViewer;
+            if (scrollViewer == null)
+                return;
 
-                var result = FindVisualChild<T>(child);
-                if (result != null)
-                    return result;
-            }
-            return null;
+            // Scroll by 3 lines per wheel click (standard Windows behavior)
+            double scrollAmount = e.Delta > 0 ? -48 : 48; // Each line is ~16 pixels, 3 lines = 48px
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + scrollAmount);
+
+            e.Handled = true;
         }
 
         private static string FormatFileSize(long bytes)

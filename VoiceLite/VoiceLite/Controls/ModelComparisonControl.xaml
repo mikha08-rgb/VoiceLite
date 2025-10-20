@@ -14,28 +14,33 @@
             <Setter Property="Margin" Value="5"/>
             <Setter Property="Padding" Value="15"/>
             <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="#B0B0B0"/>
-                    <Setter Property="Effect">
+                <!-- Selected state takes priority -->
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="#4CAF50"/>
+                    <Setter Property="BorderThickness" Value="3"/>
+                    <Setter Property="Background">
                         <Setter.Value>
-                            <DropShadowEffect ShadowDepth="2" BlurRadius="8" Color="#20000000"/>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#F8FFF8" Offset="0"/>
+                                <GradientStop Color="#FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+                <!-- Hover state (lower priority) -->
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#2196F3"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#FAFAFA" Offset="0"/>
+                                <GradientStop Color="#FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
                         </Setter.Value>
                     </Setter>
                 </Trigger>
             </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SelectedCardStyle" TargetType="Border" BasedOn="{StaticResource ModelCardStyle}">
-            <Setter Property="BorderBrush" Value="#4CAF50"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Background">
-                <Setter.Value>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Color="#F8FFF8" Offset="0"/>
-                        <GradientStop Color="#FFFFFF" Offset="1"/>
-                    </LinearGradientBrush>
-                </Setter.Value>
-            </Setter>
         </Style>
 
         <Style x:Key="MetricBarStyle" TargetType="Border">
@@ -89,9 +94,14 @@
 
         <!-- Model Cards ScrollViewer -->
         <ScrollViewer Grid.Row="1"
+                      Name="ModelsScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
-                      Padding="10">
+                      PanningMode="VerticalOnly"
+                      Focusable="True"
+                      CanContentScroll="True"
+                      Padding="10"
+                      PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
             <ItemsControl Name="ModelsItemsControl">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -139,18 +149,41 @@
                                     </Border>
                                 </Grid>
 
-                                <!-- Recommended Badge -->
-                                <Border Grid.Row="1"
-                                        Background="#FFF3E0"
-                                        CornerRadius="4"
-                                        Padding="5,2"
-                                        Margin="0,0,0,8"
-                                        HorizontalAlignment="Left"
-                                        Visibility="{Binding IsRecommended}">
-                                    <TextBlock Text="⭐ Recommended"
-                                               FontSize="11"
-                                               Foreground="#F57C00"/>
-                                </Border>
+                                <!-- Selected and Recommended Badges -->
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <!-- Selected Badge -->
+                                    <Border Background="#4CAF50"
+                                            CornerRadius="4"
+                                            Padding="6,3"
+                                            Margin="0,0,5,0"
+                                            HorizontalAlignment="Left">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="✓ SELECTED"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   Foreground="White"/>
+                                    </Border>
+
+                                    <!-- Recommended Badge -->
+                                    <Border Background="#FFF3E0"
+                                            CornerRadius="4"
+                                            Padding="5,2"
+                                            HorizontalAlignment="Left"
+                                            Visibility="{Binding IsRecommended}">
+                                        <TextBlock Text="⭐ Recommended"
+                                                   FontSize="11"
+                                                   Foreground="#F57C00"/>
+                                    </Border>
+                                </StackPanel>
 
                                 <!-- Speed Rating -->
                                 <StackPanel Grid.Row="2" Margin="0,2">
@@ -272,13 +305,26 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#45A049"/>
                                                 </Trigger>
+                                                <!-- Selected state (highest priority) -->
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Content" Value="Selected ✓"/>
+                                                    <Setter Property="Background" Value="#4CAF50"/>
+                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                    <Setter Property="Opacity" Value="0.7"/>
+                                                </DataTrigger>
+                                                <!-- Not installed -->
                                                 <DataTrigger Binding="{Binding IsInstalled}" Value="False">
                                                     <Setter Property="Background" Value="#FF9800"/>
                                                     <Setter Property="Content" Value="Download"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                                                <!-- Installed but not selected -->
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsInstalled}" Value="True"/>
+                                                        <Condition Binding="{Binding IsSelected}" Value="False"/>
+                                                    </MultiDataTrigger.Conditions>
                                                     <Setter Property="Content" Value="Select"/>
-                                                </DataTrigger>
+                                                </MultiDataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>

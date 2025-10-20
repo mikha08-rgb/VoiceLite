@@ -417,26 +417,31 @@ namespace VoiceLite.Services
 
             try
             {
-                // Wait up to 2 seconds for tasks to complete
+                // AUDIT FIX: Use fire-and-forget instead of blocking Task.WaitAll to prevent UI freeze on shutdown
                 var tasksArray = pendingTasks.ToArray();
                 if (tasksArray.Length > 0)
                 {
 #if DEBUG
-                    ErrorLogger.LogMessage($"TextInjector disposing - waiting for {tasksArray.Length} clipboard tasks");
+                    ErrorLogger.LogMessage($"TextInjector disposing - fire-and-forget cleanup for {tasksArray.Length} clipboard tasks");
 #endif
-                    Task.WaitAll(tasksArray, TimeSpan.FromSeconds(2));
+                    // Fire-and-forget cleanup - don't block UI thread during app shutdown
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await Task.WhenAll(tasksArray).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogError("TextInjector background cleanup failed", ex);
+                        }
+                    });
                 }
             }
-            catch (AggregateException ex)
+            catch (Exception ex)
             {
-                // Tasks were cancelled - this is expected
-                foreach (var inner in ex.InnerExceptions)
-                {
-                    if (!(inner is TaskCanceledException))
-                    {
-                        ErrorLogger.LogError("TextInjector disposal error", inner);
-                    }
-                }
+                // Unexpected error during disposal
+                ErrorLogger.LogError("TextInjector disposal error", ex);
             }
             finally
             {

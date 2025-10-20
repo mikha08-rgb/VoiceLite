@@ -116,7 +116,7 @@ Once migration completes, continue with:
    # Paste: https://game-honeybee-16063.upstash.io
 
    vercel env add UPSTASH_REDIS_REST_TOKEN
-   # Paste: AT6_AAIncDI1MDk4YWU5Njc0YzY0NTY3ODI5NmU5OTQwNTkxNDljNXAyMTYwNjM
+   # Paste: [REDACTED-UPSTASH-TOKEN]
 
    vercel env add ADMIN_EMAILS
    # Paste: your-email@example.com

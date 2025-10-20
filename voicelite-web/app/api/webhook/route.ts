@@ -57,6 +57,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // SECURITY: Check event timestamp to prevent replay attacks (Stripe best practice)
+  const eventAge = Date.now() - (event.created * 1000);
+  const MAX_EVENT_AGE_MS = 5 * 60 * 1000; // 5 minutes
+  if (eventAge > MAX_EVENT_AGE_MS) {
+    console.warn(`Rejecting stale webhook event: ${event.id} (${eventAge}ms old)`);
+    return NextResponse.json(
+      { error: 'Event too old', received: true },
+      { status: 400 }
+    );
+  }
+
   // Idempotency check with atomic create to prevent race conditions
   // Use unique constraint on eventId to ensure only one webhook processes this event
   try {

@@ -208,97 +208,8 @@ const FeedbackSubmitSchema = registry.register(
 );
 
 // -----------------------------------------------------------------------------
-// Register API Routes
+// Register API Routes (Only endpoints that actually exist)
 // -----------------------------------------------------------------------------
-
-// Auth Routes
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/request',
-  tags: ['Authentication'],
-  summary: 'Request magic link login',
-  description: 'Send a magic link to the user\'s email for passwordless authentication',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: AuthRequestBodySchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'Magic link sent successfully',
-      content: {
-        'application/json': {
-          schema: SuccessResponseSchema,
-        },
-      },
-    },
-    400: {
-      description: 'Invalid request',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/otp',
-  tags: ['Authentication'],
-  summary: 'Verify OTP code',
-  description: 'Verify the 6-digit OTP code sent via email and create a session',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: OTPVerifyBodySchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'OTP verified, session created',
-      content: {
-        'application/json': {
-          schema: SessionResponseSchema,
-        },
-      },
-    },
-    401: {
-      description: 'Invalid or expired OTP',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/logout',
-  tags: ['Authentication'],
-  summary: 'Logout user',
-  description: 'Revoke the current session token',
-  responses: {
-    200: {
-      description: 'Logged out successfully',
-      content: {
-        'application/json': {
-          schema: SuccessResponseSchema,
-        },
-      },
-    },
-  },
-});
 
 // Checkout Routes
 registry.registerPath({
@@ -372,181 +283,6 @@ registry.registerPath({
   },
 });
 
-registry.registerPath({
-  method: 'post',
-  path: '/api/licenses/issue',
-  tags: ['Licenses'],
-  summary: 'Issue signed license file',
-  description: 'Generate a cryptographically signed license file for desktop app validation',
-  responses: {
-    200: {
-      description: 'Signed license issued',
-      content: {
-        'application/json': {
-          schema: SignedLicenseResponseSchema,
-        },
-      },
-    },
-    401: {
-      description: 'Authentication required',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/licenses/crl',
-  tags: ['Licenses'],
-  summary: 'Get Certificate Revocation List',
-  description: 'Fetch the list of revoked license IDs for offline validation',
-  responses: {
-    200: {
-      description: 'CRL retrieved successfully',
-      content: {
-        'application/json': {
-          schema: z.object({
-            revokedLicenses: z.array(z.string()),
-            signature: z.string(),
-            issuedAt: z.string(),
-          }),
-        },
-      },
-    },
-  },
-});
-
-// Analytics Routes
-registry.registerPath({
-  method: 'post',
-  path: '/api/analytics/event',
-  tags: ['Analytics'],
-  summary: 'Submit analytics event',
-  description: 'Submit a privacy-first analytics event (opt-in only, anonymous)',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: AnalyticsEventSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'Event recorded',
-      content: {
-        'application/json': {
-          schema: SuccessResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/admin/analytics',
-  tags: ['Admin'],
-  summary: 'Get analytics dashboard data',
-  description: 'Retrieve aggregated analytics data (admin only)',
-  parameters: [
-    {
-      name: 'days',
-      in: 'query',
-      description: 'Number of days to include (default: 30, max: 365)',
-      required: false,
-      schema: {
-        type: 'number',
-        default: 30,
-      },
-    },
-  ],
-  responses: {
-    200: {
-      description: 'Analytics data retrieved',
-      content: {
-        'application/json': {
-          schema: AdminAnalyticsResponseSchema,
-        },
-      },
-    },
-    401: {
-      description: 'Unauthorized - admin access required',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-// Feedback Routes
-registry.registerPath({
-  method: 'post',
-  path: '/api/feedback/submit',
-  tags: ['Feedback'],
-  summary: 'Submit user feedback',
-  description: 'Submit feedback or bug reports',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: FeedbackSubmitSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'Feedback submitted',
-      content: {
-        'application/json': {
-          schema: SuccessResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-// User Routes
-registry.registerPath({
-  method: 'get',
-  path: '/api/me',
-  tags: ['User'],
-  summary: 'Get current user profile',
-  description: 'Get the authenticated user\'s profile and active licenses',
-  responses: {
-    200: {
-      description: 'User profile retrieved',
-      content: {
-        'application/json': {
-          schema: z.object({
-            user: z.object({
-              id: z.string(),
-              email: z.string().email(),
-            }),
-            licenses: z.array(LicenseSchema),
-          }),
-        },
-      },
-    },
-    401: {
-      description: 'Authentication required',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
 // -----------------------------------------------------------------------------
 // Generate OpenAPI Document
 // -----------------------------------------------------------------------------
@@ -562,35 +298,31 @@ export function generateOpenAPIDocument() {
       description: `
 # VoiceLite API Documentation
 
-This API powers the VoiceLite web platform for managing Pro subscriptions, licenses, and user accounts.
-
-## Authentication
-
-Most endpoints require authentication via session cookies. Use the \`/api/auth/request\` and \`/api/auth/otp\` endpoints to authenticate.
+This API powers the VoiceLite web platform for Pro license purchases and validation.
 
 ## Rate Limiting
 
 API endpoints are rate-limited using Redis (Upstash). Limits vary by endpoint:
-- Auth endpoints: 5 requests per 15 minutes
-- License endpoints: 10 requests per minute
-- Analytics endpoints: Unlimited (opt-in only)
+- License activation: 10 requests per hour per IP
+- License validation: 100 requests per hour per IP
+- Checkout: 5 requests per minute per IP
+- Webhook: Internal only (Stripe signature validation)
 
 ## Privacy
 
 VoiceLite is privacy-first:
-- Analytics are **opt-in only** and use SHA256-hashed anonymous IDs
-- No IP addresses are logged
-- No recording content is ever transmitted (all processing is local)
-- User emails are only used for authentication and license delivery
+- **100% local transcription** - your voice never leaves your computer
+- No analytics or telemetry
+- User emails only used for license delivery
+- Minimal data collection
 
 ## Desktop App Integration
 
 The desktop app communicates with this API for:
-- Pro license validation (Ed25519 cryptographic signatures)
-- Certificate Revocation List (CRL) checks
-- Optional privacy-first analytics (if user opts in)
+- Pro license activation (one-time, hardware-bound)
+- License validation (online check with rate limiting)
 
-All license validation happens **offline** after initial license fetch.
+After activation, the desktop app stores the license locally for offline use.
       `.trim(),
       contact: {
         name: 'VoiceLite Support',
@@ -614,120 +346,28 @@ All license validation happens **offline** after initial license fetch.
     ],
     tags: [
       {
-        name: 'Authentication',
-        description: 'Passwordless authentication via magic links and OTP codes',
-      },
-      {
         name: 'Payments',
-        description: 'Stripe checkout sessions for Pro subscriptions',
+        description: 'Stripe checkout sessions for Pro license purchase ($20 one-time)',
       },
       {
         name: 'Licenses',
-        description: 'License key activation and validation with Ed25519 signatures',
-      },
-      {
-        name: 'Analytics',
-        description: 'Privacy-first opt-in analytics (anonymous SHA256 IDs)',
-      },
-      {
-        name: 'Admin',
-        description: 'Admin-only endpoints for dashboard and management',
-      },
-      {
-        name: 'Feedback',
-        description: 'User feedback and bug reports',
-      },
-      {
-        name: 'User',
-        description: 'User profile and account management',
+        description: 'License key activation and validation (hardware-bound)',
       },
       {
         name: 'Internal',
-        description: 'Internal endpoints (webhooks, migrations)',
+        description: 'Internal endpoints (webhooks)',
       },
     ],
   });
 }
 
-// Add remaining routes that were missing
-registry.registerPath({
-  method: 'get',
-  path: '/api/licenses/mine',
-  tags: ['Licenses'],
-  summary: 'Get user licenses with activations',
-  description: 'Get all licenses belonging to the authenticated user with device activation details',
-  responses: {
-    200: {
-      description: 'Licenses retrieved',
-      content: {
-        'application/json': {
-          schema: z.object({
-            licenses: z.array(z.object({
-              id: z.string(),
-              licenseKey: z.string(),
-              type: z.enum(['QUARTERLY', 'LIFETIME']),
-              status: z.string(),
-              activatedAt: z.string().nullable(),
-              expiresAt: z.string().nullable(),
-              activations: z.array(z.object({
-                id: z.string(),
-                machineId: z.string(),
-                machineLabel: z.string().nullable(),
-                activatedAt: z.string(),
-                lastValidatedAt: z.string().nullable(),
-                status: z.string(),
-              })),
-            })),
-          }),
-        },
-      },
-    },
-    401: {
-      description: 'Authentication required',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/licenses/deactivate',
-  tags: ['Licenses'],
-  summary: 'Deactivate license on device',
-  description: 'Deactivate a license from a specific device to free up an activation slot',
-  request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: z.object({
-            activationId: z.string().describe('Activation ID to deactivate'),
-          }),
-        },
-      },
-    },
-  },
-  responses: {
-    200: {
-      description: 'License deactivated',
-      content: {
-        'application/json': {
-          schema: SuccessResponseSchema,
-        },
-      },
-    },
-  },
-});
-
+// Add actually implemented routes
 registry.registerPath({
   method: 'post',
   path: '/api/licenses/validate',
   tags: ['Licenses'],
   summary: 'Validate license key',
-  description: 'Validate a license key without activating it',
+  description: 'Validate a license key without activating it (rate limited: 100 req/hour)',
   request: {
     body: {
       content: {
@@ -746,70 +386,17 @@ registry.registerPath({
         'application/json': {
           schema: z.object({
             valid: z.boolean(),
-            license: LicenseSchema.optional(),
+            status: z.string().optional(),
+            type: z.string().optional(),
           }),
         },
       },
     },
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/admin/stats',
-  tags: ['Admin'],
-  summary: 'Get admin dashboard statistics',
-  description: 'Retrieve overall platform statistics (admin only)',
-  responses: {
-    200: {
-      description: 'Statistics retrieved',
-    },
-    401: {
-      description: 'Unauthorized',
+    429: {
+      description: 'Too many requests',
       content: {
         'application/json': {
           schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/admin/feedback',
-  tags: ['Admin'],
-  summary: 'Get all feedback submissions',
-  description: 'Retrieve all user feedback (admin only)',
-  responses: {
-    200: {
-      description: 'Feedback retrieved',
-    },
-    401: {
-      description: 'Unauthorized',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/billing/portal',
-  tags: ['Payments'],
-  summary: 'Create Stripe customer portal session',
-  description: 'Create a Stripe customer portal link for managing subscriptions',
-  responses: {
-    200: {
-      description: 'Portal session created',
-      content: {
-        'application/json': {
-          schema: z.object({
-            url: z.string().url(),
-          }),
         },
       },
     },
@@ -821,10 +408,13 @@ registry.registerPath({
   path: '/api/webhook',
   tags: ['Internal'],
   summary: 'Stripe webhook handler',
-  description: 'Internal endpoint for processing Stripe webhook events',
+  description: 'Internal endpoint for processing Stripe webhook events (with timestamp validation)',
   responses: {
     200: {
       description: 'Webhook processed',
+    },
+    400: {
+      description: 'Invalid signature or event too old',
     },
   },
 });

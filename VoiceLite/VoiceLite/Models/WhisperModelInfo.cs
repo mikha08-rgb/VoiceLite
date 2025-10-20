@@ -17,6 +17,7 @@ namespace VoiceLite.Models
         public double SpeedRatingWidth => (SpeedRating / 5.0) * 150; // Convert to width
         public double AccuracyRatingWidth => (AccuracyRating / 5.0) * 150; // Convert to width
         public Visibility IsRecommended { get; set; } // Changed to Visibility type
+        public bool IsSelected { get; set; } // Indicates if this model is currently selected
         public double TypicalProcessingTime { get; set; } // seconds per audio second
         public double RequiredRAMGB { get; set; }
         public bool IsInstalled { get; set; }

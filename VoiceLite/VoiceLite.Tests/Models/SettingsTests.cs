@@ -24,7 +24,7 @@ namespace VoiceLite.Tests.Models
             settings.TextInjectionMode.Should().Be(TextInjectionMode.SmartAuto);
             settings.RecordHotkey.Should().Be(Key.LeftAlt);
             settings.HotkeyModifiers.Should().Be(ModifierKeys.None);
-            settings.WhisperModel.Should().Be("ggml-base.bin"); // UPDATED: Changed default to Base model
+            settings.WhisperModel.Should().Be("ggml-tiny.bin"); // UPDATED: Changed default to Tiny model (freemium)
             settings.BeamSize.Should().Be(1);
             settings.BestOf.Should().Be(1);
             settings.WhisperTimeoutMultiplier.Should().Be(2.0);
@@ -219,13 +219,13 @@ namespace VoiceLite.Tests.Models
         #region Whisper Model Tests
 
         [Fact]
-        public void WhisperModel_DefaultValue_IsBase()
+        public void WhisperModel_DefaultValue_IsTiny()
         {
             // Arrange & Act
             var settings = new Settings();
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-base.bin"); // UPDATED: Changed default to Base model
+            settings.WhisperModel.Should().Be("ggml-tiny.bin"); // UPDATED: Changed default to Tiny model (freemium)
         }
 
         [Fact]
@@ -242,7 +242,7 @@ namespace VoiceLite.Tests.Models
         }
 
         [Fact]
-        public void WhisperModel_EmptyString_DefaultsToBase()
+        public void WhisperModel_EmptyString_DefaultsToTiny()
         {
             // Arrange
             var settings = new Settings();
@@ -251,11 +251,11 @@ namespace VoiceLite.Tests.Models
             settings.WhisperModel = "";
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-base.bin"); // UPDATED: Changed default to Base model
+            settings.WhisperModel.Should().Be("ggml-tiny.bin"); // UPDATED: Changed default to Tiny model (freemium)
         }
 
         [Fact]
-        public void WhisperModel_WhitespaceString_DefaultsToBase()
+        public void WhisperModel_WhitespaceString_DefaultsToTiny()
         {
             // Arrange
             var settings = new Settings();
@@ -264,7 +264,7 @@ namespace VoiceLite.Tests.Models
             settings.WhisperModel = "   ";
 
             // Assert
-            settings.WhisperModel.Should().Be("ggml-base.bin"); // UPDATED: Changed default to Base model
+            settings.WhisperModel.Should().Be("ggml-tiny.bin"); // UPDATED: Changed default to Tiny model (freemium)
         }
 
         #endregion
@@ -434,16 +434,6 @@ namespace VoiceLite.Tests.Models
 
             // Assert
             settings.AutoPaste.Should().BeTrue();
-        }
-
-        [Fact]
-        public void PlaySoundFeedback_DefaultValue_IsTrue()
-        {
-            // Arrange & Act
-            var settings = new Settings();
-
-            // Assert
-            settings.PlaySoundFeedback.Should().BeTrue(); // UPDATED: Enabled by default for better UX
         }
 
         [Fact]
@@ -793,7 +783,6 @@ namespace VoiceLite.Tests.Models
                 EnableNoiseSuppression = true,
                 EnableAutomaticGain = true,
                 StartWithWindows = true,
-                PlaySoundFeedback = true,
                 Language = "fr",
                 SelectedMicrophoneIndex = 2,
                 AutoPaste = false,

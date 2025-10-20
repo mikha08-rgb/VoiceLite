@@ -35,9 +35,9 @@ If you discover a security vulnerability in VoiceLite, please report it responsi
 VoiceLite takes security seriously:
 
 ### Privacy
-- ✅ **100% Offline**: Your voice never leaves your computer
+- ✅ **Offline Transcription**: Voice processing is 100% local (Pro activation requires one-time internet connection)
 - ✅ **No Telemetry**: We don't collect usage data
-- ✅ **No Cloud**: All processing happens locally
+- ✅ **No Cloud Processing**: All transcription happens locally on your device
 
 ### Data Storage
 - Settings stored in `%APPDATA%\VoiceLite\settings.json`

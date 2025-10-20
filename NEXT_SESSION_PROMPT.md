@@ -18,7 +18,7 @@ Hi Claude! I just restarted my PC and set up Supabase MCP in another instance. W
   - License encryption with DPAPI (Windows Data Protection API)
   - Rate limiting on validation endpoint (prevents brute force)
   - Graceful Stripe error handling (can deploy without Stripe)
-- Resend email configured: `re_Vn4JijC8_KJGGmrQYBe5QXa9ohEHiGjZn`
+- Resend email configured: `[REDACTED-RESEND-KEY]`
 - Upstash Redis configured: `https://golden-ibex-26450.upstash.io`
 - Git workspace clean (no uncommitted changes)
 
@@ -38,7 +38,7 @@ The Supabase MCP is now set up in another Claude instance. Let's use it to:
 **Database Details:**
 - Provider: Supabase PostgreSQL
 - Project: `lvocjzqjqllouzyggpqm`
-- Connection string: `postgresql://postgres:jpcyCSh80D5sG$iq@db.lvocjzqjqllouzyggpqm.supabase.co:5432/postgres`
+- Connection string: `postgresql://postgres:[REDACTED-OLD-PASSWORD]@db.lvocjzqjqllouzyggpqm.supabase.co:5432/postgres`
 
 **Tasks:**
 1. Verify Supabase MCP can connect
@@ -187,7 +187,7 @@ git push                        # Push to remote (when ready)
 ```bash
 # In voicelite-web/.env
 DATABASE_URL="postgresql://postgres:jpcyCSh80D5sG%24iq@db.lvocjzqjqllouzyggpqm.supabase.co:5432/postgres"
-RESEND_API_KEY="re_Vn4JijC8_KJGGmrQYBe5QXa9ohEHiGjZn"
+RESEND_API_KEY="[REDACTED-RESEND-KEY]"
 UPSTASH_REDIS_REST_URL="https://golden-ibex-26450.upstash.io"
 UPSTASH_REDIS_REST_TOKEN="AWdSAAIncDJjMDhkYTUwZWMxZWY0ODM2OTBjOWRmMGQwYTAwYzhiNXAyMjY0NTA"
 STRIPE_SECRET_KEY="sk_test_PLACEHOLDER"  # Not configured yet (optional)

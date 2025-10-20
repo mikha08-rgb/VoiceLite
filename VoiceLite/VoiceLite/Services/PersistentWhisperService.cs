@@ -130,13 +130,13 @@ namespace VoiceLite.Services
                 "small" => "ggml-small.bin",
                 "medium" => "ggml-medium.bin",
                 "large" => "ggml-large-v3.bin",
-                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
+                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
             };
 
             // CRITICAL SECURITY FIX: Server-side model gating to prevent piracy
-            // Check if user is trying to use Pro models (Small, Medium, Large) without a valid license
+            // Check if user is trying to use Pro models (Base, Small, Medium, Large) without a valid license
             // This prevents bypass by editing Settings.json directly
-            var proModels = new[] { "ggml-small.bin", "ggml-medium.bin", "ggml-large-v3.bin" };
+            var proModels = new[] { "ggml-base.bin", "ggml-small.bin", "ggml-medium.bin", "ggml-large-v3.bin" };
             if (proModels.Contains(modelFile))
             {
                 bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
@@ -144,27 +144,27 @@ namespace VoiceLite.Services
                 if (!hasValidLicense)
                 {
                     // Security violation: User tried to use Pro model without license
-                    ErrorLogger.LogMessage($"SECURITY: Attempt to use Pro model '{modelFile}' without valid license - falling back to Base model");
+                    ErrorLogger.LogMessage($"SECURITY: Attempt to use Pro model '{modelFile}' without valid license - falling back to Tiny model");
 
-                    // Fallback to Base model (free tier) instead of blocking completely
-                    modelFile = "ggml-base.bin";
+                    // Fallback to Tiny model (free tier) instead of blocking completely
+                    modelFile = "ggml-tiny.bin";
 
                     // Update settings to prevent repeated attempts
-                    settings.WhisperModel = "ggml-base.bin";
+                    settings.WhisperModel = "ggml-tiny.bin";
 
                     // Show warning to user (will be logged and displayed by MainWindow)
                     throw new UnauthorizedAccessException(
                         "Pro Model Requires License\n\n" +
                         $"The '{settings.WhisperModel}' model requires a Pro license.\n\n" +
                         "Free tier includes:\n" +
-                        "• Tiny model (fastest, lower accuracy)\n" +
-                        "• Base model (good balance)\n\n" +
+                        "• Tiny model only (80-85% accuracy)\n\n" +
                         "Pro tier unlocks:\n" +
-                        "• Small model (better accuracy)\n" +
-                        "• Medium model (professional quality)\n" +
-                        "• Large model (maximum accuracy)\n\n" +
-                        "Get Pro for $29.99 at voicelite.app\n\n" +
-                        "Your model selection has been reset to Base.");
+                        "• Base model (90% accuracy)\n" +
+                        "• Small model (92% accuracy)\n" +
+                        "• Medium model (95% accuracy)\n" +
+                        "• Large model (98% accuracy)\n\n" +
+                        "Get Pro for $20 at voicelite.app\n\n" +
+                        "Your model selection has been reset to Tiny.");
                 }
             }
 
@@ -344,16 +344,22 @@ namespace VoiceLite.Services
             bool semaphoreAcquired = false;
             Process? process = null; // TIER 1.3: Declare at method scope for finally block access
 
+            // CRITICAL FIX: Acquire semaphore with atomic flag setting to prevent leak
             try
             {
                 // Use semaphore to ensure only one transcription at a time
                 // CRITICAL FIX: Add cancellation token support to prevent deadlock during disposal
                 await transcriptionSemaphore.WaitAsync(disposalCts.Token);
+
+                // CRITICAL: Set flag immediately after successful acquisition
+                // This MUST be inside the try block to handle cancellation between acquire and flag set
                 semaphoreAcquired = true;
             }
             catch (OperationCanceledException)
             {
-                // Disposal in progress - exit gracefully without releasing semaphore
+                // CRITICAL FIX: If cancelled, semaphoreAcquired is still false (correct)
+                // The finally block will only release if semaphoreAcquired is true
+                // Disposal in progress - exit gracefully
                 return string.Empty;
             }
 
@@ -427,12 +433,12 @@ namespace VoiceLite.Services
 
                 process.Start();
 
-                // PERFORMANCE FIX: Use Normal priority instead of High to prevent UI thread starvation
-                // On systems with limited cores (2-4), HIGH priority Whisper can starve the UI thread
-                // causing the app to appear frozen during transcription
+                // AUDIT FIX: Use BelowNormal priority to prevent UI thread starvation on low-core systems
+                // On dual-core or quad-core systems, Whisper is CPU-intensive and can freeze the UI
+                // BelowNormal priority ensures UI remains responsive (transcription slightly slower but acceptable)
                 try
                 {
-                    process.PriorityClass = ProcessPriorityClass.Normal;
+                    process.PriorityClass = ProcessPriorityClass.BelowNormal;
                 }
                 catch { }
 
@@ -446,63 +452,42 @@ namespace VoiceLite.Services
 
                 if (!exited)
                 {
-                    // Kill the entire process tree to ensure cleanup of any child processes
-                    // Without entireProcessTree=true, orphaned whisper.exe processes can remain
-                    try
+                    // CRITICAL FIX: Move ALL process termination to background thread
+                    // Process.Kill() can block for 30+ seconds if process is in unkillable state
+                    await Task.Run(async () =>
                     {
-                        process.Kill(entireProcessTree: true);
-                        ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
-
-                        // CRIT-005 FIX: Non-blocking process termination with hard timeout
-                        // Use Task.Run to prevent UI thread hang if process is in unkillable state
-                        var waitTask = Task.Run(() =>
+                        try
                         {
+                            // Kill the entire process tree to ensure cleanup of any child processes
+                            process.Kill(entireProcessTree: true);
+                            ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
+
+                            // CRIT-005 FIX: Non-blocking process termination with hard timeout
+                            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                             try
                             {
-                                // CRIT-006 FIX: Add timeout to WaitForExit to prevent infinite hang
-                                // Previously called without timeout, could hang forever if process in zombie state
-                                return process.WaitForExit(5000); // Wait up to 5 seconds
+                                await process.WaitForExitAsync(cts.Token);
                             }
-                            catch
+                            catch (OperationCanceledException)
                             {
-                                return false;
+                                ErrorLogger.LogWarning("Process refused to die - using taskkill");
+
+                                // Last resort: taskkill /F
+                                using var taskkill = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "taskkill",
+                                    Arguments = $"/F /T /PID {process.Id}",
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                });
+                                taskkill?.WaitForExit(3000); // 3s max for taskkill itself
                             }
-                        });
-
-                        // Hard timeout: 6 seconds max (5s wait + 1s margin)
-                        if (!waitTask.Wait(6000) || !waitTask.Result)
-                        {
-                            ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
-
-                            // Last resort: Fire-and-forget taskkill (don't wait)
-                            _ = Task.Run(() =>
-                            {
-                                try
-                                {
-                                    var taskkill = Process.Start(new ProcessStartInfo
-                                    {
-                                        FileName = "taskkill",
-                                        Arguments = $"/F /T /PID {process.Id}",
-                                        CreateNoWindow = true,
-                                        UseShellExecute = false
-                                    });
-                                    // Don't wait - fire and forget
-                                    taskkill?.Dispose();
-                                }
-                                catch (Exception taskkillEx)
-                                {
-                                    ErrorLogger.LogError("taskkill also failed", taskkillEx);
-                                }
-                            });
                         }
-
-                    }
-                    catch (Exception killEx)
-                    {
-                        ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
-                        // Try basic kill as fallback (best effort, don't wait)
-                        try { process.Kill(); } catch { }
-                    }
+                        catch (Exception killEx)
+                        {
+                            ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
+                        }
+                    });
 
                     // Check if this is a first-run issue
                     if (!isWarmedUp)
