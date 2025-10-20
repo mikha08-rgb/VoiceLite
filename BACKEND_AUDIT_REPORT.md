@@ -63,12 +63,12 @@
 
 **Evidence**:
 ```env
-DATABASE_URL="postgresql://postgres.dzgqyytpkvjguxlhcpgl:jY%26%23DvbBo2a%25Oo%2Az@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_DATABASE_URL="postgresql://postgres:jY%26%23DvbBo2a%25Oo%2Az@db.dzgqyytpkvjguxlhcpgl.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres.dzgqyytpkvjguxlhcpgl:[REDACTED-ROTATED-2025-10-18]@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_DATABASE_URL="postgresql://postgres:[REDACTED-ROTATED-2025-10-18]@db.dzgqyytpkvjguxlhcpgl.supabase.co:5432/postgres"
 ```
 
 **Why This Matters**:
-- Password `jY&#DvbBo2a%Oo*z` is plaintext in version control
+- Password `[REDACTED-ROTATED-2025-10-18]` is plaintext in version control
 - Anyone with repo access can connect to production database
 - Database has full admin access (postgres user)
 - Enables data exfiltration, manipulation, deletion

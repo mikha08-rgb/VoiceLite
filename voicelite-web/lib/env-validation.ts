@@ -24,43 +24,6 @@ const envSchema = z.object({
     ),
 
   // -----------------------------------------------------------------------------
-  // Ed25519 Signing Keys (License & CRL)
-  // -----------------------------------------------------------------------------
-  LICENSE_SIGNING_PRIVATE_B64: z
-    .string()
-    .length(64, 'LICENSE_SIGNING_PRIVATE_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      '⚠️ CRITICAL: LICENSE_SIGNING_PRIVATE_B64 is a placeholder! Run: npm run keygen'
-    ),
-
-  LICENSE_SIGNING_PUBLIC_B64: z
-    .string()
-    .length(64, 'LICENSE_SIGNING_PUBLIC_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      '⚠️ CRITICAL: LICENSE_SIGNING_PUBLIC_B64 is a placeholder! Run: npm run keygen'
-    ),
-
-  CRL_SIGNING_PRIVATE_B64: z
-    .string()
-    .length(64, 'CRL_SIGNING_PRIVATE_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      'CRL_SIGNING_PRIVATE_B64 is a placeholder'
-    )
-    .optional(),
-
-  CRL_SIGNING_PUBLIC_B64: z
-    .string()
-    .length(64, 'CRL_SIGNING_PUBLIC_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      'CRL_SIGNING_PUBLIC_B64 is a placeholder'
-    )
-    .optional(),
-
-  // -----------------------------------------------------------------------------
   // Redis (Upstash - Rate Limiting) - Now OPTIONAL per .env.example
   // -----------------------------------------------------------------------------
   UPSTASH_REDIS_REST_URL: z

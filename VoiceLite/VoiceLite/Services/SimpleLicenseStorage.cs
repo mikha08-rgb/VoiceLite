@@ -14,6 +14,14 @@ namespace VoiceLite.Services
     /// </summary>
     public static class SimpleLicenseStorage
     {
+#if DEBUG
+        // TEST MODE: Enable mock license validation for unit tests
+        // This flag is ONLY available in DEBUG builds and has ZERO impact on RELEASE builds
+        internal static bool _testMode = false;
+        internal static bool _mockHasValidLicense = false;
+        internal static StoredLicense? _mockLicense = null;
+#endif
+
         // BUG FIX: File lock for thread-safe operations
         private static readonly object _fileLock = new object();
 
@@ -83,6 +91,15 @@ namespace VoiceLite.Services
         /// </summary>
         public static bool HasValidLicense(out StoredLicense? license)
         {
+#if DEBUG
+            // TEST MODE: Return mock license for unit tests
+            if (_testMode)
+            {
+                license = _mockLicense;
+                return _mockHasValidLicense;
+            }
+#endif
+
             lock (_fileLock) // BUG FIX: Thread-safe file access
             {
                 license = null;
@@ -123,7 +140,7 @@ namespace VoiceLite.Services
         /// Save validated license locally (called after successful online validation)
         /// Uses Windows DPAPI encryption to protect license data from tampering
         /// </summary>
-        public static void SaveLicense(string licenseKey, string email, string type = "LIFETIME")
+        public static void SaveLicense(string licenseKey, string email = "", string type = "LIFETIME")
         {
             // BUG FIX #3: Input validation - fail fast on invalid data
             if (string.IsNullOrWhiteSpace(licenseKey))
@@ -131,10 +148,9 @@ namespace VoiceLite.Services
                 throw new ArgumentException("License key cannot be null or empty", nameof(licenseKey));
             }
 
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                throw new ArgumentException("Email cannot be null or empty", nameof(email));
-            }
+            // Email is optional - it may not be returned by the API for privacy reasons
+            // If not provided, we'll store an empty string
+            email = email ?? "";
 
             lock (_fileLock) // BUG FIX #2: Thread-safe file access
             {
@@ -219,6 +235,12 @@ namespace VoiceLite.Services
         /// </summary>
         public static bool IsProVersion()
         {
+#if DEBUG
+            if (_testMode)
+            {
+                return _mockHasValidLicense;
+            }
+#endif
             return HasValidLicense(out _);
         }
 
@@ -227,6 +249,12 @@ namespace VoiceLite.Services
         /// </summary>
         public static bool IsFreeVersion()
         {
+#if DEBUG
+            if (_testMode)
+            {
+                return !_mockHasValidLicense;
+            }
+#endif
             return !HasValidLicense(out _);
         }
     }

@@ -11,7 +11,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test-stripe": "tsx scripts/test-stripe.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

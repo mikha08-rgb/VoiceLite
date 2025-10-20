@@ -58,7 +58,6 @@ namespace VoiceLite
 
             // Audio Settings
             LoadMicrophones();
-            PlaySoundFeedbackCheckBox.IsChecked = settings.PlaySoundFeedback;
             AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
             // Advanced settings removed from UI (still configurable via settings.json)
@@ -68,6 +67,19 @@ namespace VoiceLite
 
             // License Status (Read-Only)
             UpdateLicenseStatusDisplay();
+
+            // AI Models Tab - Pro Only
+            if (FeatureGate.IsProFeatureEnabled("model_selector_ui"))
+            {
+                // Pro user - show Models tab with download capability
+                ModelsTab.Visibility = Visibility.Visible;
+                // ModelComparisonControl initializes itself automatically and shows download buttons
+            }
+            else
+            {
+                // Free user - hide Models tab (Tiny model only, no choice)
+                ModelsTab.Visibility = Visibility.Collapsed;
+            }
 
             isInitialized = true;
         }
@@ -225,7 +237,6 @@ namespace VoiceLite
             // settings.ShowTrayIcon = ShowTrayIconCheckBox.IsChecked ?? true; // Hidden - always enabled (hardcoded true)
 
             // Audio Settings
-            settings.PlaySoundFeedback = PlaySoundFeedbackCheckBox.IsChecked ?? true;
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
 
             if (MicrophoneComboBox.SelectedItem is AudioDevice selectedDevice)
@@ -246,19 +257,38 @@ namespace VoiceLite
         {
             if (SimpleLicenseStorage.HasValidLicense(out var storedLicense))
             {
+                // Pro License - Green banner
                 LicenseStatusText.Text = $"✓ Pro License Active";
                 LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green);
+
+                // Update banner
+                LicenseBanner.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(232, 245, 233)); // #E8F5E9
+                LicenseBannerIcon.Text = "✓";
+                LicenseBannerIcon.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // #4CAF50
+                LicenseBannerText.Text = "Pro License Active";
+                LicenseBannerText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50)); // #2E7D32
+                LicenseBannerUpgrade.Visibility = Visibility.Collapsed;
             }
             else
             {
+                // Free Version - Orange/Yellow banner
                 LicenseStatusText.Text = "Free Version";
                 LicenseStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+
+                // Update banner
+                LicenseBanner.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 243, 224)); // #FFF3E0
+                LicenseBannerIcon.Text = "ℹ";
+                LicenseBannerIcon.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 152, 0)); // #FF9800
+                LicenseBannerText.Text = "Free Version (Tiny Model Only)";
+                LicenseBannerText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(230, 81, 0)); // #E65100
+                LicenseBannerUpgrade.Visibility = Visibility.Visible;
             }
         }
 
         private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            // AUDIT FIX: Use 'using' to ensure Process disposal
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = e.Uri.AbsoluteUri,
                 UseShellExecute = true

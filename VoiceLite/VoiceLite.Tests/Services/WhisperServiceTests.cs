@@ -7,6 +7,7 @@ using FluentAssertions;
 using Moq;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Helpers;
 using Xunit;
 
 namespace VoiceLite.Tests.Services
@@ -19,6 +20,9 @@ namespace VoiceLite.Tests.Services
 
         public WhisperServiceTests()
         {
+            // Enable Pro license for tests that use Pro models (small, medium, large)
+            LicenseTestHelper.EnableProLicense();
+
             _settings = new Settings
             {
                 WhisperModel = "small",
@@ -43,6 +47,7 @@ namespace VoiceLite.Tests.Services
         public void Dispose()
         {
             _service?.Dispose();
+            LicenseTestHelper.DisableTestMode();
         }
 
         [Fact]

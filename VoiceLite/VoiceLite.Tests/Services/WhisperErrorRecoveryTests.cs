@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Helpers;
 using Xunit;
 
 namespace VoiceLite.Tests.Services
@@ -24,6 +25,9 @@ namespace VoiceLite.Tests.Services
 
         public WhisperErrorRecoveryTests()
         {
+            // Enable Pro license for tests that use Pro models (small, medium, large)
+            LicenseTestHelper.EnableProLicense();
+
             _settings = new Settings
             {
                 WhisperModel = "ggml-small.bin",
@@ -48,6 +52,8 @@ namespace VoiceLite.Tests.Services
                 }
             }
             catch { /* Ignore cleanup errors */ }
+
+            LicenseTestHelper.DisableTestMode();
         }
 
         [Fact(Skip = "Timeout behavior is unreliable: Whisper processes silence very quickly, making it difficult to force a timeout in tests. Timeout killing IS tested in LargeAudioFile_HandlesTimeout with real processing time.")]

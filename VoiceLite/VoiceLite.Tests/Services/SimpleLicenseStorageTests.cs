@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using FluentAssertions;
 using VoiceLite.Services;
+using VoiceLite.Tests.Helpers;
 using Xunit;
 
 namespace VoiceLite.Tests.Services
@@ -17,6 +18,7 @@ namespace VoiceLite.Tests.Services
     ///
     /// NOTE: These tests use the real file system at %LOCALAPPDATA%\VoiceLite\license.dat
     /// Cleanup is performed before and after each test to ensure isolation.
+    /// These tests MUST disable test mode to test actual storage behavior.
     /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Service", "SimpleLicenseStorage")]
@@ -28,6 +30,9 @@ namespace VoiceLite.Tests.Services
 
         public SimpleLicenseStorageTests()
         {
+            // CRITICAL: Disable test mode to test actual license storage behavior
+            LicenseTestHelper.DisableTestMode();
+
             // Back up any existing license before tests
             _licenseBackupPath = Path.GetTempFileName();
             _hadExistingLicense = SimpleLicenseStorage.LicenseFileExists();

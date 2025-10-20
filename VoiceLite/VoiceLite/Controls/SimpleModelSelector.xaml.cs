@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using VoiceLite.Models;
@@ -10,7 +11,7 @@ namespace VoiceLite.Controls
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-base.bin"; // Default to Base model for better first impression (still free, better accuracy)
+        private string selectedModel = "ggml-tiny.bin"; // Default to Tiny model (free tier, pre-installed)
         private Settings? settings;
 
         public string SelectedModel
@@ -48,15 +49,29 @@ namespace VoiceLite.Controls
 
         private void CheckLicenseGating()
         {
-            // Pro model (ggml-small.bin) requires a valid license
+            // Pro models (Base, Small, Medium, Large) require a valid license
             bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
 
             if (!hasValidLicense)
             {
-                // Disable Pro model if no valid license
+                // Disable ALL Pro models for free users (Tiny only)
+                string tooltip = "Requires Pro license. Get it for $20 at voicelite.app";
+
+                BaseRadio.IsEnabled = false;
+                BaseRadio.Opacity = 0.5;
+                BaseRadio.ToolTip = tooltip;
+
                 SmallRadio.IsEnabled = false;
                 SmallRadio.Opacity = 0.5;
-                SmallRadio.ToolTip = "Requires Pro license. Get it for $20 at voicelite.app";
+                SmallRadio.ToolTip = tooltip;
+
+                MediumRadio.IsEnabled = false;
+                MediumRadio.Opacity = 0.5;
+                MediumRadio.ToolTip = tooltip;
+
+                LargeRadio.IsEnabled = false;
+                LargeRadio.Opacity = 0.5;
+                LargeRadio.ToolTip = tooltip;
             }
         }
 
@@ -84,22 +99,29 @@ namespace VoiceLite.Controls
             if (sender is RadioButton radio && radio.Tag is string modelFile)
             {
                 // Check if trying to select Pro model without license
-                if (modelFile == "ggml-small.bin")
+                var proModels = new[] { "ggml-base.bin", "ggml-small.bin", "ggml-medium.bin", "ggml-large-v3.bin" };
+                if (proModels.Contains(modelFile))
                 {
                     bool hasValidLicense = SimpleLicenseStorage.HasValidLicense(out _);
 
                     if (!hasValidLicense)
                     {
                         MessageBox.Show(
-                            "Pro model requires a valid license key.\n\n" +
-                            "Get Pro for $20 at voicelite.app\n" +
-                            "Then restart the app to activate your license.",
+                            "This AI model requires a Pro license.\n\n" +
+                            "Free tier includes:\n" +
+                            "• Tiny model only (80-85% accuracy)\n\n" +
+                            "Pro tier unlocks:\n" +
+                            "• Base model (90% accuracy)\n" +
+                            "• Small model (92% accuracy)\n" +
+                            "• Medium model (95% accuracy)\n" +
+                            "• Large model (98% accuracy)\n\n" +
+                            "Get Pro for $20 at voicelite.app",
                             "Pro License Required",
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
 
-                        // Revert to Base model (better quality than Tiny)
-                        BaseRadio.IsChecked = true;
+                        // Revert to Tiny model (free tier)
+                        TinyRadio.IsChecked = true;
                         return;
                     }
                 }
@@ -115,10 +137,10 @@ namespace VoiceLite.Controls
             switch (modelFile)
             {
                 case "ggml-tiny.bin":
-                    TipText.Text = "Fastest model - lower accuracy, good for quick notes";
+                    TipText.Text = "Free tier model - fast, good for quick notes (80-85% accuracy)";
                     break;
                 case "ggml-base.bin":
-                    TipText.Text = "Free default - good balance of speed and accuracy";
+                    TipText.Text = "Pro model - good balance of speed and accuracy (90% accuracy)";
                     break;
                 case "ggml-small.bin":
                     TipText.Text = "'Small' offers even better accuracy than Base";

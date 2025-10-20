@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Helpers;
 using Xunit;
 
 namespace VoiceLite.Tests.Integration
@@ -23,6 +24,9 @@ namespace VoiceLite.Tests.Integration
 
         public AudioPipelineTests()
         {
+            // Enable Pro license for tests that use Pro models (small, medium, large)
+            LicenseTestHelper.EnableProLicense();
+
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
             Directory.CreateDirectory(_tempDirectory);
 
@@ -47,6 +51,7 @@ namespace VoiceLite.Tests.Integration
         {
             _recorder?.Dispose();
             _transcriber?.Dispose();
+            LicenseTestHelper.DisableTestMode();
         }
 
         [Fact]

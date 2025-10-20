@@ -36,7 +36,7 @@ CLEAN_GIT_HISTORY.bat
 git push --force --all
 
 # 4. Verify secrets are gone from history
-git log --all -S "jY%26%23DvbBo2a" --source
+git log --all -S "[REDACTED]" --source
 # Should return: nothing found
 
 git log --all -S "ATWyg9d0HRk9jVu0teyeRWMM2lozXNOPtNT8RDEv3lE" --source
@@ -49,7 +49,7 @@ git log --all -S "ATWyg9d0HRk9jVu0teyeRWMM2lozXNOPtNT8RDEv3lE" --source
 wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar -O bfg.jar
 
 # 2. Create secrets.txt file with old secrets to remove
-echo "jY&#DvbBo2a%Oo*z" > secrets.txt
+echo "[REDACTED-ROTATED-2025-10-18]" > secrets.txt
 echo "re_EvfFcesA_CP7aWCFejkRjL5FwKhMq118L" >> secrets.txt
 echo "ATWyg9d0HRk9jVu0teyeRWMM2lozXNOPtNT8RDEv3lE" >> secrets.txt
 
@@ -77,7 +77,7 @@ git log --all --full-history -- "*.env*"
 After force-push, verify secrets are gone:
 ```bash
 # Check for old database password
-git log --all -S "jY%26%23DvbBo2a" --source
+git log --all -S "[REDACTED]" --source
 # Expected: nothing found
 
 # Check for old Resend key
