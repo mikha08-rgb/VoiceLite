@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6.2.0 or later
 
 #define MyAppName "VoiceLite"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.69"
 #define MyAppPublisher "VoiceLite Software"
 #define MyAppURL "https://voicelite.com"
 #define MyAppExeName "VoiceLite.exe"

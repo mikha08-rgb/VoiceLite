@@ -28,7 +28,7 @@ if (!(Test-Path $innoPath)) {
     Write-Host "Alternative: Creating ZIP package instead..." -ForegroundColor Yellow
 
     # Create ZIP package as fallback
-    $zipName = "VoiceLite-1.0.0-Windows.zip"
+    $zipName = "VoiceLite-1.0.69-Windows.zip"
     Write-Host "Creating $zipName..." -ForegroundColor Yellow
 
     # Ensure the publish directory exists
@@ -47,7 +47,7 @@ if (!(Test-Path $innoPath)) {
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✓ Installer created successfully" -ForegroundColor Green
-        $installerPath = "Installer\VoiceLite-Setup-1.0.0.exe"
+        $installerPath = "Installer\VoiceLite-Setup-1.0.69.exe"
         if (Test-Path $installerPath) {
             Write-Host "  Location: $installerPath" -ForegroundColor Gray
             Write-Host "  Size: $((Get-Item $installerPath).Length / 1MB) MB" -ForegroundColor Gray

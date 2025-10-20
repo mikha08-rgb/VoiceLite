@@ -9,9 +9,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>1.0.68</Version>
-    <AssemblyVersion>1.0.68.0</AssemblyVersion>
-    <FileVersion>1.0.68.0</FileVersion>
+    <Version>1.0.69</Version>
+    <AssemblyVersion>1.0.69.0</AssemblyVersion>
+    <FileVersion>1.0.69.0</FileVersion>
   </PropertyGroup>
 
   <!-- Expose internal members to test project for mock license validation -->
