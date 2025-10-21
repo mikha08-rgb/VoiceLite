@@ -77,3 +77,46 @@ VoiceLite/dependencies/
 VoiceLite/whisper_installer/
 VoiceLite/whisper_installer_lite/
 jdk11/
+
+# Build variants (old publish outputs)
+VoiceLite-*/
+
+# Publish output
+publish/
+
+# Test results (explicit)
+TestResults/
+
+# Debug symbols
+*.pdb
+
+# Whisper backups
+whisper_models_backup/
+
+# Temporary audit and progress reports
+*_AUDIT_*.md
+*_REPORT*.md
+*_SUMMARY*.md
+*_COMPLETE*.md
+*_STATUS*.md
+*_FIXES*.md
+DAY[0-9]_*.md
+WEEK[0-9]_*.md
+3_DAY_*.md
+CREDENTIAL_*.md
+SECRET_CLEANUP*.md
+SUPPLY_CHAIN_*.md
+PERFORMANCE_AUDIT*.md
+BUSINESS_LOGIC_AUDIT*.md
+
+# Keep important docs (overrides above patterns)
+!SECURITY.md
+!README.md
+!CONTRIBUTING.md
+!docs/**/*.md
+
+# Command cheat sheets
+*COMMANDS.txt
+
+# Windows artifacts
+nul

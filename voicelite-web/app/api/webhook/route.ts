@@ -143,12 +143,23 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       data: { emailSent: true },
     });
 
-    console.log(`License ${license.licenseKey} issued/resent to ${email}`);
+    // SECURITY: Redact license key in production logs
+    const redactedKey = process.env.NODE_ENV === 'production'
+      ? `***${license.licenseKey.slice(-4)}`
+      : license.licenseKey;
+    console.log(`License ${redactedKey} issued/resent to ${email}`);
   } catch (emailError) {
     // CRITICAL ERROR: Email failed but customer paid - log for manual recovery
     console.error('CRITICAL: License email failed to send - manual intervention required!');
-    console.error(`License Key: ${license.licenseKey}`);
-    console.error(`Email: ${email}`);
+    // SECURITY: Redact sensitive data in production logs, but keep enough for manual recovery
+    const redactedKey = process.env.NODE_ENV === 'production'
+      ? `***${license.licenseKey.slice(-4)}`
+      : license.licenseKey;
+    const redactedEmail = process.env.NODE_ENV === 'production'
+      ? email.replace(/(.{2}).*(@.*)/, '$1***$2')
+      : email;
+    console.error(`License ID: ${license.id} (Key: ${redactedKey})`);
+    console.error(`Email: ${redactedEmail}`);
     console.error(`Payment Intent: ${paymentIntentId}`);
     console.error('Email Error:', emailError);
 

@@ -158,8 +158,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: 403 });
     }
 
+    // SECURITY: Redact license key in production logs
+    const redactedKey = process.env.NODE_ENV === 'production'
+      ? `***${licenseKey.slice(-4)}`
+      : licenseKey;
     console.log(
-      `License ${licenseKey} activated on device ${machineLabel || machineId} (${
+      `License ${redactedKey} activated on device ${machineLabel || 'Unknown'} (${
         result.activatedDevices
       }/${license.maxDevices})`
     );

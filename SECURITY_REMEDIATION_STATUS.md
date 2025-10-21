@@ -23,12 +23,12 @@
 ### 2. Stripe Webhook Secret Rotation
 - ✅ Generated new secret in Stripe dashboard
 - ✅ Removed old secret from Vercel production environment
-- ✅ Added new secret to Vercel: `whsec_3OJ1MYaHYfAVHHG787ki3fWuxUHBReID`
+- ✅ Added new secret to Vercel: `whsec_[REDACTED]`
 - ✅ Deployed to production
 - ✅ Production site accessible at: https://voicelite.app
 
-**Old Secret (REVOKED)**: `whsec_e9U0n3DBo6KcaKK1s8WRHTdXQvWeHPJu`
-**New Secret (ACTIVE)**: `whsec_3OJ1MYaHYfAVHHG787ki3fWuxUHBReID`
+**Old Secret (REVOKED)**: `whsec_[REDACTED]`
+**New Secret (ACTIVE)**: `whsec_[REDACTED]` (stored in Vercel environment variables)
 **Status**: COMPLETE ✅
 
 ---

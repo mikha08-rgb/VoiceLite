@@ -33,9 +33,9 @@ You already have test keys configured! Here's what you need to do:
 
 Your `.env.local` already contains:
 ```env
-STRIPE_SECRET_KEY="sk_test_51S0BeJDcPUhNVjVN..."
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_51S0BeJDcPUhNVjVN..."
-STRIPE_WEBHOOK_SECRET="whsec_DMljoYqvQeH5mN3uWoXIkjr3t7OHZAJz"
+STRIPE_SECRET_KEY="sk_test_YOUR_SECRET_KEY_HERE"
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_YOUR_PUBLISHABLE_KEY_HERE"
+STRIPE_WEBHOOK_SECRET="whsec_YOUR_WEBHOOK_SECRET_HERE"
 ```
 
 ### Step 2: Log into Stripe Dashboard

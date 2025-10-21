@@ -49,3 +49,11 @@ next-env.d.ts
 .vercel
 .env*.local
 .env
+
+# Test artifacts
+/playwright-report/
+/test-results/
+test-results.json
+
+# Dependency analysis
+npm-deps-tree.json
