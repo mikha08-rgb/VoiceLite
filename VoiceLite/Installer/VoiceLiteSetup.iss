@@ -104,87 +104,11 @@ begin
 end;
 
 function InitializeSetup: Boolean;
-var
-  NeedsDotNet: Boolean;
-  NeedsVCRuntime: Boolean;
-  ErrMsg: String;
-  ResultCode: Integer;
 begin
+  // Skip prerequisite checks - they cause false positives
+  // If .NET 8 or VC++ Runtime is missing, Windows will show a clear error when launching VoiceLite
+  // This is better UX than blocking installation based on unreliable registry detection
   Result := True;
-
-  // Check what's missing
-  NeedsDotNet := not IsDotNet8DesktopRuntimeInstalled;
-  NeedsVCRuntime := not IsVCRuntimeInstalled;
-
-  // Handle missing .NET Runtime
-  if NeedsDotNet then
-  begin
-    ErrMsg := 'VoiceLite requires .NET Desktop Runtime 8.0.'#13#10#13#10;
-
-    if NeedsVCRuntime then
-      ErrMsg := ErrMsg + 'Additionally, Microsoft Visual C++ Runtime is required.'#13#10#13#10;
-
-    ErrMsg := ErrMsg + 'Would you like to download the missing components now?'#13#10 +
-                       '(Setup will continue after you install them)';
-
-    if MsgBox(ErrMsg, mbConfirmation, MB_YESNO) = IDYES then
-    begin
-      // Open .NET download page (direct link to Windows x64 Desktop Runtime)
-      ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.11-windows-x64-installer', '', '', SW_SHOW, ewNoWait, ResultCode);
-
-      // If VC++ is also needed, open that too
-      if NeedsVCRuntime then
-      begin
-        Sleep(1000); // Small delay to avoid confusion
-        ShellExec('open', 'https://aka.ms/vs/17/release/vc_redist.x64.exe', '', '', SW_SHOW, ewNoWait, ResultCode);
-      end;
-
-      if NeedsVCRuntime then
-        MsgBox('Downloads opened in your browser:' + #13#10#13#10 +
-               '1. .NET 8 Desktop Runtime' + #13#10 +
-               '2. Visual C++ Runtime' + #13#10 + #13#10 +
-               'Click "Install" on each download, then run VoiceLite installer again.' + #13#10#13#10 +
-               'Setup will now exit.',
-               mbInformation, MB_OK)
-      else
-        MsgBox('Download page opened in your browser.' + #13#10#13#10 +
-               'Click "Install" to download .NET 8 Desktop Runtime.' + #13#10 + #13#10 +
-               'After installing, run VoiceLite installer again.' + #13#10#13#10 +
-               'Setup will now exit.',
-               mbInformation, MB_OK);
-
-      // Exit immediately - don't re-check or confuse the user
-      Result := False;
-    end
-    else
-    begin
-      Result := False;
-    end;
-  end
-  // Handle missing VC++ Runtime only
-  else if NeedsVCRuntime then
-  begin
-    ErrMsg := 'VoiceLite requires Microsoft Visual C++ Runtime 2015-2022.'#13#10#13#10 +
-              'Would you like to download it now?';
-
-    if MsgBox(ErrMsg, mbConfirmation, MB_YESNO) = IDYES then
-    begin
-      ShellExec('open', 'https://aka.ms/vs/17/release/vc_redist.x64.exe', '', '', SW_SHOW, ewNoWait, ResultCode);
-
-      MsgBox('Visual C++ Runtime download started.' + #13#10#13#10 +
-             'Run the downloaded installer (vc_redist.x64.exe).' + #13#10 + #13#10 +
-             'After installing, run VoiceLite installer again.' + #13#10#13#10 +
-             'Setup will now exit.',
-             mbInformation, MB_OK);
-
-      // Exit immediately - don't re-check
-      Result := False;
-    end
-    else
-    begin
-      Result := False;
-    end;
-  end;
 end;
 
 // Clean up settings on uninstall
