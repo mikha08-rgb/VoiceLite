@@ -32,8 +32,10 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (only tiny, base, and small models)
-Source: "..\whisper_installer\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+; Whisper files (only tiny model for free tier - Pro users download others in-app)
+Source: "..\whisper\*.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\*.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
 
 ; Icon file
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
@@ -79,15 +81,25 @@ end;
 // Check for .NET 8.0 Desktop Runtime
 function IsDotNet8DesktopRuntimeInstalled: Boolean;
 var
-  ResultCode: Integer;
+  Version: String;
 begin
   Result := False;
 
-  // Check if dotnet is installed and has the right version
-  if Exec('cmd.exe', '/c dotnet --list-runtimes | findstr /C:"Microsoft.WindowsDesktop.App 8."', '',
-          SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  // Check registry for .NET 8.0 Desktop Runtime installation
+  // Check multiple possible locations
+  if RegQueryStringValue(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost', 'Version', Version) then
   begin
-    Result := (ResultCode = 0);
+    // If registry key exists, check if version 8.x is installed
+    if (Length(Version) > 0) and (Pos('8.', Version) > 0) then
+      Result := True;
+  end;
+
+  // Also check for the WindowsDesktop runtime specifically
+  if not Result then
+  begin
+    if RegKeyExists(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App\8.0') or
+       RegKeyExists(HKLM64, 'SOFTWARE\WOW6432Node\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App\8.0') then
+      Result := True;
   end;
 end;
 
@@ -117,8 +129,8 @@ begin
 
     if MsgBox(ErrMsg, mbConfirmation, MB_YESNO) = IDYES then
     begin
-      // Open .NET download page
-      ShellExec('open', 'https://dotnet.microsoft.com/download/dotnet/8.0/runtime', '', '', SW_SHOW, ewNoWait, ResultCode);
+      // Open .NET download page (direct link to Windows x64 Desktop Runtime)
+      ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.11-windows-x64-installer', '', '', SW_SHOW, ewNoWait, ResultCode);
 
       // If VC++ is also needed, open that too
       if NeedsVCRuntime then
@@ -128,30 +140,21 @@ begin
       end;
 
       if NeedsVCRuntime then
-        MsgBox('Please install the required components and run this setup again.' + #13#10#13#10 +
-               'Downloads:' + #13#10 +
-               '1. .NET 8 Desktop Runtime (choose Windows x64)' + #13#10 +
-               '2. Visual C++ Runtime x64' + #13#10 + #13#10 +
-               'After installation, click OK to continue setup.',
+        MsgBox('Downloads opened in your browser:' + #13#10#13#10 +
+               '1. .NET 8 Desktop Runtime' + #13#10 +
+               '2. Visual C++ Runtime' + #13#10 + #13#10 +
+               'Click "Install" on each download, then run VoiceLite installer again.' + #13#10#13#10 +
+               'Setup will now exit.',
                mbInformation, MB_OK)
       else
-        MsgBox('Please install the required components and run this setup again.' + #13#10#13#10 +
-               'Downloads:' + #13#10 +
-               '1. .NET 8 Desktop Runtime (choose Windows x64)' + #13#10 + #13#10 +
-               'After installation, click OK to continue setup.',
+        MsgBox('Download page opened in your browser.' + #13#10#13#10 +
+               'Click "Install" to download .NET 8 Desktop Runtime.' + #13#10 + #13#10 +
+               'After installing, run VoiceLite installer again.' + #13#10#13#10 +
+               'Setup will now exit.',
                mbInformation, MB_OK);
 
-      // Re-check after user says they installed
-      NeedsDotNet := not IsDotNet8DesktopRuntimeInstalled;
-      NeedsVCRuntime := not IsVCRuntimeInstalled;
-
-      if NeedsDotNet or NeedsVCRuntime then
-      begin
-        MsgBox('One or more required components are still missing.' + #13#10 +
-               'Please ensure you install them before running this setup again.',
-               mbError, MB_OK);
-        Result := False;
-      end;
+      // Exit immediately - don't re-check or confuse the user
+      Result := False;
     end
     else
     begin
@@ -168,18 +171,14 @@ begin
     begin
       ShellExec('open', 'https://aka.ms/vs/17/release/vc_redist.x64.exe', '', '', SW_SHOW, ewNoWait, ResultCode);
 
-      MsgBox('Please install Visual C++ Runtime x64 and run this setup again.' + #13#10#13#10 +
-             'After installation, click OK to continue setup.',
+      MsgBox('Visual C++ Runtime download started.' + #13#10#13#10 +
+             'Run the downloaded installer (vc_redist.x64.exe).' + #13#10 + #13#10 +
+             'After installing, run VoiceLite installer again.' + #13#10#13#10 +
+             'Setup will now exit.',
              mbInformation, MB_OK);
 
-      // Re-check after user says they installed
-      if not IsVCRuntimeInstalled then
-      begin
-        MsgBox('Visual C++ Runtime is still not detected.' + #13#10 +
-               'Please ensure you install it before running this setup again.',
-               mbError, MB_OK);
-        Result := False;
-      end;
+      // Exit immediately - don't re-check
+      Result := False;
     end
     else
     begin
