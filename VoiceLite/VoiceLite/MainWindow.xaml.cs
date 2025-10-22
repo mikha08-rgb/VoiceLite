@@ -13,7 +13,6 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using VoiceLite.Models;
 using VoiceLite.Services;
-using VoiceLite.Interfaces;
 using VoiceLite.Utilities;
 using System.Text.Json;
 
@@ -25,12 +24,10 @@ namespace VoiceLite
 
         // Service dependencies
         private AudioRecorder? audioRecorder;
-        private ITranscriber? whisperService;
+        private PersistentWhisperService? whisperService;
         private HotkeyManager? hotkeyManager;
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
-        private MemoryMonitor? memoryMonitor;
-        private ZombieProcessCleanupService? zombieCleanupService; // MEMORY_FIX 2025-10-08: Periodic zombie process cleanup
         private TranscriptionHistoryService? historyService;
         // SoundService removed per user request - no audio feedback
 
@@ -591,14 +588,6 @@ namespace VoiceLite
 
                 systemTrayManager = new SystemTrayManager(this);
 
-                // Initialize memory monitoring
-                memoryMonitor = new MemoryMonitor();
-                memoryMonitor.MemoryAlert += OnMemoryAlert;
-
-                // MEMORY_FIX 2025-10-08: Start periodic zombie process cleanup service
-                zombieCleanupService = new ZombieProcessCleanupService();
-                zombieCleanupService.ZombieDetected += OnZombieProcessDetected;
-
                 // Load and display existing history
                 _ = UpdateHistoryUI();
             }
@@ -651,13 +640,7 @@ namespace VoiceLite
                 // UI BUG FIX: Initialization complete - allow polling mode warnings to show now
                 isInitializing = false;
 
-                // Step 5: Check for first-run diagnostics (blocking for critical issues)
-                await CheckFirstRunDiagnosticsAsync();
-
-                // Step 6: Check for analytics consent on first run (non-blocking)
-                CheckAnalyticsConsentAsync();
-
-                // Step 7: Mark initialization complete - show "Ready" status
+                // Mark initialization complete - show "Ready" status
                 UpdateStatus("Ready", Brushes.Green);
             }
             catch (Exception ex)
@@ -695,46 +678,6 @@ namespace VoiceLite
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
-        }
-
-        private async Task CheckFirstRunDiagnosticsAsync()
-        {
-            try
-            {
-                // Show first-run diagnostic window on first app launch after installation
-                if (!settings.HasSeenFirstRunDiagnostics)
-                {
-                    // Small delay to let the main window fully load
-                    await Task.Delay(500);
-
-                    var diagnosticWindow = new FirstRunDiagnosticWindow();
-                    diagnosticWindow.Owner = this;
-                    var result = diagnosticWindow.ShowDialog();
-
-                    // Mark as seen regardless of dialog result
-                    settings.HasSeenFirstRunDiagnostics = true;
-                    SaveSettings();
-
-                    // If user closed dialog with critical issues, log it
-                    if (result != true)
-                    {
-                        ErrorLogger.LogMessage("First-run diagnostics completed with issues or user closed early");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("First-run diagnostics check failed", ex);
-                // Mark as seen to prevent repeated failures
-                settings.HasSeenFirstRunDiagnostics = true;
-                SaveSettings();
-            }
-        }
-
-        private async void CheckAnalyticsConsentAsync()
-        {
-            // Analytics removed - no action needed
-            await Task.CompletedTask;
         }
 
         private string GetHotkeyDisplayString()
@@ -1721,63 +1664,6 @@ namespace VoiceLite
             }
         }
 
-        private async void OnMemoryAlert(object? sender, MemoryAlertEventArgs e)
-        {
-            // CRITICAL FIX: Wrap entire async void method in try-catch to prevent silent exceptions
-            try
-            {
-                if (e.Level == MemoryAlertLevel.Critical || e.Level == MemoryAlertLevel.PotentialLeak)
-                {
-                    try
-                    {
-                        await Dispatcher.InvokeAsync(() =>
-                        {
-                            ErrorLogger.LogMessage($"Memory alert: {e.Message}");
-                            // Could show a warning to user if needed
-                        });
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        // Dispatcher shutting down during app close - this is normal, just log it
-                        ErrorLogger.LogMessage("OnMemoryAlert: Dispatcher shutting down (app closing)");
-                    }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogError("OnMemoryAlert: Unexpected exception", ex);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("OnMemoryAlert: Failed to process memory alert", ex);
-            }
-        }
-
-        // MEMORY_FIX 2025-10-08: Handle zombie whisper.exe process detection
-        // CRITICAL FIX: Add Dispatcher protection for thread-safe UI access (called from background thread)
-        private void OnZombieProcessDetected(object? sender, ZombieCleanupEventArgs e)
-        {
-            try
-            {
-                Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        ErrorLogger.LogWarning($"Zombie whisper.exe detected and killed: PID {e.ProcessId} ({e.MemoryMB}MB)");
-                        // Future UI updates (toast notifications) will be thread-safe
-                    }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogError("OnZombieProcessDetected: UI update failed", ex);
-                    }
-                });
-            }
-            catch (TaskCanceledException)
-            {
-                // Dispatcher shutting down during app close - normal
-            }
-        }
-
         #endregion
 
         #region UI Event Handlers & Settings
@@ -2093,17 +1979,6 @@ namespace VoiceLite
                 }
 
 
-                if (memoryMonitor != null)
-                {
-                    memoryMonitor.MemoryAlert -= OnMemoryAlert;
-                }
-
-                // MEMORY_FIX 2025-10-08: Unsubscribe zombie cleanup service
-                if (zombieCleanupService != null)
-                {
-                    zombieCleanupService.ZombieDetected -= OnZombieProcessDetected;
-                }
-
                 // Dispose child windows (WPF Window resources)
 
                 try { currentSettingsWindow?.Close(); } catch { }
@@ -2111,13 +1986,6 @@ namespace VoiceLite
 
 
                 // Now dispose services in reverse order of creation
-                // MEMORY_FIX 2025-10-08: Dispose zombie cleanup service
-                zombieCleanupService?.Dispose();
-                zombieCleanupService = null;
-
-                memoryMonitor?.Dispose();
-                memoryMonitor = null;
-
                 systemTrayManager?.Dispose();
                 systemTrayManager = null;
 

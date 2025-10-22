@@ -146,10 +146,6 @@ namespace VoiceLite.Models
         public bool HistoryShowTimestamp { get; set; } = true; // Show timestamp in history items
         public double HistoryPanelWidth { get; set; } = 280; // Remember panel width
 
-        // First-Run Experience
-        public bool HasSeenWelcomeDialog { get; set; } = false; // Show welcome dialog on first launch
-        public bool HasSeenFirstRunDiagnostics { get; set; } = false; // Show first-run diagnostic window after installation
-
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
     }

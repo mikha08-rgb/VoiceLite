@@ -8,12 +8,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
-using VoiceLite.Interfaces;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
 {
-    public class PersistentWhisperService : ITranscriber, IDisposable
+    public class PersistentWhisperService : IDisposable
     {
         private readonly Settings settings;
         private readonly string baseDir;

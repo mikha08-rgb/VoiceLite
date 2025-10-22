@@ -5,12 +5,11 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using WindowsInput;
 using WindowsInput.Native;
-using VoiceLite.Interfaces;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
 {
-    public class TextInjector : ITextInjector
+    public class TextInjector
     {
         public bool AutoPaste { get; set; } = true;
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this

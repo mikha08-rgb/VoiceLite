@@ -12,7 +12,13 @@
     <Version>1.0.66</Version>
     <AssemblyVersion>1.0.66.0</AssemblyVersion>
     <FileVersion>1.0.66.0</FileVersion>
+    <RollForward>LatestMinor</RollForward>
   </PropertyGroup>
+
+  <!-- Expose internal members to test project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceLite.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="H.InputSimulator" Version="1.2.1" />
