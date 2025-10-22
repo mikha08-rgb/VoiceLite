@@ -88,130 +88,6 @@ namespace VoiceLite
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
-        private async Task CheckDependenciesAsync()
-        {
-            try
-            {
-                // Update status
-                StatusText.Text = "Running diagnostics...";
-
-                // First run comprehensive diagnostics
-                var diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
-
-                if (diagnostics.HasAnyIssues)
-                {
-                    ErrorLogger.LogMessage($"Startup issues detected: {diagnostics.GetSummary()}");
-
-                    // Try to auto-fix issues silently
-                    var issuesFixed = await StartupDiagnostics.TryAutoFixIssuesAsync(diagnostics);
-
-                    if (issuesFixed)
-                    {
-                        ErrorLogger.LogMessage("Some issues were automatically fixed");
-                        // Re-run diagnostics after fixes
-                        diagnostics = await StartupDiagnostics.RunCompleteDiagnosticsAsync();
-                    }
-
-                    // Show remaining issues to user (if critical)
-                    if (diagnostics.HasAnyIssues && (diagnostics.MissingFiles.Any() || diagnostics.WindowsVersionIssue))
-                    {
-                        // Only show dialog for CRITICAL issues that block functionality
-                        await Dispatcher.InvokeAsync(() =>
-                        {
-                            var message = "VoiceLite detected critical issues:\n\n" + diagnostics.GetSummary();
-
-                            if (diagnostics.AntivirusIssues)
-                            {
-                                message += "\n\nSolution: Add VoiceLite to your antivirus exclusions.";
-                            }
-
-                            if (diagnostics.BlockedFilesIssue)
-                            {
-                                message += "\n\nSolution: Right-click VoiceLite.exe → Properties → Unblock";
-                            }
-
-                            MessageBox.Show(message, "Critical Setup Issues", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        });
-                    }
-                    else if (diagnostics.HasAnyIssues)
-                    {
-                        // Non-critical issues - just log them
-                        ErrorLogger.LogMessage($"Non-critical issues detected (app will continue): {diagnostics.GetSummary()}");
-                    }
-                }
-
-                // Update status
-                StatusText.Text = "Checking dependencies...";
-
-                // Now check dependencies
-                var result = await DependencyChecker.CheckAndInstallDependenciesAsync();
-
-                if (!result.AllDependenciesMet)
-                {
-                    ErrorLogger.LogMessage($"Dependency check failed: {result.GetErrorMessage()}");
-
-                    // Show user-friendly error
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        StatusText.Text = "Setup Required";
-
-                        var message = result.GetErrorMessage() + "\n\n";
-
-                        if (!result.VCRuntimeInstalled || !result.WhisperCanRun)
-                        {
-                            message += "Click OK to install required components automatically.";
-
-                            var response = MessageBox.Show(
-                                message,
-                                "Setup Required",
-                                MessageBoxButton.OKCancel,
-                                MessageBoxImage.Information);
-
-                            if (response == MessageBoxResult.OK)
-                            {
-                                // Re-run dependency installer
-                                // CRITICAL FIX: Add try-catch to fire-and-forget Task.Run
-                                _ = Task.Run(async () =>
-                                {
-                                    try
-                                    {
-                                        var retry = await DependencyChecker.CheckAndInstallDependenciesAsync();
-                                        if (retry.AllDependenciesMet)
-                                        {
-                                            await Dispatcher.InvokeAsync(() =>
-                                            {
-                                                StatusText.Text = "Ready";
-                                            });
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        ErrorLogger.LogError("Dependency check retry failed", ex);
-                                    }
-                                });
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show(
-                                message + "Please check the troubleshooting guide or reinstall.",
-                                "Setup Required",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Warning);
-                        }
-                    });
-                }
-                else
-                {
-                    ErrorLogger.LogMessage("All dependencies verified successfully");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Dependency check failed", ex);
-            }
-        }
-
         private string GetAppDataDirectory()
         {
             return Path.Combine(
@@ -604,15 +480,12 @@ namespace VoiceLite
             {
                 // CRITICAL FIX: Run ALL initialization asynchronously to prevent UI freeze
                 // Old code ran diagnostics/services in fire-and-forget tasks, causing race conditions
-                // New code ensures proper ordering: diagnostics → services → hotkey → UI updates
+                // New code ensures proper ordering: services → hotkey → UI updates
 
-                // Step 1: Check dependencies (runs in background)
-                await CheckDependenciesAsync();
-
-                // Step 2: Initialize services (runs in background)
+                // Step 1: Initialize services (runs in background)
                 await InitializeServicesAsync();
 
-                // Step 3: Register hotkey (ONLY after services are ready)
+                // Step 2: Register hotkey (ONLY after services are ready)
                 // BUG-005 FIX: Wrap hotkey registration in try-catch to show user-friendly error
                 var helper = new WindowInteropHelper(this);
                 try
@@ -632,7 +505,7 @@ namespace VoiceLite
                     // App continues - user can still use manual buttons
                 }
 
-                // Step 4: Update UI (now safe - all services initialized)
+                // Step 3: Update UI (now safe - all services initialized)
                 string hotkeyDisplay = GetHotkeyDisplayString();
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
