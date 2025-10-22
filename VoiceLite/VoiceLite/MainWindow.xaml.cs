@@ -2342,7 +2342,7 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
-                int cleared = historyService?.ClearAllHistory() ?? 0;
+                int cleared = historyService?.ClearHistory() ?? 0;
                 _ = UpdateHistoryUI();
                 SaveSettings();
 
