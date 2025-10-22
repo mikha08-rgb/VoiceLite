@@ -3,7 +3,7 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.69
+AppVersion=1.0.70
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -47,9 +47,7 @@ Name: "{autoprograms}\VoiceLite"; Filename: "{app}\VoiceLite.exe"
 Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktopicon
 
 [Run]
-; Auto-launch removed - users should install .NET first if they don't have it
-; They can launch VoiceLite from desktop icon after installing prerequisites
-; Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\temp"
