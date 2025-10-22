@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * - Clean UX - instant download on click
  */
 
-const INSTALLER_VERSION = 'v1.0.68';
+const INSTALLER_VERSION = 'v1.0.72';
 const INSTALLER_FILENAME = 'VoiceLite-Setup.exe';
 
 export async function GET(request: NextRequest) {
