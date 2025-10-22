@@ -27,14 +27,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Main application files
+; Main application files (top-level only - whisper directory handled separately)
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Whisper files (only tiny model for free tier - Pro users download others in-app)
-Source: "..\whisper\*.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
-Source: "..\whisper\*.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\clblast.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\libopenblas.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\whisper.dll"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\whisper\whisper.exe"; DestDir: "{app}\whisper"; Flags: ignoreversion
 Source: "..\whisper\ggml-tiny.bin"; DestDir: "{app}\whisper"; Flags: ignoreversion
 
 ; Icon file
@@ -45,7 +47,9 @@ Name: "{autoprograms}\VoiceLite"; Filename: "{app}\VoiceLite.exe"
 Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
+; Auto-launch removed - users should install .NET first if they don't have it
+; They can launch VoiceLite from desktop icon after installing prerequisites
+; Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\temp"

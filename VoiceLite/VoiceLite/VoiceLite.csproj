@@ -12,6 +12,7 @@
     <Version>1.0.69</Version>
     <AssemblyVersion>1.0.69.0</AssemblyVersion>
     <FileVersion>1.0.69.0</FileVersion>
+    <RollForward>LatestMinor</RollForward>
   </PropertyGroup>
 
   <!-- Expose internal members to test project for mock license validation -->
