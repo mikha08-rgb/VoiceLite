@@ -55,28 +55,19 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Removes unpinned items beyond the MaxHistoryItems limit.
-        /// Pinned items are never removed by this method.
+        /// Removes items beyond the MaxHistoryItems limit.
         /// P1 OPTIMIZATION: Added early exit to avoid unnecessary allocations (10-20ms savings)
         /// </summary>
         private void CleanupOldItems()
         {
-            // P1 OPTIMIZATION: Count unpinned items without allocating a list
-            int unpinnedCount = 0;
-            foreach (var item in settings.TranscriptionHistory)
-            {
-                if (!item.IsPinned) unpinnedCount++;
-            }
-
-            // P1 OPTIMIZATION: Early exit if no cleanup needed (avoids LINQ allocations)
-            if (unpinnedCount <= settings.MaxHistoryItems)
+            // P1 OPTIMIZATION: Early exit if no cleanup needed
+            if (settings.TranscriptionHistory.Count <= settings.MaxHistoryItems)
                 return; // No cleanup needed
 
             // Only allocate and sort if we actually need to remove items
             var itemsToRemove = settings.TranscriptionHistory
-                .Where(x => !x.IsPinned)
                 .OrderBy(x => x.Timestamp) // Oldest first
-                .Take(unpinnedCount - settings.MaxHistoryItems)
+                .Take(settings.TranscriptionHistory.Count - settings.MaxHistoryItems)
                 .ToList();
 
             foreach (var item in itemsToRemove)
@@ -110,93 +101,16 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Toggles the pinned status of a history item.
-        /// Pinned items stay at the top and aren't removed during cleanup.
-        /// </summary>
-        public bool TogglePin(string id)
-        {
-            var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == id);
-            if (item != null)
-            {
-                item.IsPinned = !item.IsPinned;
-                ErrorLogger.LogMessage($"{(item.IsPinned ? "Pinned" : "Unpinned")} history item: '{item.PreviewText}' (ID: {id})");
-
-                // Re-sort: pinned items should be at the top
-                ReorderHistory();
-                return true;
-            }
-
-            ErrorLogger.LogMessage($"History item not found for pin toggle: ID {id}");
-            return false;
-        }
-
-        /// <summary>
-        /// Re-orders the history to ensure pinned items are at the top.
-        /// Within pinned and unpinned groups, items are sorted by timestamp (newest first).
-        /// </summary>
-        private void ReorderHistory()
-        {
-            // THREAD SAFETY FIX: Lock settings to prevent race with serialization
-            lock (settings.SyncRoot)
-            {
-                var reordered = settings.TranscriptionHistory
-                    .OrderByDescending(x => x.IsPinned) // Pinned first
-                    .ThenByDescending(x => x.Timestamp) // Then by timestamp (newest first)
-                    .ToList();
-
-                settings.TranscriptionHistory.Clear();
-                foreach (var item in reordered)
-                {
-                    settings.TranscriptionHistory.Add(item);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Clears all unpinned items from the history.
-        /// Pinned items are preserved.
+        /// Clears all items from the history.
         /// </summary>
         public int ClearHistory()
         {
-            var unpinnedItems = settings.TranscriptionHistory
-                .Where(x => !x.IsPinned)
-                .ToList();
-
-            foreach (var item in unpinnedItems)
-            {
-                settings.TranscriptionHistory.Remove(item);
-            }
-
-            ErrorLogger.LogMessage($"Cleared {unpinnedItems.Count} unpinned history items");
-            return unpinnedItems.Count;
-        }
-
-        /// <summary>
-        /// Clears ALL items from the history, including pinned items.
-        /// </summary>
-        public int ClearAllHistory()
-        {
             int count = settings.TranscriptionHistory.Count;
             settings.TranscriptionHistory.Clear();
-            ErrorLogger.LogMessage($"Cleared ALL {count} history items (including pinned)");
+            ErrorLogger.LogMessage($"Cleared {count} history items");
             return count;
         }
 
-        /// <summary>
-        /// Gets all pinned items (for special display/export).
-        /// </summary>
-        public IEnumerable<TranscriptionHistoryItem> GetPinnedItems()
-        {
-            return settings.TranscriptionHistory.Where(x => x.IsPinned);
-        }
-
-        /// <summary>
-        /// Gets all unpinned items.
-        /// </summary>
-        public IEnumerable<TranscriptionHistoryItem> GetUnpinnedItems()
-        {
-            return settings.TranscriptionHistory.Where(x => !x.IsPinned);
-        }
 
         /// <summary>
         /// Gets history statistics for display.
@@ -206,7 +120,6 @@ namespace VoiceLite.Services
             return new HistoryStatistics
             {
                 TotalItems = settings.TranscriptionHistory.Count,
-                PinnedItems = settings.TranscriptionHistory.Count(x => x.IsPinned),
                 TotalWords = settings.TranscriptionHistory.Sum(x => x.WordCount),
                 AverageDuration = settings.TranscriptionHistory.Any()
                     ? settings.TranscriptionHistory.Average(x => x.DurationSeconds)
@@ -224,7 +137,6 @@ namespace VoiceLite.Services
     public class HistoryStatistics
     {
         public int TotalItems { get; set; }
-        public int PinnedItems { get; set; }
         public int TotalWords { get; set; }
         public double AverageDuration { get; set; }
         public DateTime OldestTimestamp { get; set; }

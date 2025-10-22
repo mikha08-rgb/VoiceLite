@@ -388,7 +388,7 @@ namespace VoiceLite
 
                 var sevenDaysAgo = DateTime.Now.AddDays(-7);
                 var itemsToRemove = settings.TranscriptionHistory
-                    .Where(h => !h.IsPinned && h.Timestamp < sevenDaysAgo)
+                    .Where(h => h.Timestamp < sevenDaysAgo)
                     .ToList();
 
                 if (itemsToRemove.Count > 0)
@@ -397,7 +397,7 @@ namespace VoiceLite
                     {
                         settings.TranscriptionHistory.Remove(item);
                     }
-                    ErrorLogger.LogMessage($"BUG-003 FIX: Cleaned up {itemsToRemove.Count} old history items (>7 days, not pinned)");
+                    ErrorLogger.LogMessage($"BUG-003 FIX: Cleaned up {itemsToRemove.Count} old history items (>7 days)");
                     _ = SaveSettingsInternalAsync(); // TIER 1.4: Fire-and-forget async save
                 }
             }
@@ -2091,7 +2091,7 @@ namespace VoiceLite
         }
 
         /// <summary>
-        /// Creates a context menu for history items with Copy, Re-inject, Pin, and Delete actions.
+        /// Creates a context menu for history items with Copy, Re-inject, and Delete actions.
         /// Extracted to eliminate code duplication between Compact and Default card layouts.
         /// </summary>
         private System.Windows.Controls.ContextMenu CreateHistoryContextMenu(TranscriptionHistoryItem item)
@@ -2142,16 +2142,6 @@ namespace VoiceLite
             contextMenu.Items.Add(reinjectMenuItem);
 
             contextMenu.Items.Add(new System.Windows.Controls.Separator());
-
-            // Pin/Unpin menu item
-            var pinMenuItem = new System.Windows.Controls.MenuItem { Header = item.IsPinned ? "📌 Unpin" : "📌 Pin" };
-            pinMenuItem.Click += (s, e) =>
-            {
-                historyService?.TogglePin(item.Id);
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            };
-            contextMenu.Items.Add(pinMenuItem);
 
             // Delete menu item
             var deleteMenuItem = new System.Windows.Controls.MenuItem { Header = "🗑️ Delete" };
@@ -2252,21 +2242,6 @@ namespace VoiceLite
             System.Windows.Controls.Grid.SetColumn(textBlock, 1);
             grid.Children.Add(textBlock);
 
-            // Pin indicator if pinned (overlays on text)
-            if (item.IsPinned)
-            {
-                var pinIcon = new System.Windows.Controls.TextBlock
-                {
-                    Text = "📌",
-                    FontSize = 11,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(0, 0, 5, 0)
-                };
-                System.Windows.Controls.Grid.SetColumn(pinIcon, 1);
-                grid.Children.Add(pinIcon);
-            }
-
             // Attach context menu using shared helper
             border.ContextMenu = CreateHistoryContextMenu(item);
             border.Child = grid;
@@ -2342,7 +2317,7 @@ namespace VoiceLite
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
 
-            // Timestamp and pin indicator
+            // Timestamp header
             var headerGrid = new System.Windows.Controls.Grid();
             System.Windows.Controls.Grid.SetRow(headerGrid, 0);
             headerGrid.Margin = new Thickness(0, 0, 0, 6);
@@ -2372,7 +2347,7 @@ namespace VoiceLite
                 VerticalAlignment = VerticalAlignment.Center,
                 Opacity = 0, // Hidden by default via opacity, NOT visibility
                 IsHitTestVisible = false, // Can't be clicked when hidden
-                Margin = new Thickness(0, 0, item.IsPinned ? 25 : 0, 0), // Space for pin icon if pinned
+                Margin = new Thickness(0, 0, 0, 0),
                 UseLayoutRounding = true,
                 SnapsToDevicePixels = true
             };
@@ -2409,17 +2384,6 @@ namespace VoiceLite
                 }
             };
             headerGrid.Children.Add(copyButton);
-
-            if (item.IsPinned)
-            {
-                var pinIcon = new System.Windows.Controls.TextBlock
-                {
-                    Text = "📌",
-                    FontSize = 12,
-                    HorizontalAlignment = HorizontalAlignment.Right
-                };
-                headerGrid.Children.Add(pinIcon);
-            }
 
             // Instant hover effects - NO animations
             border.MouseEnter += (s, e) =>
@@ -2468,12 +2432,12 @@ namespace VoiceLite
 
 
         /// <summary>
-        /// Clears all unpinned history items.
+        /// Clears all history items.
         /// </summary>
         private void ClearHistory_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
-                "This will remove all unpinned transcriptions from history.\n\nPinned items will be kept.\n\nContinue?",
+                "This will remove all transcriptions from history.\n\nContinue?",
                 "Clear History",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -2677,7 +2641,7 @@ namespace VoiceLite
 
                     foreach (var item in settings.TranscriptionHistory!)
                     {
-                        content.AppendLine($"[{item.Timestamp:yyyy-MM-dd HH:mm:ss}] {(item.IsPinned ? "📌 " : "")}");
+                        content.AppendLine($"[{item.Timestamp:yyyy-MM-dd HH:mm:ss}]");
                         content.AppendLine($"Text: {item.Text}");
                         content.AppendLine($"Words: {item.WordCount} | Duration: {item.DurationSeconds:F1}s | Model: {item.ModelUsed}");
                         content.AppendLine(new string('-', 60));

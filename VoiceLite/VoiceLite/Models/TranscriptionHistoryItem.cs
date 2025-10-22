@@ -45,11 +45,6 @@ namespace VoiceLite.Models
         public double? ConfidenceScore { get; set; }
 
         /// <summary>
-        /// Whether this item is pinned (stays at top, won't be auto-removed)
-        /// </summary>
-        public bool IsPinned { get; set; } = false;
-
-        /// <summary>
         /// Display-friendly timestamp (for UI binding)
         /// </summary>
         public string DisplayTimestamp => Timestamp.ToString("h:mm tt");
