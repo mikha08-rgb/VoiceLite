@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Direct download endpoint for VoiceLite installer
+ * Download endpoint for VoiceLite installer
  *
  * Features:
- * - Direct download from Vercel (no redirects)
+ * - Download from GitHub Releases (no file size limits)
  * - Analytics tracking
- * - Clean UX - instant download on click
+ * - Clean UX - instant download redirect
  */
 
 const INSTALLER_VERSION = 'v1.0.72';
+const GITHUB_REPO = 'mikha08-rgb/VoiceLite';
 const INSTALLER_FILENAME = 'VoiceLite-Setup.exe';
 
 export async function GET(request: NextRequest) {
@@ -25,16 +26,16 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    // Direct download from /public folder
-    // Files in /public are served at root: /VoiceLite-Setup.exe
-    const downloadUrl = new URL(`/${INSTALLER_FILENAME}`, request.url);
+    // Redirect to GitHub Release
+    const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/${INSTALLER_VERSION}/${INSTALLER_FILENAME}`;
 
     return NextResponse.redirect(downloadUrl, 302);
   } catch (error) {
-    console.error('[Download] Error serving installer:', error);
+    console.error('[Download] Error redirecting to installer:', error);
 
-    // Fallback: direct link to public file
-    return NextResponse.redirect(`/${INSTALLER_FILENAME}`, 302);
+    // Fallback: direct link to latest release
+    const fallbackUrl = `https://github.com/${GITHUB_REPO}/releases/latest/download/${INSTALLER_FILENAME}`;
+    return NextResponse.redirect(fallbackUrl, 302);
   }
 }
 
