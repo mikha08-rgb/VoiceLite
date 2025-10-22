@@ -51,84 +51,20 @@ Type: filesandordirs; Name: "{app}\temp"
 Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 [Code]
-// Check if .NET 8 Desktop Runtime is installed
-function IsDotNet8Installed: Boolean;
-var
-  Version: String;
-begin
-  Result := False;
-
-  if RegQueryStringValue(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost', 'Version', Version) then
-  begin
-    if (Length(Version) > 0) and (Pos('8.', Version) > 0) then
-      Result := True;
-  end;
-
-  if not Result then
-  begin
-    if RegKeyExists(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App\8.0') or
-       RegKeyExists(HKLM64, 'SOFTWARE\WOW6432Node\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App\8.0') then
-      Result := True;
-  end;
-end;
-
-// Check if Visual C++ Runtime is installed
-function IsVCRuntimeInstalled: Boolean;
-var
-  Installed: Cardinal;
-begin
-  Result := False;
-
-  if RegQueryDWordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed) then
-  begin
-    Result := (Installed = 1);
-  end;
-
-  if not Result then
-  begin
-    if RegQueryDWordValue(HKLM64, 'SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed) then
-    begin
-      Result := (Installed = 1);
-    end;
-  end;
-end;
-
-// Initialize setup - check prerequisites and show friendly message
+// Show simple dependency message at the very start
 function InitializeSetup: Boolean;
-var
-  MissingPrereqs: String;
-  NeedsDotNet, NeedsVCRuntime: Boolean;
-  Response: Integer;
 begin
-  NeedsDotNet := not IsDotNet8Installed;
-  NeedsVCRuntime := not IsVCRuntimeInstalled;
+  MsgBox(
+    'VoiceLite requires the following to run:' + #13#10#13#10 +
+    '• .NET 8 Desktop Runtime' + #13#10 +
+    '  https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe' + #13#10#13#10 +
+    '• Visual C++ Runtime 2015-2022' + #13#10 +
+    '  https://aka.ms/vs/17/release/vc_redist.x64.exe' + #13#10#13#10 +
+    'If you don''t have these installed, VoiceLite will not run.' + #13#10 +
+    'You can install them before or after installing VoiceLite.' + #13#10#13#10 +
+    'Click OK to continue installation.',
+    mbInformation, MB_OK);
 
-  // If prerequisites are missing, show information with download links
-  if NeedsDotNet or NeedsVCRuntime then
-  begin
-    MissingPrereqs := 'VoiceLite requires the following software to run:' + #13#10#13#10;
-
-    if NeedsDotNet then
-    begin
-      MissingPrereqs := MissingPrereqs + '• .NET 8 Desktop Runtime' + #13#10;
-      MissingPrereqs := MissingPrereqs + '  https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe' + #13#10#13#10;
-    end;
-
-    if NeedsVCRuntime then
-    begin
-      MissingPrereqs := MissingPrereqs + '• Visual C++ Runtime 2015-2022' + #13#10;
-      MissingPrereqs := MissingPrereqs + '  https://aka.ms/vs/17/release/vc_redist.x64.exe' + #13#10#13#10;
-    end;
-
-    MissingPrereqs := MissingPrereqs +
-      'Click OK to continue installation.' + #13#10 +
-      'After installation finishes, please install the required components above.' + #13#10#13#10 +
-      'VoiceLite will not run until these are installed.';
-
-    MsgBox(MissingPrereqs, mbInformation, MB_OK);
-  end;
-
-  // Always allow installation to continue
   Result := True;
 end;
 
