@@ -44,28 +44,17 @@ Name: "{autoprograms}\VoiceLite"; Filename: "{app}\VoiceLite.exe"
 Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktopicon
 
 [Run]
-; Removed auto-launch option - users should install dependencies first if needed
-; Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\temp"
 Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 [Code]
-// Show simple dependency message at the very start
+// No prerequisite checks - just let Windows handle it
+// If .NET 8 is missing, Windows will show a clear "Download it now" button
 function InitializeSetup: Boolean;
 begin
-  MsgBox(
-    'VoiceLite requires the following to run:' + #13#10#13#10 +
-    '• .NET 8 Desktop Runtime' + #13#10 +
-    '  https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe' + #13#10#13#10 +
-    '• Visual C++ Runtime 2015-2022' + #13#10 +
-    '  https://aka.ms/vs/17/release/vc_redist.x64.exe' + #13#10#13#10 +
-    'If you don''t have these installed, VoiceLite will not run.' + #13#10 +
-    'You can install them before or after installing VoiceLite.' + #13#10#13#10 +
-    'Click OK to continue installation.',
-    mbInformation, MB_OK);
-
   Result := True;
 end;
 
