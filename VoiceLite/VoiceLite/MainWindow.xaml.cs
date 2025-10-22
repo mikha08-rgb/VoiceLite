@@ -1052,7 +1052,7 @@ namespace VoiceLite
                 isInitializing = false;
 
                 // Step 5: Check for first-run diagnostics (blocking for critical issues)
-                await CheckFirstRunDiagnosticsAsync();
+                // FirstRunDiagnostics removed - Windows handles .NET errors automatically
 
                 // Step 6: Check for analytics consent on first run (non-blocking)
                 CheckAnalyticsConsentAsync();
@@ -1097,42 +1097,9 @@ namespace VoiceLite
             }
         }
 
-        private async Task CheckFirstRunDiagnosticsAsync()
-        {
-            try
-            {
-                // Show first-run diagnostic window on first app launch after installation
-                if (!settings.HasSeenFirstRunDiagnostics)
-                {
-                    // Small delay to let the main window fully load
-                    await Task.Delay(500);
-
-                    // AUDIT FIX (LEAK-CRIT-2): Using statement ensures window disposal
-                    using (var diagnosticWindow = new FirstRunDiagnosticWindow())
-                    {
-                        diagnosticWindow.Owner = this;
-                        var result = diagnosticWindow.ShowDialog();
-
-                        // Mark as seen regardless of dialog result
-                        settings.HasSeenFirstRunDiagnostics = true;
-                        SaveSettings();
-
-                        // If user closed dialog with critical issues, log it
-                        if (result != true)
-                        {
-                            ErrorLogger.LogMessage("First-run diagnostics completed with issues or user closed early");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("First-run diagnostics check failed", ex);
-                // Mark as seen to prevent repeated failures
-                settings.HasSeenFirstRunDiagnostics = true;
-                SaveSettings();
-            }
-        }
+        // CheckFirstRunDiagnosticsAsync() REMOVED - Feature deprecated
+        // Windows shows .NET error automatically if runtime is missing
+        // Model presence is checked when user tries to use transcription
 
         private async void CheckAnalyticsConsentAsync()
         {
