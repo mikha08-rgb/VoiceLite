@@ -272,10 +272,20 @@ namespace VoiceLite
                     var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                     var whisperDir = System.IO.Path.Combine(baseDir, "whisper");
 
+                    var tinyModel = System.IO.Path.Combine(whisperDir, "ggml-tiny.bin");
                     var baseModel = System.IO.Path.Combine(whisperDir, "ggml-base.bin");
                     var smallModel = System.IO.Path.Combine(whisperDir, "ggml-small.bin");
+                    var mediumModel = System.IO.Path.Combine(whisperDir, "ggml-medium.bin");
+                    var largeModel = System.IO.Path.Combine(whisperDir, "ggml-large-v3.bin");
 
                     var modelsFound = new List<string>();
+
+                    if (File.Exists(tinyModel))
+                    {
+                        var size = new FileInfo(tinyModel).Length / (1024 * 1024);
+                        if (size >= 70 && size <= 80) // ~75 MB for Tiny
+                            modelsFound.Add($"Tiny ({size} MB)");
+                    }
 
                     if (File.Exists(baseModel))
                     {
@@ -289,6 +299,20 @@ namespace VoiceLite
                         var size = new FileInfo(smallModel).Length / (1024 * 1024);
                         if (size >= 400 && size <= 550) // 400-550 MB range
                             modelsFound.Add($"Small ({size} MB)");
+                    }
+
+                    if (File.Exists(mediumModel))
+                    {
+                        var size = new FileInfo(mediumModel).Length / (1024 * 1024);
+                        if (size >= 1400 && size <= 1600) // ~1.5 GB for Medium
+                            modelsFound.Add($"Medium ({size} MB)");
+                    }
+
+                    if (File.Exists(largeModel))
+                    {
+                        var size = new FileInfo(largeModel).Length / (1024 * 1024);
+                        if (size >= 2800 && size <= 3100) // ~2.9 GB for Large
+                            modelsFound.Add($"Large ({size} MB)");
                     }
 
                     if (modelsFound.Count > 0)
