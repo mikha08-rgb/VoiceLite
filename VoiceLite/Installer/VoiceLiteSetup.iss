@@ -3,13 +3,14 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.13
+AppVersion=1.0.69
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
 AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
+LicenseFile=LICENSE.txt
 OutputDir=..\..
 OutputBaseFilename=VoiceLite-Setup
 SetupIconFile=..\VoiceLite\VoiceLite.ico
@@ -51,10 +52,19 @@ Type: filesandordirs; Name: "{app}\temp"
 Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 [Code]
-// No prerequisite checks - just let Windows handle it
-// If .NET 8 is missing, Windows will show a clear "Download it now" button
+// Show prerequisite message to EVERYONE before installation
 function InitializeSetup: Boolean;
 begin
+  MsgBox(
+    'VoiceLite requires the following to run:' + #13#10#13#10 +
+    '• .NET 8 Desktop Runtime' + #13#10 +
+    '  https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe' + #13#10#13#10 +
+    '• Visual C++ Runtime 2015-2022' + #13#10 +
+    '  https://aka.ms/vs/17/release/vc_redist.x64.exe' + #13#10#13#10 +
+    'Please install these if you don''t have them before launching VoiceLite.' + #13#10#13#10 +
+    'Click OK to continue to the license agreement.',
+    mbInformation, MB_OK);
+
   Result := True;
 end;
 
