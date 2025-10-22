@@ -2,11 +2,10 @@
 
 <div align="center">
 
-  **Free forever. Upgrade to Pro for premium accuracy.**
+  **100% Free • No Trials • No Tiers • Just Works**
 
-  [![Download Free](https://img.shields.io/badge/Download-Free-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
-  [![Upgrade to Pro](https://img.shields.io/badge/Upgrade-Pro-purple?style=for-the-badge)](https://voicelite.app)
-  [![Auditable Source](https://img.shields.io/badge/Source-Auditable-green?style=for-the-badge)](https://github.com/mikha08-rgb/VoiceLite)
+  [![Download](https://img.shields.io/badge/Download-Free-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
+  [![View Source](https://img.shields.io/badge/Source-Auditable-green?style=for-the-badge)](https://github.com/mikha08-rgb/VoiceLite)
 
   [![GitHub Stars](https://img.shields.io/github/stars/mikha08-rgb/VoiceLite?style=social)](https://github.com/mikha08-rgb/VoiceLite)
   [![GitHub Issues](https://img.shields.io/github/issues/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/issues)
@@ -20,24 +19,13 @@
 
 **VoiceLite** is a privacy-first Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
 
-## 🆓 Free Tier (Always Free)
-- ✅ **Pro Whisper model** (balanced, 90-93% accuracy)
-- ✅ **Unlimited usage** - no trials, no time limits
-- ✅ **Works completely offline** - your voice never leaves your PC
-- ✅ **All core features** - hotkeys, text injection, settings
-- ✅ **Auditable source code** - verify privacy yourself
-
-## 💎 Pro Tier ($20/3mo or $99 lifetime)
-- ✨ **Premium models**: Swift (93%), Elite (95%), Ultra (97%)
-- ✨ **Excellent accuracy** on technical terms (code, jargon, commands)
-- ✨ **Priority email support** - get help within 24 hours
-- ✨ **Early access** to new features and beta releases
-
-<div align="center">
-
-[🚀 **Upgrade to Pro**](https://voicelite.app) | [📖 **View Source Code**](https://github.com/mikha08-rgb/VoiceLite)
-
-</div>
+## ✨ Features (100% Free)
+- ✅ **Whisper AI model** - Fast and accurate speech recognition
+- ✅ **Unlimited usage** - No trials, no time limits, no tiers
+- ✅ **Works completely offline** - Your voice never leaves your PC
+- ✅ **Universal compatibility** - Works in ANY Windows application
+- ✅ **Customizable hotkeys** - Default Shift+Z, or choose your own
+- ✅ **Auditable source code** - Verify privacy yourself
 
 ### ✨ Perfect For:
 - 💻 **Developers** - Write code comments, documentation, variable names
@@ -64,21 +52,21 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.16 Installer (540MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.73 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-One-click installer • Includes Pro model (Free tier) • Premium models require Pro subscription
+Fast installation • Includes Tiny model (75MB) • Additional models available in Settings
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
-📌 **Includes Left Alt as default hotkey (customizable in settings)**
+📌 **Default hotkey: Shift+Z** (customizable in settings)
 
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.16.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.73.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
-4. **Hold Left Alt** → Speak → Release to type!
+4. **Hold Shift+Z** → Speak → Release to type!
 
 ---
 
@@ -86,7 +74,7 @@ One-click installer • Includes Pro model (Free tier) • Premium models requir
 
 <div align="center">
 
-  **Hold Left Alt** → **Speak naturally** → **Release** → **Text appears!**
+  **Hold Shift+Z** → **Speak naturally** → **Release** → **Text appears!**
 
 </div>
 
@@ -102,10 +90,10 @@ One-click installer • Includes Pro model (Free tier) • Premium models requir
 |---------|-------------|
 | 🎤 **Universal Voice Typing** | Works in ANY Windows application |
 | 🧠 **Powered by Whisper AI** | State-of-the-art accuracy, great with technical terms |
-| ⚡ **Lightning Fast** | < 200ms from speech to text |
+| ⚡ **Lightning Fast** | Optimized for speed with greedy decoding |
 | 🔒 **100% Private** | Completely offline, no cloud, no data collection |
-| ⌨️ **Customizable Hotkeys** | Use any key or combination (Shift+Z, Ctrl+Space) |
-| 📊 **Multiple Models** | Choose speed vs accuracy |
+| ⌨️ **Customizable Hotkeys** | Use any key or combination (Shift+Z, Ctrl+Space, etc.) |
+| 📊 **Multiple Models** | Download additional models in Settings for better accuracy |
 | 💾 **Lightweight** | Minimal CPU/RAM usage when idle |
 
 ---
@@ -143,9 +131,9 @@ function fibonacci(n) {
 
 ## 🛠️ System Requirements
 
-- **OS**: Windows 10/11
+- **OS**: Windows 10/11 (64-bit)
 - **RAM**: 4GB minimum (8GB recommended)
-- **Storage**: 500MB - 3GB (depending on model)
+- **Storage**: ~200MB (Tiny model), up to 3GB for larger models
 - **Visual C++ Runtime**: 2015-2022 x64 ([Download here](https://aka.ms/vs/17/release/vc_redist.x64.exe)) **REQUIRED**
 - **.NET**: Version 8.0 Desktop Runtime
 - **Microphone**: Any (better mic = better accuracy)
@@ -161,17 +149,17 @@ No! 100% offline. Your voice never leaves your computer.
 
 <details>
 <summary><b>How accurate is it?</b></summary>
-Very! 95%+ accuracy on normal speech, excellent with technical terms.
+The bundled Tiny model is fast and accurate for most use cases. You can download larger models from Settings for even better accuracy on technical terms and complex speech.
 </details>
 
 <details>
 <summary><b>Can I use it in games?</b></summary>
-Yes! Works in most games. Some fullscreen games may block hotkeys.
+Yes! Works in most games. Some fullscreen games may block hotkeys - use windowed mode if needed.
 </details>
 
 <details>
 <summary><b>Is it really free?</b></summary>
-Yes! The free tier with Small model is 100% free forever. No trials, no time limits. Pro tier unlocks premium models for better accuracy.
+Yes! 100% free forever. No trials, no time limits, no hidden costs. All features unlocked.
 </details>
 
 <details>
@@ -181,17 +169,17 @@ Transparency. Since VoiceLite processes your voice locally, we want you to verif
 
 <details>
 <summary><b>Can I use this commercially?</b></summary>
-Personal use is free. Organizations with 5+ users are encouraged to purchase Pro licenses to support continued development.
-</details>
-
-<details>
-<summary><b>How do Pro features work if the code is public?</b></summary>
-Pro models require server-side license validation. The core audio/transcription code is open for privacy auditing, but premium features are gated by our licensing server (not included in this repo).
+Yes! VoiceLite is free for both personal and commercial use under the MIT License.
 </details>
 
 <details>
 <summary><b>What languages does it support?</b></summary>
-Currently English optimized. More languages coming soon!
+VoiceLite supports 99 languages via Whisper AI! Change the language in Settings → Language.
+</details>
+
+<details>
+<summary><b>How do I download larger models?</b></summary>
+Open Settings → Model Selection. You can download additional models (Small, Medium, Large) for better accuracy. Note: Larger models require more disk space and are slower.
 </details>
 
 ---
@@ -204,7 +192,8 @@ Currently English optimized. More languages coming soon!
 | **Won't start** | Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) |
 | **Windows Defender warning** | Click "More info" → "Run anyway" (false positive) |
 | **No text appears** | Check mic is working, VoiceLite in system tray |
-| **Wrong text** | Speak clearly, try Pro model for better accuracy |
+| **Hotkey doesn't work** | Another app may be using Shift+Z - change it in Settings |
+| **Wrong text / Low accuracy** | Speak clearly, or download a larger model from Settings |
 
 ---
 
@@ -212,7 +201,7 @@ Currently English optimized. More languages coming soon!
 
 - [x] Customizable hotkeys
 - [x] Multiple accuracy models
-- [ ] Multi-language support
+- [x] Multi-language support (99 languages!)
 - [ ] Voice commands ("new line", "period")
 - [ ] Linux & Mac versions
 - [ ] Real-time streaming mode
@@ -226,14 +215,13 @@ VoiceLite is **open source** and contributions are welcome!
 - 🐛 [Report bugs](https://github.com/mikha08-rgb/VoiceLite/issues)
 - 💡 [Suggest features](https://github.com/mikha08-rgb/VoiceLite/issues)
 - 🔧 [Submit PRs](https://github.com/mikha08-rgb/VoiceLite/pulls)
-- 📖 Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - ⭐ Star if you find it useful!
 
 **Looking for contributors to help with:**
-- 🌍 Multi-language support
 - 🎨 UI/UX improvements
 - 📱 Additional keyboard shortcuts
 - 📝 Documentation improvements
+- 🧪 Testing on different Windows configurations
 
 ---
 
