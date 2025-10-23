@@ -135,7 +135,7 @@ async function main() {
 
   try {
     const stripe = new Stripe(secretKey, {
-      apiVersion: '2025-09-30.clover' as any,
+      apiVersion: '2025-08-27.basil',
     });
 
     // Test API connection by retrieving account
