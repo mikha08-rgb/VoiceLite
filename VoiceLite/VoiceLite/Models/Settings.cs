@@ -87,44 +87,13 @@ namespace VoiceLite.Models
             get => _whisperTimeoutMultiplier;
             set => _whisperTimeoutMultiplier = Math.Clamp(value, 0.5, 10.0);
         }
-        // Audio enhancement settings (disabled - kept for compatibility)
-        public bool EnableNoiseSuppression { get; set; } = false;
-        public bool EnableAutomaticGain { get; set; } = false;
 
-        private float _targetRmsLevel = 0.2f;
-        public float TargetRmsLevel
-        {
-            get => _targetRmsLevel;
-            set => _targetRmsLevel = Math.Clamp(value, 0.05f, 0.95f);
-        }
-
-        private double _noiseGateThreshold = 0.005;
-        public double NoiseGateThreshold
-        {
-            get => _noiseGateThreshold;
-            set => _noiseGateThreshold = Math.Clamp(value, 0.001, 0.5);
-        }
-
-        public bool StartWithWindows { get; set; } = false;
         public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
-        public bool PlaySoundFeedback { get; set; } = false;
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
-
-        // Whisper settings
-        public bool UseTemperatureOptimization { get; set; } = true; // Use temperature 0.2 for better accuracy
-        private float _whisperTemperature = 0.2f;
-
-        public float WhisperTemperature
-        {
-            get => _whisperTemperature;
-            set => _whisperTemperature = Math.Clamp(value, 0.0f, 2.0f);
-        }
-
-        public bool UseVAD { get; set; } = true; // Use Voice Activity Detection to trim silence
 
         // Transcription History
         private int _maxHistoryItems = 50;
@@ -148,6 +117,10 @@ namespace VoiceLite.Models
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
+
+        // License Management
+        public string? LicenseKey { get; set; } = null; // Pro license key
+        public bool IsProLicense { get; set; } = false; // True if Pro license is activated
     }
 
     public static class SettingsValidator
@@ -178,9 +151,6 @@ namespace VoiceLite.Models
             settings.BeamSize = settings.BeamSize;
             settings.BestOf = settings.BestOf;
             settings.WhisperTimeoutMultiplier = settings.WhisperTimeoutMultiplier;
-            settings.WhisperTemperature = settings.WhisperTemperature;
-            settings.TargetRmsLevel = settings.TargetRmsLevel;
-            settings.NoiseGateThreshold = settings.NoiseGateThreshold;
 
             return settings;
         }

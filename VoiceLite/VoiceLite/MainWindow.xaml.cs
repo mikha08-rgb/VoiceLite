@@ -35,7 +35,6 @@ namespace VoiceLite
         private DateTime recordingStartTime;
         private bool isRecording = false;
         private bool isTranscribing = false;
-        private CancellationTokenSource? recordingCancellation;
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
 
@@ -1708,12 +1707,6 @@ namespace VoiceLite
                 {
                     if (isRecording)
                     {
-                        // Audio feedback for cancel
-                        if (settings.PlaySoundFeedback)
-                        {
-                            // Sound removed per user request
-                        }
-
                         // Cancel the recording
                         StopRecording(true);
                         StopAutoTimeoutTimer();
@@ -1873,9 +1866,6 @@ namespace VoiceLite
 
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
                 try { saveSettingsSemaphore?.Dispose(); } catch { }
-
-                // Dispose cancellation token
-                try { recordingCancellation?.Dispose(); } catch { }
 
                 whisperService?.Dispose();
                 whisperService = null;

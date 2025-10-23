@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Version>1.0.70</Version>
+    <AssemblyVersion>1.0.70.0</AssemblyVersion>
+    <FileVersion>1.0.70.0</FileVersion>
+    <RollForward>LatestMinor</RollForward>
+  </PropertyGroup>
+
+  <!-- Expose internal members to test project for mock license validation -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VoiceLite.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="H.InputSimulator" Version="1.2.1" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
+    <PackageReference Include="System.Text.Json" Version="9.0.9" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\whisper\**\*">
+      <Link>whisper\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="MainWindow_Enhanced.xaml" />
+    <None Remove="SettingsWindow_Enhanced.xaml" />
+    <Page Remove="MainWindow_Enhanced.xaml" />
+    <Page Remove="SettingsWindow_Enhanced.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="VoiceLite.ico" />
+    <Content Include="VoiceLite.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="Resources\wood-tap-click.ogg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Post-build obfuscation disabled - script not found and not required for current builds -->
+  <!-- <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
+    <Message Text="Running post-build obfuscation..." Importance="high" />
+    <Exec Command="ObfuscateRelease.bat $(Configuration)" WorkingDirectory="$(ProjectDir)" ContinueOnError="true" />
+  </Target> -->
+
+</Project>

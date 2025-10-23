@@ -1,25 +1,8 @@
 {
   "mcpServers": {
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/"
-    },
-    "stripe": {
-      "url": "https://mcp.stripe.com"
-    },
-    "ast-grep": {
-      "command": "npx",
-      "args": ["-y", "@notprolands/ast-grep-mcp"]
-    },
     "supabase": {
       "command": "npx",
       "args": ["-y", "@supabase/mcp-server-supabase"]
-    },
-    "vibe-check": {
-      "command": "npx",
-      "args": ["-y", "vibe-check-mcp", "--stdio"]
-    },
-    "semgrep": {
-      "url": "https://mcp.semgrep.ai"
     }
   }
 }

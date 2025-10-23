@@ -1,26 +1,65 @@
-import { NextResponse } from 'next/server';
-import { sendMagicLinkEmail } from '@/lib/email';
+import { NextRequest, NextResponse } from 'next/server';
+import { sendLicenseEmail } from '@/lib/emails/license-email';
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
-    console.log('=== EMAIL TEST ENDPOINT ===');
+    const { email, licenseKey } = await request.json();
+
+    console.log('=== LICENSE EMAIL TEST ===');
     console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
     console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
+    console.log('Sending to:', email);
+    console.log('License key:', licenseKey);
 
-    await sendMagicLinkEmail({
-      email: 'mikhail.lev08@gmail.com',
-      magicLinkUrl: 'https://test.com/link',
-      otpCode: '12345678',
-      deepLinkUrl: 'voicelite://test',
-      expiresInMinutes: 15,
+    const result = await sendLicenseEmail({
+      email: email || 'test@example.com',
+      licenseKey: licenseKey || 'test-key-12345',
     });
 
-    return NextResponse.json({ success: true, message: 'Email sent' });
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'License email sent successfully',
+        messageId: result.messageId
+      });
+    } else {
+      throw result.error;
+    }
   } catch (error) {
     console.error('Test email failed:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
+  }
+}
+
+// Also support GET for quick browser testing
+export async function GET() {
+  try {
+    console.log('=== LICENSE EMAIL TEST (GET) ===');
+    console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
+    console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
+
+    const result = await sendLicenseEmail({
+      email: 'test@example.com',
+      licenseKey: 'test-key-12345-67890',
+    });
+
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'License email sent to test@example.com',
+        messageId: result.messageId
+      });
+    } else {
+      throw result.error;
+    }
+  } catch (error) {
+    console.error('Test email failed:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }
 }

@@ -6,10 +6,10 @@
 | Model | Size | Accuracy | Speed | Use Case |
 |-------|------|----------|-------|----------|
 | Tiny (ggml-tiny.bin) | 75MB | 70-80% | Fastest | Legacy fallback only |
-| Small (ggml-small.bin) | 466MB | 90-93% | Fast | **Current free tier default** |
-| Base (ggml-base.bin) | 142MB | 85-88% | Fast | Pro tier (Swift) |
-| Medium (ggml-medium.bin) | 1.5GB | 93-95% | Moderate | Pro tier (Elite) |
-| Large v3 (ggml-large-v3.bin) | 2.9GB | 95-97% | Slow | Pro tier (Ultra) |
+| Small (ggml-small.bin) | 466MB | 90-93% | Fast | **Default (ships with installer)** |
+| Base (ggml-base.bin) | 142MB | 85-88% | Fast | Swift - good balance |
+| Medium (ggml-medium.bin) | 1.5GB | 93-95% | Moderate | Elite - optional download |
+| Large v3 (ggml-large-v3.bin) | 2.9GB | 95-97% | Slow | Ultra - manual download |
 
 ### Model Selection Criteria
 - **Technical dictation** (code, commands): Use Small or Medium minimum
@@ -19,15 +19,17 @@
 
 ## Whisper Command Parameters
 
-### Optimal Settings
+### Current Settings (v1.0.65+)
 ```bash
 whisper.exe -m [model] -f [audio.wav] \
   --no-timestamps \
   --language en \
   --temperature 0.2 \
-  --beam-size 5 \
-  --best-of 5
+  --beam-size 1 \
+  --best-of 1
 ```
+
+**Note**: VoiceLite uses **greedy decoding** for 5x speed improvement over beam search.
 
 ### Parameter Explanations
 - **--no-timestamps**: Removes timestamps from output (cleaner text)
@@ -36,8 +38,10 @@ whisper.exe -m [model] -f [audio.wav] \
   - `0.0`: Most deterministic (best for technical terms)
   - `0.2`: Balanced (default)
   - `0.5+`: More creative (worse for technical accuracy)
-- **--beam-size 5**: Beam search width (higher = better quality, slower)
-- **--best-of 5**: Number of candidates to consider
+- **--beam-size 1**: Greedy decoding (fastest, v1.0.65+)
+  - Legacy: `--beam-size 5` for beam search (slower but more accurate)
+- **--best-of 1**: Single sampling (fastest, v1.0.65+)
+  - Legacy: `--best-of 5` for multiple candidates (slower)
 
 ### Temperature Tuning
 **Problem**: Poor accuracy on technical jargon (useState, forEach, npm)
@@ -107,23 +111,6 @@ if (!process.WaitForExit(timeout))
 {
     process.Kill();
     throw new TimeoutException($"Whisper timeout after {timeout}ms");
-}
-```
-
-### Warmup Strategy
-**Problem**: First transcription has high latency
-**Solution**: Warm up process on startup
-```csharp
-private async Task WarmupWhisper()
-{
-    // Generate dummy 1-second audio file
-    var warmupPath = Path.Combine(Path.GetTempPath(), "warmup.wav");
-    GenerateSilentWav(warmupPath, duration: 1);
-
-    // Run transcription to load model into memory
-    await TranscribeAsync(warmupPath);
-
-    File.Delete(warmupPath);
 }
 ```
 

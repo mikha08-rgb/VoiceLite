@@ -23,6 +23,7 @@ namespace VoiceLite
         private Action? testRecordingCallback;
         private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
         private string? originalModel;
+        private LicenseService? licenseService;
 
         public Settings Settings => settings;
 
@@ -33,12 +34,11 @@ namespace VoiceLite
             testRecordingCallback = onTestRecording;
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
+            licenseService = new LicenseService();
 
             LoadSettings();
             LoadVersionInfo();
         }
-
-        private bool isInitialized = false;
 
         private void LoadSettings()
         {
@@ -52,13 +52,10 @@ namespace VoiceLite
                 ToggleRadio.IsChecked = true;
 
             // System Settings
-            // StartWithWindowsCheckBox.IsChecked = settings.StartWithWindows; // Hidden - not implemented
             MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
-            // ShowTrayIconCheckBox.IsChecked = settings.ShowTrayIcon; // Hidden - always enabled
 
             // Audio Settings
             LoadMicrophones();
-            PlaySoundFeedbackCheckBox.IsChecked = settings.PlaySoundFeedback;
             AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
             // Advanced settings removed from UI (still configurable via settings.json)
@@ -71,7 +68,31 @@ namespace VoiceLite
 
             // Current Model is set in SetupModelComparison
 
-            isInitialized = true;
+            // License Settings
+            LoadLicenseStatus();
+        }
+
+        private void LoadLicenseStatus()
+        {
+            if (settings.IsProLicense)
+            {
+                LicenseTierText.Text = "Pro ⭐";
+                LicenseTierText.Foreground = System.Windows.Media.Brushes.Green;
+                LicenseKeyInput.Text = settings.LicenseKey;
+                LicenseKeyInput.IsEnabled = false;
+                ActivateLicenseButton.IsEnabled = false;
+                LicenseStatusText.Text = "✓ License activated";
+                LicenseStatusText.Foreground = System.Windows.Media.Brushes.Green;
+                LicenseDescriptionText.Text = "Pro tier unlocked! You have access to all features and AI models.";
+            }
+            else
+            {
+                LicenseTierText.Text = "Free";
+                LicenseTierText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(37, 99, 235)); // #2563EB
+                LicenseKeyInput.IsEnabled = true;
+                ActivateLicenseButton.IsEnabled = true;
+                LicenseStatusText.Text = "";
+            }
         }
 
 
@@ -222,12 +243,9 @@ namespace VoiceLite
             settings.Mode = (PushToTalkRadio.IsChecked == true) ? RecordMode.PushToTalk : RecordMode.Toggle;
 
             // System Settings
-            // settings.StartWithWindows = StartWithWindowsCheckBox.IsChecked ?? false; // Hidden - not implemented
             settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
-            // settings.ShowTrayIcon = ShowTrayIconCheckBox.IsChecked ?? true; // Hidden - always enabled (hardcoded true)
 
             // Audio Settings
-            settings.PlaySoundFeedback = PlaySoundFeedbackCheckBox.IsChecked ?? true;
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
 
             if (MicrophoneComboBox.SelectedItem is AudioDevice selectedDevice)
@@ -250,6 +268,91 @@ namespace VoiceLite
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
         private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
         private void SyncAudioUIFromSettings() { }
+
+        // License Management Event Handlers
+        private async void ActivateLicenseButton_Click(object sender, RoutedEventArgs e)
+        {
+            var key = LicenseKeyInput.Text.Trim();
+
+            if (string.IsNullOrEmpty(key))
+            {
+                LicenseStatusText.Text = "Please enter a license key";
+                LicenseStatusText.Foreground = System.Windows.Media.Brushes.Red;
+                return;
+            }
+
+            // Disable button and show loading state
+            ActivateLicenseButton.IsEnabled = false;
+            ActivateLicenseButton.Content = "Validating...";
+            LicenseStatusText.Text = "Validating license key...";
+            LicenseStatusText.Foreground = System.Windows.Media.Brushes.Gray;
+
+            try
+            {
+                var result = await licenseService!.ValidateLicenseAsync(key);
+
+                if (result.IsValid && result.Tier == "pro")
+                {
+                    // Activate license
+                    settings.LicenseKey = key;
+                    settings.IsProLicense = true;
+
+                    // Save settings immediately
+                    saveSettingsCallback?.Invoke();
+
+                    // Update UI
+                    LoadLicenseStatus();
+
+                    // Show success message
+                    MessageBox.Show(
+                        "License activated successfully!\n\nYou now have access to all Pro features and AI models.",
+                        "License Activated",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    LicenseStatusText.Text = "✓ License activated successfully!";
+                    LicenseStatusText.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else
+                {
+                    LicenseStatusText.Text = result.ErrorMessage ?? "✗ Invalid license key";
+                    LicenseStatusText.Foreground = System.Windows.Media.Brushes.Red;
+                    ActivateLicenseButton.IsEnabled = true;
+                    ActivateLicenseButton.Content = "Activate License";
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("License activation failed", ex);
+                LicenseStatusText.Text = "✗ Connection error. Please check your internet connection.";
+                LicenseStatusText.Foreground = System.Windows.Media.Brushes.Red;
+                ActivateLicenseButton.IsEnabled = true;
+                ActivateLicenseButton.Content = "Activate License";
+            }
+        }
+
+        private void BuyProButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Open browser to checkout page
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://voicelite.app/#pricing",
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to open browser", ex);
+                MessageBox.Show(
+                    "Could not open browser. Please visit: https://voicelite.app/#pricing",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
 
         // Stub event handlers for removed/unimplemented features
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }

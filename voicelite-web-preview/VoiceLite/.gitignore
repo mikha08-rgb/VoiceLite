@@ -1,0 +1,46 @@
+# Build output
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# User files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# NuGet packages
+*.nupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio cache/options
+.vs/
+*.vspscc
+*.vssscc
+
+# Temporary files
+temp/
+*.wav
+recording.wav
+
+# Whisper model (large file)
+whisper/ggml-*.bin
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Settings (may contain user preferences)
+settings.json
+
+# Backup files
+*.bak
+*~

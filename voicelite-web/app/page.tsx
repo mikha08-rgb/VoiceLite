@@ -1,555 +1,606 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition, lazy, Suspense } from 'react';
-import { Download, Mic, Shield, Zap } from 'lucide-react';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { FeatureCard } from '@/components/feature-card';
-import { LoadingSkeleton } from '@/components/loading-skeleton';
-import { ToastContainer } from '@/components/toast';
-import { useToast } from '@/hooks/use-toast';
-import { RippleButton } from '@/components/ripple-button';
-import { Tooltip } from '@/components/tooltip';
+import { useState } from 'react';
+import { Download, Menu, X } from 'lucide-react';
+import Link from 'next/link';
 
-// Lazy load below-the-fold components
-const PricingCard = lazy(() => import('@/components/pricing-card').then(mod => ({ default: mod.PricingCard })));
-const AccountCard = lazy(() => import('@/components/account-card').then(mod => ({ default: mod.AccountCard })));
-const FAQ = lazy(() => import('@/components/faq').then(mod => ({ default: mod.FAQ })));
+export default function HomePage() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
-// Lazy load confetti only when needed
-const loadConfetti = () => import('canvas-confetti');
-
-interface User {
-  id: string;
-  email: string;
-}
-
-interface License {
-  id: string;
-  licenseKey: string;
-  type: 'SUBSCRIPTION' | 'LIFETIME';
-  status: 'ACTIVE' | 'CANCELED' | 'EXPIRED';
-  expiresAt: string | null;
-}
-
-const plans = [
-  {
-    id: 'quarterly',
-    name: 'Quarterly',
-    description: 'Full access billed every 3 months',
-    price: '$20 / 3 months',
-    priceId: 'quarterly',
-    popular: true,
-    bullets: ['Premium models (Swift, Elite, Ultra)', 'Advanced text formatting', 'VoiceShortcuts templates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
-  },
-  {
-    id: 'lifetime',
-    name: 'Lifetime',
-    description: 'One-time payment, lifetime updates',
-    price: '$99 one-time',
-    priceId: 'lifetime',
-    popular: false,
-    bullets: ['Permanent license', 'All premium models', 'Advanced features', 'All future updates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
-  },
-];
-
-const faqItems = [
-  {
-    question: 'Is my voice data sent to the cloud?',
-    answer: 'No. VoiceLite runs 100% offline on your PC using local Whisper AI models. Your voice never leaves your computer - no internet connection required for transcription.',
-  },
-  {
-    question: "What's the difference between free and Pro?",
-    answer: 'The free version includes the Pro model (466MB, ~90-93% accuracy). Pro tier unlocks premium models (Swift, Elite, Ultra) for even higher accuracy (93-97%), advanced features like VoiceShortcuts, text formatting presets, and priority support.',
-  },
-  {
-    question: 'Which Whisper model should I use?',
-    answer: 'Start with Pro (included free, 90-93% accuracy) for balanced speed and quality. Upgrade to Swift for faster processing, or Elite/Ultra (Pro tier) for maximum accuracy on technical jargon. All models run offline.',
-  },
-  {
-    question: 'Does it work in games, Discord, VS Code?',
-    answer: 'Yes! VoiceLite works in any Windows application with a text field - browsers, IDEs, terminals, chat apps, and even games in windowed mode. Just hold your hotkey and speak.',
-  },
-  {
-    question: 'What languages are supported?',
-    answer: 'VoiceLite supports 99 languages via Whisper AI including English, Spanish, French, German, Chinese, Japanese, Arabic, and many more. All languages work 100% offline with the same accuracy and speed.',
-  },
-  {
-    question: 'Can I customize the transcribed text?',
-    answer: 'Yes! VoiceLite includes advanced text formatting: auto-capitalization, filler word removal (5 intensity levels), contractions, grammar fixes, and quick presets (Professional/Code/Casual). Use VoiceShortcuts to create custom phrase replacements with Medical/Legal/Tech templates.',
-  },
-  {
-    question: 'How accurate is the transcription?',
-    answer: 'Accuracy depends on the model: Lite (80-85%), Pro (90-93%, free tier), Swift (90-93%), Elite (93-95%), Ultra (95-97%). Technical terms and code (useState, npm, git) are recognized well. Use text formatting features to fine-tune output.',
-  },
-  {
-    question: 'Can I use VoiceLite on multiple PCs?',
-    answer: 'Yes! Each license activates on up to 3 devices. Manage activations from your account dashboard. Deactivate old devices to free up slots.',
-  },
-  {
-    question: 'Can I cancel my subscription anytime?',
-    answer: 'Absolutely. Cancel anytime from your account dashboard. No questions asked, no fees. Your license remains active until the end of your billing period.',
-  },
-  {
-    question: 'Is there a refund policy?',
-    answer: '30-day money-back guarantee on all purchases. If VoiceLite doesn\'t work for you, email support for a full refund - no questions asked.',
-  },
-];
-
-export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [licenses, setLicenses] = useState<License[]>([]);
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [magicLinkRequested, setMagicLinkRequested] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [isLoading, setIsLoading] = useState(true);
-
-  const signInSectionRef = useRef<HTMLElement>(null);
-  const { toasts, showToast, removeToast } = useToast();
-
-  const fetchProfile = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/me', { cache: 'no-store' });
-      if (!response.ok) {
-        setUser(null);
-        setLicenses([]);
-        return;
-      }
-      const data = await response.json();
-      setUser(data.user);
-      setLicenses(data.licenses ?? []);
-      if (data.user) {
-        setEmail(data.user.email);
-      }
-    } catch (error) {
-      console.error('Failed to load profile', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const handleMagicLinkRequest = async () => {
-    setErrorMessage(null);
-    setStatusMessage(null);
-    startTransition(async () => {
-      try {
-        const response = await fetch('/api/auth/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        if (!response.ok) {
-          const payload = await response.json();
-          throw new Error(payload.error ?? 'Failed to send magic link');
-        }
-        setMagicLinkRequested(true);
-        setStatusMessage('Check your email for the magic link or enter the OTP below.');
-      } catch (error) {
-        console.error(error);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to send magic link');
-      }
-    });
-  };
-
-  const handleOtpVerification = async () => {
-    setErrorMessage(null);
-    setStatusMessage(null);
-    startTransition(async () => {
-      try {
-        const response = await fetch('/api/auth/otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, otp }),
-        });
-        if (!response.ok) {
-          const payload = await response.json();
-          throw new Error(payload.error ?? 'Invalid code');
-        }
-        setOtp('');
-        setMagicLinkRequested(false);
-        setStatusMessage('You are signed in.');
-        await fetchProfile();
-
-        // Trigger success confetti (lazy loaded)
-        loadConfetti().then((confetti) => {
-          confetti.default({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd'],
-          });
-        });
-      } catch (error) {
-        console.error(error);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to verify code');
-      }
-    });
-  };
-
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    setUser(null);
-    setLicenses([]);
-    setMagicLinkRequested(false);
-    setStatusMessage('Signed out.');
-  };
-
-  const handleCheckout = async (plan: string) => {
-    if (!user) {
-      setErrorMessage('Please sign in before upgrading.');
-
-      // Scroll to sign-in section
-      if (signInSectionRef.current) {
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        signInSectionRef.current.scrollIntoView({
-          behavior: prefersReducedMotion ? 'auto' : 'smooth',
-          block: 'center'
-        });
-      }
-
-      return;
-    }
-
+  const handleGetProClick = async () => {
+    setIsCheckoutLoading(true);
     try {
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      const data = await response.json();
-      if (!response.ok || !data.url) {
-        throw new Error(data.error ?? 'Checkout failed');
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
       }
-      window.location.href = data.url;
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (error) {
       console.error('Checkout error:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to start checkout');
+      alert('Failed to start checkout. Please try again.');
+      setIsCheckoutLoading(false);
     }
   };
 
-  const handleLicenseCopy = () => {
-    showToast('License key copied to clipboard!', 'success');
-  };
-
   return (
-    <main id="main-content" className="min-h-screen bg-stone-50 text-stone-900 dark:bg-[#0f0f12] dark:text-stone-50">
-      <a href="#main-content" className="skip-to-content">
-        Skip to main content
-      </a>
-      <section className="px-6 py-32 md:py-40">
-        <div className="mx-auto max-w-6xl md:grid md:grid-cols-[1.05fr_0.95fr] md:gap-20">
-          <header className="max-w-2xl space-y-10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <span className="inline-flex items-center gap-2 rounded-full border border-purple-200/50 bg-gradient-to-br from-purple-50 to-violet-50 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.24em] text-purple-900 shadow-sm shadow-purple-100/50 dark:border-purple-500/30 dark:from-purple-950/50 dark:to-violet-950/50 dark:text-purple-200 dark:shadow-purple-500/10">
-                <Mic className="h-4 w-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
-                100% Offline Voice Typing for Windows
-              </span>
-              <ThemeToggle />
+    <main className="min-h-screen bg-white dark:bg-stone-950">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 border-b border-stone-200 bg-white/95 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-950/95">
+        <div className="container mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-blue-600 dark:text-blue-400">
+            🎤 <span>VoiceLite</span>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden items-center gap-8 md:flex">
+            <a href="#features" className="text-sm font-medium text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+              Pricing
+            </a>
+            <a href="#faq" className="text-sm font-medium text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+              FAQ
+            </a>
+            <a
+              href="https://github.com/mikha08-rgb/VoiceLite"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
+            >
+              GitHub
+            </a>
+            <a
+              href="#pricing"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-blue-600/30 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              Get Pro
+            </a>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="rounded-lg p-2 text-stone-600 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800 md:hidden"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="border-t border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950 md:hidden">
+            <div className="container mx-auto max-w-7xl space-y-1 px-6 py-4">
+              <a
+                href="#features"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block rounded-lg px-4 py-3 text-base font-medium text-stone-600 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+              >
+                Features
+              </a>
+              <a
+                href="#pricing"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block rounded-lg px-4 py-3 text-base font-medium text-stone-600 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+              >
+                Pricing
+              </a>
+              <a
+                href="#faq"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block rounded-lg px-4 py-3 text-base font-medium text-stone-600 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+              >
+                FAQ
+              </a>
+              <a
+                href="https://github.com/mikha08-rgb/VoiceLite"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg px-4 py-3 text-base font-medium text-stone-600 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+              >
+                GitHub
+              </a>
+              <a
+                href="#pricing"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block rounded-lg bg-blue-600 px-4 py-3 text-center text-base font-semibold text-white shadow-md shadow-blue-600/30 transition-all hover:bg-blue-700"
+              >
+                Get Pro
+              </a>
             </div>
-            <div className="space-y-7">
-              <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-6xl">
-                Turn Your Voice Into Text
+          </div>
+        )}
+      </nav>
+
+      {/* Hero Section */}
+      <section className="px-6 py-24 md:py-32">
+        <div className="container mx-auto max-w-7xl">
+          <div className="grid items-center gap-16 md:grid-cols-2">
+            {/* Left Column */}
+            <div className="space-y-8">
+              <h1 className="text-5xl font-bold leading-tight tracking-tight text-stone-900 dark:text-stone-50 md:text-6xl">
+                Stop Typing.
                 <br />
-                <span className="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 bg-clip-text text-transparent dark:from-purple-400 dark:via-violet-400 dark:to-purple-400">Instantly</span>
+                Start Speaking.
               </h1>
-              <p className="text-base leading-[1.7] text-stone-600 dark:text-stone-300 md:text-lg">
-                Hold Alt, speak naturally, release. Your words appear as typed text in{' '}
-                <span className="font-semibold text-stone-900 dark:text-stone-50">any</span> Windows application.{' '}
-                <Tooltip content="Powered by OpenAI Whisper AI - runs 100% on your PC">
-                  <span>100% offline</span>
-                </Tooltip>
-                . Supports 99 languages, advanced text formatting, and custom VoiceShortcuts. Your voice never leaves your PC.
+              <p className="text-xl leading-relaxed text-stone-600 dark:text-stone-400">
+                VoiceLite turns your voice into text instantly—anywhere on Windows. Private, fast, and{' '}
+                <strong className="font-semibold text-blue-600 dark:text-blue-400">$20 one-time</strong>. No subscription.
+              </p>
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <a
+                  href="#pricing"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 motion-reduce:transform-none"
+                >
+                  <Download className="h-5 w-5" />
+                  Get VoiceLite Pro - $20
+                </a>
+                <a
+                  href="#features"
+                  className="inline-flex items-center justify-center rounded-lg border-2 border-stone-300 bg-transparent px-8 py-4 text-base font-semibold text-stone-700 transition-all hover:border-blue-600 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-stone-700 dark:text-stone-300 dark:hover:border-blue-400 dark:hover:text-blue-400"
+                >
+                  Learn More
+                </a>
+              </div>
+              <div className="flex flex-wrap items-center gap-5 text-sm text-stone-500 dark:text-stone-400">
+                <span className="flex items-center gap-2">🔒 100% Offline</span>
+                <span className="flex items-center gap-2">⚡ Locally Processed</span>
+                <span className="flex items-center gap-2">🛡️ Zero Tracking</span>
+              </div>
+            </div>
+
+            {/* Right Column - Video */}
+            <div className="space-y-4">
+              <div className="relative aspect-video overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-2xl shadow-blue-600/10 dark:border-stone-800 dark:from-blue-950/50 dark:to-indigo-950/50">
+                <div className="flex h-full items-center justify-center text-7xl">▶️</div>
+              </div>
+              <p className="text-center text-sm text-stone-500 dark:text-stone-400">Watch 60-second demo</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="border-t border-stone-200 px-6 py-24 dark:border-stone-800 md:py-32">
+        <div className="container mx-auto max-w-7xl space-y-16">
+          <div className="space-y-4 text-center">
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Built for Developers & Writers</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Simple, powerful, and respects your privacy</p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-3">
+            <div className="space-y-4 rounded-2xl bg-white p-10 shadow-md transition-all hover:-translate-y-2 hover:shadow-xl dark:bg-stone-900">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-3xl dark:from-blue-950/50 dark:to-blue-900/50">
+                🔒
+              </div>
+              <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">Privacy First</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">
+                No cloud, no tracking, fully offline. Your voice is processed locally on your machine. What you say stays on your device.
               </p>
             </div>
-            <div className="flex flex-col items-stretch gap-5 sm:w-auto sm:flex-row sm:items-center">
-              <RippleButton
-                onClick={() => {
-                  window.location.href = 'https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.74/VoiceLite-Setup-1.0.74.exe';
-                }}
-                className="group inline-flex w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-violet-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transform-none motion-reduce:transition-none dark:shadow-purple-500/20 dark:hover:shadow-purple-500/30"
-                rippleColor="rgba(255, 255, 255, 0.4)"
+
+            <div className="space-y-4 rounded-2xl bg-white p-10 shadow-md transition-all hover:-translate-y-2 hover:shadow-xl dark:bg-stone-900">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-3xl dark:from-blue-950/50 dark:to-blue-900/50">
+                ⚡
+              </div>
+              <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">Lightning Fast</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">
+                &lt;200ms latency after speech. Optimized AI models run locally on GPU. No network delays, no waiting.
+              </p>
+            </div>
+
+            <div className="space-y-4 rounded-2xl bg-white p-10 shadow-md transition-all hover:-translate-y-2 hover:shadow-xl dark:bg-stone-900">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-3xl dark:from-blue-950/50 dark:to-blue-900/50">
+                💻
+              </div>
+              <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">Works Anywhere</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">
+                VS Code, Chrome, Discord, Slack, terminals. Any Windows app. Global hotkey works system-wide.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Founder Story */}
+      <section className="border-y border-stone-200 bg-stone-50 px-6 py-24 dark:border-stone-800 dark:bg-stone-900/50 md:py-32">
+        <div className="container mx-auto max-w-5xl">
+          <div className="space-y-8 rounded-2xl bg-white p-12 shadow-md dark:bg-stone-900">
+            <p className="text-center text-sm font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">Why I Built VoiceLite</p>
+            <p className="text-center text-2xl leading-relaxed text-stone-700 dark:text-stone-300 md:text-3xl">
+              "I got tired of slow, cloud-based dictation tools that tracked everything I said. I wanted something private, fast, and offline.
+              Something I could trust with my code, my ideas, my writing. So I built VoiceLite."
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-2xl font-bold text-white">
+                M
+              </div>
+              <div>
+                <h4 className="font-semibold text-stone-900 dark:text-stone-50">Misha</h4>
+                <p className="text-sm text-stone-600 dark:text-stone-400">Creator of VoiceLite</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="px-6 py-24 md:py-32">
+        <div className="container mx-auto max-w-7xl space-y-16">
+          <div className="space-y-4 text-center">
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">How VoiceLite Works</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Get started in under 2 minutes</p>
+          </div>
+
+          <div className="grid gap-12 md:grid-cols-3">
+            <div className="space-y-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-3xl font-bold text-white">
+                1
+              </div>
+              <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Download & Install</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">150MB download, 2-minute setup, no sign-up required</p>
+            </div>
+
+            <div className="space-y-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-3xl font-bold text-white">
+                2
+              </div>
+              <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Hold Hotkey & Speak</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">Press Left Alt, say what you want to type, release</p>
+            </div>
+
+            <div className="space-y-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-3xl font-bold text-white">
+                3
+              </div>
+              <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Text Appears Instantly</h3>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">AI transcribes locally, injects text where you type</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Model Comparison */}
+      <section className="border-t border-stone-200 bg-stone-50 px-6 py-24 dark:border-stone-800 dark:bg-stone-900/50 md:py-32">
+        <div className="container mx-auto max-w-7xl space-y-16">
+          <div className="space-y-4 text-center">
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Choose Your AI Model</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">All 5 models included with your purchase</p>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl bg-white shadow-md dark:bg-stone-900">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-800/50">
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Model</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Size</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Accuracy</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Speed</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Best For</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-stone-200 dark:border-stone-800">
+                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Tiny</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">75MB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">80-85%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">1.5s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Quick notes, fast drafts</td>
+                </tr>
+                <tr className="border-b border-stone-200 dark:border-stone-800">
+                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Swift</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">142MB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">85-88%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.0s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Emails, chat messages</td>
+                </tr>
+                <tr className="border-b border-stone-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-stone-800 dark:from-blue-950/30 dark:to-indigo-950/30">
+                  <td className="px-6 py-4 font-semibold text-stone-900 dark:text-stone-50">Pro ⭐ (Recommended)</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">466MB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">90-93%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.5s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Code, technical writing</td>
+                </tr>
+                <tr className="border-b border-stone-200 dark:border-stone-800">
+                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Elite</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">1.5GB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">93-96%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">4.0s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Articles, reports</td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Ultra</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.9GB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">96-98%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">6.0s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Professional content</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="px-6 py-24 md:py-32">
+        <div className="container mx-auto max-w-7xl space-y-16">
+          <div className="space-y-4 text-center">
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Simple, Honest Pricing</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Try free with Tiny model. Upgrade to Pro for best accuracy.</p>
+          </div>
+
+          <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2">
+            {/* Free Tier */}
+            <div className="space-y-8 rounded-3xl border-2 border-stone-200 bg-white p-10 shadow-lg dark:border-stone-800 dark:bg-stone-900">
+              <div className="space-y-2 text-center">
+                <h3 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Free</h3>
+                <p className="text-stone-600 dark:text-stone-400">Get started at no cost</p>
+              </div>
+
+              <div className="text-center">
+                <div className="text-5xl font-bold text-stone-900 dark:text-stone-50">$0</div>
+                <p className="mt-2 text-base text-stone-600 dark:text-stone-400">forever</p>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Tiny model (80-85% accuracy)
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  100% offline & private
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Unlimited usage
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  No time limits
+                </li>
+              </ul>
+
+              <a
+                href="/api/download?version=1.0.74"
+                className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
-                <Download className="mr-2 h-5 w-5 transition-transform duration-300 group-hover:translate-y-0.5" aria-hidden="true" />
-                Download VoiceLite Free
-              </RippleButton>
+                Download Free
+              </a>
             </div>
-            <div className="flex items-center gap-4 text-sm text-stone-500 dark:text-stone-400" role="list" aria-label="Download prerequisites">
-              <span>Windows 10/11</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-stone-300 dark:bg-stone-600" />
-              <span>One-click installer</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-stone-300 dark:bg-stone-600" />
-              <span>Ready in 2 minutes</span>
+
+            {/* Pro Tier */}
+            <div className="relative space-y-8 rounded-3xl border-2 border-blue-600 bg-white p-10 shadow-xl dark:border-blue-400 dark:bg-stone-900">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-sm font-semibold text-white dark:bg-blue-400 dark:text-blue-950">
+                RECOMMENDED
+              </div>
+
+              <div className="space-y-2 text-center">
+                <h3 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Pro</h3>
+                <p className="text-stone-600 dark:text-stone-400">Best accuracy & all features</p>
+              </div>
+
+              <div className="text-center">
+                <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">$20</div>
+                <p className="mt-2 text-base text-stone-600 dark:text-stone-400">one-time payment</p>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  <strong>All 4 Pro models</strong> (Small/Base/Medium/Large)
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  90-98% accuracy (vs 80-85% free)
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Lifetime updates
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  100% offline & private
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Unlimited usage
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Commercial use allowed
+                </li>
+              </ul>
+
+              <button
+                onClick={handleGetProClick}
+                disabled={isCheckoutLoading}
+                className="block w-full rounded-lg bg-blue-600 px-8 py-4 text-center text-lg font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCheckoutLoading ? 'Loading...' : 'Get Pro - $20'}
+              </button>
+
+              <div className="space-y-4 border-t border-stone-200 pt-8 text-center dark:border-stone-800">
+                <div className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-900 dark:border-green-800 dark:bg-green-950/50 dark:text-green-100">
+                  <span className="text-lg">✓</span>
+                  30-Day Money-Back Guarantee
+                </div>
+                <p className="text-sm text-stone-600 dark:text-stone-400">
+                  Not happy? Full refund, no questions asked.
+                  <br />
+                  Secure checkout via Stripe.
+                </p>
+              </div>
             </div>
-          </header>
-
-          <aside ref={signInSectionRef} className="mt-20 space-y-8 md:mt-0" aria-label="Account and activation">
-            {isLoading ? (
-              <LoadingSkeleton />
-            ) : (
-              <Suspense fallback={<LoadingSkeleton />}>
-                <AccountCard
-                  user={user}
-                  licenses={licenses}
-                  email={email}
-                  otp={otp}
-                  statusMessage={statusMessage}
-                  errorMessage={errorMessage}
-                  magicLinkRequested={magicLinkRequested}
-                  isPending={isPending}
-                  onEmailChange={setEmail}
-                  onOtpChange={setOtp}
-                  onMagicLinkRequest={handleMagicLinkRequest}
-                  onOtpVerification={handleOtpVerification}
-                  onLogout={handleLogout}
-                  onLicenseCopy={handleLicenseCopy}
-                />
-              </Suspense>
-            )}
-
-            <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 px-6 py-6 text-sm leading-6 text-green-900 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50 dark:text-green-100">
-              <strong className="font-bold">✨ New in v1.0.74:</strong> Critical fix for stuck transcription state! Resolved bug where isTranscribing flag wasn't reset during recovery, preventing all future transcriptions.
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="border-t border-stone-200 bg-white px-6 py-32 dark:border-stone-800 dark:bg-[#0f0f12]">
-        <div className="mx-auto max-w-6xl space-y-16">
-          <div className="space-y-5 text-center">
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Why VoiceLite?</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
-              Built for privacy, speed, and universal compatibility
-            </p>
-          </div>
-
-          <div className="grid gap-8 md:grid-cols-3">
-            <FeatureCard
-              icon={Shield}
-              title="100% Private"
-              description="Completely offline. Your voice never leaves your computer. No cloud, no tracking, no data collection."
-            />
-            <FeatureCard
-              icon={Zap}
-              title="Lightning Fast"
-              description={
-                <>
-                  Instant transcription with{' '}
-                  <Tooltip content="From the moment you stop speaking to text appearing">
-                    <span>less than 200ms latency</span>
-                  </Tooltip>{' '}
-                  from speech to text. No waiting, no buffering.
-                </>
-              }
-            />
-            <FeatureCard
-              icon={Mic}
-              title="Works Everywhere"
-              description="Discord, VS Code, Word, Terminal, Games—any Windows app, any text field, anywhere."
-            />
           </div>
         </div>
       </section>
 
-      <section className="border-y border-stone-200 bg-stone-100/50 px-6 py-32 dark:border-stone-800 dark:bg-stone-950/50">
-        <div className="mx-auto max-w-5xl space-y-16">
-          <div className="space-y-5 text-center">
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Upgrade When You're Ready</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
-              Sign in, choose your plan, and get your license key instantly via email
-            </p>
+      {/* FAQ */}
+      <section id="faq" className="border-t border-stone-200 bg-stone-50 px-6 py-24 dark:border-stone-800 dark:bg-stone-900/50 md:py-32">
+        <div className="container mx-auto max-w-4xl space-y-12">
+          <div className="space-y-4 text-center">
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Frequently Asked Questions</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Everything you need to know about VoiceLite</p>
           </div>
 
-          <div className="grid gap-10 md:grid-cols-2">
-            <Suspense fallback={<div className="h-96 animate-pulse rounded-3xl bg-stone-200 dark:bg-stone-800" />}>
-              {plans.map((plan) => (
-                <PricingCard
-                  key={plan.id}
-                  id={plan.id}
-                  name={plan.name}
-                  description={plan.description}
-                  price={plan.price}
-                  popular={plan.popular}
-                  bullets={plan.bullets}
-                  comingSoon={plan.comingSoon}
-                  onCheckout={handleCheckout}
-                />
-              ))}
-            </Suspense>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white px-6 py-32 dark:bg-[#0f0f12]">
-        <div className="mx-auto max-w-6xl space-y-16">
-          <div className="space-y-5 text-center">
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Everything You Need for Frictionless Dictation</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
-              Simple, secure, and powerful voice typing for everyone
-            </p>
-          </div>
-
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="space-y-4">
             {[
               {
-                icon: Shield,
-                title: 'Advanced Text Formatting',
-                description: 'Auto-capitalization, filler word removal (5 levels), grammar fixes, and quick presets (Professional/Code/Casual). Fine-tune every transcription.',
+                q: 'Does VoiceLite require an internet connection?',
+                a: 'No. VoiceLite runs 100% offline on your PC. Your voice never leaves your computer - no internet required for transcription.',
               },
               {
-                icon: Zap,
-                title: 'VoiceShortcuts',
-                description: 'Create custom phrase replacements with built-in templates for Medical, Legal, and Tech terminology. Type faster with voice commands.',
+                q: 'Which Windows apps does VoiceLite work with?',
+                a: 'All of them! VS Code, Chrome, Discord, Slack, terminals, Word, and any Windows app with a text field. The global hotkey works system-wide.',
               },
               {
-                icon: Mic,
-                title: '99 Languages Supported',
-                description: 'English, Spanish, French, German, Chinese, Japanese, Arabic, and 92 more. All languages work 100% offline with the same speed and accuracy.',
+                q: 'How accurate is VoiceLite with technical terms?',
+                a: 'VoiceLite recognizes technical terms like useState, npm, git, Docker with 90-93% accuracy (Pro model). It handles code, jargon, and specialized vocabulary.',
               },
-            ].map((feature) => (
-              <FeatureCard key={feature.title} icon={feature.icon} title={feature.title} description={feature.description} />
+              {
+                q: 'Can I use VoiceLite for coding?',
+                a: 'Yes! VoiceLite works great for dictating code. It recognizes function names, variable names, and technical syntax. Many developers use it daily.',
+              },
+              {
+                q: 'Is VoiceLite stable enough for daily use?',
+                a: 'Yes! VoiceLite has been in development for months with extensive testing. The core features are production-ready. 30-day money-back guarantee if anything goes wrong.',
+              },
+              {
+                q: 'What languages does VoiceLite support?',
+                a: 'VoiceLite supports 99 languages including English, Spanish, French, German, Chinese, Japanese, and many more. All work 100% offline.',
+              },
+              {
+                q: 'Will this slow down my computer?',
+                a: 'No. VoiceLite uses <100MB RAM when idle and <300MB when transcribing. It only uses CPU/GPU when you hold the hotkey. Minimal performance impact.',
+              },
+              {
+                q: "What's your refund policy?",
+                a: "30-day money-back guarantee on all purchases. If VoiceLite doesn't work for you, email support for a full refund - no questions asked.",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="cursor-pointer rounded-xl border border-stone-200 bg-white p-7 transition-all hover:shadow-md dark:border-stone-800 dark:bg-stone-900"
+                onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-50">{item.q}</h3>
+                  <span className={`text-stone-400 transition-transform ${openFaqIndex === i ? 'rotate-90' : ''}`}>▶</span>
+                </div>
+                {openFaqIndex === i && (
+                  <p className="mt-4 text-base leading-relaxed text-stone-600 dark:text-stone-400">{item.a}</p>
+                )}
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-y border-stone-200 bg-stone-100/50 px-6 py-32 dark:border-stone-800 dark:bg-stone-950/50">
-        <div className="mx-auto max-w-4xl space-y-12">
-          <div className="space-y-5 text-center">
-            <h2 className="text-3xl font-bold leading-tight md:text-4xl">Frequently Asked Questions</h2>
-            <p className="mx-auto max-w-2xl text-base leading-6 text-stone-600 dark:text-stone-400">
-              Everything you need to know about VoiceLite
-            </p>
-          </div>
-          <Suspense fallback={<div className="space-y-4">{[...Array(6)].map((_, i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-stone-200 dark:bg-stone-800" />)}</div>}>
-            <FAQ items={faqItems} />
-          </Suspense>
+      {/* Final CTA */}
+      <section className="bg-gradient-to-br from-blue-600 to-indigo-600 px-6 py-24 text-white md:py-32">
+        <div className="container mx-auto max-w-4xl space-y-10 text-center">
+          <h2 className="text-4xl font-bold md:text-5xl">Ready to stop typing?</h2>
+          <p className="text-xl opacity-90">Be among the first to experience truly private voice-to-text.</p>
+          <a
+            href="#pricing"
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-10 py-5 text-xl font-semibold text-blue-600 shadow-2xl transition-all hover:scale-105 hover:shadow-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transform-none"
+          >
+            Get VoiceLite Pro - $20
+          </a>
+          <p className="text-sm opacity-75">
+            Windows 10/11 • 150MB • 2-minute setup
+            <br />
+            30-day money-back guarantee • Try free tier first
+          </p>
         </div>
       </section>
 
-      <footer className="border-t border-stone-200 bg-white px-6 py-24 dark:border-stone-800 dark:bg-[#0f0f12]">
-        <div className="mx-auto max-w-6xl space-y-12">
+      {/* Footer */}
+      <footer className="border-t border-stone-200 bg-white px-6 py-16 dark:border-stone-800 dark:bg-stone-950">
+        <div className="container mx-auto max-w-7xl">
           <div className="grid gap-12 md:grid-cols-4">
-            <div className="space-y-5 md:col-span-2">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-violet-600 shadow-md shadow-purple-500/30">
-                  <Mic className="h-5 w-5 text-white" aria-hidden="true" />
-                </div>
-                <span className="text-lg font-bold leading-6">VoiceLite</span>
-              </div>
-              <p className="text-sm leading-[1.7] text-stone-600 dark:text-stone-400">
-                Privacy-focused offline voice typing for Windows. Your voice never leaves your computer.
+            <div className="space-y-4">
+              <Link href="/" className="flex items-center gap-2 text-xl font-bold text-blue-600 dark:text-blue-400">
+                🎤 <span>VoiceLite</span>
+              </Link>
+              <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                Private, offline speech-to-text for Windows. Built for developers and writers who value privacy.
               </p>
             </div>
 
-            <nav aria-label="Product links">
-              <h4 className="text-xs font-bold uppercase tracking-[0.28em] text-stone-500 dark:text-stone-400">Product</h4>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
-                <li>
-                  <a
-                    href="https://github.com/mikha08-rgb/VoiceLite"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Download
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/mikha08-rgb/VoiceLite#features"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Features
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/mikha08-rgb/VoiceLite/releases"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Changelog
-                  </a>
-                </li>
-              </ul>
-            </nav>
+            <div className="space-y-4">
+              <h4 className="font-semibold text-stone-900 dark:text-stone-50">Product</h4>
+              <div className="flex flex-col gap-3 text-sm">
+                <a href="#features" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Features
+                </a>
+                <a href="#pricing" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Pricing
+                </a>
+                <a
+                  href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+                  className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
+                >
+                  Download
+                </a>
+              </div>
+            </div>
 
-            <nav aria-label="Support links">
-              <h4 className="text-xs font-bold uppercase tracking-[0.28em] text-stone-500 dark:text-stone-400">Support</h4>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
-                <li>
-                  <a
-                    href="/feedback"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                  >
-                    Send Feedback
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/mikha08-rgb/VoiceLite/issues"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Report Issue
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/mikha08-rgb/VoiceLite#readme"
-                    className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Documentation
-                  </a>
-                </li>
-              </ul>
-            </nav>
+            <div className="space-y-4">
+              <h4 className="font-semibold text-stone-900 dark:text-stone-50">Resources</h4>
+              <div className="flex flex-col gap-3 text-sm">
+                <a
+                  href="https://github.com/mikha08-rgb/VoiceLite"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
+                >
+                  GitHub
+                </a>
+                <a href="#faq" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  FAQ
+                </a>
+                <a href="/docs" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Documentation
+                </a>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-semibold text-stone-900 dark:text-stone-50">Legal</h4>
+              <div className="flex flex-col gap-3 text-sm">
+                <Link href="/privacy" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Privacy Policy
+                </Link>
+                <Link href="/terms" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Terms of Service
+                </Link>
+                <Link href="/legal/refunds" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Refund Policy
+                </Link>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-4 border-t border-stone-200 pt-8 text-xs leading-6 text-stone-500 dark:border-stone-800 dark:text-stone-400 md:flex-row md:items-center md:justify-between">
-            <p>© {new Date().getFullYear()} VoiceLite. Open source under MIT License.</p>
-            <div className="flex gap-6">
-              <a
-                href="https://github.com/mikha08-rgb/VoiceLite"
-                className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                GitHub
-              </a>
-              <a
-                href="https://github.com/mikha08-rgb/VoiceLite/blob/master/LICENSE"
-                className="transition duration-200 hover:text-purple-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 motion-reduce:transition-none dark:hover:text-purple-400"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                License
-              </a>
-            </div>
+          <div className="mt-12 border-t border-stone-200 pt-8 text-center text-sm text-stone-600 dark:border-stone-800 dark:text-stone-400">
+            © {new Date().getFullYear()} VoiceLite. All rights reserved.
           </div>
         </div>
       </footer>
-
-      <div aria-live="polite" className="sr-only" id="otp-error-message">
-        {magicLinkRequested && errorMessage ? errorMessage : null}
-      </div>
-
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </main>
   );
 }

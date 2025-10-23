@@ -1,0 +1,343 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.22)'
+        required: true
+        type: string
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Extract version from tag or input
+      id: version
+      shell: pwsh
+      run: |
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Building version: $version"
+
+    - name: Update version in project file
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $csprojPath = "VoiceLite/VoiceLite/VoiceLite.csproj"
+
+        $content = Get-Content $csprojPath -Raw
+        $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+        Set-Content $csprojPath -Value $content
+
+        echo "Updated version to $version in $csprojPath"
+
+    - name: Update version in installer script
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $issPath = "VoiceLite/Installer/VoiceLiteSetup_Simple.iss"
+
+        $content = Get-Content $issPath -Raw
+        $content = $content -replace 'AppVersion=[\d\.]+', "AppVersion=$version"
+        $content = $content -replace 'OutputBaseFilename=VoiceLite-Setup-[\d\.]+', "OutputBaseFilename=VoiceLite-Setup-$version"
+        Set-Content $issPath -Value $content
+
+        echo "Updated version to $version in $issPath"
+
+    - name: Restore dependencies
+      run: dotnet restore VoiceLite/VoiceLite.sln
+
+    - name: Build Release
+      run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
+
+    - name: Restore Whisper models cache
+      id: cache-whisper
+      uses: actions/cache@v4
+      with:
+        path: VoiceLite/whisper_installer
+        key: whisper-models-v1-${{ hashFiles('VoiceLite/whisper/**') }}
+        restore-keys: |
+          whisper-models-v1-
+
+    - name: Download Whisper models and executable
+      if: steps.cache-whisper.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        echo "Downloading Whisper models and executables for installer..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer"
+
+        # Download whisper.cpp binaries (whisper.exe + DLLs)
+        $whisperBinUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
+        echo "Downloading whisper.cpp binaries (whisper.exe, whisper.dll, DLLs)..."
+        Invoke-WebRequest -Uri $whisperBinUrl -OutFile "whisper-temp.zip"
+        Expand-Archive -Path "whisper-temp.zip" -DestinationPath "whisper-temp" -Force
+
+        # Copy all required files
+        Copy-Item -Path "whisper-temp/main.exe" -Destination "VoiceLite/whisper_installer/whisper.exe" -Force
+        Copy-Item -Path "whisper-temp/*.dll" -Destination "VoiceLite/whisper_installer/" -Force
+
+        Remove-Item "whisper-temp.zip" -Force
+        Remove-Item "whisper-temp" -Recurse -Force
+
+        # Download Small model (Pro - 466MB)
+        $smallModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+        echo "Downloading ggml-small.bin (466MB)..."
+        Invoke-WebRequest -Uri $smallModelUrl -OutFile "VoiceLite/whisper_installer/ggml-small.bin"
+
+        # Download Tiny model (Lite - 75MB)
+        $tinyModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+        echo "Downloading ggml-tiny.bin (75MB)..."
+        Invoke-WebRequest -Uri $tinyModelUrl -OutFile "VoiceLite/whisper_installer/ggml-tiny.bin"
+
+        echo "Downloads complete. Installer directory contents:"
+        Get-ChildItem "VoiceLite/whisper_installer" | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
+    - name: Copy Whisper models to publish directory
+      shell: pwsh
+      run: |
+        echo "Copying Whisper models from whisper_installer/ to publish directory..."
+
+        $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
+        New-Item -ItemType Directory -Force -Path $publishDir
+
+        # Copy all Whisper files (models + executables + DLLs)
+        Copy-Item -Path "VoiceLite/whisper_installer/*" -Destination $publishDir -Force
+
+        echo "Copied files to publish directory:"
+        Get-ChildItem $publishDir | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
+    - name: Download VC++ Redistributable
+      shell: pwsh
+      run: |
+        echo "Downloading Microsoft Visual C++ Redistributable..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/dependencies"
+
+        $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        echo "Downloading vc_redist.x64.exe..."
+        Invoke-WebRequest -Uri $vcRedistUrl -OutFile "VoiceLite/dependencies/vc_redist.x64.exe"
+
+        $vcSize = (Get-Item "VoiceLite/dependencies/vc_redist.x64.exe").Length / 1MB
+        echo "Downloaded VC++ Runtime: $([math]::Round($vcSize, 2)) MB"
+
+        # Verify SHA256 hash
+        $actualHash = (Get-FileHash "VoiceLite/dependencies/vc_redist.x64.exe" -Algorithm SHA256).Hash
+        echo "SHA256: $actualHash"
+
+        # Note: VC++ Runtime hash changes with each Microsoft update (quarterly)
+        # This verification detects corrupted downloads but not version changes
+        # Expected size: ~13-25 MB (Microsoft updates may increase size)
+        if ($vcSize -lt 10 -or $vcSize -gt 30) {
+          echo "ERROR: VC++ Runtime file size is suspicious: $([math]::Round($vcSize, 2)) MB"
+          echo "Expected: 10-30 MB. File may be corrupted."
+          exit 1
+        }
+
+        echo "VC++ Runtime verified: size OK, hash logged"
+
+    - name: Download Inno Setup
+      shell: pwsh
+      run: |
+        $innoSetupUrl = "https://jrsoftware.org/download.php/is.exe"
+        $installerPath = "$env:TEMP\innosetup.exe"
+
+        echo "Downloading Inno Setup..."
+        Invoke-WebRequest -Uri $innoSetupUrl -OutFile $installerPath
+
+        echo "Installing Inno Setup..."
+        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+
+        echo "Inno Setup installed"
+
+    - name: Compile Full installer
+      shell: pwsh
+      run: |
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+        if (-not (Test-Path $isccPath)) {
+          echo "ERROR: Inno Setup not found at $isccPath"
+          exit 1
+        }
+
+        echo "Compiling Full installer with Inno Setup..."
+        & $isccPath "VoiceLite\Installer\VoiceLiteSetup_Simple.iss"
+
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: Full installer compilation failed"
+          exit 1
+        }
+
+        echo "Full installer compiled successfully"
+
+    - name: Create Lite installer directory
+      shell: pwsh
+      run: |
+        echo "Creating Lite installer directory with Tiny model only..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
+
+        # Copy only whisper executable, DLLs, and Tiny model (no Small model)
+        Copy-Item -Path "VoiceLite/whisper_installer/whisper.exe" -Destination "VoiceLite/whisper_installer_lite/whisper.exe" -Force
+        Copy-Item -Path "VoiceLite/whisper_installer/ggml-tiny.bin" -Destination "VoiceLite/whisper_installer_lite/ggml-tiny.bin" -Force
+        Copy-Item -Path "VoiceLite/whisper_installer/*.dll" -Destination "VoiceLite/whisper_installer_lite/" -Force
+
+        echo "Lite installer directory created:"
+        Get-ChildItem "VoiceLite/whisper_installer_lite" | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
+    - name: Compile Lite installer
+      shell: pwsh
+      run: |
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+        echo "Compiling Lite installer with Inno Setup..."
+        & $isccPath "VoiceLite\Installer\VoiceLiteSetup_Lite.iss"
+
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: Lite installer compilation failed"
+          exit 1
+        }
+
+        echo "Lite installer compiled successfully"
+
+    - name: Generate SHA256 hashes
+      id: generate-hashes
+      shell: pwsh
+      run: |
+        echo "Generating SHA256 hashes for installers..."
+
+        $installers = Get-ChildItem -Path . -Filter "VoiceLite-Setup-*.exe" -Recurse
+        $hashes = @()
+
+        foreach ($installer in $installers) {
+          $hash = Get-FileHash -Path $installer.FullName -Algorithm SHA256
+          $sizeInMB = [math]::Round($installer.Length / 1MB, 2)
+
+          echo "File: $($installer.Name) ($sizeInMB MB)"
+          echo "SHA256: $($hash.Hash)"
+          echo ""
+
+          $hashes += "**$($installer.Name)** ($sizeInMB MB)`n``````text`n$($hash.Hash)`n```````n"
+        }
+
+        # Save hashes to output for release notes
+        $hashesContent = $hashes -join "`n"
+        # Escape special characters for GitHub Actions
+        $hashesContentEscaped = $hashesContent -replace '%','%25' -replace '\r','%0D' -replace '\n','%0A'
+        echo "HASHES=$hashesContentEscaped" >> $env:GITHUB_OUTPUT
+
+    - name: List installer files
+      shell: pwsh
+      run: |
+        echo "Installer files created:"
+        Get-ChildItem -Path . -Filter "VoiceLite-Setup-*.exe" -Recurse | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.FullName) ($sizeInMB MB)"
+        }
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: VoiceLite v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        files: |
+          VoiceLite-Setup-*.exe
+        body: |
+          ## VoiceLite v${{ steps.version.outputs.VERSION }}
+
+          ### ⚠️ IMPORTANT: Verify Download First
+
+          **Before installing**, verify your download hasn't been corrupted:
+
+          ```powershell
+          Get-FileHash VoiceLite-Setup-*.exe -Algorithm SHA256
+          ```
+
+          Compare with SHA256 hashes at bottom of this page. **Mismatched hash = corrupted download**.
+
+          ---
+
+          ### Download Options
+          - **Full Installer** (Recommended): `VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe` (~557 MB)
+            - Includes Pro model (466MB) + Tiny model (75MB) + VC++ Runtime (~14MB)
+            - Best for users with good internet
+            - Works offline after installation
+          - **Lite Installer** (Fast Download): `VoiceLite-Setup-Lite-${{ steps.version.outputs.VERSION }}.exe` (~94 MB)
+            - Includes Tiny model (75MB) + VC++ Runtime (~14MB)
+            - Download Pro model later from Settings
+            - Best for slow connections or limited bandwidth
+
+          ### Installation Steps
+          1. **Verify SHA256 hash** (see above) ⚠️
+          2. Download the installer (Full or Lite)
+          3. Right-click installer → Properties → **Unblock** (if shown)
+          4. Run the installer
+          5. **Restart your computer** if prompted
+          6. Launch VoiceLite from Start Menu or Desktop shortcut
+          7. First-run diagnostic window will verify installation
+
+          ### System Requirements
+          - Windows 10/11 (64-bit) - Build 18362 or newer
+          - Visual C++ Runtime 2015-2022 (auto-installed if missing)
+          - ~1 GB free disk space
+          - Microphone (built-in or USB)
+
+          ### SHA256 Hashes
+          ${{ steps.generate-hashes.outputs.HASHES }}
+
+          ### Troubleshooting
+          If installation fails, see [TROUBLESHOOTING.md](https://github.com/${{ github.repository }}/blob/master/TROUBLESHOOTING.md)
+
+          **Common fixes**:
+          - **Antivirus blocking**: Run desktop shortcut "Fix Antivirus Issues" (requires admin)
+          - **VCRUNTIME140.dll missing**: Download [VC++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe), install, **restart PC**
+          - **Whisper verification failed**: Add antivirus exclusions or reinstall with verified hash
+          - **Model corruption**: Verify SHA256 hash, re-download if mismatch
+
+          ### What's New
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for full release notes.
+
+          ---
+
+          🤖 Auto-generated release via GitHub Actions
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VoiceLite-Installer-v${{ steps.version.outputs.VERSION }}
+        path: VoiceLite-Setup-*.exe
+        retention-days: 90

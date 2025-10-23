@@ -18,33 +18,10 @@ namespace VoiceLite.Services
         private readonly InputSimulator inputSimulator;
         private readonly Settings settings;
 
-        // QUICK WIN 5: Track clipboard restoration failures for data-driven decision making
-        private static int clipboardRestoreFailures = 0;
-        private static int clipboardRestoreSuccesses = 0;
-
         public TextInjector(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             inputSimulator = new InputSimulator();
-        }
-
-        /// <summary>
-        /// BUG-007 FIX: Calculate CRC32 checksum for clipboard verification
-        /// More reliable than string equality for large texts or texts with whitespace variations
-        /// </summary>
-        private static uint CalculateCRC32(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return 0;
-
-            uint crc = 0xFFFFFFFF;
-            foreach (char c in text)
-            {
-                crc ^= (uint)c;
-                for (int i = 0; i < 8; i++)
-                    crc = (crc >> 1) ^ (0xEDB88320 & ~((crc & 1) - 1));
-            }
-            return ~crc;
         }
 
         public void InjectText(string text)
@@ -237,7 +214,7 @@ namespace VoiceLite.Services
             bool hadOriginalClipboard = false;
 
             // Try to preserve original clipboard content with retry logic
-            for (int attempt = 0; attempt < 3; attempt++)
+            for (int attempt = 0; attempt < 2; attempt++)
             {
                 try
                 {
@@ -260,7 +237,7 @@ namespace VoiceLite.Services
 #if DEBUG
                     ErrorLogger.LogMessage($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
 #endif
-                    if (attempt < 2)
+                    if (attempt < 1)
                         Thread.Sleep(10); // Brief delay before retry
                 }
             }
@@ -277,8 +254,6 @@ namespace VoiceLite.Services
                 if (hadOriginalClipboard && !string.IsNullOrEmpty(originalClipboard))
                 {
                     var clipboardToRestore = originalClipboard; // Capture for closure
-                    // BUG-007 FIX: Calculate CRC32 hash of transcription for reliable comparison
-                    var transcriptionHash = CalculateCRC32(text);
 
                     _ = Task.Run(async () =>
                     {
@@ -308,18 +283,14 @@ namespace VoiceLite.Services
                                 return;
                             }
 
-                            // BUG-007 FIX: Use CRC32 hash comparison for more reliable detection
-                            // Handles cases where string equality fails due to whitespace or encoding differences
                             // ISSUE #8 FIX: currentClipboard is never null after ?? string.Empty above
                             bool clipboardUnchanged = string.IsNullOrEmpty(currentClipboard) ||
-                                                     currentClipboard == text ||
-                                                     CalculateCRC32(currentClipboard) == transcriptionHash;
+                                                     currentClipboard == text;
 
                             if (clipboardUnchanged)
                             {
                                 // Safe to restore - clipboard hasn't been modified by user
-                                bool restoreSucceeded = false;
-                                for (int attempt = 0; attempt < 3; attempt++)
+                                for (int attempt = 0; attempt < 2; attempt++)
                                 {
                                     try
                                     {
@@ -327,7 +298,6 @@ namespace VoiceLite.Services
 #if DEBUG
                                         ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
 #endif
-                                        restoreSucceeded = true;
                                         break;
                                     }
                                     catch (Exception
@@ -339,29 +309,14 @@ namespace VoiceLite.Services
 #if DEBUG
                                         ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
 #endif
-                                        if (attempt < 2)
+                                        if (attempt < 1)
                                             await Task.Delay(50);
                                         else
                                         {
 #if DEBUG
-                                            ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 3 attempts");
+                                            ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 2 attempts");
 #endif
                                         }
-                                    }
-                                }
-
-                                // QUICK WIN 5: Track restoration success/failure for metrics
-                                if (restoreSucceeded)
-                                {
-                                    System.Threading.Interlocked.Increment(ref clipboardRestoreSuccesses);
-                                }
-                                else
-                                {
-                                    int failures = System.Threading.Interlocked.Increment(ref clipboardRestoreFailures);
-                                    // Log every 10 failures to track problem severity
-                                    if (failures % 10 == 0)
-                                    {
-                                        ErrorLogger.LogWarning($"QUICK WIN 5: Clipboard restoration has failed {failures} times (successes: {clipboardRestoreSuccesses})");
                                     }
                                 }
                             }
