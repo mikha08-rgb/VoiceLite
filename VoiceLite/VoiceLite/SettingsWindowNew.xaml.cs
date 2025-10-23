@@ -24,6 +24,7 @@ namespace VoiceLite
         private Action? saveSettingsCallback; // CRITICAL FIX: Callback to persist settings to disk
         private string? originalModel;
         private LicenseService? licenseService;
+        private ProFeatureService? proFeatureService;
 
         public Settings Settings => settings;
 
@@ -35,6 +36,7 @@ namespace VoiceLite
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.WhisperModel;
             licenseService = new LicenseService();
+            proFeatureService = new ProFeatureService(settings);
 
             LoadSettings();
             LoadVersionInfo();
@@ -70,6 +72,15 @@ namespace VoiceLite
 
             // License Settings
             LoadLicenseStatus();
+
+            // Pro Features - Control visibility of AI Models tab
+            UpdateProFeatureVisibility();
+
+            // Initialize Model Download Control (Pro users only)
+            if (proFeatureService?.IsProUser == true)
+            {
+                ModelDownloadControl.Initialize(settings);
+            }
         }
 
         private void LoadLicenseStatus()
@@ -95,7 +106,23 @@ namespace VoiceLite
             }
         }
 
+        /// <summary>
+        /// Controls visibility of Pro-only features (AI Models tab, etc.)
+        /// Free users: AI Models tab hidden
+        /// Pro users: AI Models tab visible
+        /// </summary>
+        private void UpdateProFeatureVisibility()
+        {
+            if (proFeatureService == null) return;
 
+            // Control AI Models tab visibility
+            AIModelsTab.Visibility = proFeatureService.AIModelsTabVisibility;
+
+            // Future: Add more Pro feature visibility controls here
+            // Example:
+            // VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
+            // ExportHistoryButton.Visibility = proFeatureService.ExportHistoryButtonVisibility;
+        }
 
         private void LoadMicrophones()
         {
@@ -303,9 +330,15 @@ namespace VoiceLite
                     // Update UI
                     LoadLicenseStatus();
 
+                    // Show Pro features (AI Models tab)
+                    UpdateProFeatureVisibility();
+
+                    // Initialize Model Download Control
+                    ModelDownloadControl.Initialize(settings);
+
                     // Show success message
                     MessageBox.Show(
-                        "License activated successfully!\n\nYou now have access to all Pro features and AI models.",
+                        "License activated successfully!\n\nYou now have access to all Pro features and AI models.\n\nCheck out the new 'AI Models' tab to download and select different models!",
                         "License Activated",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);

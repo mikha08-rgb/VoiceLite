@@ -134,6 +134,29 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- AI Models Tab (Pro Only) -->
+            <TabItem Header="AI Models" Name="AIModelsTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <TextBlock Text="AI Model Selection"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,20"
+                                   FontSize="12">
+                            <Run Text="Select which AI model to use for speech recognition. "/>
+                            <Run Text="Larger models offer better accuracy but require more RAM and processing time."/>
+                        </TextBlock>
+
+                        <!-- Model Download Control -->
+                        <controls:ModelDownloadControl x:Name="ModelDownloadControl"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- License Tab -->
             <TabItem Header="License">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
@@ -163,9 +186,9 @@
                                                    TextWrapping="Wrap"
                                                    Foreground="#1E3A8A"
                                                    FontSize="12">
-                                            <Run Text="Free tier includes Tiny model (80-85% accuracy)."/>
+                                            <Run Text="Free tier includes the Tiny model (80-85% accuracy)."/>
                                             <LineBreak/>
-                                            <Run Text="Upgrade to Pro for all 5 models and 90-98% accuracy."/>
+                                            <Run Text="Upgrade to Pro to unlock all 5 AI models (90-98% accuracy) and in-app model downloads."/>
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>

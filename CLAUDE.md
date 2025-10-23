@@ -50,7 +50,7 @@ git push --tags
 
 ## Project Architecture
 
-**Target**: .NET 8.0 Windows | **Distribution**: 100% free, no licensing
+**Target**: .NET 8.0 Windows | **Distribution**: Free tier + Pro upgrade ($20 one-time)
 
 ### Core Components (12 Services - v1.0.65+ simplification)
 
@@ -70,11 +70,14 @@ git push --tags
 
 ### Whisper Models (in `whisper/` directory)
 
-- `ggml-tiny.bin` (75MB): **Lite** - Legacy fallback
-- `ggml-small.bin` (466MB): **Pro** ⭐ - Current default (ships with installer)
-- `ggml-base.bin` (142MB): **Swift** - Fast
-- `ggml-medium.bin` (1.5GB): **Elite** - Higher accuracy
-- `ggml-large-v3.bin` (2.9GB): **Ultra** - Highest accuracy
+**Free Tier (bundled with installer):**
+- `ggml-tiny.bin` (75MB): **Lite** - Default, 80-85% accuracy, <1s processing
+
+**Pro Tier ($20 one-time - downloadable in-app):**
+- `ggml-base.bin` (142MB): **Swift** - 85-90% accuracy, ~2s processing
+- `ggml-small.bin` (466MB): **Pro** ⭐ - 90-93% accuracy, ~5s processing (recommended)
+- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~12s processing
+- `ggml-large-v3.bin` (2.9GB): **Ultra** - 97-98% accuracy, ~25s processing
 
 **Whisper Command** (v1.0.65+):
 ```bash
@@ -156,9 +159,37 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Distribution
 
-**Installer**: `VoiceLite-Setup-{VERSION}.exe` (~540MB, includes Pro + Lite models)
+**Installer**: `VoiceLite-Setup-{VERSION}.exe` (~100-150MB, includes Tiny model only)
 **Release Process**: GitHub Actions auto-builds on git tag push
 **Channels**: GitHub Releases (primary), Google Drive (mirror)
+
+**Pro License**: $20 one-time payment via Stripe → Email with UUID license key → Activate in Settings → Unlock AI Models tab for in-app model downloads
+
+## Pro Features System
+
+**Architecture**: Centralized feature gating via `ProFeatureService.cs`
+
+**Free Tier**:
+- Tiny model (ggml-tiny.bin) only
+- Basic transcription
+- Settings: General + License tabs only
+
+**Pro Tier** ($20 one-time):
+- All 5 AI models (downloadable in-app via AI Models tab)
+- Settings: General + **AI Models** + License tabs
+- Future Pro features: Voice Shortcuts, Export History, Custom Dictionary, etc.
+
+**Adding New Pro Features** (3 lines of code):
+```csharp
+// 1. In ProFeatureService.cs:
+public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
+
+// 2. In SettingsWindowNew.xaml: Add tab
+<TabItem Header="Voice Shortcuts" Name="VoiceShortcutsTab">...</TabItem>
+
+// 3. In SettingsWindowNew.xaml.cs: Control visibility
+VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
+```
 
 ---
 
