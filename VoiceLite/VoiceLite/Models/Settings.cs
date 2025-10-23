@@ -148,6 +148,21 @@ namespace VoiceLite.Models
 
         // UI Preset (Appearance) - Hardcoded to Compact
         public UIPreset UIPreset => UIPreset.Compact;
+
+        // License Management
+        private string? _licenseKey;
+        public string? LicenseKey
+        {
+            get => _licenseKey;
+            set => _licenseKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        // Enabled features from license (e.g., ["all_models"])
+        public List<string> LicenseFeatures { get; set; } = new List<string>();
+
+        // License status cache (avoid repeated API calls)
+        public string LicenseStatus { get; set; } = "FREE"; // "FREE", "ACTIVE", "EXPIRED", "INVALID"
+        public DateTime? LicenseLastValidated { get; set; }
     }
 
     public static class SettingsValidator

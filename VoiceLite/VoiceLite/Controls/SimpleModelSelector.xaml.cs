@@ -30,6 +30,7 @@ namespace VoiceLite.Controls
         {
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
 
+            CheckAndUpdateRadio(TinyRadio, Path.Combine(whisperPath, "ggml-tiny.bin"));
             CheckAndUpdateRadio(BaseRadio, Path.Combine(whisperPath, "ggml-base.bin"));
             CheckAndUpdateRadio(SmallRadio, Path.Combine(whisperPath, "ggml-small.bin"));
             CheckAndUpdateRadio(MediumRadio, Path.Combine(whisperPath, "ggml-medium.bin"));
@@ -69,6 +70,9 @@ namespace VoiceLite.Controls
         {
             switch (modelFile)
             {
+                case "ggml-tiny.bin":
+                    TipText.Text = "Free forever - basic transcription for everyone";
+                    break;
                 case "ggml-base.bin":
                     TipText.Text = "Good for simple dictation and casual use";
                     break;
@@ -88,6 +92,9 @@ namespace VoiceLite.Controls
         {
             switch (selectedModel)
             {
+                case "ggml-tiny.bin":
+                    TinyRadio.IsChecked = true;
+                    break;
                 case "ggml-base.bin":
                     BaseRadio.IsChecked = true;
                     break;
