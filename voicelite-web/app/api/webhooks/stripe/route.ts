@@ -154,8 +154,13 @@ export async function POST(request: NextRequest) {
         emailSent: emailResult.success,
       });
     } catch (error) {
-      console.error('Error processing checkout.session.completed:', error);
-      return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
+      console.error('❌ Error processing checkout.session.completed:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      return NextResponse.json({
+        error: 'Processing failed',
+        details: error instanceof Error ? error.message : String(error)
+      }, { status: 500 });
     }
   }
 
