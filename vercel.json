@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "rootDirectory": "voicelite-web"
+  "buildCommand": "cd voicelite-web && npm run build",
+  "outputDirectory": "voicelite-web/.next",
+  "installCommand": "cd voicelite-web && npm install"
 }
