@@ -1204,8 +1204,10 @@ namespace VoiceLite
                 // Reset all state flags
                 lock (recordingLock)
                 {
-                    ErrorLogger.LogWarning($"OnStuckStateRecovery: Force-resetting state - was // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, isHotkeyMode={isHotkeyMode}");
-                    // WEEK1-DAY3: State managed by coordinator - // WEEK1-DAY3: State managed by coordinator - isRecording = false;
+                    ErrorLogger.LogWarning($"OnStuckStateRecovery: Force-resetting state - was isRecording={isRecording}, isTranscribing={isTranscribing}, isHotkeyMode={isHotkeyMode}");
+                    // CRITICAL FIX: Reset isTranscribing to unblock future transcriptions
+                    isTranscribing = false;
+                    // WEEK1-DAY3: State managed by coordinator - isRecording = false;
                     isHotkeyMode = false;
                 }
 
@@ -1347,7 +1349,9 @@ namespace VoiceLite
             {
                 if (isTranscribing)
                 {
-                    ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing, ignoring");
+                    ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing - ignoring duplicate event");
+                    // DO NOT reset isTranscribing here - let the ongoing transcription complete
+                    // DO NOT stop the stuck state timer - the ongoing transcription still needs it
                     return;
                 }
 
