@@ -394,9 +394,9 @@ namespace VoiceLite.Services
 
                     if (AutoPaste)
                     {
-                        // CRITICAL PERFORMANCE FIX: Reduce delay from 50ms to 5ms
-                        // Modern systems need much less time for clipboard operations
-                        Thread.Sleep(5); // Minimal delay to ensure clipboard is ready
+                        // RELIABILITY FIX: Increased delay from 5ms to 20ms for better compatibility
+                        // Some applications need more time to process clipboard changes
+                        Thread.Sleep(20); // Ensure clipboard is ready across all applications
                         SimulateCtrlV();
                     }
                 }
@@ -459,23 +459,25 @@ namespace VoiceLite.Services
                 ErrorLogger.LogMessage("Simulating Ctrl+V");
 #endif
 
-                // CRITICAL PERFORMANCE FIX: Optimize key simulation timing
-                // Old: 10ms delay between each key event (30ms total)
-                // New: 1ms delay only where necessary (2ms total)
-                // Modern systems can handle much faster key simulation
+                // RELIABILITY FIX: Increased timing for better cross-application compatibility
+                // Previous 1ms delays were too aggressive, causing paste failures in some apps
+                // Balance between speed (still fast at 12ms total) and reliability
 
                 // Press Ctrl
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
 
-                // Press V (minimal delay to ensure Ctrl is registered)
-                Thread.Sleep(1);
+                // Press V (5ms delay to ensure Ctrl is registered across all applications)
+                Thread.Sleep(5);
                 keybd_event(VK_V, 0, KEYEVENTF_KEYDOWN, 0);
 
-                // Release V (no delay needed)
+                // Small delay before releasing (helps with slower applications)
+                Thread.Sleep(2);
+
+                // Release V
                 keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0);
 
-                // Release Ctrl (minimal delay to ensure proper key sequence)
-                Thread.Sleep(1);
+                // Release Ctrl (5ms delay to ensure proper key sequence completion)
+                Thread.Sleep(5);
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
 
 #if DEBUG
