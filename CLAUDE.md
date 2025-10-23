@@ -130,7 +130,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.66 (100% free, radical simplification)
+**Current Desktop**: v1.0.74 (100% free, radical simplification)
 **Major Change (v1.0.65)**: Removed ~15,000 lines (VoiceShortcuts, Analytics, Licensing, Server mode)
 **Philosophy**: Reliability over features - core-only workflow
 

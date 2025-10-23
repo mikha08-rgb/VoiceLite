@@ -52,7 +52,7 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.73 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.74 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
 Fast installation • Includes Tiny model (75MB) • Additional models available in Settings
 
@@ -63,7 +63,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.73.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.74.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
 4. **Hold Shift+Z** → Speak → Release to type!
