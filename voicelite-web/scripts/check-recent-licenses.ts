@@ -5,11 +5,14 @@ async function main() {
     orderBy: { createdAt: 'desc' },
     take: 5,
     select: {
-      email: true,
       licenseKey: true,
-      emailSent: true,
       createdAt: true,
       stripePaymentIntentId: true,
+      user: {
+        select: {
+          email: true,
+        },
+      },
     },
   });
 
