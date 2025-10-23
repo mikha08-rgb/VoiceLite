@@ -15,7 +15,13 @@ Stripe webhooks are failing with **500 errors** → No license emails being sent
 
 **Run this SQL**:
 
+**SEE FILE**: [CREATE_TABLES_SUPABASE.sql](./CREATE_TABLES_SUPABASE.sql) for the complete SQL script.
+
+**Quick version** (copy/paste this):
+
 ```sql
+-- IMPORTANT: Column names MUST be quoted because Prisma uses camelCase!
+
 CREATE TABLE IF NOT EXISTS "User" (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   email TEXT UNIQUE NOT NULL,
@@ -62,6 +68,8 @@ CREATE TABLE IF NOT EXISTS "UserActivity" (
 
 CREATE INDEX IF NOT EXISTS "License_userId_idx" ON "License"("userId");
 CREATE INDEX IF NOT EXISTS "License_stripeCustomerId_idx" ON "License"("stripeCustomerId");
+CREATE INDEX IF NOT EXISTS "LicenseEvent_licenseId_idx" ON "LicenseEvent"("licenseId");
+CREATE INDEX IF NOT EXISTS "UserActivity_userId_idx" ON "UserActivity"("userId");
 ```
 
 Click **"Run"** → Should say "Success. No rows returned"
