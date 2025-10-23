@@ -52,7 +52,7 @@ git push --tags
 
 **Target**: .NET 8.0 Windows | **Distribution**: 100% free, no licensing
 
-### Core Components (12 Services - v1.0.65+ simplification)
+### Core Components (8 Services - v1.0.74 simplification)
 
 **Active Services**:
 - `AudioRecorder`: NAudio recording (16kHz mono WAV, no preprocessing)
@@ -61,8 +61,8 @@ git push --tags
 - `HotkeyManager`: Global hotkeys via Win32 API
 - `SystemTrayManager`: Tray icon + context menu
 - `TranscriptionHistoryService`: History with pinning
-- `MemoryMonitor`, `ErrorLogger`, `StartupDiagnostics`, `DependencyChecker`
-- `ZombieProcessCleanupService`: Prevents orphaned whisper.exe processes
+- `ErrorLogger`: Centralized error logging
+- `LicenseService`: Legacy/unused (TODO: remove)
 
 **Removed in v1.0.65** (~15,000 lines deleted):
 - ❌ VoiceShortcuts, TranscriptionPostProcessor, Analytics, Licensing
@@ -95,6 +95,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 <PackageReference Include="H.InputSimulator" Version="1.2.1" />
 <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
 <PackageReference Include="System.Text.Json" Version="9.0.9" />
+<PackageReference Include="System.Management" Version="8.0.0" />
 ```
 
 ## Code Guidelines
@@ -130,15 +131,15 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.66 (100% free, radical simplification)
+**Current Desktop**: v1.0.74 (100% free, radical simplification)
 **Major Change (v1.0.65)**: Removed ~15,000 lines (VoiceShortcuts, Analytics, Licensing, Server mode)
 **Philosophy**: Reliability over features - core-only workflow
 
 ## Web Backend (voicelite-web)
 
-**Tech Stack**: Next.js 15, React 19, Prisma, PostgreSQL (Supabase), Stripe (optional donations)
+**Tech Stack**: Next.js 15, React 19, Prisma, PostgreSQL (Supabase)
 **Purpose**: Landing page, download links, feedback collection
-**No Licensing**: Backend no longer validates licenses (100% free app)
+**No Licensing**: Backend no longer validates licenses (100% free app), no Stripe/payments
 
 **API Endpoints** (simplified v1.0.65+):
 - `POST /api/feedback` - User feedback (rate limited via Upstash Redis)

@@ -52,9 +52,9 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.73 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.74 (~540MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-Fast installation • Includes Tiny model (75MB) • Additional models available in Settings
+Fast installation • Includes Small model (466MB) for best accuracy • Additional models available in Settings
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
@@ -63,7 +63,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.73.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.74.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
 4. **Hold Shift+Z** → Speak → Release to type!
@@ -133,7 +133,7 @@ function fibonacci(n) {
 
 - **OS**: Windows 10/11 (64-bit)
 - **RAM**: 4GB minimum (8GB recommended)
-- **Storage**: ~200MB (Tiny model), up to 3GB for larger models
+- **Storage**: ~540MB (Small model included), up to 3GB for larger models
 - **Visual C++ Runtime**: 2015-2022 x64 ([Download here](https://aka.ms/vs/17/release/vc_redist.x64.exe)) **REQUIRED**
 - **.NET**: Version 8.0 Desktop Runtime
 - **Microphone**: Any (better mic = better accuracy)
@@ -149,7 +149,7 @@ No! 100% offline. Your voice never leaves your computer.
 
 <details>
 <summary><b>How accurate is it?</b></summary>
-The bundled Tiny model is fast and accurate for most use cases. You can download larger models from Settings for even better accuracy on technical terms and complex speech.
+The bundled Small model provides excellent accuracy for most use cases, including technical terms. You can download larger models (Medium, Large) from Settings for even better accuracy on complex speech, or smaller models (Tiny, Base) for faster processing.
 </details>
 
 <details>
