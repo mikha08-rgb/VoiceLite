@@ -60,13 +60,8 @@ namespace VoiceLite
             LoadMicrophones();
             AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
-            // Advanced settings removed from UI (still configurable via settings.json)
-
             // Audio Enhancement - sync UI from settings
             SyncAudioUIFromSettings();
-
-            // Custom Dictionary - REMOVED (feature simplified away)
-            // UpdateDictionaryCount(); // Dead code
 
             // Current Model is set in SetupModelComparison
 

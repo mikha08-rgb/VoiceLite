@@ -7,7 +7,13 @@ export interface LicenseEmailData {
   licenseKey: string;
 }
 
-export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData) {
+export interface LicenseEmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: unknown;
+}
+
+export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@voicelite.app';
 
   const html = `

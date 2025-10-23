@@ -1,13 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/ratelimit';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 const bodySchema = z.object({
   licenseKey: z.string().min(10),
 });
 
+// Rate limiter: 5 validation attempts per hour per IP
+// Prevents license key brute-forcing
+const isConfigured = Boolean(
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+);
+
+const redis = isConfigured
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    })
+  : null;
+
+const licenseValidationRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:license-validation',
+    })
+  : null;
+
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit by IP to prevent brute-forcing license keys
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
+    const rateLimit = await checkRateLimit(ip, licenseValidationRateLimit);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many validation attempts. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { licenseKey } = bodySchema.parse(body);
 

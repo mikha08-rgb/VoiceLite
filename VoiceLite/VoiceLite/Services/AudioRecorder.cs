@@ -82,9 +82,10 @@ namespace VoiceLite.Services
                             deletedCount++;
                         }
                     }
-                    catch
+                    catch (Exception deleteEx)
                     {
-                        // Ignore individual file deletion failures
+                        // Log but don't fail cleanup for individual file errors
+                        ErrorLogger.LogWarning($"Failed to delete old audio file {file}: {deleteEx.Message}");
                     }
                 }
 
@@ -393,7 +394,10 @@ namespace VoiceLite.Services
                         {
                             waveFile.Dispose();
                         }
-                        catch { }
+                        catch (Exception disposeEx)
+                        {
+                            ErrorLogger.LogWarning($"OnRecordingStopped: Failed to dispose wave file: {disposeEx.Message}");
+                        }
                         waveFile = null;
                         ErrorLogger.LogMessage("OnRecordingStopped: Defensive wave file cleanup");
                     }
@@ -448,7 +452,10 @@ namespace VoiceLite.Services
                             {
                                 audioMemoryStream.Dispose();
                             }
-                            catch { }
+                            catch (Exception memEx)
+                            {
+                                ErrorLogger.LogWarning($"Failed to dispose audio memory stream: {memEx.Message}");
+                            }
                             finally
                             {
                                 audioMemoryStream = null;
@@ -482,7 +489,7 @@ namespace VoiceLite.Services
                         waveFile = null;
                         if (audioMemoryStream != null)
                         {
-                            try { audioMemoryStream.Dispose(); } catch { }
+                            try { audioMemoryStream.Dispose(); } catch (Exception streamEx) { ErrorLogger.LogWarning($"Failed to dispose memory stream in error handler: {streamEx.Message}"); }
                             audioMemoryStream = null;
                         }
                     }
@@ -535,7 +542,7 @@ namespace VoiceLite.Services
                     else
                     {
                         ErrorLogger.LogMessage($"StopRecording: Skipping empty recording - {audioFileToNotify} (size: {fileInfo.Length} bytes)");
-                        try { File.Delete(audioFileToNotify); } catch { }
+                        try { File.Delete(audioFileToNotify); } catch (Exception delEx) { ErrorLogger.LogWarning($"Failed to delete empty audio file: {delEx.Message}"); }
                     }
                 }
 

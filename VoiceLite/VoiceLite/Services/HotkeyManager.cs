@@ -287,9 +287,10 @@ namespace VoiceLite.Services
                     cts.Cancel();
                     cts.Dispose(); // Prevent resource leak
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException disposeEx)
                 {
-                    // Already disposed, ignore
+                    // Already disposed, this is acceptable during cleanup
+                    ErrorLogger.LogWarning($"CancellationTokenSource already disposed during cleanup: {disposeEx.Message}");
                 }
             }
 

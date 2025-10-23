@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { headers } from 'next/headers';
+import { validateOrigin, getCsrfErrorResponse } from '@/lib/csrf';
 
 // Rate limiting: 5 feedback submissions per hour per IP
 const ratelimit = new Ratelimit({
@@ -26,6 +27,11 @@ const feedbackSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // CSRF protection: Validate request origin
+  if (!validateOrigin(req)) {
+    return NextResponse.json(getCsrfErrorResponse(), { status: 403 });
+  }
+
   try {
     // Rate limiting: 5 feedback submissions per hour per IP
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';

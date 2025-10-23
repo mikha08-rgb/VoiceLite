@@ -29,26 +29,31 @@ namespace VoiceLite.Services
         public Visibility AIModelsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         // ============================================================
-        // Future Pro Features - Add new features below:
+        // Future Pro Features - PLANNED BUT NOT YET IMPLEMENTED
+        // When implementing: Create UI tab/button, then bind to these visibility properties
         // ============================================================
 
         /// <summary>
-        /// Voice Shortcuts feature (Future Pro feature)
+        /// Voice Shortcuts feature (Future Pro feature - NOT YET IMPLEMENTED)
+        /// TODO: Implement voice command shortcuts UI for custom transcription triggers
         /// </summary>
         public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Export History button visibility (Future Pro feature)
+        /// Export History button visibility (Future Pro feature - NOT YET IMPLEMENTED)
+        /// TODO: Add export functionality for transcription history (CSV, JSON, TXT formats)
         /// </summary>
         public Visibility ExportHistoryButtonVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Custom Dictionary feature (Future Pro feature)
+        /// Custom Dictionary feature (Future Pro feature - NOT YET IMPLEMENTED)
+        /// TODO: Allow users to add custom vocabulary/pronunciation corrections
         /// </summary>
         public Visibility CustomDictionaryTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Advanced Settings (beam size, temperature, etc.)
+        /// Advanced Settings (beam size, temperature, etc.) - (Future Pro feature - NOT YET IMPLEMENTED)
+        /// TODO: Expose Whisper advanced parameters for fine-tuning accuracy vs speed
         /// </summary>
         public Visibility AdvancedSettingsVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 

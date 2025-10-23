@@ -264,7 +264,10 @@ namespace VoiceLite.Services
                     if (File.Exists(tempPath))
                         File.Delete(tempPath);
                 }
-                catch { /* Ignore cleanup errors */ }
+                catch (Exception cleanupEx)
+                {
+                    ErrorLogger.LogWarning($"Failed to delete temp audio file {tempPath}: {cleanupEx.Message}");
+                }
             }
         }
 
@@ -535,7 +538,10 @@ namespace VoiceLite.Services
                     {
                         File.Delete(dummyAudioPath);
                     }
-                    catch { /* Ignore cleanup errors */ }
+                    catch (Exception delEx)
+                    {
+                        ErrorLogger.LogWarning($"Failed to delete dummy audio file {dummyAudioPath}: {delEx.Message}");
+                    }
                 }
 
                 isWarmedUp = false;

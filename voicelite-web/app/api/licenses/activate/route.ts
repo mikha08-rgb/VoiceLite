@@ -49,10 +49,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'License does not belong to this account' }, { status: 403 });
     }
 
-    const activeActivations = license.activations.filter((activation) => activation.status === 'ACTIVE');
-    const existing = activeActivations.find((activation) => activation.machineId === machineId);
+    // Count ALL activations (ACTIVE + BLOCKED) to prevent limit bypass
+    // Users were previously able to block 3 machines, then activate 3 more
+    const allActivations = license.activations;
+    const existing = allActivations.find((activation) => activation.machineId === machineId);
 
-    if (!existing && activeActivations.length >= MAX_ACTIVATIONS) {
+    if (!existing && allActivations.length >= MAX_ACTIVATIONS) {
       return NextResponse.json({ error: 'Activation limit reached' }, { status: 409 });
     }
 
