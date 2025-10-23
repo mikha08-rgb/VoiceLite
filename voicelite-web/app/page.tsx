@@ -39,8 +39,8 @@ const plans = [
     price: '$20 / 3 months',
     priceId: 'quarterly',
     popular: true,
-    bullets: ['Premium models (Swift, Elite, Ultra)', 'Advanced text formatting', 'VoiceShortcuts templates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
+    bullets: ['Premium models (Swift, Pro, Elite, Ultra)', 'All future features', '3 device activations', 'Priority support'],
+    comingSoon: false, // Payments enabled
   },
   {
     id: 'lifetime',
@@ -49,8 +49,8 @@ const plans = [
     price: '$99 one-time',
     priceId: 'lifetime',
     popular: false,
-    bullets: ['Permanent license', 'All premium models', 'Advanced features', 'All future updates', 'Priority support'],
-    comingSoon: true, // Added: Pro tier launching soon
+    bullets: ['Permanent license', 'All premium models', 'All future features', '3 device activations', 'Priority support'],
+    comingSoon: false, // Payments enabled
   },
 ];
 

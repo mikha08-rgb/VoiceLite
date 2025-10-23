@@ -63,6 +63,9 @@ export async function upsertLicenseFromStripe({
     ? { stripeSubscriptionId }
     : { stripePaymentIntentId: stripePaymentIntentId! };
 
+  // Pro licenses unlock all models
+  const features = JSON.stringify(['all_models']);
+
   const license = await prisma.license.upsert({
     where,
     create: {
@@ -70,6 +73,7 @@ export async function upsertLicenseFromStripe({
       licenseKey,
       type,
       status,
+      features,
       stripeCustomerId,
       stripeSubscriptionId: stripeSubscriptionId ?? undefined,
       stripePaymentIntentId: stripePaymentIntentId ?? undefined,
@@ -79,6 +83,7 @@ export async function upsertLicenseFromStripe({
     update: {
       userId: user.id,
       status,
+      features,
       stripeCustomerId,
       stripeSubscriptionId: stripeSubscriptionId ?? undefined,
       stripePaymentIntentId: stripePaymentIntentId ?? undefined,

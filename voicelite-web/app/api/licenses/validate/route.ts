@@ -1,64 +1,113 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getLicenseByKey } from '@/lib/licensing';
-import { getSessionTokenFromRequest, getSessionFromToken } from '@/lib/auth/session';
-import { licenseRateLimit, checkRateLimit } from '@/lib/ratelimit';
+import { LicenseStatus } from '@prisma/client';
+
+/**
+ * POST /api/licenses/validate
+ *
+ * Validates a license key and returns license status + features.
+ * Used by desktop app to check if user has Pro features unlocked.
+ * No authentication required - license key is the credential.
+ *
+ * Request body:
+ * {
+ *   "licenseKey": "VL-ABC123-DEF456-GHI789"
+ * }
+ *
+ * Response:
+ * {
+ *   "valid": true,
+ *   "status": "ACTIVE",
+ *   "type": "SUBSCRIPTION" | "LIFETIME",
+ *   "features": ["all_models"],
+ *   "expiresAt": "2025-12-31T00:00:00.000Z" | null
+ * }
+ */
 
 const bodySchema = z.object({
   licenseKey: z.string().min(10),
-  machineId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
-    const sessionToken = getSessionTokenFromRequest(request);
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    const body = await request.json();
+    const { licenseKey } = bodySchema.parse(body);
 
-    const session = await getSessionFromToken(sessionToken);
-    if (!session) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    // Look up license
+    const license = await getLicenseByKey(licenseKey);
 
-    // Rate limiting (30 requests per day per user)
-    const rateLimit = await checkRateLimit(session.userId, licenseRateLimit);
-    if (!rateLimit.allowed) {
+    if (!license) {
       return NextResponse.json(
-        { error: `Rate limit exceeded. Try again after ${rateLimit.reset.toLocaleTimeString()}.` },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.reset.getTime() - Date.now()) / 1000)) } }
+        {
+          valid: false,
+          error: 'License key not found',
+          status: 'INVALID',
+          features: []
+        },
+        { status: 404 }
       );
     }
 
-    const body = await request.json();
-    const { licenseKey, machineId } = bodySchema.parse(body);
+    // Check if license is active
+    const isActive = license.status === LicenseStatus.ACTIVE;
 
-    const license = await getLicenseByKey(licenseKey);
-    if (!license) {
-      return NextResponse.json({ valid: false }, { status: 200 });
+    // Check if expired (for subscriptions)
+    const now = new Date();
+    const isExpired = license.expiresAt && license.expiresAt < now;
+
+    if (isExpired) {
+      return NextResponse.json(
+        {
+          valid: false,
+          status: 'EXPIRED',
+          type: license.type,
+          features: [],
+          expiresAt: license.expiresAt?.toISOString() || null
+        },
+        { status: 200 }
+      );
     }
 
-    const activation = machineId
-      ? license.activations.find((item) => item.machineId === machineId)
-      : null;
+    if (!isActive) {
+      return NextResponse.json(
+        {
+          valid: false,
+          status: license.status,
+          type: license.type,
+          features: [],
+          expiresAt: license.expiresAt?.toISOString() || null
+        },
+        { status: 200 }
+      );
+    }
 
-    return NextResponse.json({
-      valid: license.status === 'ACTIVE',
-      license: {
-        type: license.type,
+    // Parse features from JSON string
+    let features: string[] = [];
+    try {
+      features = JSON.parse(license.features);
+    } catch (e) {
+      console.error('Failed to parse license features:', e);
+      features = [];
+    }
+
+    // Return valid license with features
+    return NextResponse.json(
+      {
+        valid: true,
         status: license.status,
-        expiresAt: license.expiresAt,
+        type: license.type,
+        features,
+        expiresAt: license.expiresAt?.toISOString() || null
       },
-      activation: activation
-        ? {
-            status: activation.status,
-            lastValidatedAt: activation.lastValidatedAt,
-          }
-        : null,
-    });
+      { status: 200 }
+    );
+
   } catch (error) {
-    console.error('License validation failed', error);
-    return NextResponse.json({ error: 'Unable to validate' }, { status: 500 });
+    console.error('License validation error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

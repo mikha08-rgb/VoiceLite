@@ -82,6 +82,7 @@ model License {
   licenseKey            String    @unique
   type                  LicenseType
   status                LicenseStatus @default(ACTIVE)
+  features              String    @default("[]") // JSON array of enabled features: ["all_models", "cloud_sync", etc.]
   stripeCustomerId      String?
   stripeSubscriptionId  String?   @unique
   stripePaymentIntentId String?   @unique
