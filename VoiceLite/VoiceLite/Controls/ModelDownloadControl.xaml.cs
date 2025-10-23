@@ -21,6 +21,7 @@ namespace VoiceLite.Controls
         private readonly ObservableCollection<ModelInfo> models;
         private readonly string whisperPath;
         private Settings? settings;
+        private Action? saveSettingsCallback;
 
         public ModelDownloadControl()
         {
@@ -32,9 +33,10 @@ namespace VoiceLite.Controls
             InitializeModels();
         }
 
-        public void Initialize(Settings currentSettings)
+        public void Initialize(Settings currentSettings, Action? onSaveSettings = null)
         {
             settings = currentSettings;
+            saveSettingsCallback = onSaveSettings;
             RefreshModelStates();
         }
 
@@ -107,6 +109,8 @@ namespace VoiceLite.Controls
                 if (settings != null)
                 {
                     settings.WhisperModel = model.FileName;
+                    // Save settings immediately when model changes
+                    saveSettingsCallback?.Invoke();
                 }
 
                 UpdateTip(model);

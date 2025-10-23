@@ -79,7 +79,7 @@ namespace VoiceLite
             // Initialize Model Download Control (Pro users only)
             if (proFeatureService?.IsProUser == true)
             {
-                ModelDownloadControl.Initialize(settings);
+                ModelDownloadControl.Initialize(settings, () => saveSettingsCallback?.Invoke());
             }
         }
 
@@ -334,12 +334,15 @@ namespace VoiceLite
                     UpdateProFeatureVisibility();
 
                     // Initialize Model Download Control
-                    ModelDownloadControl.Initialize(settings);
+                    ModelDownloadControl.Initialize(settings, () => saveSettingsCallback?.Invoke());
 
                     // Show success message
                     MessageBox.Show(
-                        "License activated successfully!\n\nYou now have access to all Pro features and AI models.\n\nCheck out the new 'AI Models' tab to download and select different models!",
-                        "License Activated",
+                        "🎉 License activated successfully!\n\n" +
+                        "You now have access to all Pro features and AI models.\n\n" +
+                        "⚠️ IMPORTANT: Please close and restart VoiceLite for the changes to take full effect.\n\n" +
+                        "After restarting, you can download and select different models in the 'AI Models' tab.",
+                        "License Activated - Restart Required",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
 
