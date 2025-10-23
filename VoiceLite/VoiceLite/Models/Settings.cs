@@ -35,7 +35,7 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "ggml-tiny.bin"; // MVP default - fastest model, bundled with installer
+        private string _whisperModel = "ggml-tiny.bin"; // Free tier default - Lite model, bundled with installer
         private int _beamSize = 1; // PERFORMANCE: Greedy decoding for 5x faster transcription
         private int _bestOf = 1;   // PERFORMANCE: Single sampling for 5x faster transcription
         private double _whisperTimeoutMultiplier = 2.0;

@@ -2,13 +2,17 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using VoiceLite.Models;
+using VoiceLite.Services;
 
 namespace VoiceLite.Controls
 {
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-small.bin";
+        private string selectedModel = "ggml-tiny.bin"; // Free tier default
+        private Settings? settings;
 
         public string SelectedModel
         {
@@ -24,6 +28,54 @@ namespace VoiceLite.Controls
         {
             InitializeComponent();
             CheckModelAvailability();
+        }
+
+        /// <summary>
+        /// Apply license restrictions based on user's license features.
+        /// </summary>
+        public void ApplyLicenseRestrictions(Settings userSettings)
+        {
+            settings = userSettings;
+            var featureService = new FeatureService(userSettings);
+            bool isPro = featureService.IsPro;
+
+            // Tiny is always enabled (free tier)
+            TinyRadio.IsEnabled = true;
+            TinyRadio.Opacity = 1.0;
+
+            // Pro models require license
+            if (!isPro)
+            {
+                // Disable Pro models for free users
+                BaseRadio.IsEnabled = false;
+                SmallRadio.IsEnabled = false;
+                MediumRadio.IsEnabled = false;
+                LargeRadio.IsEnabled = false;
+
+                BaseRadio.Opacity = 0.5;
+                SmallRadio.Opacity = 0.5;
+                MediumRadio.Opacity = 0.5;
+                LargeRadio.Opacity = 0.5;
+
+                BaseRadio.ToolTip = "🔒 Pro tier required - Upgrade to unlock";
+                SmallRadio.ToolTip = "🔒 Pro tier required - Upgrade to unlock";
+                MediumRadio.ToolTip = "🔒 Pro tier required - Upgrade to unlock";
+                LargeRadio.ToolTip = "🔒 Pro tier required - Upgrade to unlock";
+
+                // Force select Tiny if user had Pro model selected
+                if (selectedModel != "ggml-tiny.bin")
+                {
+                    selectedModel = "ggml-tiny.bin";
+                    userSettings.WhisperModel = "ggml-tiny.bin";
+                    TinyRadio.IsChecked = true;
+                    UpdateTip("ggml-tiny.bin");
+                }
+            }
+            else
+            {
+                // Enable Pro models for Pro users (if downloaded)
+                CheckModelAvailability();
+            }
         }
 
         private void CheckModelAvailability()
