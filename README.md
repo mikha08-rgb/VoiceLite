@@ -2,7 +2,7 @@
 
 <div align="center">
 
-  **100% Free • No Trials • No Tiers • Just Works**
+  **Try Free • Upgrade to Pro ($20) • 100% Offline • Privacy-First**
 
   [![Download](https://img.shields.io/badge/Download-Free-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
   [![View Source](https://img.shields.io/badge/Source-Auditable-green?style=for-the-badge)](https://github.com/mikha08-rgb/VoiceLite)
@@ -19,13 +19,19 @@
 
 **VoiceLite** is a privacy-first Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
 
-## ✨ Features (100% Free)
-- ✅ **Whisper AI model** - Fast and accurate speech recognition
-- ✅ **Unlimited usage** - No trials, no time limits, no tiers
-- ✅ **Works completely offline** - Your voice never leaves your PC
+## ✨ Features
+**Free Tier:**
+- ✅ **Tiny AI model** - Fast and accurate speech recognition (80-85% accuracy)
+- ✅ **Unlimited usage** - No trials, no time limits
+- ✅ **100% offline** - Your voice never leaves your PC
 - ✅ **Universal compatibility** - Works in ANY Windows application
 - ✅ **Customizable hotkeys** - Default Shift+Z, or choose your own
 - ✅ **Auditable source code** - Verify privacy yourself
+
+**Pro Tier ($20 one-time):**
+- ⭐ **4 additional AI models** - Base, Small, Medium, Large (85-98% accuracy)
+- ⭐ **Lifetime updates** - All future features included
+- ⭐ **Priority support** - Direct email assistance
 
 ### ✨ Perfect For:
 - 💻 **Developers** - Write code comments, documentation, variable names
@@ -52,9 +58,9 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.74 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.82 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-Fast installation • Includes Tiny model (75MB) • Additional models available in Settings
+Fast installation • Includes Tiny model (75MB) • Pro models available after upgrade
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
@@ -63,7 +69,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.74.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.82.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
 4. **Hold Shift+Z** → Speak → Release to type!
@@ -159,7 +165,7 @@ Yes! Works in most games. Some fullscreen games may block hotkeys - use windowed
 
 <details>
 <summary><b>Is it really free?</b></summary>
-Yes! 100% free forever. No trials, no time limits, no hidden costs. All features unlocked.
+Yes! The free version includes the Tiny AI model (80-85% accuracy) with unlimited usage forever. No trials, no time limits. Upgrade to Pro ($20 one-time) to unlock 4 additional AI models with 85-98% accuracy.
 </details>
 
 <details>
@@ -179,7 +185,7 @@ VoiceLite supports 99 languages via Whisper AI! Change the language in Settings 
 
 <details>
 <summary><b>How do I download larger models?</b></summary>
-Open Settings → Model Selection. You can download additional models (Small, Medium, Large) for better accuracy. Note: Larger models require more disk space and are slower.
+Upgrade to Pro ($20 one-time), then open Settings → AI Models tab. You can download additional models (Base, Small, Medium, Large) for better accuracy. Note: Larger models require more disk space and processing time.
 </details>
 
 ---
