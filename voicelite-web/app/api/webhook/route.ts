@@ -10,11 +10,18 @@ import {
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
-// Stripe client initialization
-// Environment validation ensures STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET exist at startup
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+// Lazy Stripe client initialization (deferred until first webhook)
+// Environment validation ensures STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET exist at runtime
+let stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2025-08-27.basil',
+    });
+  }
+  return stripe;
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -27,7 +34,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session);
+        await handleCheckoutCompleted(getStripe(), event.data.object as Stripe.Checkout.Session);
         break;
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);

@@ -9,20 +9,26 @@ const bodySchema = z.object({
   licenseKey: z.string().min(10),
 });
 
-// Rate limiter: 5 validation attempts per hour per IP
+// Lazy rate limiter initialization (deferred until first API call)
 // Prevents license key brute-forcing
-// Environment validation ensures Redis credentials exist at startup
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+// Environment validation ensures Redis credentials exist at runtime
+let licenseValidationRateLimit: Ratelimit | null = null;
 
-const licenseValidationRateLimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, '1 h'),
-  analytics: true,
-  prefix: 'ratelimit:license-validation',
-});
+function getRateLimiter(): Ratelimit {
+  if (!licenseValidationRateLimit) {
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
+    licenseValidationRateLimit = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:license-validation',
+    });
+  }
+  return licenseValidationRateLimit;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
       || request.headers.get('x-real-ip')
       || 'unknown';
 
-    const rateLimit = await checkRateLimit(ip, licenseValidationRateLimit);
+    const rateLimit = await checkRateLimit(ip, getRateLimiter());
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many validation attempts. Please try again later.' },

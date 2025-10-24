@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Stripe client initialization
-// Environment validation ensures STRIPE_SECRET_KEY exists at startup
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+// Lazy Stripe client initialization (deferred until first API call)
+// Environment validation ensures STRIPE_SECRET_KEY exists at runtime
+let stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2025-08-27.basil',
+    });
+  }
+  return stripe;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +20,7 @@ export async function POST(request: NextRequest) {
     const priceId = process.env.STRIPE_PRO_PRICE_ID;
 
     // Simple one-time payment session - Stripe collects email
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items: [

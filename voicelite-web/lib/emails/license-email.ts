@@ -1,8 +1,15 @@
 import { Resend } from 'resend';
 
-// Resend client initialization
-// Environment validation ensures RESEND_API_KEY exists at startup
-const resend = new Resend(process.env.RESEND_API_KEY!);
+// Lazy Resend client initialization (deferred until first email send)
+// Environment validation ensures RESEND_API_KEY exists at runtime
+let resend: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY!);
+  }
+  return resend;
+}
 
 export interface LicenseEmailData {
   email: string;
@@ -124,7 +131,7 @@ Need help? Just reply to this email.
 `.trim();
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: `VoiceLite <${fromEmail}>`,
       to: email,
       subject: 'Your VoiceLite Pro License Key',
