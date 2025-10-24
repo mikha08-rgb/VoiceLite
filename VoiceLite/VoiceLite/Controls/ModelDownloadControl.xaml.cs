@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using VoiceLite.Models;
+using VoiceLite.Services;
 
 namespace VoiceLite.Controls
 {
@@ -22,6 +23,7 @@ namespace VoiceLite.Controls
         private readonly string whisperPath;
         private Settings? settings;
         private Action? saveSettingsCallback;
+        private ProFeatureService? proFeatureService;
 
         public ModelDownloadControl()
         {
@@ -43,6 +45,10 @@ namespace VoiceLite.Controls
         {
             settings = currentSettings;
             saveSettingsCallback = onSaveSettings;
+            proFeatureService = new ProFeatureService(currentSettings);
+
+            // Apply Pro feature gating after initialization
+            ApplyProFeatureGating();
             RefreshModelStates();
         }
 
@@ -54,44 +60,66 @@ namespace VoiceLite.Controls
                 DisplayName = "Tiny (Lite)",
                 Description = "Fast and lightweight - 75MB, 80-85% accuracy, <1 second processing",
                 FileSizeMB = 75,
-                DownloadUrl = null // Bundled with installer
+                DownloadUrl = null, // Bundled with installer
+                IsProOnly = false // Free tier model
             });
 
             models.Add(new ModelInfo
             {
                 FileName = "ggml-base.bin",
-                DisplayName = "Base (Swift)",
+                DisplayName = "Base (Swift) 🔒",
                 Description = "Good balance - 142MB, 85-90% accuracy, ~2 seconds processing",
                 FileSizeMB = 142,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                IsProOnly = true // Pro tier model
             });
 
             models.Add(new ModelInfo
             {
                 FileName = "ggml-small.bin",
-                DisplayName = "Small (Pro)",
+                DisplayName = "Small (Pro) 🔒",
                 Description = "Recommended for most users - 466MB, 90-93% accuracy, ~5 seconds processing",
                 FileSizeMB = 466,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                IsProOnly = true // Pro tier model
             });
 
             models.Add(new ModelInfo
             {
                 FileName = "ggml-medium.bin",
-                DisplayName = "Medium (Elite)",
+                DisplayName = "Medium (Elite) 🔒",
                 Description = "Professional accuracy - 1.5GB, 95-97% accuracy, ~12 seconds processing",
                 FileSizeMB = 1500,
-                DownloadUrl = "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin"
+                DownloadUrl = "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin",
+                IsProOnly = true // Pro tier model
             });
 
             models.Add(new ModelInfo
             {
                 FileName = "ggml-large-v3.bin",
-                DisplayName = "Large (Ultra)",
+                DisplayName = "Large (Ultra) 🔒",
                 Description = "Maximum accuracy - 2.9GB, 97-98% accuracy, ~25 seconds processing (requires 8GB+ RAM)",
                 FileSizeMB = 2900,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+                IsProOnly = true // Pro tier model
             });
+        }
+
+        private void ApplyProFeatureGating()
+        {
+            if (proFeatureService == null) return;
+
+            foreach (var model in models)
+            {
+                // Free users can only see Tiny model
+                model.IsVisible = !model.IsProOnly || proFeatureService.IsProUser;
+
+                // Update display name for locked models (free users)
+                if (model.IsProOnly && !proFeatureService.IsProUser)
+                {
+                    model.IsLocked = true;
+                }
+            }
         }
 
         private void RefreshModelStates()
@@ -115,6 +143,25 @@ namespace VoiceLite.Controls
         {
             if (sender is RadioButton radio && radio.DataContext is ModelInfo model)
             {
+                // Check if user has permission to use this model
+                if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                {
+                    MessageBox.Show(
+                        proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                        "Pro Feature",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+
+                    // Revert to Tiny model
+                    if (settings != null)
+                    {
+                        settings.WhisperModel = "ggml-tiny.bin";
+                        RefreshModelStates();
+                    }
+                    return;
+                }
+
                 if (settings != null)
                 {
                     settings.WhisperModel = model.FileName;
@@ -136,6 +183,18 @@ namespace VoiceLite.Controls
         {
             if (sender is Button button && button.Tag is ModelInfo model)
             {
+                // Check Pro permission before download
+                if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                {
+                    MessageBox.Show(
+                        proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                        "Pro Feature",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                    return;
+                }
+
                 if (!model.IsInstalled && model.DownloadUrl != null)
                 {
                     await DownloadModel(model);
@@ -200,12 +259,30 @@ namespace VoiceLite.Controls
         private bool isSelected;
         private bool isDownloading;
         private int downloadProgress;
+        private bool isVisible = true;
+        private bool isLocked = false;
 
         public string FileName { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int FileSizeMB { get; set; }
         public string? DownloadUrl { get; set; }
+        public bool IsProOnly { get; set; } = false;
+
+        public bool IsVisible
+        {
+            get => isVisible;
+            set { isVisible = value; OnPropertyChanged(); OnPropertyChanged(nameof(VisibilityState)); }
+        }
+
+        public bool IsLocked
+        {
+            get => isLocked;
+            set { isLocked = value; OnPropertyChanged(); OnPropertyChanged(nameof(Opacity)); }
+        }
+
+        public Visibility VisibilityState => IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        public double Opacity => IsLocked ? 0.5 : 1.0;
 
         public bool IsInstalled
         {
