@@ -5,12 +5,21 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { headers } from 'next/headers';
 
-// Rate limiting: 5 feedback submissions per hour per IP
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(5, '1 h'),
-  analytics: true,
-});
+// Lazy initialization of rate limiter to allow builds without env vars
+function getRateLimiter() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!url || !token) {
+    throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be configured');
+  }
+
+  return new Ratelimit({
+    redis: new Redis({ url, token }),
+    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    analytics: true,
+  });
+}
 
 const feedbackSchema = z.object({
   type: z.enum(['BUG', 'FEATURE_REQUEST', 'GENERAL', 'QUESTION']),
@@ -30,6 +39,7 @@ export async function POST(req: NextRequest) {
     // Rate limiting: 5 feedback submissions per hour per IP
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
 
+    const ratelimit = getRateLimiter();
     const { success, limit, remaining, reset } = await ratelimit.limit(`feedback:${ip}`);
     if (!success) {
       return NextResponse.json(

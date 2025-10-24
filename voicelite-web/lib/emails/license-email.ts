@@ -1,6 +1,13 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend client to allow builds without env vars
+function getResendClient() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || key === 're_placeholder') {
+    throw new Error('RESEND_API_KEY must be configured');
+  }
+  return new Resend(key);
+}
 
 export interface LicenseEmailData {
   email: string;
@@ -122,6 +129,7 @@ Need help? Just reply to this email.
 `.trim();
 
   try {
+    const resend = getResendClient();
     const result = await resend.emails.send({
       from: `VoiceLite <${fromEmail}>`,
       to: email,
