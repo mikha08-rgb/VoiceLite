@@ -215,3 +215,5 @@ VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
 ---
 
 **For detailed changelogs, architecture history, and migration notes**: See git history and inline code comments. This file focuses on **actionable development commands and critical context**.
+
+<!-- Version sync: Automated via post-commit git hook -->
