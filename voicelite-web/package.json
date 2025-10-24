@@ -11,28 +11,22 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio",
-    "keygen": "tsx scripts/keygen.ts"
+    "db:studio": "prisma studio"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.1.0",
-    "@noble/ed25519": "^3.0.0",
     "@prisma/client": "^6.1.0",
-    "@types/canvas-confetti": "^1.9.0",
-    "@types/swagger-ui-react": "^5.18.0",
     "@upstash/ratelimit": "^2.0.6",
     "@upstash/redis": "^1.35.4",
-    "canvas-confetti": "^1.9.3",
     "lucide-react": "^0.544.0",
     "nanoid": "^5.0.7",
     "next": "15.5.4",
     "next-themes": "^0.4.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.2.1",
     "resend": "^6.1.0",
     "stripe": "^18.5.0",
     "swagger-ui-react": "^5.29.2",
@@ -43,6 +37,7 @@
     "@types/node": "^24.6.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/swagger-ui-react": "^5.18.0",
     "prisma": "^6.1.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",

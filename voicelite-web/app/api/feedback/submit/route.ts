@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { headers } from 'next/headers';
-import { validateOrigin, getCsrfErrorResponse } from '@/lib/csrf';
 
 // Rate limiting: 5 feedback submissions per hour per IP
 const ratelimit = new Ratelimit({
@@ -27,11 +26,6 @@ const feedbackSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // CSRF protection: Validate request origin
-  if (!validateOrigin(req)) {
-    return NextResponse.json(getCsrfErrorResponse(), { status: 403 });
-  }
-
   try {
     // Rate limiting: 5 feedback submissions per hour per IP
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
@@ -55,36 +49,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validatedData = feedbackSchema.parse(body);
 
-    // Get user agent and IP for tracking
-    const headersList = await headers();
-    const userAgent = headersList.get('user-agent') || undefined;
-    const ipAddress = ip !== 'unknown' ? ip : undefined;
-
-    // Check if user is authenticated (optional)
-    const sessionCookie = req.cookies.get('session');
-    let userId: string | undefined;
-
-    if (sessionCookie) {
-      try {
-        // Verify session and get userId if valid
-        const session = await prisma.session.findUnique({
-          where: { sessionHash: sessionCookie.value },
-          select: { userId: true, expiresAt: true, revokedAt: true },
-        });
-
-        if (session && session.expiresAt > new Date() && !session.revokedAt) {
-          userId = session.userId;
-        }
-      } catch (error) {
-        // Session verification failed, continue as anonymous
-        console.error('Session verification failed:', error);
-      }
-    }
-
     // Create feedback entry
     const feedback = await prisma.feedback.create({
       data: {
-        userId,
         email: validatedData.email || null,
         type: validatedData.type,
         subject: validatedData.subject,
@@ -94,22 +61,6 @@ export async function POST(req: NextRequest) {
         priority: validatedData.type === 'BUG' ? 'HIGH' : 'MEDIUM',
       },
     });
-
-    // Track activity if user is authenticated
-    if (userId) {
-      await prisma.userActivity.create({
-        data: {
-          userId,
-          activityType: 'FEEDBACK_SUBMITTED',
-          metadata: JSON.stringify({
-            feedbackId: feedback.id,
-            type: validatedData.type,
-          }),
-          ipAddress,
-          userAgent,
-        },
-      });
-    }
 
     return NextResponse.json(
       {

@@ -1,7 +1,6 @@
 import { LicenseActivationStatus, LicenseStatus, LicenseType } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { prisma } from '@/lib/prisma';
-import { signLicense, LicensePayload } from '@/lib/ed25519';
 
 export function generateLicenseKey() {
   const segment = () => nanoid(6).toUpperCase();
@@ -48,12 +47,6 @@ export async function upsertLicenseFromStripe({
   }
 
   const normalizedEmail = email.toLowerCase();
-  const user = await prisma.user.upsert({
-    where: { email: normalizedEmail },
-    create: { email: normalizedEmail },
-    update: {},
-  });
-
   const licenseKey = generateLicenseKey();
   const status = stripeSubscriptionId
     ? mapStripeSubscriptionStatus(subscriptionStatus ?? 'active')
@@ -66,7 +59,7 @@ export async function upsertLicenseFromStripe({
   const license = await prisma.license.upsert({
     where,
     create: {
-      userId: user.id,
+      email: normalizedEmail,
       licenseKey,
       type,
       status,
@@ -77,16 +70,13 @@ export async function upsertLicenseFromStripe({
       expiresAt: periodEndsAt ?? undefined,
     },
     update: {
-      userId: user.id,
+      email: normalizedEmail,
       status,
       stripeCustomerId,
       stripeSubscriptionId: stripeSubscriptionId ?? undefined,
       stripePaymentIntentId: stripePaymentIntentId ?? undefined,
       expiresAt: periodEndsAt ?? undefined,
       activatedAt: new Date(),
-    },
-    include: {
-      user: true,
     },
   });
 
@@ -111,7 +101,7 @@ export async function updateLicenseStatusBySubscriptionId(
 export async function getLicenseByKey(licenseKey: string) {
   return prisma.license.findUnique({
     where: { licenseKey },
-    include: { user: true, activations: true },
+    include: { activations: true },
   });
 }
 
@@ -186,54 +176,6 @@ export async function recordLicenseEvent(
 }
 
 /**
- * Generate a signed license payload for a given license and device
- */
-export async function generateSignedLicense(licenseId: string, deviceFingerprint: string) {
-  const license = await prisma.license.findUnique({
-    where: { id: licenseId },
-    include: { user: true },
-  });
-
-  if (!license) {
-    throw new Error('License not found');
-  }
-
-  if (license.status !== LicenseStatus.ACTIVE) {
-    throw new Error('License is not active');
-  }
-
-  const now = new Date();
-  const graceDays = 14;
-
-  // Calculate expiry based on license type
-  let expiresAt: Date;
-  if (license.type === LicenseType.LIFETIME) {
-    // Lifetime: 10 years from now
-    expiresAt = new Date(now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000);
-  } else {
-    // Subscription: use existing expiresAt or 90 days
-    expiresAt = license.expiresAt ?? new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-  }
-
-  const payload: LicensePayload = {
-    license_id: license.id,
-    user_id: license.userId,
-    product_id: license.type === LicenseType.LIFETIME ? 'voicelite-lifetime' : 'voicelite-pro',
-    plan: license.type === LicenseType.LIFETIME ? 'lifetime' : 'pro',
-    device_fingerprint: deviceFingerprint,
-    seat_limit: 1,
-    issued_at: now.toISOString(),
-    expires_at: expiresAt.toISOString(),
-    grace_days: graceDays,
-    key_version: 1,
-    version: 1,
-  };
-
-  const signedLicense = await signLicense(payload);
-  return signedLicense;
-}
-
-/**
  * Revoke a license and record the event
  */
 export async function revokeLicense(licenseId: string, reason?: string) {
@@ -246,16 +188,4 @@ export async function revokeLicense(licenseId: string, reason?: string) {
 
   await recordLicenseEvent(licenseId, 'revoked', { reason });
   return license;
-}
-
-/**
- * Get all revoked license IDs for CRL
- */
-export async function getRevokedLicenseIds(): Promise<string[]> {
-  const revokedLicenses = await prisma.license.findMany({
-    where: { status: LicenseStatus.CANCELED },
-    select: { id: true },
-  });
-
-  return revokedLicenses.map((l) => l.id);
 }

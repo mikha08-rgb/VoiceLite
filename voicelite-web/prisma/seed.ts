@@ -4,31 +4,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
-
-  // Create products
-  const proProduct = await prisma.product.upsert({
-    where: { id: 'voicelite-pro' },
-    update: {},
-    create: {
-      id: 'voicelite-pro',
-      name: 'VoiceLite Pro',
-      plan: 'pro',
-      seatsDefault: 1,
-    },
-  });
-
-  const lifetimeProduct = await prisma.product.upsert({
-    where: { id: 'voicelite-lifetime' },
-    update: {},
-    create: {
-      id: 'voicelite-lifetime',
-      name: 'VoiceLite Lifetime',
-      plan: 'lifetime',
-      seatsDefault: 1,
-    },
-  });
-
-  console.log('✅ Created products:', proProduct.id, lifetimeProduct.id);
+  console.log('No seeds required for simplified schema.');
   console.log('✅ Seed completed successfully');
 }
 

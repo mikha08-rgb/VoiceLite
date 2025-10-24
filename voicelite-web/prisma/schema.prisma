@@ -1,4 +1,4 @@
-// Prisma schema for VoiceLite auth + licensing
+// Prisma schema for VoiceLite licensing (simplified - removed auth, analytics, unused models)
 // Datasource uses Supabase Postgres via pooled connection string.
 
 datasource db {
@@ -27,58 +27,10 @@ enum LicenseActivationStatus {
   BLOCKED
 }
 
-model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  sessions     Session[]
-  magicLinks   MagicLinkToken[]
-  licenses     License[]
-  purchases    Purchase[]
-  apiKeys      ApiKey[]
-  feedback     Feedback[]
-  activities   UserActivity[]
-}
-
-model MagicLinkToken {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String    @unique
-  otpHash     String
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  redirectUri String?
-  createdAt   DateTime  @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([consumedAt]) // For cleanup queries
-}
-
-model Session {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionHash String    @unique
-  jwtId       String    @unique
-  expiresAt   DateTime
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  revokedAt   DateTime?
-  userAgent   String?
-  ipAddress   String?
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([revokedAt]) // For session validation queries
-}
-
+// Core licensing model - stores license keys from Stripe purchases
 model License {
   id                    String    @id @default(cuid())
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email                 String    // Customer email (no auth/user table needed)
   licenseKey            String    @unique
   type                  LicenseType
   status                LicenseStatus @default(ACTIVE)
@@ -92,10 +44,11 @@ model License {
   activations           LicenseActivation[]
   events                LicenseEvent[]
 
-  @@index([userId])
+  @@index([email])
   @@index([stripeCustomerId])
 }
 
+// License activations - tracks 3-device limit per license
 model LicenseActivation {
   id              String                  @id @default(cuid())
   licenseId       String
@@ -113,33 +66,7 @@ model LicenseActivation {
   @@index([machineHash]) // For duplicate machine detection
 }
 
-model Product {
-  id           String     @id
-  name         String
-  plan         String     // "pro" | "lifetime"
-  seatsDefault Int        @default(1)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  purchases    Purchase[]
-}
-
-model Purchase {
-  id                   String    @id @default(cuid())
-  userId               String
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId            String
-  product              Product   @relation(fields: [productId], references: [id])
-  stripeCustomerId     String?
-  stripeSubscriptionId String?   @unique
-  status               String    @default("active") // "active" | "canceled" | "refunded"
-  currentPeriodEnd     DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([stripeCustomerId])
-}
-
+// License event audit trail
 model LicenseEvent {
   id        String   @id @default(cuid())
   licenseId String
@@ -152,6 +79,7 @@ model LicenseEvent {
   @@index([createdAt])
 }
 
+// Webhook event deduplication for Stripe webhooks
 model WebhookEvent {
   eventId String   @id
   seenAt  DateTime @default(now())
@@ -159,18 +87,7 @@ model WebhookEvent {
   @@index([seenAt])
 }
 
-model ApiKey {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique
-  scopes     String    // JSON array
-  createdAt  DateTime  @default(now())
-  lastUsedAt DateTime?
-
-  @@index([userId])
-}
-
+// Feedback submission enums
 enum FeedbackType {
   BUG
   FEATURE_REQUEST
@@ -192,10 +109,9 @@ enum FeedbackPriority {
   CRITICAL
 }
 
+// Feedback - optional, for user feedback collection
 model Feedback {
   id        String           @id @default(cuid())
-  userId    String?
-  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   email     String?
   type      FeedbackType     @default(GENERAL)
   subject   String
@@ -206,85 +122,6 @@ model Feedback {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  @@index([userId])
   @@index([status])
   @@index([createdAt])
-}
-
-enum ActivityType {
-  USER_REGISTERED
-  USER_LOGIN
-  USER_LOGOUT
-  CHECKOUT_STARTED
-  CHECKOUT_COMPLETED
-  LICENSE_ISSUED
-  LICENSE_ACTIVATED
-  LICENSE_DEACTIVATED
-  LICENSE_RENEWED
-  FEEDBACK_SUBMITTED
-}
-
-model UserActivity {
-  id           String       @id @default(cuid())
-  userId       String?
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  activityType ActivityType
-  metadata     String?      // JSON - additional context
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime     @default(now())
-
-  @@index([userId])
-  @@index([activityType])
-  @@index([createdAt])
-}
-
-// Analytics event types for anonymous usage tracking
-enum AnalyticsEventType {
-  APP_LAUNCHED
-  TRANSCRIPTION_COMPLETED
-  MODEL_CHANGED
-  SETTINGS_CHANGED
-  ERROR_OCCURRED
-  PRO_UPGRADE
-}
-
-// Tier types for analytics segmentation
-enum TierType {
-  FREE
-  PRO
-}
-
-// Anonymous analytics events (privacy-first, opt-in)
-model AnalyticsEvent {
-  id              String               @id @default(cuid())
-  anonymousUserId String               // SHA256 hash, no PII
-  eventType       AnalyticsEventType
-  tier            TierType             @default(FREE)
-  appVersion      String?              // e.g., "1.0.16"
-  osVersion       String?              // e.g., "Windows 11"
-  modelUsed       String?              // e.g., "ggml-small.bin"
-  metadata        String?              // JSON - additional event-specific data
-  ipAddress       String?              // Optional, for geo analytics only
-  createdAt       DateTime             @default(now())
-
-  @@index([anonymousUserId])
-  @@index([eventType])
-  @@index([createdAt])
-  @@index([tier])
-  @@index([appVersion])
-}
-
-// Production telemetry metrics for monitoring performance, reliability, and usage
-model TelemetryMetric {
-  id              String    @id @default(cuid())
-  anonymousUserId String    // SHA256 hash, no PII
-  metricType      String    // e.g., "app_start_time_ms", "transcription_duration_ms", "crash", "error"
-  value           Float     // Numeric metric value
-  metadata        String?   // JSON - additional context (model, component, success, etc.)
-  timestamp       DateTime  @default(now())
-
-  @@index([anonymousUserId])
-  @@index([metricType])
-  @@index([timestamp])
 }

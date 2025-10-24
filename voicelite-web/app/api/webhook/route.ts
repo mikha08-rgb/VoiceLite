@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { LicenseType } from '@prisma/client';
-import { sendLicenseEmail } from '@/lib/email';
+import { sendLicenseEmail } from '@/lib/emails/license-email';
 import {
   upsertLicenseFromStripe,
   updateLicenseStatusBySubscriptionId,
-  revokeLicense,
   recordLicenseEvent,
+  revokeLicense,
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
@@ -120,7 +120,6 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     await sendLicenseEmail({
       email,
       licenseKey: license.licenseKey,
-      plan: 'subscription',
     });
   } else {
     const paymentIntentId = typeof session.payment_intent === 'string'
@@ -141,7 +140,6 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     await sendLicenseEmail({
       email,
       licenseKey: license.licenseKey,
-      plan: 'lifetime',
     });
   }
 }

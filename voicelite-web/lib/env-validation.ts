@@ -24,43 +24,6 @@ const envSchema = z.object({
     ),
 
   // -----------------------------------------------------------------------------
-  // Ed25519 Signing Keys (License & CRL)
-  // -----------------------------------------------------------------------------
-  LICENSE_SIGNING_PRIVATE_B64: z
-    .string()
-    .length(64, 'LICENSE_SIGNING_PRIVATE_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      '⚠️ CRITICAL: LICENSE_SIGNING_PRIVATE_B64 is a placeholder! Run: npm run keygen'
-    ),
-
-  LICENSE_SIGNING_PUBLIC_B64: z
-    .string()
-    .length(64, 'LICENSE_SIGNING_PUBLIC_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      '⚠️ CRITICAL: LICENSE_SIGNING_PUBLIC_B64 is a placeholder! Run: npm run keygen'
-    ),
-
-  CRL_SIGNING_PRIVATE_B64: z
-    .string()
-    .length(64, 'CRL_SIGNING_PRIVATE_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      'CRL_SIGNING_PRIVATE_B64 is a placeholder'
-    )
-    .optional(),
-
-  CRL_SIGNING_PUBLIC_B64: z
-    .string()
-    .length(64, 'CRL_SIGNING_PUBLIC_B64 must be 64 characters (generate with: npm run keygen)')
-    .refine(
-      (val) => !val.includes('GENERATE') && !val.includes('PLACEHOLDER'),
-      'CRL_SIGNING_PUBLIC_B64 is a placeholder'
-    )
-    .optional(),
-
-  // -----------------------------------------------------------------------------
   // Redis (Upstash - Rate Limiting) - Now OPTIONAL per .env.example
   // -----------------------------------------------------------------------------
   UPSTASH_REDIS_REST_URL: z
@@ -88,16 +51,10 @@ const envSchema = z.object({
     .regex(/^whsec_/, 'STRIPE_WEBHOOK_SECRET must start with whsec_')
     .optional(),
 
-  STRIPE_QUARTERLY_PRICE_ID: z
+  STRIPE_PRO_PRICE_ID: z
     .string()
-    .regex(/^price_/, 'STRIPE_QUARTERLY_PRICE_ID must start with price_')
-    .refine((val) => !val.includes('placeholder'), 'STRIPE_QUARTERLY_PRICE_ID is a placeholder')
-    .optional(),
-
-  STRIPE_LIFETIME_PRICE_ID: z
-    .string()
-    .regex(/^price_/, 'STRIPE_LIFETIME_PRICE_ID must start with price_')
-    .refine((val) => !val.includes('placeholder'), 'STRIPE_LIFETIME_PRICE_ID is a placeholder')
+    .regex(/^price_/, 'STRIPE_PRO_PRICE_ID must start with price_')
+    .refine((val) => !val.includes('placeholder'), 'STRIPE_PRO_PRICE_ID is a placeholder')
     .optional(),
 
   // -----------------------------------------------------------------------------
