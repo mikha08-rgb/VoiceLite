@@ -24,52 +24,54 @@ const envSchema = z.object({
     ),
 
   // -----------------------------------------------------------------------------
-  // Redis (Upstash - Rate Limiting) - Now OPTIONAL per .env.example
+  // Redis (Upstash - Rate Limiting) - REQUIRED for production security
   // -----------------------------------------------------------------------------
   UPSTASH_REDIS_REST_URL: z
     .string()
+    .min(1, 'UPSTASH_REDIS_REST_URL is required for rate limiting')
     .url('UPSTASH_REDIS_REST_URL must be a valid URL')
     .startsWith('https://', 'UPSTASH_REDIS_REST_URL must use HTTPS')
     .refine(
       (val) => !val.includes('placeholder'),
       'UPSTASH_REDIS_REST_URL contains a placeholder - get from https://console.upstash.com'
-    )
-    .optional(),
+    ),
 
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  UPSTASH_REDIS_REST_TOKEN: z
+    .string()
+    .min(1, 'UPSTASH_REDIS_REST_TOKEN is required for rate limiting'),
 
   // -----------------------------------------------------------------------------
-  // Stripe (Payments) - Warnings only, not hard requirements
+  // Stripe (Payments) - REQUIRED for accepting Pro license payments
   // -----------------------------------------------------------------------------
   STRIPE_SECRET_KEY: z
     .string()
-    .regex(/^sk_(test|live)_/, 'STRIPE_SECRET_KEY must start with sk_test_ or sk_live_')
-    .optional(),
+    .min(1, 'STRIPE_SECRET_KEY is required for payments')
+    .regex(/^sk_(test|live)_/, 'STRIPE_SECRET_KEY must start with sk_test_ or sk_live_'),
 
   STRIPE_WEBHOOK_SECRET: z
     .string()
-    .regex(/^whsec_/, 'STRIPE_WEBHOOK_SECRET must start with whsec_')
-    .optional(),
+    .min(1, 'STRIPE_WEBHOOK_SECRET is required for webhook processing')
+    .regex(/^whsec_/, 'STRIPE_WEBHOOK_SECRET must start with whsec_'),
 
   STRIPE_PRO_PRICE_ID: z
     .string()
+    .min(1, 'STRIPE_PRO_PRICE_ID is required for checkout')
     .regex(/^price_/, 'STRIPE_PRO_PRICE_ID must start with price_')
-    .refine((val) => !val.includes('placeholder'), 'STRIPE_PRO_PRICE_ID is a placeholder')
-    .optional(),
+    .refine((val) => !val.includes('placeholder'), 'STRIPE_PRO_PRICE_ID is a placeholder'),
 
   // -----------------------------------------------------------------------------
-  // Email (Resend)
+  // Email (Resend) - REQUIRED for sending license keys to customers
   // -----------------------------------------------------------------------------
   RESEND_API_KEY: z
     .string()
-    .regex(/^re_/, 'RESEND_API_KEY must start with re_')
-    .optional(),
+    .min(1, 'RESEND_API_KEY is required for sending license emails')
+    .regex(/^re_/, 'RESEND_API_KEY must start with re_'),
 
   RESEND_FROM_EMAIL: z
     .string()
+    .min(1, 'RESEND_FROM_EMAIL is required for email sending')
     .email()
-    .or(z.string().regex(/^.+<.+@.+>$/))
-    .optional(),
+    .or(z.string().regex(/^.+<.+@.+>$/)),
 
   // -----------------------------------------------------------------------------
   // Application URLs
@@ -106,28 +108,12 @@ export function validateEnvironment() {
     envSchema.parse(process.env);
 
     // Additional warnings for optional but recommended vars
-    if (!process.env.RESEND_API_KEY) {
-      warnings.push('RESEND_API_KEY not configured - email sending will fail');
-    }
-
-    if (!process.env.STRIPE_SECRET_KEY) {
-      warnings.push('STRIPE_SECRET_KEY not configured - payments will fail');
-    }
-
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      warnings.push('STRIPE_WEBHOOK_SECRET not configured - webhook processing will fail');
-    }
-
     if (!process.env.NEXT_PUBLIC_APP_URL) {
       warnings.push('NEXT_PUBLIC_APP_URL not set - using fallback localhost:3000');
     }
 
     if (!process.env.ADMIN_EMAILS) {
       warnings.push('ADMIN_EMAILS not set - admin dashboard will be inaccessible');
-    }
-
-    if (!process.env.UPSTASH_REDIS_REST_URL) {
-      warnings.push('UPSTASH_REDIS_REST_URL not set - rate limiting disabled (acceptable per .env.example)');
     }
 
     // Log warnings

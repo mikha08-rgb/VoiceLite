@@ -1,33 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Lazy initialization of Stripe client
-// During build time, env vars may not be set, so we initialize on first use
-function getStripeClient() {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error('STRIPE_SECRET_KEY environment variable is required but not set');
-  }
-  return new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2025-08-27.basil',
-  });
-}
+// Stripe client initialization
+// Environment validation ensures STRIPE_SECRET_KEY exists at startup
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+});
 
 export async function POST(request: NextRequest) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!baseUrl) {
-      return NextResponse.json(
-        { error: 'Server configuration error: NEXT_PUBLIC_APP_URL is required' },
-        { status: 500 }
-      );
-    }
-
     const priceId = process.env.STRIPE_PRO_PRICE_ID;
-    if (!priceId || priceId.includes('placeholder')) {
-      return NextResponse.json({ error: 'Stripe price not configured' }, { status: 500 });
-    }
-
-    const stripe = getStripeClient();
 
     // Simple one-time payment session - Stripe collects email
     const session = await stripe.checkout.sessions.create({

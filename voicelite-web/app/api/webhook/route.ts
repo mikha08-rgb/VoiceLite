@@ -10,21 +10,13 @@ import {
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
-// Lazy initialization of Stripe client to allow builds without env vars
-function getStripeClient() {
-  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
-    throw new Error('STRIPE_SECRET_KEY must be configured');
-  }
-  if (!process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET === 'whsec_placeholder') {
-    throw new Error('STRIPE_WEBHOOK_SECRET must be configured');
-  }
-  return new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2025-08-27.basil',
-  });
-}
+// Stripe client initialization
+// Environment validation ensures STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET exist at startup
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+});
 
 export async function POST(request: NextRequest) {
-  const stripe = getStripeClient();
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
