@@ -135,7 +135,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.83 (Pro licensing active)
+**Current Desktop**: v1.0.82 (Pro licensing active)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 
@@ -216,4 +216,3 @@ VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
 
 **For detailed changelogs, architecture history, and migration notes**: See git history and inline code comments. This file focuses on **actionable development commands and critical context**.
 
-<!-- Version sync: Automated via post-commit git hook (testing) -->

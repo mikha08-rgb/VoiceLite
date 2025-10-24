@@ -38,32 +38,72 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         echo "Building version: $version"
 
-    - name: Update version in project file
+    - name: Validate version consistency
       shell: pwsh
       run: |
-        $version = "${{ steps.version.outputs.VERSION }}"
+        $expectedVersion = "${{ steps.version.outputs.VERSION }}"
+        $errors = @()
+
+        # Check VoiceLite.csproj
         $csprojPath = "VoiceLite/VoiceLite/VoiceLite.csproj"
+        $csprojContent = Get-Content $csprojPath -Raw
+        if ($csprojContent -match '<Version>([\d\.]+)</Version>') {
+          $csprojVersion = $matches[1]
+          if ($csprojVersion -ne $expectedVersion) {
+            $errors += "❌ VoiceLite.csproj has version $csprojVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ VoiceLite.csproj version: $csprojVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find version in VoiceLite.csproj"
+        }
 
-        $content = Get-Content $csprojPath -Raw
-        $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
-        $content = $content -replace '<AssemblyVersion>[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
-        $content = $content -replace '<FileVersion>[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
-        Set-Content $csprojPath -Value $content
-
-        echo "Updated version to $version in $csprojPath"
-
-    - name: Update version in installer script
-      shell: pwsh
-      run: |
-        $version = "${{ steps.version.outputs.VERSION }}"
+        # Check VoiceLiteSetup.iss
         $issPath = "VoiceLite/Installer/VoiceLiteSetup.iss"
+        $issContent = Get-Content $issPath -Raw
+        if ($issContent -match 'AppVersion=([\d\.]+)') {
+          $issVersion = $matches[1]
+          if ($issVersion -ne $expectedVersion) {
+            $errors += "❌ VoiceLiteSetup.iss has version $issVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ VoiceLiteSetup.iss version: $issVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find AppVersion in VoiceLiteSetup.iss"
+        }
 
-        $content = Get-Content $issPath -Raw
-        $content = $content -replace 'AppVersion=[\d\.]+', "AppVersion=$version"
-        $content = $content -replace 'OutputBaseFilename=VoiceLite-Setup-[\d\.]+', "OutputBaseFilename=VoiceLite-Setup-$version"
-        Set-Content $issPath -Value $content
+        # Check CLAUDE.md
+        $claudeMdPath = "CLAUDE.md"
+        $claudeContent = Get-Content $claudeMdPath -Raw
+        if ($claudeContent -match '\*\*Current Desktop\*\*: v([\d\.]+)') {
+          $claudeVersion = $matches[1]
+          if ($claudeVersion -ne $expectedVersion) {
+            $errors += "❌ CLAUDE.md has version $claudeVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ CLAUDE.md version: $claudeVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find Current Desktop version in CLAUDE.md"
+        }
 
-        echo "Updated version to $version in $issPath"
+        # Fail if any errors
+        if ($errors.Count -gt 0) {
+          Write-Host ""
+          Write-Host "Version Mismatch Detected!" -ForegroundColor Red
+          Write-Host "Git tag: v$expectedVersion" -ForegroundColor Yellow
+          Write-Host ""
+          foreach ($error in $errors) {
+            Write-Host $error -ForegroundColor Red
+          }
+          Write-Host ""
+          Write-Host "HINT: The post-commit git hook should auto-sync versions." -ForegroundColor Yellow
+          Write-Host "If versions are out of sync, update VoiceLite.csproj and commit again." -ForegroundColor Yellow
+          exit 1
+        }
+
+        Write-Host ""
+        Write-Host "✓ All versions match tag v$expectedVersion" -ForegroundColor Green
+        Write-Host ""
 
     - name: Restore dependencies
       run: dotnet restore VoiceLite/VoiceLite.sln
