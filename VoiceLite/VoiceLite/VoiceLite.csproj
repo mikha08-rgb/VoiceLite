@@ -9,9 +9,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>1.0.78</Version>
-    <AssemblyVersion>1.0.78.0</AssemblyVersion>
-    <FileVersion>1.0.78.0</FileVersion>
+    <Version>1.0.79</Version>
+    <AssemblyVersion>1.0.79.0</AssemblyVersion>
+    <FileVersion>1.0.79.0</FileVersion>
     <RollForward>LatestMinor</RollForward>
   </PropertyGroup>
 

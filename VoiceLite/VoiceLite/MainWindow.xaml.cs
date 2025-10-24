@@ -1725,6 +1725,9 @@ namespace VoiceLite
         {
             try
             {
+                // CRITICAL FIX: Validate Pro license + model permissions to prevent settings.json editing bypass
+                var proService = new ProFeatureService(settings);
+
                 // Use PersistentWhisperService's logic: support both short names and full filenames
                 var modelFile = settings.WhisperModel switch
                 {
@@ -1733,17 +1736,54 @@ namespace VoiceLite
                     "small" => "ggml-small.bin",
                     "medium" => "ggml-medium.bin",
                     "large" => "ggml-large-v3.bin",
-                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
+                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
                 };
 
+                // CRITICAL FIX: If user manually edited settings.json to set Pro model without license, revert to Tiny
+                if (!proService.CanUseModel(modelFile))
+                {
+                    ErrorLogger.LogWarning($"SECURITY: Free user had Pro model '{modelFile}' in settings.json - reverting to Tiny (possible manual edit)");
+                    settings.WhisperModel = "ggml-tiny.bin";
+                    modelFile = "ggml-tiny.bin";
+                    _ = SaveSettingsInternalAsync(); // Save corrected settings
+
+                    MessageBox.Show(
+                        "VoiceLite Free includes the Tiny model only.\n\n" +
+                        "The selected AI model has been reset to Tiny.\n\n" +
+                        "To use Base, Small, Medium, or Large models, upgrade to VoiceLite Pro for $20.\n\n" +
+                        "Visit Settings → License to upgrade.",
+                        "Free Tier Model Limit",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+
+                // Also validate IsProLicense flag consistency
+                if (settings.IsProLicense && string.IsNullOrWhiteSpace(settings.LicenseKey))
+                {
+                    ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no license key - possible manual edit, resetting to free");
+                    settings.IsProLicense = false;
+                    settings.LicenseKey = string.Empty;
+                    _ = SaveSettingsInternalAsync();
+                }
+
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
-                if (!File.Exists(modelPath))
+                // Also check LocalAppData for downloaded models
+                var localDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "VoiceLite",
+                    "whisper",
+                    modelFile
+                );
+
+                if (!File.Exists(modelPath) && !File.Exists(localDataPath))
                 {
                     // Show clear error message - no fallback
                     MessageBox.Show(
                         $"Model file '{modelFile}' is missing.\n\n" +
-                        "Please reinstall VoiceLite to restore missing files.\n\n" +
-                        $"Expected location: {modelPath}",
+                        "Please reinstall VoiceLite or download the model from Settings → AI Models.\n\n" +
+                        $"Expected locations:\n" +
+                        $"- Bundled: {modelPath}\n" +
+                        $"- Downloaded: {localDataPath}",
                         "Model File Missing",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);

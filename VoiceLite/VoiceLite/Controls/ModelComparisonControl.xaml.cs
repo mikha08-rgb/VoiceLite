@@ -19,6 +19,8 @@ namespace VoiceLite.Controls
         private WhisperModelInfo? selectedModel;
         private List<WhisperModelInfo> models = new List<WhisperModelInfo>();
         private string whisperPath;
+        private ProFeatureService? proFeatureService;
+        private Settings? settings;
 
         public event EventHandler<WhisperModelInfo>? ModelSelected;
 
@@ -37,6 +39,36 @@ namespace VoiceLite.Controls
             InitializeComponent();
             whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
             LoadModels();
+        }
+
+        /// <summary>
+        /// Initialize with settings and Pro feature service for permission checking
+        /// </summary>
+        public void Initialize(Settings currentSettings, ProFeatureService? proService = null)
+        {
+            settings = currentSettings;
+            proFeatureService = proService;
+            ApplyProFeatureGating();
+        }
+
+        /// <summary>
+        /// Filter models list to hide Pro models from free users
+        /// </summary>
+        private void ApplyProFeatureGating()
+        {
+            if (proFeatureService == null) return;
+
+            // Free users: Only show Tiny model
+            // Pro users: Show all models
+            var filteredModels = models.Where(m => {
+                // Tiny is free for everyone
+                if (m.FileName == "ggml-tiny.bin") return true;
+
+                // Other models require Pro
+                return proFeatureService.IsProUser;
+            }).ToList();
+
+            ModelsItemsControl.ItemsSource = filteredModels;
         }
 
         private void LoadModels()
@@ -69,15 +101,23 @@ namespace VoiceLite.Controls
 
                 if (recommended != null)
                 {
-                    string priority = prioritizeSpeed ? "speed priority" : "best accuracy";
-                    RecommendationText.Text = $"Based on your {availableRAM:F1}GB available RAM and {priority}, we recommend '{recommended.DisplayName}'";
-
-                    // Mark the recommended model
-                    foreach (var model in models)
+                    // If free user, always recommend Tiny
+                    if (proFeatureService != null && !proFeatureService.IsProUser)
                     {
-                        model.IsRecommended = (model.FileName == recommended.FileName)
-                            ? System.Windows.Visibility.Visible
-                            : System.Windows.Visibility.Collapsed;
+                        RecommendationText.Text = "Free tier: Tiny model only. Upgrade to Pro for better accuracy.";
+                    }
+                    else
+                    {
+                        string priority = prioritizeSpeed ? "speed priority" : "best accuracy";
+                        RecommendationText.Text = $"Based on your {availableRAM:F1}GB available RAM and {priority}, we recommend '{recommended.DisplayName}'";
+
+                        // Mark the recommended model
+                        foreach (var model in models)
+                        {
+                            model.IsRecommended = (model.FileName == recommended.FileName)
+                                ? System.Windows.Visibility.Visible
+                                : System.Windows.Visibility.Collapsed;
+                        }
                     }
                 }
             }
@@ -117,6 +157,18 @@ namespace VoiceLite.Controls
         {
             if (sender is Button button && button.Tag is WhisperModelInfo model)
             {
+                // CRITICAL FIX: Check Pro permission before download/select
+                if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                {
+                    MessageBox.Show(
+                        proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                        "Pro Feature",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                    return;
+                }
+
                 if (!model.IsInstalled)
                 {
                     DownloadModel(model);
@@ -130,6 +182,18 @@ namespace VoiceLite.Controls
 
         private void SelectModel(WhisperModelInfo model)
         {
+            // CRITICAL FIX: Check Pro permission before selection
+            if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+            {
+                MessageBox.Show(
+                    proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                    "Pro Feature",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+                return;
+            }
+
             if (!model.IsInstalled)
             {
                 MessageBox.Show($"Please download {model.DisplayName} model first.",
@@ -183,6 +247,18 @@ namespace VoiceLite.Controls
 
         private async void DownloadModel(WhisperModelInfo model)
         {
+            // CRITICAL FIX: Check Pro permission before download
+            if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+            {
+                MessageBox.Show(
+                    proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                    "Pro Feature",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+                return;
+            }
+
             var result = MessageBox.Show(
                 $"Download {model.DisplayName} model?\n\n" +
                 $"Size: {model.FileSizeDisplay}\n" +
@@ -213,7 +289,15 @@ namespace VoiceLite.Controls
                     return;
                 }
 
-                var targetPath = Path.Combine(whisperPath, model.FileName);
+                // Download to LocalAppData instead of Program Files (user-writable)
+                var localDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "VoiceLite",
+                    "whisper"
+                );
+                Directory.CreateDirectory(localDataPath);
+                var targetPath = Path.Combine(localDataPath, model.FileName);
+
                 if (File.Exists(targetPath))
                 {
                     MessageBox.Show($"{model.DisplayName} is already downloaded.",
