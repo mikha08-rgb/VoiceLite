@@ -101,3 +101,9 @@ cleanup-project.ps1
 create-release-*.ps1
 # Patch files
 *.patch
+
+# Temporary verification/diagnostic files
+verify-*.ps1
+*_VERIFICATION_*.md
+*_REPORT.md
+CLEANUP_*.md
