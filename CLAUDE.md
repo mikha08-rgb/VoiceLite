@@ -20,7 +20,7 @@ VoiceLite/
 ## Tech Stack
 
 **Desktop**: .NET 8.0, WPF, NAudio 2.2.1, H.InputSimulator 1.2.1, Whisper.cpp subprocess
-**Web**: Next.js 15.5, React 19, Prisma 6.1, PostgreSQL (Supabase), Stripe 18.5, Upstash Redis
+**Web**: Next.js 15.5, React 19, Prisma 6.1, PostgreSQL (Supabase), Stripe 18.5
 **Testing**: xUnit, Moq, FluentAssertions
 
 ## Essential Commands
@@ -38,33 +38,32 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 
 # Web: Development
 cd voicelite-web && npm install && npm run dev
-npm run db:migrate  # Prisma migrations
 vercel deploy --prod
 
 # Release (GitHub Actions)
 git tag v1.0.XX && git push --tags  # Auto-builds installer in ~5-7 min
 ```
 
-## Critical Development Rules
+## Critical Rules (BEFORE ANY CODE CHANGES)
 
-### Thread Safety & Resources (MOST IMPORTANT)
-1. **ALWAYS dispose IDisposable** - Use `using` statements (see AudioRecorder.cs pattern). Undisposed resources leak 5MB/recording → 500MB after 100 recordings
-2. **ALWAYS lock shared state** - Use `lock (_recordingLock)` before accessing `_isRecording` etc. Race conditions cause duplicate recordings
-3. **ALWAYS use Dispatcher.Invoke()** for UI updates from background threads - WPF throws InvalidOperationException otherwise
-4. **NEVER skip disposal tests** - Run before every commit touching Services/
+### Thread Safety (prevents crashes)
+- **Dispose ALL IDisposable** - Use `using` statements (see AudioRecorder.cs). Undisposed resources leak 5MB/recording → 500MB after 100 recordings
+- **Lock shared state** - Use `lock (_recordingLock)` before accessing `_isRecording` etc. Race conditions cause duplicate recordings
+- **UI updates ONLY via Dispatcher.Invoke()** - WPF throws InvalidOperationException on cross-thread access
+- **NEVER skip disposal tests** - Run before every commit touching Services/
 
-### Audio & Whisper (NEVER MODIFY)
-5. **Audio MUST be 16kHz, 16-bit mono WAV** - No preprocessing (see AudioRecorder.cs). Whisper trained on this format; noise reduction reduces accuracy
-6. **One whisper.exe subprocess per transcription** - ALWAYS Process.Kill() in finally block (see PersistentWhisperService.cs). Zombies consume 200MB each
-7. **Whisper command** (DO NOT CHANGE):
-   ```bash
-   whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperature 0.2 --beam-size 1 --best-of 1
-   ```
-   Greedy decoding (beam-size=1) is 5x faster with minimal accuracy loss
+### Audio Pipeline (NEVER MODIFY)
+- **Audio MUST be 16kHz, 16-bit mono WAV** - No preprocessing (see AudioRecorder.cs). Whisper trained on this format; noise reduction reduces accuracy
+- **One whisper.exe per transcription** - ALWAYS Process.Kill() in finally block (see PersistentWhisperService.cs). Zombies consume 200MB each
+- **Whisper command** (DO NOT CHANGE):
+  ```bash
+  whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en --temperature 0.2 --beam-size 1 --best-of 1
+  ```
+  Greedy decoding (beam-size=1) is 5x faster with minimal accuracy loss
 
 ### Text Injection & WPF
-8. **SmartAuto mode**: Clipboard for >100 chars (fast), typing for short text (preserves formatting). See TextInjector.cs
-9. **XAML**: Use ModernStyles.xaml for consistency. UI updates always via Dispatcher.Invoke()
+- **SmartAuto mode**: Clipboard for >100 chars (fast), typing for short text (preserves formatting). See TextInjector.cs
+- **XAML**: Use ModernStyles.xaml for consistency
 
 ### Testing (BEFORE EVERY COMMIT)
 - Run: `dotnet test` - ALL ~200 tests MUST pass (no skips)
@@ -85,29 +84,17 @@ When modifying functionality, identify which service owns the logic:
 8. **LicenseService** - Pro validation via voicelite.app/api/licenses/validate
 9. **ProFeatureService** - Feature gating (`IsProUser` property for UI visibility)
 
-## Pro Features System
+## Pro Features - DO NOT BYPASS
 
-**License Flow**: Stripe payment → Backend creates License → User enters key → Desktop validates → ProFeatureService gates UI
+- **Free**: Tiny model only
+- **Pro ($20)**: Small + Base/Medium/Large models + 3 device activations
+- **Gate ALL Pro UI via ProFeatureService.IsProUser**
+- **Pattern**: See ProFeatureService.cs for visibility bindings
 
-**Free**: Tiny model (75MB, bundled)
-**Pro ($20)**: Small (466MB, in source) + Base/Medium/Large (downloadable via AI Models tab) + 3 device activations
+## Web API
 
-**Adding Pro Features** (3-step pattern - see ProFeatureService.cs + SettingsWindowNew.xaml):
-1. Add visibility property to ProFeatureService: `public Visibility FeatureVisibility => IsProUser ? Visible : Collapsed;`
-2. Add gated UI to XAML: `<TabItem Header="Feature" Name="FeatureTab">...</TabItem>`
-3. Bind visibility in code-behind: `FeatureTab.Visibility = proFeatureService.FeatureVisibility;`
-
-**WHY**: Centralized in ProFeatureService = single source of truth, prevents bypass
-
-## Web API (voicelite-web/app/api/)
-
-- `POST /api/licenses/validate` - Validates license (rate limited: 5/hour/IP)
-- `POST /api/checkout` - Stripe checkout ($20 payment)
-- `POST /api/webhook` - Stripe webhook (creates License on payment)
-- `POST /api/feedback/submit` - User feedback (rate limited)
-- `POST /api/download` - Download tracking
-
-**DB Models**: License (email-based, Stripe-linked), LicenseActivation (3-device limit), LicenseEvent (audit), Feedback
+**Key endpoints**: `/api/licenses/validate` (rate limited 5/hr), `/api/checkout` (Stripe)
+**Full API**: See voicelite-web/app/api/
 
 ## Common Pitfalls - DO NOT
 
@@ -119,18 +106,17 @@ When modifying functionality, identify which service owns the logic:
 6. **Skip license validation** - Always gate Pro features via ProFeatureService.IsProUser
 7. **Leave zombie whisper.exe** - Each consumes ~200MB RAM
 
-## Performance Targets
+## Performance Checks
 
-Measure via Task Manager + test recordings:
-- Transcription latency: <200ms from speech stop to text injection
-- Idle RAM: <100MB | Active RAM: <300MB | Idle CPU: <5%
-- Accuracy: 95%+ on technical terms (Small+ models)
+Before commit: Run app for 10 recordings, check Task Manager:
+- **RAM stays <300MB, no growth per recording** = disposal working
+- **Transcription <200ms** = subprocess lifecycle correct
+- **No zombie whisper.exe processes** = cleanup working
 
 ## Distribution
 
 **Installer**: VoiceLite-Setup-{VERSION}.exe (~100-150MB, Tiny only)
 **Process**: Tag push → GitHub Actions → Version bump → Build → Installer → Release (~5-7 min)
-**Channels**: GitHub Releases (primary), Google Drive (mirror)
 
 ---
 
