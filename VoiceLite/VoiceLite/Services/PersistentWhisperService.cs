@@ -131,7 +131,7 @@ namespace VoiceLite.Services
                 _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
             };
 
-            // Check standard model locations
+            // Check bundled models in Program Files (read-only)
             var modelPath = Path.Combine(baseDir, "whisper", modelFile);
             if (File.Exists(modelPath))
                 return modelPath;
@@ -140,12 +140,24 @@ namespace VoiceLite.Services
             if (File.Exists(modelPath))
                 return modelPath;
 
+            // Check downloaded models in LocalApplicationData (user-writable)
+            var localDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite",
+                "whisper",
+                modelFile
+            );
+            if (File.Exists(localDataPath))
+                return localDataPath;
+
             // No fallback - fail fast with clear error message
             // Exception is caught by MainWindow and shown to user with reinstall instructions
             throw new FileNotFoundException(
                 $"Whisper model '{modelFile}' not found.\n\n" +
-                $"Please reinstall VoiceLite to restore missing files.\n\n" +
-                $"Expected location: {modelPath}");
+                $"Please download it from Settings → AI Models tab, or reinstall VoiceLite.\n\n" +
+                $"Expected locations:\n" +
+                $"- Bundled: {modelPath}\n" +
+                $"- Downloaded: {localDataPath}");
         }
 
         private void CreateDummyAudioFile()

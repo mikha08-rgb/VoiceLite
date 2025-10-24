@@ -26,7 +26,13 @@ namespace VoiceLite.Controls
         public ModelDownloadControl()
         {
             InitializeComponent();
-            whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper");
+            // Use LocalApplicationData for downloads (user-writable) instead of Program Files
+            var localDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite",
+                "whisper"
+            );
+            whisperPath = localDataPath;
             models = new ObservableCollection<ModelInfo>();
             ModelList.ItemsSource = models;
 
@@ -92,8 +98,11 @@ namespace VoiceLite.Controls
         {
             foreach (var model in models)
             {
-                var modelPath = Path.Combine(whisperPath, model.FileName);
-                model.IsInstalled = File.Exists(modelPath);
+                // Check both bundled location (Program Files) and download location (LocalAppData)
+                var bundledPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", model.FileName);
+                var downloadedPath = Path.Combine(whisperPath, model.FileName);
+
+                model.IsInstalled = File.Exists(bundledPath) || File.Exists(downloadedPath);
 
                 if (settings != null)
                 {
