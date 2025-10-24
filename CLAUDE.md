@@ -70,13 +70,15 @@ git push --tags
 ### Whisper Models (in `whisper/` directory)
 
 **Free Tier (bundled with installer):**
-- `ggml-tiny.bin` (75MB): **Lite** - Default, 80-85% accuracy, <1s processing
+- `ggml-tiny.bin` (75MB): **Lite** - Default, 80-85% accuracy, ~1.5s processing
 
 **Pro Tier ($20 one-time - requires license activation):**
-- `ggml-small.bin` (466MB): **Pro** ⭐ - 90-93% accuracy, ~5s processing (available in source)
+- `ggml-small.bin` (466MB): **Pro** ⭐ - 90-93% accuracy, ~2.5s processing (available in source)
 - `ggml-base.bin` (142MB): **Swift** - 85-90% accuracy, ~2s processing (downloadable)
-- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~12s processing (downloadable)
-- `ggml-large-v3.bin` (2.9GB): **Ultra** - 97-98% accuracy, ~25s processing (downloadable)
+- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~4s processing (downloadable)
+- `ggml-large-v3.bin` (2.9GB): **Ultra** - 97-98% accuracy, ~6s processing (downloadable)
+
+**Note**: Processing times based on modern hardware (i5/Ryzen 5+, 16GB RAM). Older systems may be 20-30% slower.
 
 **Note**: Only Tiny and Small models are present in source repository. Base/Medium/Large are downloaded via AI Models tab after Pro activation.
 
