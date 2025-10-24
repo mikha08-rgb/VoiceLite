@@ -259,7 +259,7 @@ export default function HomePage() {
                 2
               </div>
               <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Hold Hotkey & Speak</h3>
-              <p className="leading-relaxed text-stone-600 dark:text-stone-400">Press Left Alt, say what you want to type, release</p>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">Press Shift+Z, say what you want to type, release</p>
             </div>
 
             <div className="space-y-6 text-center">
