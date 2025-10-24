@@ -73,13 +73,13 @@ namespace VoiceLite.Models
         public int BeamSize
         {
             get => _beamSize;
-            set => _beamSize = Math.Clamp(value, 1, 10);
+            set => _beamSize = Math.Clamp(value, 1, 3); // PERFORMANCE: Cap at 3 (5-10 causes 10-30s transcription delays)
         }
 
         public int BestOf
         {
             get => _bestOf;
-            set => _bestOf = Math.Clamp(value, 1, 10);
+            set => _bestOf = Math.Clamp(value, 1, 3); // PERFORMANCE: Cap at 3 (higher values exponentially slow)
         }
 
         public double WhisperTimeoutMultiplier
