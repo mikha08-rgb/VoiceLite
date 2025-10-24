@@ -37,23 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="MainWindow_Enhanced.xaml" />
-    <None Remove="SettingsWindow_Enhanced.xaml" />
-    <Page Remove="MainWindow_Enhanced.xaml" />
-    <Page Remove="SettingsWindow_Enhanced.xaml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Resource Include="VoiceLite.ico" />
     <Content Include="VoiceLite.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
-  <!-- Post-build obfuscation disabled - script not found and not required for current builds -->
-  <!-- <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(Configuration)' == 'Release'">
-    <Message Text="Running post-build obfuscation..." Importance="high" />
-    <Exec Command="ObfuscateRelease.bat $(Configuration)" WorkingDirectory="$(ProjectDir)" ContinueOnError="true" />
-  </Target> -->
 
 </Project>
