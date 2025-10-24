@@ -78,3 +78,26 @@ bfg.jar
 VoiceLite/dependencies/
 VoiceLite/whisper_installer/
 VoiceLite/whisper_installer_lite/
+
+# Obsolete scripts and migrations (Tier 2 cleanup patterns)
+# Database migrations belong in voicelite-web/prisma/migrations/
+*_migration.sql
+CREATE_*.sql
+CLEAN_*.sql
+# One-time fix scripts
+fix_*.ps1
+fix_*.py
+*_fix.ps1
+revert_*.py
+apply_*.ps1
+apply_*.py
+# Testing/debug scripts that skip tests
+skip_*.ps1
+reset_*.ps1
+# Obsolete deployment scripts
+DEPLOY_*.bat
+DEMO_*.bat
+cleanup-project.ps1
+create-release-*.ps1
+# Patch files
+*.patch
