@@ -59,6 +59,11 @@ voicelite-web/*.bat
 
 # Build artifacts
 VoiceLite/Installer/publish/
+publish/
+TestResults/
+VoiceLite-*/
+*_output.txt
+*-results-*.txt
 
 # Generated security reports and keys
 NEW_KEYS.txt
