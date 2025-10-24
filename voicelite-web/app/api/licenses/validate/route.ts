@@ -11,25 +11,18 @@ const bodySchema = z.object({
 
 // Rate limiter: 5 validation attempts per hour per IP
 // Prevents license key brute-forcing
-const isConfigured = Boolean(
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-);
+// Environment validation ensures Redis credentials exist at startup
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
-const redis = isConfigured
-  ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  : null;
-
-const licenseValidationRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(5, '1 h'),
-      analytics: true,
-      prefix: 'ratelimit:license-validation',
-    })
-  : null;
+const licenseValidationRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:license-validation',
+});
 
 export async function POST(request: NextRequest) {
   try {
