@@ -120,21 +120,75 @@ Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 
 [Code]
+var
+  DependencyPage: TWizardPage;
 
-function InitializeSetup(): Boolean;
+procedure LinkClick(Sender: TObject);
+var
+  ErrorCode: Integer;
+  URL: String;
 begin
-  Result := True;
+  // Get URL from the label's hint
+  URL := TNewStaticText(Sender).Hint;
+  ShellExec('open', URL, '', '', SW_SHOW, ewNoWait, ErrorCode);
+end;
 
-  // Check for .NET 8 Runtime
-  if not RegKeyExists(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App') then
-  begin
-    if MsgBox('VoiceLite requires .NET 8.0 Desktop Runtime.'#13#10#13#10 +
-              'Would you like to download it now?', mbError, MB_YESNO) = IDYES then
-    begin
-      ShellExec('open', 'https://dotnet.microsoft.com/download/dotnet/8.0/runtime', '', '', SW_SHOW, ewNoWait, Result);
-    end;
-    Result := False;
-  end;
+procedure InitializeWizard;
+var
+  Y: Integer;
+  Lbl: TNewStaticText;
+begin
+  // Create one page with clickable links
+  DependencyPage := CreateCustomPage(wpWelcome, 'Requirements',
+    'VoiceLite requires the following to run:');
+
+  Y := 10;
+
+  // VC++ section
+  Lbl := TNewStaticText.Create(DependencyPage);
+  Lbl.Parent := DependencyPage.Surface;
+  Lbl.Caption := '1. Microsoft Visual C++ Runtime 2015-2022 (x64)';
+  Lbl.Top := Y;
+
+  Y := Y + 25;
+  Lbl := TNewStaticText.Create(DependencyPage);
+  Lbl.Parent := DependencyPage.Surface;
+  Lbl.Caption := 'https://aka.ms/vs/17/release/vc_redist.x64.exe';
+  Lbl.Top := Y;
+  Lbl.Font.Color := clBlue;
+  Lbl.Font.Style := [fsUnderline];
+  Lbl.Cursor := crHand;
+  Lbl.Hint := 'https://aka.ms/vs/17/release/vc_redist.x64.exe';
+  Lbl.OnClick := @LinkClick;
+
+  Y := Y + 40;
+
+  // .NET section
+  Lbl := TNewStaticText.Create(DependencyPage);
+  Lbl.Parent := DependencyPage.Surface;
+  Lbl.Caption := '2. .NET 8.0 Desktop Runtime (x64)';
+  Lbl.Top := Y;
+
+  Y := Y + 25;
+  Lbl := TNewStaticText.Create(DependencyPage);
+  Lbl.Parent := DependencyPage.Surface;
+  Lbl.Caption := 'https://dotnet.microsoft.com/download/dotnet/8.0';
+  Lbl.Top := Y;
+  Lbl.Font.Color := clBlue;
+  Lbl.Font.Style := [fsUnderline];
+  Lbl.Cursor := crHand;
+  Lbl.Hint := 'https://dotnet.microsoft.com/download/dotnet/8.0';
+  Lbl.OnClick := @LinkClick;
+
+  Y := Y + 40;
+
+  // Footer text
+  Lbl := TNewStaticText.Create(DependencyPage);
+  Lbl.Parent := DependencyPage.Surface;
+  Lbl.Caption := 'If you don''t have these installed, VoiceLite will not launch.' + #13#10 +
+                 'Click the links above to download, then click Next to continue.';
+  Lbl.Top := Y;
+  Lbl.AutoSize := True;
 end;
 
 // Licensing prompts removed; installer now assumes fully free build
