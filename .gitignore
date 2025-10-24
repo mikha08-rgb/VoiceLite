@@ -11,6 +11,7 @@ obj/
 
 # Backup folders
 backup*/
+*.bak
 
 # Temporary files
 temp/
@@ -28,6 +29,7 @@ whisper/*.dll
 
 # Tooling artifacts
 VoiceLite/.claude/
+.serena/
 
 # Sensitive files - NEVER commit these!
 license-keys.txt
