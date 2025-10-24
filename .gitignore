@@ -53,6 +53,7 @@ voicelite-web/*.bat
 # Claude settings
 .claude/*.local.json
 .claude/settings.local.json
+.claude/mcp.json
 
 # Generated security reports and keys
 NEW_KEYS.txt

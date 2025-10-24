@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-VoiceLite: Radically simplified Windows speech-to-text app using OpenAI Whisper AI. **Philosophy**: Core-only, zero complexity. Just recording → Whisper → text injection.
+VoiceLite: Windows speech-to-text app using OpenAI Whisper AI. **Philosophy**: Core-only workflow with Pro licensing for advanced models. Recording → Whisper → text injection.
 
 ## Quick Commands
 
@@ -52,7 +52,7 @@ git push --tags
 
 **Target**: .NET 8.0 Windows | **Distribution**: Free tier + Pro upgrade ($20 one-time)
 
-### Core Components (12 Services - v1.0.65+ simplification)
+### Core Components (9 Services - v1.0.79)
 
 **Active Services**:
 - `AudioRecorder`: NAudio recording (16kHz mono WAV, no preprocessing)
@@ -61,23 +61,24 @@ git push --tags
 - `HotkeyManager`: Global hotkeys via Win32 API
 - `SystemTrayManager`: Tray icon + context menu
 - `TranscriptionHistoryService`: History with pinning
-- `MemoryMonitor`, `ErrorLogger`, `StartupDiagnostics`, `DependencyChecker`
-- `ZombieProcessCleanupService`: Prevents orphaned whisper.exe processes
+- `ErrorLogger`: Centralized error logging
+- `LicenseService`: Pro license validation via web API
+- `ProFeatureService`: Centralized Pro feature gating (AI Models tab, future features)
 
-**Removed in v1.0.65** (~15,000 lines deleted):
-- ❌ VoiceShortcuts, TranscriptionPostProcessor, Analytics, Licensing
-- ❌ WhisperServerService, RecordingCoordinator, ModelBenchmarkService
+**Note**: Services like `MemoryMonitor`, `StartupDiagnostics`, `DependencyChecker`, `ZombieProcessCleanupService` exist only in `voicelite-web-preview/` branch (v1.0.70), not in main production app.
 
 ### Whisper Models (in `whisper/` directory)
 
 **Free Tier (bundled with installer):**
 - `ggml-tiny.bin` (75MB): **Lite** - Default, 80-85% accuracy, <1s processing
 
-**Pro Tier ($20 one-time - downloadable in-app):**
-- `ggml-base.bin` (142MB): **Swift** - 85-90% accuracy, ~2s processing
-- `ggml-small.bin` (466MB): **Pro** ⭐ - 90-93% accuracy, ~5s processing (recommended)
-- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~12s processing
-- `ggml-large-v3.bin` (2.9GB): **Ultra** - 97-98% accuracy, ~25s processing
+**Pro Tier ($20 one-time - requires license activation):**
+- `ggml-small.bin` (466MB): **Pro** ⭐ - 90-93% accuracy, ~5s processing (available in source)
+- `ggml-base.bin` (142MB): **Swift** - 85-90% accuracy, ~2s processing (downloadable)
+- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~12s processing (downloadable)
+- `ggml-large-v3.bin` (2.9GB): **Ultra** - 97-98% accuracy, ~25s processing (downloadable)
+
+**Note**: Only Tiny and Small models are present in source repository. Base/Medium/Large are downloaded via AI Models tab after Pro activation.
 
 **Whisper Command** (v1.0.65+):
 ```bash
@@ -98,6 +99,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 <PackageReference Include="H.InputSimulator" Version="1.2.1" />
 <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
 <PackageReference Include="System.Text.Json" Version="9.0.9" />
+<PackageReference Include="System.Management" Version="8.0.0" />
 ```
 
 ## Code Guidelines
@@ -106,7 +108,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 1. **Audio Format**: 16kHz, 16-bit mono WAV (no preprocessing for reliability)
 2. **Thread Safety**: Use `lock` for recording state, `Dispatcher.Invoke()` for UI updates
-3. **Process Management**: One whisper.exe per transcription, auto-cleanup via ZombieProcessCleanupService
+3. **Process Management**: One whisper.exe per transcription, manual cleanup via Process.Kill()
 4. **Memory**: Always dispose IDisposable, check disposal tests
 5. **Error Handling**: Centralized via ErrorLogger, graceful fallbacks
 6. **Text Injection**: SmartAuto mode (clipboard for >100 chars, typing for short)
@@ -129,26 +131,38 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 1. **VCRUNTIME140_1.dll**: Installer bundles VC++ Runtime (auto-installs)
 2. **Antivirus**: Text injection may trigger false positives (global hotkeys)
-3. **First Run**: StartupDiagnostics auto-fixes common issues
+3. **License Validation**: Requires internet connection for initial Pro activation (cached after first validation)
 
 ## Version Context
 
-**Current Desktop**: v1.0.74 (100% free, radical simplification)
-**Major Change (v1.0.65)**: Removed ~15,000 lines (VoiceShortcuts, Analytics, Licensing, Server mode)
-**Philosophy**: Reliability over features - core-only workflow
+**Current Desktop**: v1.0.79 (Pro licensing active)
+**Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
+**Philosophy**: Core-only workflow with Pro feature gating for advanced models
+
+**Recent Security Fixes** (v1.0.77-79):
+- Closed freemium bypass vulnerabilities
+- Added Pro feature gating to model downloads
+- Fixed model download permissions
 
 ## Web Backend (voicelite-web)
 
-**Tech Stack**: Next.js 15, React 19, Prisma, PostgreSQL (Supabase), Stripe (optional donations)
-**Purpose**: Landing page, download links, feedback collection
-**No Licensing**: Backend no longer validates licenses (100% free app)
+**Tech Stack**: Next.js 15.5.4, React 19.2.0, Prisma 6.1.0, PostgreSQL (Supabase), Stripe 18.5.0
+**Purpose**: License validation, Stripe payments, model downloads, feedback collection
 
-**API Endpoints** (simplified v1.0.65+):
-- `POST /api/feedback` - User feedback (rate limited via Upstash Redis)
-- `POST /api/metrics/upload` - Server telemetry (desktop app doesn't use)
-- Landing page at `/`
+**API Endpoints**:
+- `POST /api/licenses/validate` - License key validation (rate limited: 5/hour/IP)
+- `POST /api/checkout` - Stripe checkout session creation
+- `POST /api/feedback/submit` - User feedback (rate limited via Upstash Redis)
+- `POST /api/download` - Model/app download tracking
+- `POST /api/webhook` - Stripe webhook handler for payment events
+- `GET /api/docs` - API documentation
 
-**Removed**: Authentication, licensing, desktop analytics, Ed25519 signing
+**Database Models** (Prisma):
+- `License` - Core licensing with Stripe integration (email-based, no user accounts)
+- `LicenseActivation` - Device activation tracking (3-device limit per license)
+- `LicenseEvent` - Audit trail for license operations
+- `WebhookEvent` - Stripe webhook event deduplication
+- `Feedback` - User feedback with priority/status tracking
 
 ## Performance Targets
 
@@ -167,7 +181,13 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Pro Features System
 
-**Architecture**: Centralized feature gating via `ProFeatureService.cs`
+**Architecture**: Centralized feature gating via `ProFeatureService.cs` + `LicenseService.cs`
+
+**License Validation Flow**:
+1. User purchases via Stripe → Backend creates License record
+2. User enters license key in Settings → Desktop calls `/api/licenses/validate`
+3. LicenseService caches validation result (HTTPClient to voicelite.app)
+4. ProFeatureService exposes `IsProUser` property based on cached status
 
 **Free Tier**:
 - Tiny model (ggml-tiny.bin) only
@@ -175,19 +195,20 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 - Settings: General + License tabs only
 
 **Pro Tier** ($20 one-time):
-- All 5 AI models (downloadable in-app via AI Models tab)
+- All 5 AI models (Small included in source, Base/Medium/Large downloadable via AI Models tab)
 - Settings: General + **AI Models** + License tabs
+- 3 device activations per license
 - Future Pro features: Voice Shortcuts, Export History, Custom Dictionary, etc.
 
-**Adding New Pro Features** (3 lines of code):
+**Adding New Pro Features** (3-step pattern):
 ```csharp
-// 1. In ProFeatureService.cs:
+// 1. In ProFeatureService.cs: Add visibility property
 public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
-// 2. In SettingsWindowNew.xaml: Add tab
+// 2. In SettingsWindowNew.xaml: Add gated tab
 <TabItem Header="Voice Shortcuts" Name="VoiceShortcutsTab">...</TabItem>
 
-// 3. In SettingsWindowNew.xaml.cs: Control visibility
+// 3. In SettingsWindowNew.xaml.cs: Bind visibility
 VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
 ```
 
