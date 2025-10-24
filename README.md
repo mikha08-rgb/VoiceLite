@@ -2,7 +2,7 @@
 
 <div align="center">
 
-  **100% Free • No Trials • No Tiers • Just Works**
+  **Free Core Edition • Pro $20 (one-time) • Privacy First**
 
   [![Download](https://img.shields.io/badge/Download-Free-blue?style=for-the-badge&logo=windows)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
   [![View Source](https://img.shields.io/badge/Source-Auditable-green?style=for-the-badge)](https://github.com/mikha08-rgb/VoiceLite)
@@ -19,13 +19,21 @@
 
 **VoiceLite** is a privacy-first Windows app that lets you type with your voice in ANY application. Just hold a key, speak, release - your words instantly appear as typed text. No internet required, 100% private, powered by OpenAI's Whisper.
 
-## ✨ Features (100% Free)
-- ✅ **Whisper AI model** - Fast and accurate speech recognition
-- ✅ **Unlimited usage** - No trials, no time limits, no tiers
+## ✨ Features
+
+### Free Core Edition
+- ✅ **Whisper Tiny AI model** - Fast speech recognition (80-85% accuracy)
+- ✅ **Unlimited usage** - No trials, no time limits
 - ✅ **Works completely offline** - Your voice never leaves your PC
 - ✅ **Universal compatibility** - Works in ANY Windows application
 - ✅ **Customizable hotkeys** - Default Shift+Z, or choose your own
 - ✅ **Auditable source code** - Verify privacy yourself
+
+### Pro Edition ($20 one-time)
+- ⭐ **4 Additional AI models** - Small, Base, Medium, Large (90-98% accuracy)
+- ⭐ **Better technical term recognition** - Perfect for coding and professional work
+- ⭐ **3 device activations** - Use on work PC, home PC, and laptop
+- ⭐ **One-time payment** - No subscriptions, pay once, use forever
 
 ### ✨ Perfect For:
 - 💻 **Developers** - Write code comments, documentation, variable names
@@ -52,9 +60,9 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.74 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.82 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-Fast installation • Includes Tiny model (75MB) • Additional models available in Settings
+Free Core includes Tiny model • Pro models available after upgrade ($20 one-time)
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
@@ -63,7 +71,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.74.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.82.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
 4. **Hold Shift+Z** → Speak → Release to type!
@@ -93,7 +101,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 | ⚡ **Lightning Fast** | Optimized for speed with greedy decoding |
 | 🔒 **100% Private** | Completely offline, no cloud, no data collection |
 | ⌨️ **Customizable Hotkeys** | Use any key or combination (Shift+Z, Ctrl+Space, etc.) |
-| 📊 **Multiple Models** | Download additional models in Settings for better accuracy |
+| 📊 **5 AI Models** | Free: Tiny (fast) • Pro: Small, Base, Medium, Large (90-98% accuracy) |
 | 💾 **Lightweight** | Minimal CPU/RAM usage when idle |
 
 ---
@@ -105,7 +113,7 @@ Fast installation • Includes Tiny model (75MB) • Additional models available
 | **Works Everywhere** | ✅ Yes | ❌ Limited | ✅ Yes | ❌ Browser only |
 | **Offline** | ✅ 100% | ✅ Yes | ✅ Yes | ❌ No |
 | **Technical Terms** | ✅ Excellent | ❌ Poor | ⚠️ OK | ⚠️ OK |
-| **Price** | ✅ FREE | ✅ Free | 💰 $200+ | ✅ Free |
+| **Price** | ✅ Free / $20 Pro | ✅ Free | 💰 $200+ | ✅ Free |
 | **Setup Time** | ✅ 2 min | ⚠️ Training | ⚠️ Training | ✅ Quick |
 
 ---
@@ -149,7 +157,7 @@ No! 100% offline. Your voice never leaves your computer.
 
 <details>
 <summary><b>How accurate is it?</b></summary>
-The bundled Tiny model is fast and accurate for most use cases. You can download larger models from Settings for even better accuracy on technical terms and complex speech.
+The bundled Tiny model (Free) provides 80-85% accuracy and is fast for everyday use. Upgrade to Pro ($20 one-time) to unlock 4 additional models with 90-98% accuracy for better technical term recognition and complex speech.
 </details>
 
 <details>
@@ -159,7 +167,7 @@ Yes! Works in most games. Some fullscreen games may block hotkeys - use windowed
 
 <details>
 <summary><b>Is it really free?</b></summary>
-Yes! 100% free forever. No trials, no time limits, no hidden costs. All features unlocked.
+Yes! The Core edition is completely free forever - no trials, no time limits. You get unlimited voice typing with the Tiny AI model (80-85% accuracy). Pro edition ($20 one-time payment) unlocks 4 additional models with higher accuracy (90-98%) for professional and technical use.
 </details>
 
 <details>
@@ -179,7 +187,17 @@ VoiceLite supports 99 languages via Whisper AI! Change the language in Settings 
 
 <details>
 <summary><b>How do I download larger models?</b></summary>
-Open Settings → Model Selection. You can download additional models (Small, Medium, Large) for better accuracy. Note: Larger models require more disk space and are slower.
+First upgrade to Pro ($20 one-time) in Settings → License. Then go to Settings → AI Models to download additional models (Base, Small, Medium, Large) for 90-98% accuracy. Note: Larger models require more disk space (up to 3GB) and take longer to process.
+</details>
+
+<details>
+<summary><b>What's included in Pro?</b></summary>
+Pro is a $20 one-time payment (not a subscription) that unlocks:
+• 4 additional AI models (Base, Small, Medium, Large) with 90-98% accuracy
+• Better recognition for technical terms and professional vocabulary
+• 3 device activations (work PC, home PC, laptop)
+• Priority support
+• One-time payment means you own it forever - no recurring charges
 </details>
 
 ---
@@ -193,7 +211,7 @@ Open Settings → Model Selection. You can download additional models (Small, Me
 | **Windows Defender warning** | Click "More info" → "Run anyway" (false positive) |
 | **No text appears** | Check mic is working, VoiceLite in system tray |
 | **Hotkey doesn't work** | Another app may be using Shift+Z - change it in Settings |
-| **Wrong text / Low accuracy** | Speak clearly, or download a larger model from Settings |
+| **Wrong text / Low accuracy** | Speak clearly, or upgrade to Pro for better AI models |
 
 ---
 
