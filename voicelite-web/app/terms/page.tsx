@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Terms of Service - VoiceLite",
-  description: "VoiceLite terms of service: Subscription details, refund policy, and user agreement for our offline voice typing software.",
+  description: "VoiceLite terms of service: Pricing details, refund policy, and user agreement for our offline voice typing software.",
 };
 
 export default function TermsOfService() {
@@ -45,12 +45,12 @@ export default function TermsOfService() {
               >
                 LICENSE
               </a>
-              ). Certain features (Pro models) require a paid subscription.
+              ). Certain features (Pro models) require a one-time payment.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Subscription Plans</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Pricing</h2>
 
             <h3 className="text-xl font-semibold text-gray-800 mb-3">3.1 Free Version</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
@@ -60,7 +60,7 @@ export default function TermsOfService() {
               <li>No credit card required</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.2 Pro Version ($20 / 3 months or $99 one-time)</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.2 Pro Version ($20 one-time payment)</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
               <li>Access to all 5 AI models (Tiny, Base, Small, Medium, Large)</li>
               <li>Unlimited usage</li>
@@ -68,45 +68,34 @@ export default function TermsOfService() {
               <li>Offline functionality (license validation requires one-time internet connection)</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.3 Billing</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">3.3 Payment</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
-              <li>Subscriptions are billed monthly via Stripe</li>
-              <li>Automatic renewal on the same day each month unless canceled</li>
-              <li>Prices are in USD and subject to change with 30 days notice</li>
+              <li>Pro version is a one-time payment of $20 USD via Stripe</li>
+              <li>No recurring charges or automatic renewals</li>
+              <li>Prices are in USD and subject to change with 30 days notice for new purchases</li>
               <li>You are responsible for all taxes applicable in your jurisdiction</li>
             </ul>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Cancellation and Refunds</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Refund Policy</h2>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">4.1 Cancellation</h3>
-            <p className="text-gray-700 mb-4">
-              You may cancel your Pro subscription at any time through the Stripe customer portal. Upon
-              cancellation:
-            </p>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">4.1 Money-Back Guarantee</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
-              <li>You retain Pro access until the end of your current billing period</li>
-              <li>No further charges will be made</li>
-              <li>The Software continues to work offline with Free tier features</li>
-            </ul>
-
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">4.2 Refund Policy</h3>
-            <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
-              <li><strong>7-Day Money-Back Guarantee:</strong> Full refund if requested within 7 days of first purchase</li>
-              <li>Refunds are not provided for partial months</li>
+              <li><strong>30-Day Money-Back Guarantee:</strong> Full refund if requested within 30 days of purchase</li>
               <li>Refund requests must be sent to{' '}
                 <a href="mailto:contact@voicelite.app" className="text-blue-600 hover:underline">
                   contact@voicelite.app
                 </a>
               </li>
-              <li>Refunds are processed within 5-10 business days</li>
+              <li>No questions asked - we want you to be 100% satisfied</li>
+              <li>Refunds are processed within 5-10 business days to your original payment method</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">4.3 Termination by Us</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">4.2 License Revocation</h3>
             <p className="text-gray-700">
-              We reserve the right to suspend or terminate your Pro subscription if you violate these Terms,
-              with a pro-rated refund for unused time.
+              We reserve the right to revoke your Pro license if you violate these Terms (e.g., sharing license
+              keys, attempting to bypass license validation). In such cases, refunds will be at our discretion.
             </p>
           </section>
 
@@ -210,15 +199,15 @@ export default function TermsOfService() {
             <p className="text-gray-700">
               We may modify these Terms at any time. We will notify Pro users of material changes via email.
               Continued use of the Software after changes constitutes acceptance of the updated Terms. If you
-              do not agree to the changes, you must stop using the Software and cancel your subscription.
+              do not agree to the changes, you must stop using the Software.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Governing Law</h2>
             <p className="text-gray-700">
-              These Terms are governed by the laws of [Your State/Country], without regard to conflict of law
-              principles. Any disputes shall be resolved in the courts of [Your Jurisdiction].
+              These Terms are governed by the laws of the State of Illinois, United States, without regard to conflict of law
+              principles. Any disputes shall be resolved in the courts of Illinois, United States.
             </p>
           </section>
 
