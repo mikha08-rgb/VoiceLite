@@ -55,6 +55,9 @@ voicelite-web/*.bat
 .claude/settings.local.json
 .claude/mcp.json
 
+# Build artifacts
+VoiceLite/Installer/publish/
+
 # Generated security reports and keys
 NEW_KEYS.txt
 GIT_HISTORY_AUDIT_REPORT.md
