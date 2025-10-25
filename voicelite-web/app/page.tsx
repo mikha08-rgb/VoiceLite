@@ -251,7 +251,7 @@ export default function HomePage() {
                 1
               </div>
               <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Download & Install</h3>
-              <p className="leading-relaxed text-stone-600 dark:text-stone-400">150MB download, 2-minute setup, no sign-up required</p>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">98MB download, 2-minute setup, no sign-up required</p>
             </div>
 
             <div className="space-y-6 text-center">
@@ -375,7 +375,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="/api/download?version=1.0.86"
+                href="/api/download?version=1.0.88"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -522,7 +522,7 @@ export default function HomePage() {
             Get VoiceLite Pro - $20
           </a>
           <p className="text-sm opacity-75">
-            Windows 10/11 • 150MB • 2-minute setup
+            Windows 10/11 • 98MB • 2-minute setup
             <br />
             30-day money-back guarantee • Try free tier first
           </p>
