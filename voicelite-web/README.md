@@ -88,4 +88,4 @@ Upgrade to database when you have >100 customers.
 
 ## Support
 
-Email: contact@voicelite.app
+Email: contact@voicelite.app# GA4 Fix 2025-10-25
