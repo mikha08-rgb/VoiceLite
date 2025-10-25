@@ -142,7 +142,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.95 (Critical hotfix - installer model bundling)
+**Current Desktop**: v1.0.96 (Critical hotfix - model file missing from git)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 
@@ -153,7 +153,8 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 - v1.0.88: Q8_0 quantization for all Pro models - 67-73% faster overall, 45% smaller
 
 **Recent Critical Fixes**:
-- **v1.0.95**: CRITICAL installer bug - whisper model not bundled (100% failure rate on fresh installs). Installer was copying from wrong directory path (`whisper_installer_lite/` GitHub Actions temp dir instead of `publish/whisper/`). All v1.0.94 users must upgrade.
+- **v1.0.96**: CRITICAL model file not in git - `ggml-tiny.bin` (42MB) was ignored by `.gitignore`, causing GitHub Actions builds to fail (100% failure rate on fresh installs). Fixed by force-adding model to git with `git add -f`. v1.0.95 was broken for all fresh installations.
+- **v1.0.95**: PARTIAL FIX - Fixed installer path but model still missing (only fixed local builds, not GitHub Actions)
 - **v1.0.94**: Critical logging bug - Release builds had logging suppressed, preventing diagnostics
 - **v1.0.77-79**: Security fixes - Closed freemium bypass vulnerabilities, Pro feature gating
 

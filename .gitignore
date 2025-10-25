@@ -1,5 +1,6 @@
-# Large model files
+# Large model files (EXCEPT bundled tiny model)
 *.bin
+!VoiceLite/whisper/ggml-tiny.bin
 
 # Build outputs
 bin/
@@ -22,8 +23,7 @@ temp/
 *.user
 *.suo
 
-# Whisper executables and models
-whisper/*.bin
+# Whisper executables (models handled above)
 whisper/*.exe
 whisper/*.dll
 
