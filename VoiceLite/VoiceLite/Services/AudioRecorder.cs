@@ -461,9 +461,12 @@ namespace VoiceLite.Services
                                 audioMemoryStream = null;
                             }
 
+                            // CRITICAL: Log at WARNING level so it shows in Release builds
+                            ErrorLogger.LogWarning($"StopRecording: Memory buffer contains {audioData.Length} bytes");
+
                             if (audioData.Length > 100) // Only process if there's actual audio
                             {
-                                ErrorLogger.LogMessage($"StopRecording: Memory buffer contains {audioData.Length} bytes");
+                                ErrorLogger.LogWarning($"StopRecording: CALLING SaveMemoryBufferToTempFile with {audioData.Length} bytes");
 
                                 // Notify listeners with the audio data
                                 AudioDataReady?.Invoke(this, audioData);
@@ -471,10 +474,12 @@ namespace VoiceLite.Services
                                 // CRITICAL FIX: Always save to temp file for transcription
                                 // Don't depend on event subscribers - the file is needed regardless
                                 SaveMemoryBufferToTempFile(audioData);
+
+                                ErrorLogger.LogWarning("StopRecording: SaveMemoryBufferToTempFile COMPLETED");
                             }
                             else
                             {
-                                ErrorLogger.LogMessage("StopRecording: Skipping empty memory buffer");
+                                ErrorLogger.LogWarning($"StopRecording: Skipping TINY/EMPTY buffer - only {audioData.Length} bytes!");
                             }
                         }
                         // QUICK WIN 1: File-based recording code removed (memory mode is enforced)
@@ -550,24 +555,30 @@ namespace VoiceLite.Services
 
         private void SaveMemoryBufferToTempFile(byte[] audioData)
         {
+            ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: ENTERED with {audioData.Length} bytes");
             try
             {
                 // Ensure temp directory exists (Windows temp cleanup might delete it while app is running)
                 if (!Directory.Exists(tempDirectory))
                 {
-                    ErrorLogger.LogMessage($"SaveMemoryBufferToTempFile: Temp directory was deleted, recreating: {tempDirectory}");
+                    ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: Temp directory was deleted, recreating: {tempDirectory}");
                     Directory.CreateDirectory(tempDirectory);
                 }
 
                 string guidPart = Guid.NewGuid().ToString("N")[..8];
                 currentAudioFilePath = Path.Combine(tempDirectory, $"recording_{DateTime.Now:yyyyMMddHHmmssfff}_{guidPart}.wav");
 
+                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: About to write {audioData.Length} bytes to {currentAudioFilePath}");
+
                 // Write the complete WAV data to file
                 File.WriteAllBytes(currentAudioFilePath, audioData);
-                ErrorLogger.LogMessage($"SaveMemoryBufferToTempFile: Saved {audioData.Length} bytes to {currentAudioFilePath}");
+
+                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: SUCCESS - Saved {audioData.Length} bytes to {currentAudioFilePath}");
 
                 // Notify about the file
                 AudioFileReady?.Invoke(this, currentAudioFilePath);
+
+                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: AudioFileReady event invoked");
             }
             catch (Exception ex)
             {
