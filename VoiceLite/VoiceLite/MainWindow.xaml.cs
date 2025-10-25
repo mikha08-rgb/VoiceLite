@@ -1343,6 +1343,7 @@ namespace VoiceLite
         /// </summary>
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
+            ErrorLogger.LogWarning($"OnAudioFileReady: ENTERED with file: {audioFilePath}");
             // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
             {
@@ -1354,20 +1355,26 @@ namespace VoiceLite
                     return;
                 }
 
+                ErrorLogger.LogWarning("OnAudioFileReady: Setting isTranscribing = true");
                 isTranscribing = true;
 
                 // Start stuck state recovery timer now that we have audio to process
                 StartStuckStateRecoveryTimer();
 
+                ErrorLogger.LogWarning("OnAudioFileReady: Starting transcription...");
                 try
             {
+                ErrorLogger.LogWarning("OnAudioFileReady: Checking whisperService...");
                 var transcriber = whisperService;
                 if (transcriber == null)
                 {
+                    ErrorLogger.LogWarning("OnAudioFileReady: ERROR - whisperService is NULL!");
                     throw new InvalidOperationException("Whisper service not initialized");
                 }
 
+                ErrorLogger.LogWarning($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
                 var transcription = await transcriber.TranscribeAsync(audioFilePath);
+                ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned: '{transcription}'");
 
                 await Dispatcher.InvokeAsync(() =>
                 {
