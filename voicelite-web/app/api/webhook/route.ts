@@ -10,6 +10,9 @@ import {
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
+// Configure route to receive raw body for Stripe signature verification
+export const dynamic = 'force-dynamic';
+
 // Lazy initialization of Stripe client to allow builds without env vars
 function getStripeClient() {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
@@ -117,10 +120,27 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       periodEndsAt: currentPeriodEnd,
     });
 
-    await sendLicenseEmail({
+    console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
+
+    const emailResult = await sendLicenseEmail({
       email,
       licenseKey: license.licenseKey,
     });
+
+    if (emailResult.success) {
+      console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+      await recordLicenseEvent(license.id, 'email_sent', {
+        messageId: emailResult.messageId,
+        email: email,
+      });
+    } else {
+      console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+      await recordLicenseEvent(license.id, 'email_failed', {
+        error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
+        email: email,
+      });
+      // Don't throw - license was created successfully, just log the email failure
+    }
   } else {
     const paymentIntentId = typeof session.payment_intent === 'string'
       ? session.payment_intent
@@ -137,10 +157,27 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       stripePaymentIntentId: paymentIntentId,
     });
 
-    await sendLicenseEmail({
+    console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
+
+    const emailResult = await sendLicenseEmail({
       email,
       licenseKey: license.licenseKey,
     });
+
+    if (emailResult.success) {
+      console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+      await recordLicenseEvent(license.id, 'email_sent', {
+        messageId: emailResult.messageId,
+        email: email,
+      });
+    } else {
+      console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+      await recordLicenseEvent(license.id, 'email_failed', {
+        error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
+        email: email,
+      });
+      // Don't throw - license was created successfully, just log the email failure
+    }
   }
 }
 
