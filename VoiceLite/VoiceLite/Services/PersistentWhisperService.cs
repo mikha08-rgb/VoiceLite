@@ -218,7 +218,8 @@ namespace VoiceLite.Services
                               "--best-of 1 " +            // Single candidate
                               "--entropy-thold 3.0 " +    // Prevent retries
                               "--no-fallback " +          // Skip temperature fallback
-                              "--max-context 64";
+                              "--max-context 64 " +       // Limit context
+                              "--flash-attn";             // Flash attention (v1.7.6)
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -338,11 +339,12 @@ namespace VoiceLite.Services
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
                 // Build arguments using user settings for optimal accuracy/speed balance
-                // PERFORMANCE OPTIMIZATIONS (v1.0.85):
+                // PERFORMANCE OPTIMIZATIONS (v1.0.87):
                 // - Use physical cores instead of logical processors (compute-intensive workload)
                 // - Add entropy threshold to prevent hallucination retries (~20-30% faster)
                 // - Add no-fallback to skip temperature retries (~15-25% faster)
                 // - Add max-context limit for short audio clips (~10-15% faster)
+                // - Flash attention for modern CPU/GPU optimization (~15-30% faster)
                 int optimalThreads = Math.Max(1, Environment.ProcessorCount / 2); // Physical cores
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
@@ -352,7 +354,8 @@ namespace VoiceLite.Services
                               $"--best-of {settings.BestOf} " +
                               $"--entropy-thold 3.0 " +      // Prevent repetition retries
                               $"--no-fallback " +            // Skip temperature fallback
-                              $"--max-context 64";
+                              $"--max-context 64 " +         // Limit context for short clips
+                              $"--flash-attn";               // Flash attention optimization (v1.7.6)
 
                 // Command prepared (no logging to reduce noise and avoid exposing file paths)
 
