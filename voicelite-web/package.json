@@ -11,14 +11,16 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:email": "tsx scripts/test-email.ts",
+    "check:licenses": "tsx scripts/check-recent-licenses.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.1.0",
-    "@prisma/client": "^6.1.0",
+    "@prisma/client": "^6.18.0",
     "@upstash/ratelimit": "^2.0.6",
     "@upstash/redis": "^1.35.4",
     "lucide-react": "^0.544.0",
@@ -28,7 +30,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "resend": "^6.1.0",
-    "stripe": "^18.5.0",
+    "stripe": "^19.1.0",
     "swagger-ui-react": "^5.29.2",
     "zod": "^4.1.11"
   },
