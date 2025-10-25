@@ -5,7 +5,7 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.0.94
+AppVersion=1.0.95
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.0.94
+OutputBaseFilename=VoiceLite-Setup-1.0.95
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
@@ -36,7 +36,9 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Whisper files (Tiny model only - 75MB)
-Source: "..\whisper_installer_lite\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+; CRITICAL FIX v1.0.95: Copy from publish directory (consistent with .exe/.dll copying above)
+; Previous bug: Copied from whisper_installer_lite/ (GitHub Actions temp dir) which doesn't exist in local builds
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion

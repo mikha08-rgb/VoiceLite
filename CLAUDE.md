@@ -142,7 +142,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.94 (Critical hotfix - logging in Release builds)
+**Current Desktop**: v1.0.95 (Critical hotfix - installer model bundling)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 
@@ -152,10 +152,10 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 - v1.0.87: Added flash attention + Q8_0 tiny model - Additional 7-12% faster
 - v1.0.88: Q8_0 quantization for all Pro models - 67-73% faster overall, 45% smaller
 
-**Recent Security Fixes** (v1.0.77-79):
-- Closed freemium bypass vulnerabilities
-- Added Pro feature gating to model downloads
-- Fixed model download permissions
+**Recent Critical Fixes**:
+- **v1.0.95**: CRITICAL installer bug - whisper model not bundled (100% failure rate on fresh installs). Installer was copying from wrong directory path (`whisper_installer_lite/` GitHub Actions temp dir instead of `publish/whisper/`). All v1.0.94 users must upgrade.
+- **v1.0.94**: Critical logging bug - Release builds had logging suppressed, preventing diagnostics
+- **v1.0.77-79**: Security fixes - Closed freemium bypass vulnerabilities, Pro feature gating
 
 ## Web Backend (voicelite-web)
 
