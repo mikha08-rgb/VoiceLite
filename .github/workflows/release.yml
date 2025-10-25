@@ -120,33 +120,19 @@ jobs:
         restore-keys: |
           whisper-models-lite-v1-
 
-    - name: Download Whisper models and executable
+    - name: Copy Whisper files for installer
       if: steps.cache-whisper.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        echo "Downloading Whisper executable and Tiny model for installer..."
+        echo "Copying Whisper files from VoiceLite/whisper/ directory..."
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
 
-        # Download whisper.cpp binaries (whisper.exe + DLLs)
-        $whisperBinUrl = "https://github.com/ggerganov/whisper.cpp/releases/download/v1.5.4/whisper-bin-x64.zip"
-        echo "Downloading whisper.cpp binaries (whisper.exe, whisper.dll, DLLs)..."
-        Invoke-WebRequest -Uri $whisperBinUrl -OutFile "whisper-temp.zip"
-        Expand-Archive -Path "whisper-temp.zip" -DestinationPath "whisper-temp" -Force
+        # CRITICAL FIX: Use whisper files from source directory (v1.7.6)
+        # DO NOT download old v1.5.4 - it cannot read NAudio WAV format correctly
+        Copy-Item -Path "VoiceLite/whisper/*" -Destination "VoiceLite/whisper_installer_lite/" -Force
 
-        # Copy all required files to lite installer directory
-        Copy-Item -Path "whisper-temp/main.exe" -Destination "VoiceLite/whisper_installer_lite/whisper.exe" -Force
-        Copy-Item -Path "whisper-temp/*.dll" -Destination "VoiceLite/whisper_installer_lite/" -Force
-
-        Remove-Item "whisper-temp.zip" -Force
-        Remove-Item "whisper-temp" -Recurse -Force
-
-        # Download Tiny model only (75MB)
-        $tinyModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
-        echo "Downloading ggml-tiny.bin (75MB)..."
-        Invoke-WebRequest -Uri $tinyModelUrl -OutFile "VoiceLite/whisper_installer_lite/ggml-tiny.bin"
-
-        echo "Downloads complete. Installer directory contents:"
+        echo "Copied Whisper files. Installer directory contents:"
         Get-ChildItem "VoiceLite/whisper_installer_lite" | ForEach-Object {
           $sizeInMB = [math]::Round($_.Length / 1MB, 2)
           echo "  - $($_.Name) ($sizeInMB MB)"

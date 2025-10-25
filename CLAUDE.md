@@ -142,7 +142,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.0.93 (Critical hotfix - logging in Release builds)
+**Current Desktop**: v1.0.94 (Critical hotfix - logging in Release builds)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 
