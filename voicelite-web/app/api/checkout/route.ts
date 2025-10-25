@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${baseUrl}/checkout/cancel`,
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
+      customer_creation: 'always', // CRITICAL: Create customer so webhook can access customer ID
     });
 
     return NextResponse.json({ url: session.url });
