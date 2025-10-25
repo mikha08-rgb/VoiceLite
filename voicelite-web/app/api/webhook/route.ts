@@ -92,14 +92,20 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
+  console.log(`🔔 WEBHOOK RECEIVED: checkout.session.completed - Session ${session.id}`);
+
   const email = session.customer_email || session.customer_details?.email;
   const stripeCustomerId = (session.customer as string) ?? '';
 
+  console.log(`📝 Email: ${email}, Customer: ${stripeCustomerId}`);
+
   if (!email || !stripeCustomerId) {
+    console.error('❌ Missing customer email or ID');
     throw new Error('Missing customer email or ID on checkout session');
   }
 
   const plan = session.metadata?.plan ?? (session.mode === 'subscription' ? 'quarterly' : 'lifetime');
+  console.log(`💳 Plan type: ${plan}, Mode: ${session.mode}`);
 
   if (plan === 'quarterly') {
     const subscriptionId = session.subscription as string | undefined;
@@ -142,20 +148,34 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       // Don't throw - license was created successfully, just log the email failure
     }
   } else {
+    console.log(`💰 Processing lifetime/one-time payment`);
     const paymentIntentId = typeof session.payment_intent === 'string'
       ? session.payment_intent
       : session.payment_intent?.id;
 
+    console.log(`💳 Payment Intent ID: ${paymentIntentId}`);
+
     if (!paymentIntentId) {
+      console.error('❌ Missing payment intent for lifetime plan');
       throw new Error('Missing payment intent for lifetime plan');
     }
 
-    const license = await upsertLicenseFromStripe({
-      email,
-      type: LicenseType.LIFETIME,
-      stripeCustomerId,
-      stripePaymentIntentId: paymentIntentId,
-    });
+    console.log(`💾 Creating/updating license in database...`);
+
+    let license;
+    try {
+      license = await upsertLicenseFromStripe({
+        email,
+        type: LicenseType.LIFETIME,
+        stripeCustomerId,
+        stripePaymentIntentId: paymentIntentId,
+      });
+      console.log(`✅ License created: ${license.licenseKey} (ID: ${license.id})`);
+    } catch (dbError) {
+      console.error(`❌ DATABASE ERROR:`, dbError);
+      console.error(`Error details:`, JSON.stringify(dbError, null, 2));
+      throw dbError;
+    }
 
     console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
 
