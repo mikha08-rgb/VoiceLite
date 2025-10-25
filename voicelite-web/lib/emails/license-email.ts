@@ -129,6 +129,7 @@ Need help? Just reply to this email.
 `.trim();
 
   try {
+    console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
     const resend = getResendClient();
     const result = await resend.emails.send({
       from: `VoiceLite <${fromEmail}>`,
@@ -138,9 +139,19 @@ Need help? Just reply to this email.
       text,
     });
 
+    console.log(`✅ Resend API response:`, {
+      success: true,
+      messageId: result.data?.id,
+      email: email
+    });
+
     return { success: true, messageId: result.data?.id };
   } catch (error) {
-    console.error('Failed to send license email:', error);
+    console.error('❌ Failed to send license email:', {
+      email,
+      error: error instanceof Error ? error.message : String(error),
+      errorDetails: error,
+    });
     return { success: false, error };
   }
 }
