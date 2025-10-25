@@ -468,11 +468,9 @@ namespace VoiceLite.Services
                                 // Notify listeners with the audio data
                                 AudioDataReady?.Invoke(this, audioData);
 
-                                // Optionally save to temp file for compatibility with existing code
-                                if (AudioFileReady != null)
-                                {
-                                    SaveMemoryBufferToTempFile(audioData);
-                                }
+                                // CRITICAL FIX: Always save to temp file for transcription
+                                // Don't depend on event subscribers - the file is needed regardless
+                                SaveMemoryBufferToTempFile(audioData);
                             }
                             else
                             {
