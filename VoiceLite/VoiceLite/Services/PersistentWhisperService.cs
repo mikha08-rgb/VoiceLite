@@ -492,15 +492,17 @@ namespace VoiceLite.Services
                     }
                 }
 
-                // Only log errors, not successful transcriptions (reduce noise)
+                // CRITICAL: Log at WARNING level so it shows in Release builds
+                ErrorLogger.LogWarning($"Whisper process exited with code: {process.ExitCode}");
+
                 if (process.ExitCode != 0)
                 {
-                    ErrorLogger.LogMessage($"Whisper process failed with exit code: {process.ExitCode}");
                     var error = errorBuilder.ToString();
+                    ErrorLogger.LogWarning($"Whisper process failed with exit code: {process.ExitCode}");
                     if (!string.IsNullOrEmpty(error) && error.Length < 500)
                     {
                         // Log truncated error to avoid excessive log sizes
-                        ErrorLogger.LogMessage($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
+                        ErrorLogger.LogWarning($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
                     }
                     throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
                 }
@@ -510,7 +512,8 @@ namespace VoiceLite.Services
                 var result = outputBuilder.ToString().Trim();
 
                 var totalTime = DateTime.Now - startTime;
-                ErrorLogger.LogMessage($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms");
+                ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {result.Length} chars");
+                ErrorLogger.LogWarning($"Transcription result: '{result.Substring(0, Math.Min(result.Length, 200))}'");
 
                 // PERFORMANCE: Removed redundant post-transcription warmup
                 // Background warmup only provides benefit on cold start. After first transcription,
