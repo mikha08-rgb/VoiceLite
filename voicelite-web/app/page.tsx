@@ -552,7 +552,7 @@ export default function HomePage() {
                   Pricing
                 </a>
                 <a
-                  href="https://github.com/mikha08-rgb/VoiceLite/releases/latest"
+                  href="/api/download?version=1.0.88"
                   className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
                 >
                   Download
