@@ -79,10 +79,10 @@ namespace VoiceLite.Services
             try
             {
                 // Expected SHA256 hash of the official whisper.exe binary (whisper.cpp build)
-                // Hash verified: DC58771DF4C4E8FC0602879D5CB9AA9D0FB9CD210D8DF555BA84EB63599FB235
-                // File size: 111KB (113,664 bytes)
-                // Build date: Jan 5, 2024
-                const string EXPECTED_HASH = "DC58771DF4C4E8FC0602879D5CB9AA9D0FB9CD210D8DF555BA84EB63599FB235";
+                // Hash verified: B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF
+                // File size: 469KB (480,768 bytes)
+                // Build version: whisper.cpp v1.7.6 (Oct 2024) - Q8_0 quantization support
+                const string EXPECTED_HASH = "B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF";
 
                 using var sha256 = System.Security.Cryptography.SHA256.Create();
                 using var stream = File.OpenRead(path);
