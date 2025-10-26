@@ -374,6 +374,11 @@ namespace VoiceLite.Services
                               $"--max-context 64 " +         // Limit context for short clips
                               $"--flash-attn";               // Flash attention optimization (v1.7.6)
 
+                // DIAGNOSTIC: Log exact whisper command with thread count
+                File.AppendAllText(Path.Combine(Path.GetTempPath(), "VoiceLite", "diagnostic.log"),
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Thread count: {optimalThreads}, CPU cores: {Environment.ProcessorCount}\n" +
+                    $"Command: {whisperExePath} {arguments}\n\n");
+
                 var processStartInfo = new ProcessStartInfo
                 {
                     FileName = whisperExePath,

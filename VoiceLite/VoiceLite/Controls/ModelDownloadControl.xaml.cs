@@ -109,9 +109,9 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-large-v3.bin",
                 DisplayName = "Large (Ultra) 🔒",
-                Description = "Maximum accuracy - 1.6GB Q8_0, 97-98% accuracy, ~8 seconds processing",
-                FileSizeMB = 1600,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q8_0.bin",
+                Description = "Maximum accuracy - 3.1GB F16, 97-98% accuracy, ~15 seconds processing",
+                FileSizeMB = 3100,
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
                 IsProOnly = true // Pro tier model
             });
         }

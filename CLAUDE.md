@@ -69,7 +69,7 @@ git push --tags
 
 ### Whisper Models (in `whisper/` directory)
 
-**All models Q8_0 quantized (v1.0.88+)** for 45% size reduction & 30-40% speed boost with identical accuracy.
+**Most models Q8_0 quantized (v1.0.88+)** for 45% size reduction & 30-40% speed boost with identical accuracy. Large-v3 uses F16 (Q8_0 unavailable upstream).
 
 **Free Tier (bundled with installer):**
 - `ggml-tiny.bin` (42MB Q8_0): **Lite** - Default, 80-85% accuracy, <0.8s processing
@@ -78,7 +78,7 @@ git push --tags
 - `ggml-base.bin` (78MB Q8_0): **Swift** - 85-90% accuracy, ~1.5s processing
 - `ggml-small.bin` (253MB Q8_0): **Pro** ⭐ - 90-93% accuracy, ~3s processing (recommended)
 - `ggml-medium.bin` (823MB Q8_0): **Elite** - 95-97% accuracy, ~12s processing
-- `ggml-large-v3.bin` (1.6GB Q8_0): **Ultra** - 97-98% accuracy, ~8s processing
+- `ggml-large-v3.bin` (3.1GB F16): **Ultra** - 97-98% accuracy, ~15s processing (not quantized - Q8_0 unavailable)
 
 **Quantization Details (v1.0.88)**:
 - Method: Q8_0 (8-bit integer quantization)
@@ -142,7 +142,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.1.3 (Critical hotfix - whisper.exe v1.7.6 NAudio WAV fix)
+**Current Desktop**: v1.1.4 (Fix Large model download 404 error)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 
