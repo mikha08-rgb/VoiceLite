@@ -15,7 +15,7 @@ namespace VoiceLite.Tests
             BindingFlags.NonPublic | BindingFlags.Static) ??
             throw new InvalidOperationException("Helper not found");
 
-        [Fact]
+        [Fact(Skip = "IsProcessOwnedByVoiceLite method no longer exists in App class")]
         public void IsProcessOwnedByVoiceLite_ReturnsTrueWhenExecutableResidesUnderRoot()
         {
             using var current = Process.GetCurrentProcess();
@@ -26,7 +26,7 @@ namespace VoiceLite.Tests
             owned.Should().BeTrue();
         }
 
-        [Fact]
+        [Fact(Skip = "IsProcessOwnedByVoiceLite method no longer exists in App class")]
         public void IsProcessOwnedByVoiceLite_ReturnsFalseForExternalProcesses()
         {
             using var current = Process.GetCurrentProcess();

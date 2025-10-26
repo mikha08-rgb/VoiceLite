@@ -26,8 +26,6 @@ namespace VoiceLite.Tests.Services
             _settings = new Settings
             {
                 WhisperModel = "ggml-small.bin",
-                BeamSize = 5,
-                BestOf = 5
             };
 
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp_error_recovery");

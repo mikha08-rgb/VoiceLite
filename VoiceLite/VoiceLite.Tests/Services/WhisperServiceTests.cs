@@ -22,7 +22,6 @@ namespace VoiceLite.Tests.Services
             _settings = new Settings
             {
                 WhisperModel = "small",
-                BeamSize = 5
             };
 
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");

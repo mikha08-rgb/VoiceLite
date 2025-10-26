@@ -36,8 +36,6 @@ namespace VoiceLite.Models
         private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
         private string _whisperModel = "ggml-tiny.bin"; // MVP default - fastest model, bundled with installer
-        private int _beamSize = 1; // PERFORMANCE: Greedy decoding for 5x faster transcription
-        private int _bestOf = 1;   // PERFORMANCE: Single sampling for 5x faster transcription
         private double _whisperTimeoutMultiplier = 2.0;
 
         public RecordMode Mode
@@ -70,17 +68,12 @@ namespace VoiceLite.Models
             set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
         }
 
-        public int BeamSize
-        {
-            get => _beamSize;
-            set => _beamSize = Math.Clamp(value, 1, 3); // PERFORMANCE: Cap at 3 (5-10 causes 10-30s transcription delays)
-        }
-
-        public int BestOf
-        {
-            get => _bestOf;
-            set => _bestOf = Math.Clamp(value, 1, 3); // PERFORMANCE: Cap at 3 (higher values exponentially slow)
-        }
+        // CRITICAL: BeamSize and BestOf are HARD-CODED to optimal values
+        // These are no longer user-configurable to prevent performance regressions
+        // v1.1.6: Made read-only after recurring issues with persisted bad settings causing 20+ second transcriptions
+        // Greedy decoding (beam_size=1, best_of=1) provides optimal speed with minimal accuracy tradeoff
+        public int BeamSize => 1; // HARD-CODED: Greedy decoding (5x faster than beam_size=3)
+        public int BestOf => 1;   // HARD-CODED: Single sampling (5x faster than best_of=3)
 
         public double WhisperTimeoutMultiplier
         {
@@ -203,22 +196,11 @@ namespace VoiceLite.Models
                 settings.Threads = 4;
             }
 
-            // CRITICAL FIX (v1.1.6): Reset BeamSize and BestOf to optimal values
-            // Issue: Old settings with BeamSize=5-10 were clamped to 3, still causing 5-9x slower transcription
-            // BeamSize=3 + BestOf=3 = ~9x slower than optimal (0.8s → 7s)
-            // Force reset to optimal greedy decoding for maximum speed
-            if (settings.BeamSize > 1)
-            {
-                settings.BeamSize = 1; // Reset to greedy decoding (5x faster)
-            }
-            if (settings.BestOf > 1)
-            {
-                settings.BestOf = 1; // Reset to single sampling (5x faster)
-            }
+            // v1.1.6: BeamSize and BestOf are now hard-coded properties (always return 1)
+            // No need to validate/reset since they can't be changed via JSON deserialization
+            // Old settings.json files with BeamSize/BestOf will be ignored on load
 
             // Force re-validation by triggering property setters
-            settings.BeamSize = settings.BeamSize;
-            settings.BestOf = settings.BestOf;
             settings.WhisperTimeoutMultiplier = settings.WhisperTimeoutMultiplier;
 
             return settings;

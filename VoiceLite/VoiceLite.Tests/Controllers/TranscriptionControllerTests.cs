@@ -85,47 +85,63 @@ namespace VoiceLite.Tests.Controllers
         public async Task RetryTranscriptionAsync_ShouldRetryOnFailure()
         {
             // Arrange
-            var audioFile = "test.wav";
-            var modelPath = "tiny";
-            var callCount = 0;
+            var audioFile = Path.GetTempFileName();
+            try
+            {
+                var modelPath = "tiny";
+                var callCount = 0;
 
-            _mockWhisperService.Setup(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(() =>
-                {
-                    callCount++;
-                    if (callCount < 3)
-                        throw new Exception("Transient error");
-                    return "Success after retries";
-                });
+                _mockWhisperService.Setup(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()))
+                    .ReturnsAsync(() =>
+                    {
+                        callCount++;
+                        if (callCount < 3)
+                            throw new Exception("Transient error");
+                        return "Success after retries";
+                    });
 
-            // Act
-            var result = await _controller.RetryTranscriptionAsync(audioFile, modelPath, maxRetries: 3);
+                // Act
+                var result = await _controller.RetryTranscriptionAsync(audioFile, modelPath, maxRetries: 3);
 
-            // Assert
-            result.Success.Should().BeTrue();
-            result.Text.Should().Be("Success after retries");
-            callCount.Should().Be(3);
-            _mockErrorLogger.Verify(x => x.LogInfo(It.IsAny<string>()), Times.AtLeast(2));
+                // Assert
+                result.Success.Should().BeTrue();
+                result.Text.Should().Be("Success after retries");
+                callCount.Should().Be(3);
+                _mockErrorLogger.Verify(x => x.LogInfo(It.IsAny<string>()), Times.AtLeast(2));
+            }
+            finally
+            {
+                if (File.Exists(audioFile))
+                    File.Delete(audioFile);
+            }
         }
 
         [Fact]
         public async Task RetryTranscriptionAsync_ShouldFailAfterMaxRetries()
         {
             // Arrange
-            var audioFile = "test.wav";
-            var modelPath = "tiny";
+            var audioFile = Path.GetTempFileName();
+            try
+            {
+                var modelPath = "tiny";
 
-            _mockWhisperService.Setup(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .ThrowsAsync(new Exception("Persistent error"));
+                _mockWhisperService.Setup(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()))
+                    .ThrowsAsync(new Exception("Persistent error"));
 
-            // Act
-            var result = await _controller.RetryTranscriptionAsync(audioFile, modelPath, maxRetries: 2);
+                // Act
+                var result = await _controller.RetryTranscriptionAsync(audioFile, modelPath, maxRetries: 2);
 
-            // Assert
-            result.Success.Should().BeFalse();
-            result.Error.Should().Be("Persistent error");
-            _mockWhisperService.Verify(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()),
-                Times.Exactly(3)); // Initial + 2 retries
+                // Assert
+                result.Success.Should().BeFalse();
+                result.Error.Should().Be("Persistent error");
+                _mockWhisperService.Verify(x => x.TranscribeAsync(It.IsAny<string>(), It.IsAny<string>()),
+                    Times.Exactly(3)); // Initial + 2 retries
+            }
+            finally
+            {
+                if (File.Exists(audioFile))
+                    File.Delete(audioFile);
+            }
         }
 
         [Fact]

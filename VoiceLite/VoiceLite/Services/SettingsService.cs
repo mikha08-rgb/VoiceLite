@@ -306,8 +306,7 @@ namespace VoiceLite.Services
             // Copy all properties from source to target
             target.SelectedModel = source.SelectedModel;
             target.Language = source.Language;
-            target.BeamSize = source.BeamSize;
-            target.BestOf = source.BestOf;
+            // BeamSize and BestOf are now hard-coded read-only properties (v1.1.6) - no copying needed
             target.Threads = source.Threads;
             target.MinimizeToTray = source.MinimizeToTray;
             target.StartMinimized = source.StartMinimized;

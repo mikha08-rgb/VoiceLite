@@ -34,8 +34,6 @@ namespace VoiceLite.Tests.Stress
             {
                 WhisperModel = "tiny", // Use tiny model for speed
                 Language = "en",
-                BeamSize = 1,
-                BestOf = 1
             };
 
             PersistentWhisperService? whisperService = null;
@@ -144,8 +142,6 @@ namespace VoiceLite.Tests.Stress
             {
                 WhisperModel = "tiny",
                 Language = "en",
-                BeamSize = 1,
-                BestOf = 1
             };
 
             PersistentWhisperService? whisperService = null;
@@ -223,8 +219,6 @@ namespace VoiceLite.Tests.Stress
             {
                 WhisperModel = "tiny",
                 Language = "en",
-                BeamSize = 1,
-                BestOf = 1
             };
 
             PersistentWhisperService? whisperService = null;

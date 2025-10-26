@@ -29,7 +29,6 @@ namespace VoiceLite.Tests.Integration
             _settings = new Settings
             {
                 WhisperModel = "small",
-                BeamSize = 5
             };
 
             _recorder = new AudioRecorder();
