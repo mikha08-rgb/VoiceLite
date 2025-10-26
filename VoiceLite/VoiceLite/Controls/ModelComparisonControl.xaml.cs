@@ -247,32 +247,36 @@ namespace VoiceLite.Controls
 
         private async void DownloadModel(WhisperModelInfo model)
         {
-            // CRITICAL FIX: Check Pro permission before download
-            if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
-            {
-                MessageBox.Show(
-                    proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
-                    "Pro Feature",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information
-                );
-                return;
-            }
-
-            var result = MessageBox.Show(
-                $"Download {model.DisplayName} model?\n\n" +
-                $"Size: {model.FileSizeDisplay}\n" +
-                $"Source: GitHub Releases\n\n" +
-                $"This may take several minutes depending on your connection.",
-                "Download Model",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result != MessageBoxResult.Yes)
-                return;
-
+            // CRITICAL FIX #5: Wrap entire async void method in try-catch
             try
             {
+                // CRITICAL FIX: Check Pro permission before download
+                if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                {
+                    MessageBox.Show(
+                        proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                        "Pro Feature",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                    return;
+                }
+
+                var result = MessageBox.Show(
+                    $"Download {model.DisplayName} model?\n\n" +
+                    $"Size: {model.FileSizeDisplay}\n" +
+                    $"Source: GitHub Releases\n\n" +
+                    $"This may take several minutes depending on your connection.",
+                    "Download Model",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes)
+                    return;
+
+                // Inner try for download-specific errors
+                try
+                {
                 // Determine download URL based on model
                 string? downloadUrl = model.FileName switch
                 {
@@ -329,15 +333,27 @@ namespace VoiceLite.Controls
                 // Refresh model list to show newly downloaded model
                 LoadModels();
             }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Download failed: {ex.Message}\n\nPlease try again or download manually.",
+                        "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    IsEnabled = true;
+                    Mouse.OverrideCursor = null;
+                }
+            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Download failed: {ex.Message}\n\nPlease try again or download manually.",
-                    "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                IsEnabled = true;
-                Mouse.OverrideCursor = null;
+                // CRITICAL FIX #5: Outer catch for pre-download errors
+                ErrorLogger.LogError("Model download failed", ex);
+                MessageBox.Show(
+                    $"An error occurred: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
             }
         }
 

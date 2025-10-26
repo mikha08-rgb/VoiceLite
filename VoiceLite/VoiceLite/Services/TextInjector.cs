@@ -268,6 +268,7 @@ namespace VoiceLite.Services
                             // Only restore if clipboard still contains our transcription text
                             // This prevents overwriting user's new clipboard content during the 50ms window
                             string? currentClipboard = null;
+                            bool clipboardCheckFailed = false;
                             try
                             {
                                 if (Clipboard.ContainsText())
@@ -279,12 +280,14 @@ namespace VoiceLite.Services
                             catch (Exception ex)
                             {
                                 ErrorLogger.LogMessage($"BUG-007: Failed to check current clipboard: {ex.Message}");
-                                // Can't check clipboard state - skip restoration to be safe
-                                return;
+                                // CRITICAL FIX #3: If we can't check clipboard state, restore anyway
+                                // Better to restore than lose user's original data
+                                clipboardCheckFailed = true;
                             }
 
                             // ISSUE #8 FIX: currentClipboard is never null after ?? string.Empty above
-                            bool clipboardUnchanged = string.IsNullOrEmpty(currentClipboard) ||
+                            bool clipboardUnchanged = clipboardCheckFailed ||
+                                                     string.IsNullOrEmpty(currentClipboard) ||
                                                      currentClipboard == text;
 
                             if (clipboardUnchanged)

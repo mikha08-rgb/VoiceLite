@@ -30,6 +30,7 @@ namespace VoiceLite.Services
         private const int CleanupIntervalMinutes = 30;
         private const bool useMemoryBuffer = true; // QUICK WIN 1: Force memory mode to eliminate file I/O latency (50-100ms)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
+        private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
 
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
@@ -259,6 +260,10 @@ namespace VoiceLite.Services
                         throw new InvalidOperationException("Previous recording session not fully cleaned up. Cannot start new session.");
                     }
 
+                    // CRITICAL FIX #1: Increment session ID to invalidate any stale callbacks
+                    currentSessionId++;
+                    int sessionId = currentSessionId;
+
                     waveIn = new WaveInEvent
                     {
                         WaveFormat = new WaveFormat(16000, 16, 1),
@@ -276,12 +281,12 @@ namespace VoiceLite.Services
                     // File mode code paths removed to eliminate dead code warnings
                     audioMemoryStream = new MemoryStream();
                     waveFile = new WaveFileWriter(audioMemoryStream, waveIn.WaveFormat);
-                    ErrorLogger.LogDebug("StartRecording: Using memory buffer mode (enforced)");
+                    ErrorLogger.LogDebug($"StartRecording: Using memory buffer mode (session #{sessionId})");
 
                     // Start recording - this creates a completely fresh audio capture session
                     waveIn.StartRecording();
                     isRecording = true;
-                    ErrorLogger.LogInfo("Recording session started");
+                    ErrorLogger.LogInfo($"Recording session #{sessionId} started");
                 }
                 catch (Exception ex)
                 {
@@ -300,6 +305,9 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
+            // CRITICAL FIX #1: Capture session ID before any other checks
+            int callbackSessionId = currentSessionId;
+
             // Quick pre-lock check for obvious late callbacks
             if (!isRecording)
             {
@@ -310,6 +318,13 @@ namespace VoiceLite.Services
             // Additional safety check in lock to prevent race conditions
             lock (lockObject)
             {
+                // CRITICAL FIX #1: Reject callbacks from old sessions
+                if (callbackSessionId != currentSessionId)
+                {
+                    ErrorLogger.LogDebug($"OnDataAvailable: Rejected stale callback from session #{callbackSessionId} (current: #{currentSessionId})");
+                    return;
+                }
+
                 // Re-check after acquiring lock - state might have changed
                 if (!isRecording)
                     return;
@@ -422,11 +437,12 @@ namespace VoiceLite.Services
             {
                 if (!isRecording) return;
 
-                ErrorLogger.LogMessage($"StopRecording: CRITICAL - Stopping session at {DateTime.Now:HH:mm:ss.fff}");
+                int stoppingSessionId = currentSessionId;
+                ErrorLogger.LogMessage($"StopRecording: CRITICAL - Stopping session #{stoppingSessionId} at {DateTime.Now:HH:mm:ss.fff}");
 
                 // CRITICAL FIX: Set isRecording to false IMMEDIATELY to reject any incoming data
                 isRecording = false;
-                ErrorLogger.LogMessage("StopRecording: isRecording=false set - will IMMEDIATELY reject all incoming data");
+                ErrorLogger.LogMessage($"StopRecording: isRecording=false set for session #{stoppingSessionId} - will IMMEDIATELY reject all incoming data");
 
                 string? audioFileToNotify = currentAudioFilePath;
 

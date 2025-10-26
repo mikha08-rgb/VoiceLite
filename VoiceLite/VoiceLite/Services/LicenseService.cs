@@ -8,14 +8,28 @@ namespace VoiceLite.Services
 {
     public class LicenseService : IDisposable
     {
-        private readonly HttpClient _httpClient;
+        // WEEK 1 FIX: Static HttpClient prevents socket exhaustion
+        // Single instance shared across all LicenseService instances
+        private static readonly HttpClient _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(10),
+            DefaultRequestHeaders =
+            {
+                { "User-Agent", "VoiceLite-Desktop/1.0" }
+            }
+        };
+
         private readonly string _apiBaseUrl;
         private bool _disposed = false;
 
+        static LicenseService()
+        {
+            // Configure HttpClient once at startup
+            _httpClient.BaseAddress = new Uri("https://voicelite.app/");
+        }
+
         public LicenseService()
         {
-            _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(10);
             _apiBaseUrl = "https://voicelite.app";
         }
 
@@ -110,7 +124,9 @@ namespace VoiceLite.Services
         {
             if (!_disposed)
             {
-                _httpClient?.Dispose();
+                // WEEK 1 FIX: Don't dispose static HttpClient
+                // Static instance lives for application lifetime
+                // This prevents socket exhaustion from creating/disposing multiple instances
                 _disposed = true;
             }
             GC.SuppressFinalize(this);

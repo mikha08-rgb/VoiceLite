@@ -543,9 +543,24 @@ namespace VoiceLite.Services
 
                 // BUG FIX (BUG-003): Only release semaphore if we successfully acquired it
                 // This prevents SemaphoreFullException if exception occurred before WaitAsync
-                if (!isDisposed && semaphoreAcquired)
+                // CRITICAL FIX #4: Always release if acquired, even during disposal
+                // Otherwise semaphore stays locked forever if disposal happens mid-transcription
+                if (semaphoreAcquired)
                 {
-                    transcriptionSemaphore.Release();
+                    try
+                    {
+                        transcriptionSemaphore.Release();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Semaphore was disposed during shutdown - this is OK
+                        // The semaphore is disposed at line 613 in Dispose()
+                    }
+                    catch (SemaphoreFullException)
+                    {
+                        // Should never happen since we track acquisition, but log just in case
+                        ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
+                    }
                 }
 
                 // CRITICAL FIX: Signal disposal completion to unblock Dispose() method
