@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NAudio.Wave;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
@@ -14,7 +16,7 @@ namespace VoiceLite.Services
         public override string ToString() => Name;
     }
 
-    public class AudioRecorder : IDisposable
+    public class AudioRecorder : IAudioRecorder
     {
         private WaveInEvent? waveIn;
         private WaveFileWriter? waveFile;
@@ -35,7 +37,7 @@ namespace VoiceLite.Services
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
         public event EventHandler<byte[]>? AudioDataReady; // New event for memory buffer mode
-
+        public event EventHandler<Exception>? RecordingError; // Required by IAudioRecorder
 
         public AudioRecorder()
         {
@@ -608,6 +610,52 @@ namespace VoiceLite.Services
 
         // QUICK WIN 1: SetMemoryBufferMode removed - memory mode is now enforced (const = true)
         // This eliminates 50-100ms file I/O latency per recording session
+
+        // Interface implementation methods
+        public async Task<string> GetLastAudioFileAsync()
+        {
+            return await Task.Run(() =>
+            {
+                if (!string.IsNullOrEmpty(currentAudioFilePath) && File.Exists(currentAudioFilePath))
+                {
+                    return currentAudioFilePath;
+                }
+
+                // Find the most recent audio file in temp directory
+                var directory = new DirectoryInfo(tempDirectory);
+                var latestFile = directory.GetFiles("*.wav")
+                    .OrderByDescending(f => f.CreationTime)
+                    .FirstOrDefault();
+
+                return latestFile?.FullName ?? string.Empty;
+            });
+        }
+
+        public bool ValidateAudioSystem()
+        {
+            try
+            {
+                // Check if any recording devices are available
+                int deviceCount = WaveInEvent.DeviceCount;
+                if (deviceCount == 0)
+                {
+                    RecordingError?.Invoke(this, new InvalidOperationException("No audio recording devices found"));
+                    return false;
+                }
+
+                // Test creating a WaveInEvent
+                using (var testWaveIn = new WaveInEvent())
+                {
+                    testWaveIn.WaveFormat = new WaveFormat(16000, 16, 1);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                RecordingError?.Invoke(this, ex);
+                return false;
+            }
+        }
 
         public void Dispose()
         {

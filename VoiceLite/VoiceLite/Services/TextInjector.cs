@@ -1,15 +1,18 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WindowsInput;
 using WindowsInput.Native;
 using VoiceLite.Models;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class TextInjector
+    public class TextInjector : ITextInjector
     {
         public bool AutoPaste { get; set; } = true;
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
@@ -449,6 +452,65 @@ namespace VoiceLite.Services
             }
         }
 
+        // Interface implementation methods
+        public async Task InjectTextAsync(string text, ITextInjector.InjectionMode mode)
+        {
+            await Task.Run(() =>
+            {
+                switch (mode)
+                {
+                    case ITextInjector.InjectionMode.Type:
+                        InjectViaTyping(text);
+                        break;
+                    case ITextInjector.InjectionMode.Paste:
+                        InjectViaClipboard(text);
+                        break;
+                    case ITextInjector.InjectionMode.SmartAuto:
+                        InjectText(text); // Uses existing smart logic
+                        break;
+                }
+            });
+        }
+
+        public bool CanInject()
+        {
+            try
+            {
+                // Check if we can get the foreground window
+                return GetForegroundWindow() != IntPtr.Zero;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string GetFocusedApplicationName()
+        {
+            try
+            {
+                IntPtr hwnd = GetForegroundWindow();
+                if (hwnd == IntPtr.Zero)
+                    return "Unknown";
+
+                uint processId;
+                GetWindowThreadProcessId(hwnd, out processId);
+
+                var process = Process.GetProcessById((int)processId);
+                return process?.ProcessName ?? "Unknown";
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        public void SetTypingDelay(int millisecondsDelay)
+        {
+            // Would need to refactor TYPING_DELAY_MS to be non-const
+            // For now, this is a no-op as the delay is constant
+        }
+
         // Virtual key codes
         private const byte VK_CONTROL = 0x11;
         private const byte VK_V = 0x56;
@@ -459,5 +521,11 @@ namespace VoiceLite.Services
 
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
     }
 }

@@ -9,10 +9,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
 using VoiceLite.Models;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class PersistentWhisperService : IDisposable
+    public class PersistentWhisperService : IWhisperService
     {
         private readonly Settings settings;
         private readonly string baseDir;
@@ -26,6 +27,13 @@ namespace VoiceLite.Services
         private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
+        private volatile bool isProcessing = false;
+
+        // Interface implementation properties and events
+        public bool IsProcessing => isProcessing;
+        public event EventHandler<string>? TranscriptionComplete;
+        public event EventHandler<Exception>? TranscriptionError;
+        public event EventHandler<int>? ProgressChanged;
 
         public PersistentWhisperService(Settings settings)
         {
@@ -288,7 +296,14 @@ namespace VoiceLite.Services
             }
         }
 
+        // Backward compatibility overload
         public async Task<string> TranscribeAsync(string audioFilePath)
+        {
+            return await TranscribeAsync(audioFilePath, cachedModelPath ?? ResolveModelPath());
+        }
+
+        // Interface implementation
+        public async Task<string> TranscribeAsync(string audioFilePath, string modelPath)
         {
             if (isDisposed)
                 throw new ObjectDisposedException(nameof(PersistentWhisperService));
@@ -335,7 +350,8 @@ namespace VoiceLite.Services
                     await WarmUpWhisperAsync();
                 }
 
-                var modelPath = cachedModelPath ?? ResolveModelPath();
+                // Use the passed modelPath parameter, fall back to cached if empty
+                var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? ResolveModelPath());
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
                 // Build arguments using user settings for optimal accuracy/speed balance
@@ -346,7 +362,7 @@ namespace VoiceLite.Services
                 // - Add max-context limit for short audio clips (~10-15% faster)
                 // - Flash attention for modern CPU/GPU optimization (~15-30% faster)
                 int optimalThreads = Math.Max(1, Environment.ProcessorCount / 2); // Physical cores
-                var arguments = $"-m \"{modelPath}\" " +
+                var arguments = $"-m \"{effectiveModelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
                               $"--threads {optimalThreads} " +
                               $"--no-timestamps --language {settings.Language} " +
@@ -595,6 +611,68 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("PersistentWhisperService.CleanupProcess", ex);
+            }
+        }
+
+        // Interface implementation methods
+        public void CancelTranscription()
+        {
+            // Signal cancellation
+            disposalCts?.Cancel();
+        }
+
+        public bool ValidateWhisperExecutable()
+        {
+            try
+            {
+                var whisperPath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                if (string.IsNullOrEmpty(whisperPath) || !File.Exists(whisperPath))
+                {
+                    TranscriptionError?.Invoke(this, new FileNotFoundException("Whisper executable not found"));
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                TranscriptionError?.Invoke(this, ex);
+                return false;
+            }
+        }
+
+        public string GetWhisperVersion()
+        {
+            try
+            {
+                var whisperPath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                if (string.IsNullOrEmpty(whisperPath) || !File.Exists(whisperPath))
+                {
+                    return "Unknown";
+                }
+
+                // Run whisper --version
+                using (var process = new Process())
+                {
+                    process.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = whisperPath,
+                        Arguments = "--version",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+
+                    process.Start();
+                    var output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit(5000);
+
+                    return string.IsNullOrWhiteSpace(output) ? "Unknown" : output.Trim();
+                }
+            }
+            catch (Exception)
+            {
+                return "Unknown";
             }
         }
 
