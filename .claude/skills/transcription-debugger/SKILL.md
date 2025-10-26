@@ -189,7 +189,41 @@ _waveIn = new WaveInEvent
 **v1.0.94**: Logging was disabled in Release builds with `#if !DEBUG`
 **v1.0.95-96**: Model file missing from installer (different issue)
 
-## Helper Files
+## Critical Log Patterns
 
-- [common-fixes.md](common-fixes.md) - Quick fixes for common issues
-- [test-audio.md](test-audio.md) - Test phrases and expected results
+Search VoiceLite logs for diagnostic info:
+
+```bash
+# Log location
+$log_file = "$env:LOCALAPPDATA\VoiceLite\logs\voicelite.log"
+
+# Check if AudioFileReady is firing
+grep "AudioFileReady fired" $log_file
+
+# Check whisper process launch
+grep "Starting whisper process" $log_file | tail -5
+
+# Check for timeout errors
+grep "Whisper timeout" $log_file
+
+# Check for event subscription
+grep "Event subscribed: AudioFileReady" $log_file
+
+# Check transcription completion
+grep "Transcription completed" $log_file | tail -5
+```
+
+## Test Audio Phrases
+
+Use these phrases to test accuracy (expect 95%+ correct):
+
+**Technical Terms**:
+- "npm install react useState useEffect"
+- "git commit minus m add new feature"
+- "dotnet build configuration release"
+
+**Common Dictation**:
+- "Hello world this is a test recording"
+- "The quick brown fox jumps over the lazy dog"
+
+**Expected**: All technical terms captured correctly

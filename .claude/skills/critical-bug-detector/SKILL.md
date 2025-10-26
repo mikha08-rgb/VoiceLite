@@ -37,10 +37,15 @@ grep -q "ggml-tiny.bin" VoiceLite/Installer/VoiceLiteSetup.iss || FAIL "Model no
 # Executable present
 test -f "VoiceLite/whisper/whisper.exe" || FAIL "Missing whisper.exe!"
 
+# Verify size (whisper.cpp v1.7.6)
+expected_size=480256
+actual_size=$(stat -c%s "VoiceLite/whisper/whisper.exe" 2>/dev/null)
+[ "$actual_size" -eq "$expected_size" ] || WARN "whisper.exe size mismatch (expected 469KB, got $(($actual_size / 1024))KB)"
+
 # Verify SHA256 (v1.7.6)
-expected_hash="your_expected_hash_here"
+expected_hash="b7c6dc2e999a80bc2d23cd4c76701211f392ae55d5cabdf0d45eb2ca4faf09af"
 actual_hash=$(sha256sum VoiceLite/whisper/whisper.exe | cut -d' ' -f1)
-[ "$actual_hash" = "$expected_hash" ] || WARN "whisper.exe hash mismatch"
+[ "$actual_hash" = "$expected_hash" ] || WARN "whisper.exe hash mismatch - binary may have been modified!"
 ```
 
 ### 2. Version Consistency Check
@@ -97,6 +102,13 @@ When issues are detected:
 
 **v1.0.94 Bug**: Logging was suppressed in Release builds with `#if !DEBUG`, making production debugging impossible.
 
-## Helper Checklist
+## Quick Pre-Release Checklist
 
-See [checklist.md](checklist.md) for manual verification steps.
+Before building installer:
+1. [ ] Model file exists: `VoiceLite/whisper/ggml-tiny.bin` (42MB)
+2. [ ] Model not in .gitignore
+3. [ ] Whisper.exe present and correct hash
+4. [ ] All version files match (`.csproj`, `.iss`, `package.json`)
+5. [ ] Building in Release mode (not Debug)
+6. [ ] No uncommitted version changes
+7. [ ] Installer script includes all required files

@@ -147,7 +147,19 @@ gh run view [run-id] --log
 - Is `ggml-tiny.bin` in `VoiceLite/whisper/`?
 - Is it referenced in `.iss` file?
 
-## Helper Files
+## GitHub Actions Monitoring
 
-- [version-locations.md](version-locations.md) - All files requiring version updates
-- [release-history.md](release-history.md) - Past releases and issues
+Watch the release workflow in real-time:
+
+```bash
+# Watch workflow (blocks until complete ~5-7 min)
+gh run watch
+
+# Check latest workflow status
+gh run list --workflow release.yml --limit 1
+
+# View logs if failed
+gh run view --log
+
+# Expected: "completed" status with green checkmark
+```
