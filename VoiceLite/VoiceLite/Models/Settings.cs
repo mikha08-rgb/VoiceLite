@@ -203,6 +203,19 @@ namespace VoiceLite.Models
                 settings.Threads = 4;
             }
 
+            // CRITICAL FIX (v1.1.6): Reset BeamSize and BestOf to optimal values
+            // Issue: Old settings with BeamSize=5-10 were clamped to 3, still causing 5-9x slower transcription
+            // BeamSize=3 + BestOf=3 = ~9x slower than optimal (0.8s → 7s)
+            // Force reset to optimal greedy decoding for maximum speed
+            if (settings.BeamSize > 1)
+            {
+                settings.BeamSize = 1; // Reset to greedy decoding (5x faster)
+            }
+            if (settings.BestOf > 1)
+            {
+                settings.BestOf = 1; // Reset to single sampling (5x faster)
+            }
+
             // Force re-validation by triggering property setters
             settings.BeamSize = settings.BeamSize;
             settings.BestOf = settings.BestOf;

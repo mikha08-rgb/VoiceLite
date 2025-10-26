@@ -375,9 +375,18 @@ namespace VoiceLite.Services
                               $"--flash-attn";               // Flash attention optimization (v1.7.6)
 
                 // DIAGNOSTIC: Log exact whisper command with thread count
-                File.AppendAllText(Path.Combine(Path.GetTempPath(), "VoiceLite", "diagnostic.log"),
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Thread count: {optimalThreads}, CPU cores: {Environment.ProcessorCount}\n" +
-                    $"Command: {whisperExePath} {arguments}\n\n");
+                try
+                {
+                    var diagDir = Path.Combine(Path.GetTempPath(), "VoiceLite");
+                    Directory.CreateDirectory(diagDir); // CRITICAL FIX: Create directory if it doesn't exist
+                    File.AppendAllText(Path.Combine(diagDir, "diagnostic.log"),
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Thread count: {optimalThreads}, CPU cores: {Environment.ProcessorCount}\n" +
+                        $"Command: {whisperExePath} {arguments}\n\n");
+                }
+                catch
+                {
+                    // Ignore diagnostic logging failures - don't let them break transcription
+                }
 
                 var processStartInfo = new ProcessStartInfo
                 {
