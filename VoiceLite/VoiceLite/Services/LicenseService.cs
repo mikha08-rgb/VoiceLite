@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using VoiceLite.Core.Interfaces.Features;
+using VoiceLite.Infrastructure.Resilience;
 
 namespace VoiceLite.Services
 {
@@ -28,6 +29,11 @@ namespace VoiceLite.Services
         private int _activationCount = 0;
         private int _maxActivations = 3;
 
+        // PHASE 3 - DAY 1: Cached validation result (lifetime - no expiry)
+        // Licenses are $20 one-time payment with lifetime validity
+        // Once validated successfully, cache forever for offline use
+        private LicenseValidationResult? _cachedValidationResult = null;
+
         public event EventHandler<bool>? LicenseStatusChanged;
 
         static LicenseService()
@@ -43,6 +49,12 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Validates a license key with the VoiceLite API
+        /// PHASE 3 - DAY 1: Now with automatic retry and lifetime caching
+        ///
+        /// Caching Strategy:
+        /// - Lifetime licenses cached forever after successful validation
+        /// - Only re-validates if user changes license key
+        /// - Retry logic (3 attempts) ensures resilient first-time activation
         /// </summary>
         /// <param name="licenseKey">The license key to validate</param>
         /// <returns>Validation result</returns>
@@ -59,6 +71,13 @@ namespace VoiceLite.Services
                     };
                 }
 
+                // Check if we have a cached result for this key (cache forever - lifetime licenses)
+                if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
+                {
+                    ErrorLogger.LogMessage("Using cached license validation result (lifetime cache)");
+                    return _cachedValidationResult;
+                }
+
                 var request = new
                 {
                     licenseKey = licenseKey.Trim()
@@ -67,7 +86,30 @@ namespace VoiceLite.Services
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"{_apiBaseUrl}/api/licenses/validate", content);
+                // PHASE 3 - DAY 1: Wrap API call with Polly retry policy
+                // This will automatically retry up to 3 times on transient failures (5xx errors, network issues)
+                HttpResponseMessage response;
+                try
+                {
+                    response = await RetryPolicies.HttpRetryPolicy.ExecuteAsync(async () =>
+                        await _httpClient.PostAsync($"{_apiBaseUrl}/api/licenses/validate", content));
+                }
+                catch (Exception retryEx)
+                {
+                    // All retries exhausted - check if we have a cached result to fall back to
+                    // (This handles case where user tries to re-validate an already-cached license while offline)
+                    if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
+                    {
+                        ErrorLogger.LogWarning(
+                            $"License API unreachable after 3 retries. Using cached result (lifetime license). " +
+                            $"Exception: {retryEx.Message}"
+                        );
+                        return _cachedValidationResult;
+                    }
+
+                    // No cache available - return error (first-time activation requires internet)
+                    throw;
+                }
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -93,16 +135,33 @@ namespace VoiceLite.Services
                     };
                 }
 
-                return new LicenseValidationResult
+                var validationResult = new LicenseValidationResult
                 {
                     IsValid = result.Valid,
                     Tier = result.Tier ?? "free",
                     ErrorMessage = result.Valid ? null : "Invalid or expired license key"
                 };
+
+                // PHASE 3 - DAY 1: Cache successful validation result (forever - lifetime licenses)
+                if (result.Valid)
+                {
+                    _cachedValidationResult = validationResult;
+                    ErrorLogger.LogMessage($"License validation succeeded - cached permanently (lifetime license)");
+                }
+
+                return validationResult;
             }
             catch (HttpRequestException ex)
             {
                 ErrorLogger.LogError("License validation HTTP error", ex);
+
+                // Try to use cached result even on network failure
+                if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
+                {
+                    ErrorLogger.LogWarning("Network error - using cached license validation result");
+                    return _cachedValidationResult;
+                }
+
                 return new LicenseValidationResult
                 {
                     IsValid = false,
@@ -111,6 +170,13 @@ namespace VoiceLite.Services
             }
             catch (TaskCanceledException)
             {
+                // Try to use cached result on timeout
+                if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
+                {
+                    ErrorLogger.LogWarning("Request timeout - using cached license validation result");
+                    return _cachedValidationResult;
+                }
+
                 return new LicenseValidationResult
                 {
                     IsValid = false,
