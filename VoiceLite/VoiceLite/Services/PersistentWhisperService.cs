@@ -31,9 +31,13 @@ namespace VoiceLite.Services
 
         // Interface implementation properties and events
         public bool IsProcessing => isProcessing;
+#pragma warning disable CS0067 // Event is never used - kept for interface compatibility
         public event EventHandler<string>? TranscriptionComplete;
+#pragma warning restore CS0067
         public event EventHandler<Exception>? TranscriptionError;
+#pragma warning disable CS0067 // Event is never used - kept for interface compatibility
         public event EventHandler<int>? ProgressChanged;
+#pragma warning restore CS0067
 
         public PersistentWhisperService(Settings settings)
         {
