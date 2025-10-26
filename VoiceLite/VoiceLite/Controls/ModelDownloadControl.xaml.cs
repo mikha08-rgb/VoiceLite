@@ -19,6 +19,17 @@ namespace VoiceLite.Controls
     {
         public event EventHandler<string>? ModelSelected;
 
+        // WEEK 1 FIX: Static HttpClient for downloads prevents socket exhaustion
+        // Separate client for downloads with longer timeout
+        private static readonly HttpClient _downloadHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(30),
+            DefaultRequestHeaders =
+            {
+                { "User-Agent", "VoiceLite-Desktop/1.0" }
+            }
+        };
+
         private readonly ObservableCollection<ModelInfo> models;
         private readonly string whisperPath;
         private Settings? settings;
@@ -181,24 +192,38 @@ namespace VoiceLite.Controls
 
         private async void ActionButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is ModelInfo model)
+            // CRITICAL FIX #5: Wrap async void event handler in try-catch
+            try
             {
-                // Check Pro permission before download
-                if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                if (sender is Button button && button.Tag is ModelInfo model)
                 {
-                    MessageBox.Show(
-                        proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
-                        "Pro Feature",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information
-                    );
-                    return;
-                }
+                    // Check Pro permission before download
+                    if (proFeatureService != null && !proFeatureService.CanUseModel(model.FileName))
+                    {
+                        MessageBox.Show(
+                            proFeatureService.GetUpgradeMessage($"{model.DisplayName} model"),
+                            "Pro Feature",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information
+                        );
+                        return;
+                    }
 
-                if (!model.IsInstalled && model.DownloadUrl != null)
-                {
-                    await DownloadModel(model);
+                    if (!model.IsInstalled && model.DownloadUrl != null)
+                    {
+                        await DownloadModel(model);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Model download button click failed", ex);
+                MessageBox.Show(
+                    $"An error occurred: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
             }
         }
 
@@ -211,8 +236,8 @@ namespace VoiceLite.Controls
 
                 var destinationPath = Path.Combine(whisperPath, model.FileName);
 
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-                using var response = await httpClient.GetAsync(model.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                // WEEK 1 FIX: Use static HttpClient instead of creating new instance
+                using var response = await _downloadHttpClient.GetAsync(model.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
 
                 var totalBytes = response.Content.Headers.ContentLength ?? 0;

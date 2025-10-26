@@ -14,6 +14,7 @@ using System.Windows.Media.Effects;
 using VoiceLite.Models;
 using VoiceLite.Services;
 using VoiceLite.Utilities;
+using VoiceLite.Helpers;
 using System.Text.Json;
 
 namespace VoiceLite
@@ -61,8 +62,10 @@ namespace VoiceLite
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
         private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
 
-        // CRITICAL FIX: Track all DispatcherTimers created for status messages to prevent memory leaks
-        private readonly List<System.Windows.Threading.DispatcherTimer> activeStatusTimers = new List<System.Windows.Threading.DispatcherTimer>();
+        // WEEK 1 FIX: Improved timer management with Dictionary for proper cleanup
+        // Dictionary allows us to track and clean up specific timers by ID
+        private readonly HashSet<System.Windows.Threading.DispatcherTimer> activeStatusTimers = new HashSet<System.Windows.Threading.DispatcherTimer>();
+        private readonly object timerLock = new object();
 
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
@@ -407,7 +410,7 @@ namespace VoiceLite
         {
             try
             {
-                StatusText.Text = "Initializing services...";
+                await Dispatcher.InvokeAsync(() => StatusText.Text = "Initializing services...");
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
@@ -461,15 +464,17 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated += OnPollingModeActivated;
                 }
 
-                systemTrayManager = new SystemTrayManager(this);
+                systemTrayManager = new SystemTrayManager();
+                await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this));
 
                 // Load and display existing history
-                _ = UpdateHistoryUI();
+                await Dispatcher.InvokeAsync(() => _ = UpdateHistoryUI());
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize: {ex.Message}",
-                    "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                await Dispatcher.InvokeAsync(() =>
+                    MessageBox.Show($"Failed to initialize: {ex.Message}",
+                        "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error));
             }
         }
 
@@ -482,7 +487,7 @@ namespace VoiceLite
                 // New code ensures proper ordering: services → hotkey → UI updates
 
                 // Step 1: Initialize services (runs in background)
-                await InitializeServicesAsync();
+                await Task.Run(() => InitializeServicesAsync());
 
                 // Step 2: Register hotkey (ONLY after services are ready)
                 // BUG-005 FIX: Wrap hotkey registration in try-catch to show user-friendly error
@@ -947,20 +952,10 @@ namespace VoiceLite
                 Dispatcher.InvokeAsync(() =>
                 {
                     // Show subtle notification (orange color, auto-dismiss after 3 seconds)
-                    StatusText.Text = message;
-                    StatusText.Foreground = Brushes.Orange;
                     ErrorLogger.LogMessage($"BUG-006 FIX: {message}");
 
-                    // Auto-clear after 3 seconds and restore normal status
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
-                    timer.Tick += (_, __) =>
-                    {
-                        timer.Stop();
-                        activeStatusTimers.Remove(timer); // Remove from tracking when complete
-                        UpdateUIForCurrentMode(); // Restore normal status text
-                    };
-                    timer.Start();
+                    // WEEK 1 FIX: Use new timer management method
+                    CreateStatusTimer(message, TimeSpan.FromSeconds(3), Brushes.Orange);
                 });
             }
             catch (Exception ex)
@@ -1806,14 +1801,16 @@ namespace VoiceLite
         // v1.0.56 CRITICAL FIX: Prevent deadlock on app close
         // Old approach: SaveSettingsInternalAsync().Wait() blocks UI thread for 5-30 seconds
         // New approach: Use async OnClosing to await settings save without blocking
-        private bool isClosingHandled = false;
+        // CRITICAL FIX #2: Use int for Interlocked operations (thread-safe)
+        private int isClosingHandled = 0;
 
         protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (!isClosingHandled)
+            // CRITICAL FIX #2: Thread-safe check-and-set using Interlocked.CompareExchange
+            // Returns 0 if this is the first call, 1 if already handled
+            if (Interlocked.CompareExchange(ref isClosingHandled, 1, 0) == 0)
             {
                 e.Cancel = true; // Prevent immediate close
-                isClosingHandled = true;
 
                 // CRITICAL FIX (BUG-002 + v1.0.56): Flush pending settings save BEFORE disposal
                 // NOW ASYNC - no UI thread blocking!
@@ -1857,17 +1854,8 @@ namespace VoiceLite
                 recordingElapsedTimer = null;
             }
 
-            // CRITICAL FIX: Dispose all active status timers to prevent memory leaks
-            foreach (var timer in activeStatusTimers.ToList()) // ToList() to avoid modification during iteration
-            {
-                try
-                {
-                    timer?.Stop();
-                    // Note: DispatcherTimer doesn't implement IDisposable, but stopping is sufficient
-                }
-                catch { /* Ignore disposal errors */ }
-            }
-            activeStatusTimers.Clear();
+            // WEEK 1 FIX: Use new cleanup method for proper timer disposal
+            CleanupAllTimers();
 
             // CRITICAL FIX: Kill any hung whisper.exe processes on shutdown
             // Prevents orphaned processes from consuming resources after app closes
@@ -2358,15 +2346,11 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
-                int cleared = historyService?.ClearHistory() ?? 0;
+                historyService?.ClearHistory();
                 _ = UpdateHistoryUI();
                 SaveSettings();
 
-                MessageBox.Show(
-                    $"Cleared {cleared} items from history.",
-                    "History Cleared",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // History cleared successfully
             }
         }
 
@@ -2383,15 +2367,11 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
-                int cleared = historyService?.ClearHistory() ?? 0;
+                historyService?.ClearHistory();
                 _ = UpdateHistoryUI();
                 SaveSettings();
 
-                MessageBox.Show(
-                    $"Cleared all {cleared} items from history.",
-                    "History Cleared",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // All history cleared successfully
             }
         }
 
@@ -2579,6 +2559,80 @@ namespace VoiceLite
                     "Export Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+        }
+
+        #endregion
+
+        #region WEEK 1 FIX: Timer Management
+
+        /// <summary>
+        /// Creates and manages a status timer that will auto-dispose properly
+        /// This prevents timer accumulation and memory leaks
+        /// </summary>
+        private void CreateStatusTimer(string message, TimeSpan duration, Brush? textColor = null, Action? onComplete = null)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                // Generate unique timer ID
+                var timerId = $"status_{Guid.NewGuid():N}";
+
+                lock (timerLock)
+                {
+                    // Clean up any existing timers
+                    foreach (var existingTimer in activeStatusTimers.ToList())
+                    {
+                        existingTimer.Stop();
+                        activeStatusTimers.Remove(existingTimer);
+                    }
+
+                    // Update status message
+                    StatusText.Text = message;
+                    if (textColor != null)
+                        StatusText.Foreground = textColor;
+
+                    // Create new timer
+                    var timer = new System.Windows.Threading.DispatcherTimer
+                    {
+                        Interval = duration,
+                        Tag = timerId
+                    };
+
+                    timer.Tick += (sender, e) =>
+                    {
+                        var t = (System.Windows.Threading.DispatcherTimer)sender!;
+                        t.Stop();
+
+                        lock (timerLock)
+                        {
+                            activeStatusTimers.Remove(t);
+                        }
+
+                        // Execute completion callback
+                        onComplete?.Invoke();
+
+                        // Restore normal status
+                        UpdateUIForCurrentMode();
+                    };
+
+                    timer.Start();
+                    activeStatusTimers.Add(timer);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Cleans up all active status timers
+        /// </summary>
+        private void CleanupAllTimers()
+        {
+            lock (timerLock)
+            {
+                foreach (var timer in activeStatusTimers.ToList())
+                {
+                    timer.Stop();
+                }
+                activeStatusTimers.Clear();
             }
         }
 

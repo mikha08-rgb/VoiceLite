@@ -90,10 +90,33 @@ namespace VoiceLite.Models
 
         public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
+        public bool StartMinimized { get; set; } = false;
+        public bool LaunchAtStartup { get; set; } = false;
+        public bool CloseToTray { get; set; } = false;
+        public bool CheckForUpdates { get; set; } = true;
+        public string SelectedModel { get; set; } = "ggml-tiny.bin";
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
+
+        // Additional properties for SettingsService compatibility
+        public bool UseGpu { get; set; } = false;
+        public bool UseGpuAcceleration { get; set; } = false;
+        public int TypingDelay { get; set; } = 10;
+        public int TypingDelayMs { get; set; } = 10;
+        public bool AddSpaceAfter { get; set; } = false;
+        public bool AddSpaceAfterInjection { get; set; } = false;
+        public Key HotkeyKey { get; set; } = Key.LeftAlt;
+        public string GlobalHotkey { get; set; } = "Alt";
+        public bool HotkeyEnabled { get; set; } = true;
+        public bool HotkeysEnabled { get; set; } = true;
+        public string InputDevice { get; set; } = "Default";
+        public string SelectedAudioDevice { get; set; } = "Default";
+        public int SampleRate { get; set; } = 16000;
+        public bool PlaySoundFeedback { get; set; } = false;
+        public bool SaveHistory { get; set; } = true;
+        public int ActivationCount { get; set; } = 0;
 
         // Transcription History
         private int _maxHistoryItems = 50;
@@ -121,6 +144,26 @@ namespace VoiceLite.Models
         // License Management
         public string? LicenseKey { get; set; } = null; // Pro license key
         public bool IsProLicense { get; set; } = false; // True if Pro license is activated
+
+        // Performance Settings
+        public int Threads { get; set; } = Environment.ProcessorCount / 2; // Optimal thread count for Whisper
+
+        // Static methods for loading/saving settings
+        public static Settings Load()
+        {
+            // This is a placeholder - actual implementation would load from JSON
+            return new Settings();
+        }
+
+        public void Save()
+        {
+            // This is a placeholder - actual implementation would save to JSON
+        }
+
+        public void Reload()
+        {
+            // This is a placeholder - actual implementation would reload from JSON
+        }
     }
 
     public static class SettingsValidator

@@ -250,7 +250,7 @@ jobs:
 
           ### Download
           - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~100 MB)
-            - Includes Tiny model (75MB) for fastest installation
+            - Includes Tiny model (42MB Q8_0 quantized) for fastest installation
             - Download additional models from Settings after installation
             - Works completely offline after setup
 

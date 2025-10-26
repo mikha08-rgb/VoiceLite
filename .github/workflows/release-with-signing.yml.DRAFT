@@ -1,0 +1,319 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.22)'
+        required: true
+        type: string
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Extract version from tag or input
+      id: version
+      shell: pwsh
+      run: |
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Building version: $version"
+
+    - name: Validate version consistency
+      shell: pwsh
+      run: |
+        $expectedVersion = "${{ steps.version.outputs.VERSION }}"
+        $errors = @()
+
+        # Check VoiceLite.csproj
+        $csprojPath = "VoiceLite/VoiceLite/VoiceLite.csproj"
+        $csprojContent = Get-Content $csprojPath -Raw
+        if ($csprojContent -match '<Version>([\d\.]+)</Version>') {
+          $csprojVersion = $matches[1]
+          if ($csprojVersion -ne $expectedVersion) {
+            $errors += "❌ VoiceLite.csproj has version $csprojVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ VoiceLite.csproj version: $csprojVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find version in VoiceLite.csproj"
+        }
+
+        # Check VoiceLiteSetup.iss
+        $issPath = "VoiceLite/Installer/VoiceLiteSetup.iss"
+        $issContent = Get-Content $issPath -Raw
+        if ($issContent -match 'AppVersion=([\d\.]+)') {
+          $issVersion = $matches[1]
+          if ($issVersion -ne $expectedVersion) {
+            $errors += "❌ VoiceLiteSetup.iss has version $issVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ VoiceLiteSetup.iss version: $issVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find AppVersion in VoiceLiteSetup.iss"
+        }
+
+        # Check CLAUDE.md
+        $claudeMdPath = "CLAUDE.md"
+        $claudeContent = Get-Content $claudeMdPath -Raw
+        if ($claudeContent -match '\*\*Current Desktop\*\*: v([\d\.]+)') {
+          $claudeVersion = $matches[1]
+          if ($claudeVersion -ne $expectedVersion) {
+            $errors += "❌ CLAUDE.md has version $claudeVersion, expected $expectedVersion"
+          } else {
+            Write-Host "✓ CLAUDE.md version: $claudeVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find Current Desktop version in CLAUDE.md"
+        }
+
+        # Fail if any errors
+        if ($errors.Count -gt 0) {
+          Write-Host ""
+          Write-Host "Version Mismatch Detected!" -ForegroundColor Red
+          Write-Host "Git tag: v$expectedVersion" -ForegroundColor Yellow
+          Write-Host ""
+          foreach ($error in $errors) {
+            Write-Host $error -ForegroundColor Red
+          }
+          Write-Host ""
+          Write-Host "HINT: The post-commit git hook should auto-sync versions." -ForegroundColor Yellow
+          Write-Host "If versions are out of sync, update VoiceLite.csproj and commit again." -ForegroundColor Yellow
+          exit 1
+        }
+
+        Write-Host ""
+        Write-Host "✓ All versions match tag v$expectedVersion" -ForegroundColor Green
+        Write-Host ""
+
+    - name: Restore dependencies
+      run: dotnet restore VoiceLite/VoiceLite.sln
+
+    - name: Build Release
+      run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
+
+    # ✨ NEW STEP 1: Code sign the main executable
+    - name: Code Sign VoiceLite.exe
+      uses: sslcom/esigner-codesign@develop
+      with:
+        username: ${{ secrets.ESIGNER_USERNAME }}
+        password: ${{ secrets.ESIGNER_PASSWORD }}
+        totp-secret: ${{ secrets.ESIGNER_TOTP }}
+        file-path: VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/VoiceLite.exe
+
+    - name: Restore Whisper models cache
+      id: cache-whisper
+      uses: actions/cache@v4
+      with:
+        path: VoiceLite/whisper_installer_lite
+        key: whisper-models-lite-v1-${{ hashFiles('VoiceLite/whisper/**') }}
+        restore-keys: |
+          whisper-models-lite-v1-
+
+    - name: Copy Whisper files for installer
+      if: steps.cache-whisper.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        echo "Copying Whisper files from VoiceLite/whisper/ directory..."
+
+        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
+
+        # CRITICAL FIX: Use whisper files from source directory (v1.7.6)
+        # DO NOT download old v1.5.4 - it cannot read NAudio WAV format correctly
+        Copy-Item -Path "VoiceLite/whisper/*" -Destination "VoiceLite/whisper_installer_lite/" -Force
+
+        echo "Copied Whisper files. Installer directory contents:"
+        Get-ChildItem "VoiceLite/whisper_installer_lite" | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
+    - name: Copy Whisper models to publish directory
+      shell: pwsh
+      run: |
+        echo "Copying Whisper files from whisper_installer_lite/ to publish directory..."
+
+        $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
+        New-Item -ItemType Directory -Force -Path $publishDir
+
+        # Copy all Whisper files (Tiny model + whisper.exe + DLLs)
+        Copy-Item -Path "VoiceLite/whisper_installer_lite/*" -Destination $publishDir -Force
+
+        echo "Copied files to publish directory:"
+        Get-ChildItem $publishDir | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.Name) ($sizeInMB MB)"
+        }
+
+    - name: Download Inno Setup
+      shell: pwsh
+      run: |
+        $innoSetupUrl = "https://jrsoftware.org/download.php/is.exe"
+        $installerPath = "$env:TEMP\innosetup.exe"
+
+        echo "Downloading Inno Setup..."
+        Invoke-WebRequest -Uri $innoSetupUrl -OutFile $installerPath
+
+        echo "Installing Inno Setup..."
+        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+
+        echo "Inno Setup installed"
+
+    - name: Compile installer
+      shell: pwsh
+      run: |
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+        if (-not (Test-Path $isccPath)) {
+          echo "ERROR: Inno Setup not found at $isccPath"
+          exit 1
+        }
+
+        echo "Compiling installer with Inno Setup..."
+        & $isccPath "VoiceLite\Installer\VoiceLiteSetup.iss"
+
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: Installer compilation failed"
+          exit 1
+        }
+
+        echo "Installer compiled successfully"
+
+    # ✨ NEW STEP 2: Code sign the installer
+    - name: Code Sign Installer
+      uses: sslcom/esigner-codesign@develop
+      with:
+        username: ${{ secrets.ESIGNER_USERNAME }}
+        password: ${{ secrets.ESIGNER_PASSWORD }}
+        totp-secret: ${{ secrets.ESIGNER_TOTP }}
+        file-path: VoiceLite-Setup-*.exe
+
+    - name: Generate SHA256 hashes
+      id: generate-hashes
+      shell: pwsh
+      run: |
+        echo "Generating SHA256 hashes for installers..."
+
+        $installers = Get-ChildItem -Path . -Filter "VoiceLite-Setup-*.exe" -Recurse
+        $hashes = @()
+
+        foreach ($installer in $installers) {
+          $hash = Get-FileHash -Path $installer.FullName -Algorithm SHA256
+          $sizeInMB = [math]::Round($installer.Length / 1MB, 2)
+
+          echo "File: $($installer.Name) ($sizeInMB MB)"
+          echo "SHA256: $($hash.Hash)"
+          echo ""
+
+          $hashes += "**$($installer.Name)** ($sizeInMB MB)`n``````text`n$($hash.Hash)`n```````n"
+        }
+
+        # Save hashes to output for release notes
+        $hashesContent = $hashes -join "`n"
+        # Escape special characters for GitHub Actions
+        $hashesContentEscaped = $hashesContent -replace '%','%25' -replace '\r','%0D' -replace '\n','%0A'
+        echo "HASHES=$hashesContentEscaped" >> $env:GITHUB_OUTPUT
+
+    - name: List installer files
+      shell: pwsh
+      run: |
+        echo "Installer files created:"
+        Get-ChildItem -Path . -Filter "VoiceLite-Setup-*.exe" -Recurse | ForEach-Object {
+          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
+          echo "  - $($_.FullName) ($sizeInMB MB)"
+        }
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: VoiceLite v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        files: |
+          VoiceLite-Setup-*.exe
+        body: |
+          ## VoiceLite v${{ steps.version.outputs.VERSION }}
+
+          ### ⚠️ IMPORTANT: Verify Download First
+
+          **Before installing**, verify your download hasn't been corrupted:
+
+          ```powershell
+          Get-FileHash VoiceLite-Setup-*.exe -Algorithm SHA256
+          ```
+
+          Compare with SHA256 hashes at bottom of this page. **Mismatched hash = corrupted download**.
+
+          ---
+
+          ### Download
+          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~100 MB) ✅ **Code Signed**
+            - Includes Tiny model (75MB) for fastest installation
+            - Download additional models from Settings after installation
+            - Works completely offline after setup
+
+          ### Installation Steps
+          1. **Verify SHA256 hash** (see above) ⚠️
+          2. Download the installer
+          3. Right-click installer → Properties → **Unblock** (if shown)
+          4. Run the installer - you'll see a popup listing required dependencies
+          5. If you don't have the dependencies, install them first:
+             - Microsoft Visual C++ Runtime 2015-2022 (x64)
+             - .NET 8.0 Desktop Runtime (x64)
+          6. Accept EULA and complete installation
+          7. Launch VoiceLite from Start Menu or Desktop shortcut
+
+          ### System Requirements
+          - Windows 10/11 (64-bit)
+          - Visual C++ Runtime 2015-2022 (x64) - [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+          - .NET 8.0 Desktop Runtime (x64) - [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
+          - ~200 MB free disk space (Tiny model only)
+          - Microphone (built-in or USB)
+
+          ### SHA256 Hashes
+          ${{ steps.generate-hashes.outputs.HASHES }}
+
+          ### Troubleshooting
+          If installation fails, see [TROUBLESHOOTING.md](https://github.com/${{ github.repository }}/blob/master/TROUBLESHOOTING.md)
+
+          **Common issues**:
+          - **VCRUNTIME140.dll missing**: Install [VC++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) then run installer again
+          - **App won't launch**: Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) then restart
+          - **Antivirus blocking**: This version is code-signed and should pass most antivirus checks. If still blocked, add VoiceLite.exe to antivirus exclusions.
+          - **Model corruption**: Verify SHA256 hash, re-download if mismatch
+
+          ### What's New
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for full release notes.
+
+          ---
+
+          🤖 Auto-generated release via GitHub Actions | ✅ Code signed with EV certificate
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VoiceLite-Installer-v${{ steps.version.outputs.VERSION }}
+        path: VoiceLite-Setup-*.exe
+        retention-days: 90

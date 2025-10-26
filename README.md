@@ -25,7 +25,7 @@
 - ✅ **Unlimited usage** - No trials, no time limits
 - ✅ **100% offline** - Your voice never leaves your PC
 - ✅ **Universal compatibility** - Works in ANY Windows application
-- ✅ **Customizable hotkeys** - Default Shift+Z, or choose your own
+- ✅ **Customizable hotkeys** - Default Ctrl+Alt+R, or choose your own
 - ✅ **Auditable source code** - Verify privacy yourself
 
 **Pro Tier ($20 one-time):**
@@ -58,21 +58,21 @@ Most PCs already have this. If VoiceLite won't start:
 ### Step 2: Download VoiceLite
 <div align="center">
 
-**[⬇️ Download VoiceLite v1.0.82 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
+**[⬇️ Download VoiceLite v1.0.96 (~100MB)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)**
 
-Fast installation • Includes Tiny model (75MB) • Pro models available after upgrade
+Fast installation • Includes Tiny model (42MB Q8_0) • Pro models available after upgrade
 
 ⚠️ **IMPORTANT: You MUST install Visual C++ Runtime first (see Step 1A above)**
 
-📌 **Default hotkey: Shift+Z** (customizable in settings)
+📌 **Default hotkey: Ctrl+Alt+R** (customizable in settings)
 
 </div>
 
 ### Step 3: Install & Run!
-1. Run the installer (`VoiceLite-Setup-1.0.82.exe`)
+1. Run the installer (`VoiceLite-Setup-1.0.96.exe`)
 2. Follow the installation wizard
 3. Launch VoiceLite from Start Menu or Desktop
-4. **Hold Shift+Z** → Speak → Release to type!
+4. **Hold Ctrl+Alt+R** → Speak → Release to type!
 
 ---
 
@@ -80,7 +80,7 @@ Fast installation • Includes Tiny model (75MB) • Pro models available after 
 
 <div align="center">
 
-  **Hold Shift+Z** → **Speak naturally** → **Release** → **Text appears!**
+  **Hold Ctrl+Alt+R** → **Speak naturally** → **Release** → **Text appears!**
 
 </div>
 
@@ -96,11 +96,12 @@ Fast installation • Includes Tiny model (75MB) • Pro models available after 
 |---------|-------------|
 | 🎤 **Universal Voice Typing** | Works in ANY Windows application |
 | 🧠 **Powered by Whisper AI** | State-of-the-art accuracy, great with technical terms |
-| ⚡ **Lightning Fast** | Optimized for speed with greedy decoding |
+| ⚡ **Lightning Fast** | 67-73% faster than v1.0 with Q8_0 quantization & optimizations |
 | 🔒 **100% Private** | Completely offline, no cloud, no data collection |
-| ⌨️ **Customizable Hotkeys** | Use any key or combination (Shift+Z, Ctrl+Space, etc.) |
+| ⌨️ **Customizable Hotkeys** | Use any key or combination (Ctrl+Alt+R, Shift+Z, etc.) |
 | 📊 **Multiple Models** | Download additional models in Settings for better accuracy |
 | 💾 **Lightweight** | Minimal CPU/RAM usage when idle |
+| 🏗️ **Robust Architecture** | Clean MVVM design with comprehensive test coverage |
 
 ---
 
@@ -198,7 +199,7 @@ Upgrade to Pro ($20 one-time), then open Settings → AI Models tab. You can dow
 | **Won't start** | Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) |
 | **Windows Defender warning** | Click "More info" → "Run anyway" (false positive) |
 | **No text appears** | Check mic is working, VoiceLite in system tray |
-| **Hotkey doesn't work** | Another app may be using Shift+Z - change it in Settings |
+| **Hotkey doesn't work** | Another app may be using Ctrl+Alt+R - change it in Settings |
 | **Wrong text / Low accuracy** | Speak clearly, or download a larger model from Settings |
 
 ---

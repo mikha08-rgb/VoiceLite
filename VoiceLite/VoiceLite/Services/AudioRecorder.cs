@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using NAudio.Wave;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
@@ -14,7 +16,7 @@ namespace VoiceLite.Services
         public override string ToString() => Name;
     }
 
-    public class AudioRecorder : IDisposable
+    public class AudioRecorder : IAudioRecorder
     {
         private WaveInEvent? waveIn;
         private WaveFileWriter? waveFile;
@@ -30,11 +32,12 @@ namespace VoiceLite.Services
         private const int CleanupIntervalMinutes = 30;
         private const bool useMemoryBuffer = true; // QUICK WIN 1: Force memory mode to eliminate file I/O latency (50-100ms)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
+        private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
 
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
         public event EventHandler<byte[]>? AudioDataReady; // New event for memory buffer mode
-
+        public event EventHandler<Exception>? RecordingError; // Required by IAudioRecorder
 
         public AudioRecorder()
         {
@@ -259,6 +262,10 @@ namespace VoiceLite.Services
                         throw new InvalidOperationException("Previous recording session not fully cleaned up. Cannot start new session.");
                     }
 
+                    // CRITICAL FIX #1: Increment session ID to invalidate any stale callbacks
+                    currentSessionId++;
+                    int sessionId = currentSessionId;
+
                     waveIn = new WaveInEvent
                     {
                         WaveFormat = new WaveFormat(16000, 16, 1),
@@ -276,12 +283,12 @@ namespace VoiceLite.Services
                     // File mode code paths removed to eliminate dead code warnings
                     audioMemoryStream = new MemoryStream();
                     waveFile = new WaveFileWriter(audioMemoryStream, waveIn.WaveFormat);
-                    ErrorLogger.LogDebug("StartRecording: Using memory buffer mode (enforced)");
+                    ErrorLogger.LogDebug($"StartRecording: Using memory buffer mode (session #{sessionId})");
 
                     // Start recording - this creates a completely fresh audio capture session
                     waveIn.StartRecording();
                     isRecording = true;
-                    ErrorLogger.LogInfo("Recording session started");
+                    ErrorLogger.LogInfo($"Recording session #{sessionId} started");
                 }
                 catch (Exception ex)
                 {
@@ -300,6 +307,9 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
+            // CRITICAL FIX #1: Capture session ID before any other checks
+            int callbackSessionId = currentSessionId;
+
             // Quick pre-lock check for obvious late callbacks
             if (!isRecording)
             {
@@ -310,6 +320,13 @@ namespace VoiceLite.Services
             // Additional safety check in lock to prevent race conditions
             lock (lockObject)
             {
+                // CRITICAL FIX #1: Reject callbacks from old sessions
+                if (callbackSessionId != currentSessionId)
+                {
+                    ErrorLogger.LogDebug($"OnDataAvailable: Rejected stale callback from session #{callbackSessionId} (current: #{currentSessionId})");
+                    return;
+                }
+
                 // Re-check after acquiring lock - state might have changed
                 if (!isRecording)
                     return;
@@ -422,11 +439,12 @@ namespace VoiceLite.Services
             {
                 if (!isRecording) return;
 
-                ErrorLogger.LogMessage($"StopRecording: CRITICAL - Stopping session at {DateTime.Now:HH:mm:ss.fff}");
+                int stoppingSessionId = currentSessionId;
+                ErrorLogger.LogMessage($"StopRecording: CRITICAL - Stopping session #{stoppingSessionId} at {DateTime.Now:HH:mm:ss.fff}");
 
                 // CRITICAL FIX: Set isRecording to false IMMEDIATELY to reject any incoming data
                 isRecording = false;
-                ErrorLogger.LogMessage("StopRecording: isRecording=false set - will IMMEDIATELY reject all incoming data");
+                ErrorLogger.LogMessage($"StopRecording: isRecording=false set for session #{stoppingSessionId} - will IMMEDIATELY reject all incoming data");
 
                 string? audioFileToNotify = currentAudioFilePath;
 
@@ -592,6 +610,52 @@ namespace VoiceLite.Services
 
         // QUICK WIN 1: SetMemoryBufferMode removed - memory mode is now enforced (const = true)
         // This eliminates 50-100ms file I/O latency per recording session
+
+        // Interface implementation methods
+        public async Task<string> GetLastAudioFileAsync()
+        {
+            return await Task.Run(() =>
+            {
+                if (!string.IsNullOrEmpty(currentAudioFilePath) && File.Exists(currentAudioFilePath))
+                {
+                    return currentAudioFilePath;
+                }
+
+                // Find the most recent audio file in temp directory
+                var directory = new DirectoryInfo(tempDirectory);
+                var latestFile = directory.GetFiles("*.wav")
+                    .OrderByDescending(f => f.CreationTime)
+                    .FirstOrDefault();
+
+                return latestFile?.FullName ?? string.Empty;
+            });
+        }
+
+        public bool ValidateAudioSystem()
+        {
+            try
+            {
+                // Check if any recording devices are available
+                int deviceCount = WaveInEvent.DeviceCount;
+                if (deviceCount == 0)
+                {
+                    RecordingError?.Invoke(this, new InvalidOperationException("No audio recording devices found"));
+                    return false;
+                }
+
+                // Test creating a WaveInEvent
+                using (var testWaveIn = new WaveInEvent())
+                {
+                    testWaveIn.WaveFormat = new WaveFormat(16000, 16, 1);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                RecordingError?.Invoke(this, ex);
+                return false;
+            }
+        }
 
         public void Dispose()
         {

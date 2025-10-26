@@ -33,8 +33,9 @@ SolidCompression=yes
 InternalCompressLevel=ultra64
 
 ; Security Settings
-SignTool=signtool
-SignedUninstaller=yes
+; TODO: Uncomment after obtaining EV code signing certificate (see CODE_SIGNING_SETUP.md)
+; SignTool=signtool sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a $f
+; SignedUninstaller=yes
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 
@@ -67,9 +68,9 @@ ArchitecturesAllowed=x64
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; Main Application (Obfuscated)
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\Obfuscated\bin\Release\net8.0-windows\VoiceLite.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Main Application
 Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 

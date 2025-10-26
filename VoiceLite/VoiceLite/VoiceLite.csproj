@@ -13,6 +13,18 @@
     <AssemblyVersion>1.0.96.0</AssemblyVersion>
     <FileVersion>1.0.96.0</FileVersion>
     <RollForward>LatestMinor</RollForward>
+
+    <!-- Rich metadata helps antivirus trust (visible in file properties) -->
+    <Company>VoiceLite Software</Company>
+    <Product>VoiceLite</Product>
+    <Copyright>Copyright © 2025 VoiceLite Software</Copyright>
+    <AssemblyTitle>VoiceLite - Speech to Text</AssemblyTitle>
+    <Description>Professional speech-to-text dictation software using OpenAI Whisper AI. Converts your voice to text with global hotkeys and automatic insertion.</Description>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <Authors>VoiceLite Software</Authors>
+    <PackageProjectUrl>https://voicelite.app</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/yourusername/voicelite</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <!-- Expose internal members to test project -->
@@ -26,6 +38,8 @@
     <PackageReference Include="System.Text.Json" Version="9.0.9" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Polly" Version="8.4.2" />
   </ItemGroup>
 
   <ItemGroup>
