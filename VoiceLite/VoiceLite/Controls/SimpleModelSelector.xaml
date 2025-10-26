@@ -42,7 +42,7 @@
                                     <TextBlock Text="Swift"
                                                FontWeight="Bold"
                                                FontSize="14"/>
-                                    <TextBlock Text="142 MB"
+                                    <TextBlock Text="78 MB Q8_0"
                                                FontSize="11"
                                                Foreground="Gray"/>
                                 </StackPanel>
@@ -89,7 +89,7 @@
                                                        FontSize="12"
                                                        Foreground="#4CAF50"/>
                                         </StackPanel>
-                                        <TextBlock Text="466 MB"
+                                        <TextBlock Text="253 MB Q8_0"
                                                    FontSize="11"
                                                    Foreground="Gray"/>
                                     </StackPanel>
@@ -128,7 +128,7 @@
                                     <TextBlock Text="Elite"
                                                FontWeight="Bold"
                                                FontSize="14"/>
-                                    <TextBlock Text="1.5 GB"
+                                    <TextBlock Text="823 MB Q8_0"
                                                FontSize="11"
                                                Foreground="Gray"/>
                                 </StackPanel>
@@ -166,7 +166,7 @@
                                     <TextBlock Text="Ultra"
                                                FontWeight="Bold"
                                                FontSize="14"/>
-                                    <TextBlock Text="2.9 GB"
+                                    <TextBlock Text="1.6 GB Q8_0"
                                                FontSize="11"
                                                Foreground="Gray"/>
                                 </StackPanel>

@@ -77,7 +77,7 @@ git push --tags
 **Pro Tier ($20 one-time - downloadable in-app):**
 - `ggml-base.bin` (78MB Q8_0): **Swift** - 85-90% accuracy, ~1.5s processing
 - `ggml-small.bin` (253MB Q8_0): **Pro** ⭐ - 90-93% accuracy, ~3s processing (recommended)
-- `ggml-medium.bin` (1.5GB): **Elite** - 95-97% accuracy, ~12s processing (not yet quantized)
+- `ggml-medium.bin` (823MB Q8_0): **Elite** - 95-97% accuracy, ~12s processing
 - `ggml-large-v3.bin` (1.6GB Q8_0): **Ultra** - 97-98% accuracy, ~8s processing
 
 **Quantization Details (v1.0.88)**:
@@ -142,7 +142,7 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 
 ## Version Context
 
-**Current Desktop**: v1.1.2 (Critical hotfix - whisper.exe v1.7.6 NAudio WAV fix)
+**Current Desktop**: v1.1.3 (Critical hotfix - whisper.exe v1.7.6 NAudio WAV fix)
 **Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
 **Philosophy**: Core-only workflow with Pro feature gating for advanced models
 

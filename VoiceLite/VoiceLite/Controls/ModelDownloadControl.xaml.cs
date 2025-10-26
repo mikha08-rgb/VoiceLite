@@ -69,8 +69,8 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-tiny.bin",
                 DisplayName = "Tiny (Lite)",
-                Description = "Fast and lightweight - 75MB, 80-85% accuracy, <1 second processing",
-                FileSizeMB = 75,
+                Description = "Fast and lightweight - 42MB Q8_0, 80-85% accuracy, <1 second processing",
+                FileSizeMB = 42,
                 DownloadUrl = null, // Bundled with installer
                 IsProOnly = false // Free tier model
             });
@@ -79,9 +79,9 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-base.bin",
                 DisplayName = "Base (Swift) 🔒",
-                Description = "Good balance - 142MB, 85-90% accuracy, ~2 seconds processing",
-                FileSizeMB = 142,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                Description = "Good balance - 78MB Q8_0, 85-90% accuracy, ~2 seconds processing",
+                FileSizeMB = 78,
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q8_0.bin",
                 IsProOnly = true // Pro tier model
             });
 
@@ -89,9 +89,9 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-small.bin",
                 DisplayName = "Small (Pro) 🔒",
-                Description = "Recommended for most users - 466MB, 90-93% accuracy, ~5 seconds processing",
-                FileSizeMB = 466,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                Description = "Recommended for most users - 253MB Q8_0, 90-93% accuracy, ~3 seconds processing",
+                FileSizeMB = 253,
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q8_0.bin",
                 IsProOnly = true // Pro tier model
             });
 
@@ -99,9 +99,9 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-medium.bin",
                 DisplayName = "Medium (Elite) 🔒",
-                Description = "Professional accuracy - 1.5GB, 95-97% accuracy, ~12 seconds processing",
-                FileSizeMB = 1500,
-                DownloadUrl = "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin",
+                Description = "Professional accuracy - 823MB Q8_0, 95-97% accuracy, ~12 seconds processing",
+                FileSizeMB = 823,
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q8_0.bin",
                 IsProOnly = true // Pro tier model
             });
 
@@ -109,9 +109,9 @@ namespace VoiceLite.Controls
             {
                 FileName = "ggml-large-v3.bin",
                 DisplayName = "Large (Ultra) 🔒",
-                Description = "Maximum accuracy - 2.9GB, 97-98% accuracy, ~25 seconds processing (requires 8GB+ RAM)",
-                FileSizeMB = 2900,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+                Description = "Maximum accuracy - 1.6GB Q8_0, 97-98% accuracy, ~8 seconds processing",
+                FileSizeMB = 1600,
+                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q8_0.bin",
                 IsProOnly = true // Pro tier model
             });
         }
