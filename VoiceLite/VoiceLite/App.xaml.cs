@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using VoiceLite.Infrastructure.DependencyInjection;
 using VoiceLite.Services;
 
@@ -14,9 +13,9 @@ namespace VoiceLite
 {
     public partial class App : Application
     {
-        private IHost? _host;
+        private ServiceProvider? _serviceProvider;
 
-        protected override async void OnStartup(StartupEventArgs e)
+        protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
@@ -31,39 +30,32 @@ namespace VoiceLite
             // Clean up any orphaned whisper processes from previous crashes
             CleanupOrphanedWhisperProcesses();
 
-            // Configure and build the DI host
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureServices((context, services) =>
-                {
-                    // Add all application services
-                    services.AddVoiceLiteServices();
-                    services.AddInfrastructureServices();
-                    services.ConfigureOptions();
-                })
-                .Build();
+            // Configure and build the DI container (WPF-appropriate, not web hosting)
+            var serviceCollection = new ServiceCollection();
+
+            // Add all application services
+            serviceCollection.AddVoiceLiteServices();
+            serviceCollection.AddInfrastructureServices();
+            serviceCollection.ConfigureOptions();
+
+            // Build the service provider
+            _serviceProvider = serviceCollection.BuildServiceProvider();
 
             // Initialize the service provider wrapper for global access
-            ServiceProviderWrapper.Initialize(_host.Services);
-
-            // Start the host
-            await _host.StartAsync();
+            ServiceProviderWrapper.Initialize(_serviceProvider);
 
             // Create and show the main window
-            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
         }
 
-        protected override async void OnExit(ExitEventArgs e)
+        protected override void OnExit(ExitEventArgs e)
         {
             // Clean up on exit
             CleanupOrphanedWhisperProcesses();
 
-            // Stop and dispose the host
-            if (_host != null)
-            {
-                await _host.StopAsync();
-                _host.Dispose();
-            }
+            // Dispose the service provider
+            _serviceProvider?.Dispose();
 
             base.OnExit(e);
         }
