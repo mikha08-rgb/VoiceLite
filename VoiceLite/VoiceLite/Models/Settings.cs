@@ -146,7 +146,8 @@ namespace VoiceLite.Models
         public bool IsProLicense { get; set; } = false; // True if Pro license is activated
 
         // Performance Settings
-        public int Threads { get; set; } = Environment.ProcessorCount / 2; // Optimal thread count for Whisper
+        // CRITICAL: Always capped at 4 threads to prevent CPU thrashing (see v1.1.2 performance fix)
+        public int Threads { get; set; } = 4; // Fixed optimal thread count
 
         // Static methods for loading/saving settings
         public static Settings Load()
@@ -188,6 +189,18 @@ namespace VoiceLite.Models
             if (settings.SelectedMicrophoneIndex < -1)
             {
                 settings.SelectedMicrophoneIndex = -1;
+            }
+
+            // CRITICAL FIX (v1.1.5): Cap Threads at 4 to prevent CPU thrashing
+            // Issue: Settings persisted Threads=8 causing severe performance degradation
+            // This ensures even if settings.json has a bad value, we cap it
+            if (settings.Threads > 4)
+            {
+                settings.Threads = 4;
+            }
+            else if (settings.Threads < 1)
+            {
+                settings.Threads = 4;
             }
 
             // Force re-validation by triggering property setters
