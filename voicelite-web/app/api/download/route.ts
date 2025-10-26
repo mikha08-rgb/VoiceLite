@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const version = searchParams.get('version') || '1.0.96';
+  const version = searchParams.get('version') || '1.1.0';
 
   // GitHub releases direct download URL (triggers immediate download, no GitHub page)
   const downloadUrl = `https://github.com/mikha08-rgb/VoiceLite/releases/download/v${version}/VoiceLite-Setup-${version}.exe`;
