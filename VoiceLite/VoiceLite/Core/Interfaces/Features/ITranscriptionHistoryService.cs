@@ -35,14 +35,34 @@ namespace VoiceLite.Core.Interfaces.Features
         void ClearHistory();
 
         /// <summary>
+        /// Clears all history items with option to preserve pinned
+        /// </summary>
+        void ClearHistory(bool preservePinned);
+
+        /// <summary>
         /// Removes a specific history item
         /// </summary>
         void RemoveItem(Guid itemId);
 
         /// <summary>
+        /// Removes a specific history item by string ID
+        /// </summary>
+        void RemoveItem(string itemId);
+
+        /// <summary>
         /// Pins or unpins a history item
         /// </summary>
         void TogglePin(Guid itemId);
+
+        /// <summary>
+        /// Pins or unpins a history item by string ID
+        /// </summary>
+        void TogglePin(string itemId);
+
+        /// <summary>
+        /// Adds a new item to the history
+        /// </summary>
+        void AddItem(TranscriptionItem item);
 
         /// <summary>
         /// Gets all pinned items
@@ -70,13 +90,15 @@ namespace VoiceLite.Core.Interfaces.Features
     /// </summary>
     public class TranscriptionItem
     {
-        public Guid Id { get; set; }
-        public string Text { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string ModelUsed { get; set; }
-        public TimeSpan ProcessingTime { get; set; }
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Text { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public double ProcessingTime { get; set; }
+        public string? ModelUsed { get; set; }
         public bool IsPinned { get; set; }
-        public string ApplicationContext { get; set; }
+        public string? AudioFilePath { get; set; }
+        public string? ApplicationContext { get; set; }
+        public int WordCount => Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
     }
 
     /// <summary>

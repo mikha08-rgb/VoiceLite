@@ -15,10 +15,31 @@ namespace VoiceLite.Core.Interfaces.Services
         event EventHandler<HotkeyEventArgs> HotkeyPressed;
 
         /// <summary>
+        /// Raised when a registered hotkey is released
+        /// </summary>
+        event EventHandler<HotkeyEventArgs> HotkeyReleased;
+
+        /// <summary>
+        /// Gets the current hotkey
+        /// </summary>
+        Key CurrentKey { get; }
+
+        /// <summary>
+        /// Gets the current modifier keys
+        /// </summary>
+        ModifierKeys CurrentModifiers { get; }
+
+        /// <summary>
         /// Registers a global hotkey
         /// </summary>
         /// <param name="window">The window to receive hotkey messages</param>
         void RegisterHotkey(Window window);
+
+        /// <summary>
+        /// Registers a global hotkey
+        /// </summary>
+        /// <param name="handle">The window handle to receive hotkey messages</param>
+        void RegisterHotkey(IntPtr handle);
 
         /// <summary>
         /// Unregisters all hotkeys

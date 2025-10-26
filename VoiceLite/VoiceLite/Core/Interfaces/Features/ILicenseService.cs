@@ -12,8 +12,8 @@ namespace VoiceLite.Core.Interfaces.Features
         /// Validates a license key
         /// </summary>
         /// <param name="licenseKey">The license key to validate</param>
-        /// <returns>True if the license is valid</returns>
-        Task<bool> ValidateLicenseAsync(string licenseKey);
+        /// <returns>Validation result with details</returns>
+        Task<LicenseValidationResult> ValidateLicenseAsync(string licenseKey);
 
         /// <summary>
         /// Gets the current license status
@@ -55,5 +55,17 @@ namespace VoiceLite.Core.Interfaces.Features
         /// Raised when license status changes
         /// </summary>
         event EventHandler<bool> LicenseStatusChanged;
+    }
+
+    /// <summary>
+    /// Result of license validation
+    /// </summary>
+    public class LicenseValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string Tier { get; set; } = "free";
+        public string? ErrorMessage { get; set; }
+        public string? Email { get; set; }
+        public int? ActivationCount { get; set; }
     }
 }

@@ -6,10 +6,11 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class HotkeyManager : IDisposable
+    public class HotkeyManager : IHotkeyManager
     {
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -47,13 +48,14 @@ namespace VoiceLite.Services
             dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
         }
 
-        public event EventHandler? HotkeyPressed;
-        public event EventHandler? HotkeyReleased;
+        public event EventHandler<HotkeyEventArgs>? HotkeyPressed;
+        public event EventHandler<HotkeyEventArgs>? HotkeyReleased;
 
         // BUG-006 FIX: Add event to notify UI when polling mode is activated
         // Allows UI to show notification that polling mode has slightly higher latency
         public event EventHandler<string>? PollingModeActivated;
 
+        // Public properties for interface compliance
         public Key CurrentKey => currentKey;
         public ModifierKeys CurrentModifiers => currentModifiers;
 
@@ -216,12 +218,16 @@ namespace VoiceLite.Services
 
                         if (raisePressed)
                         {
-                            RunOnDispatcher(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
+                            RunOnDispatcher(() => HotkeyPressed?.Invoke(this, new HotkeyEventArgs
+                            {
+                                Key = key,
+                                Modifiers = ModifierKeys.None
+                            }));
                         }
 
                         if (raiseReleased)
                         {
-                            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, EventArgs.Empty));
+                            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, new HotkeyEventArgs { Key = currentKey, Modifiers = currentModifiers, HotkeyId = 0 }));
                         }
 
                         await Task.Delay(15, cts.Token).ConfigureAwait(false);
@@ -372,7 +378,7 @@ namespace VoiceLite.Services
             }
 
             StopKeyMonitor();
-            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, EventArgs.Empty));
+            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, new HotkeyEventArgs { Key = currentKey, Modifiers = currentModifiers, HotkeyId = 0 }));
         }
 
         private uint ConvertModifiers(ModifierKeys modifiers)
@@ -410,7 +416,12 @@ namespace VoiceLite.Services
 
                 if (shouldStartMonitoring)
                 {
-                    HotkeyPressed?.Invoke(this, EventArgs.Empty);
+                    HotkeyPressed?.Invoke(this, new HotkeyEventArgs
+                    {
+                        Key = currentKey,
+                        Modifiers = currentModifiers,
+                        HotkeyId = HOTKEY_ID
+                    });
 
                     // Start monitoring for key release (for push-to-talk mode)
                     StartReleaseMonitoring();
@@ -454,7 +465,7 @@ namespace VoiceLite.Services
 
                         if (raiseRelease)
                         {
-                            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, EventArgs.Empty));
+                            RunOnDispatcher(() => HotkeyReleased?.Invoke(this, new HotkeyEventArgs { Key = currentKey, Modifiers = currentModifiers, HotkeyId = 0 }));
                             break;
                         }
 
@@ -483,6 +494,48 @@ namespace VoiceLite.Services
                 keyMonitorTask = task;
             }
         }
+
+        #region IHotkeyManager Implementation
+
+        public void RegisterHotkey(Window window)
+        {
+            var helper = new WindowInteropHelper(window);
+            RegisterHotkey(helper.Handle);
+        }
+
+        public void UnregisterAllHotkeys()
+        {
+            UnregisterCurrentHotkey();
+        }
+
+        public bool UpdateHotkey(Key key, ModifierKeys modifiers)
+        {
+            try
+            {
+                UnregisterCurrentHotkey();
+                currentKey = key;
+                currentModifiers = modifiers;
+                RegisterHotkey(windowHandle, key, modifiers);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string GetHotkeyString()
+        {
+            var result = "";
+            if (currentModifiers.HasFlag(ModifierKeys.Control)) result += "Ctrl+";
+            if (currentModifiers.HasFlag(ModifierKeys.Alt)) result += "Alt+";
+            if (currentModifiers.HasFlag(ModifierKeys.Shift)) result += "Shift+";
+            if (currentModifiers.HasFlag(ModifierKeys.Windows)) result += "Win+";
+            result += currentKey.ToString();
+            return result;
+        }
+
+        #endregion
 
         public void Dispose()
         {

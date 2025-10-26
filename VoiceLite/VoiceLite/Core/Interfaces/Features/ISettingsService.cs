@@ -26,6 +26,11 @@ namespace VoiceLite.Core.Interfaces.Features
         bool StartWithWindows { get; set; }
 
         /// <summary>
+        /// Gets or sets whether to close to tray instead of exiting
+        /// </summary>
+        bool CloseToTray { get; set; }
+
+        /// <summary>
         /// Gets or sets whether to check for updates
         /// </summary>
         bool CheckForUpdates { get; set; }
@@ -67,6 +72,16 @@ namespace VoiceLite.Core.Interfaces.Features
         /// Gets or sets the global hotkey
         /// </summary>
         string GlobalHotkey { get; set; }
+
+        /// <summary>
+        /// Gets or sets the hotkey key
+        /// </summary>
+        System.Windows.Input.Key HotkeyKey { get; set; }
+
+        /// <summary>
+        /// Gets or sets the hotkey modifiers
+        /// </summary>
+        System.Windows.Input.ModifierKeys HotkeyModifiers { get; set; }
 
         /// <summary>
         /// Gets or sets whether hotkeys are enabled
@@ -115,6 +130,11 @@ namespace VoiceLite.Core.Interfaces.Features
         /// Resets all settings to defaults
         /// </summary>
         void ResetToDefaults();
+
+        /// <summary>
+        /// Gets the full path to the selected model file
+        /// </summary>
+        string GetModelPath();
 
         /// <summary>
         /// Exports settings to a file

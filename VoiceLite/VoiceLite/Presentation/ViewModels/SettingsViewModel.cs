@@ -450,9 +450,9 @@ namespace VoiceLite.Presentation.ViewModels
             try
             {
                 LicenseStatus = "Validating...";
-                var isValid = await _licenseService.ValidateLicenseAsync(LicenseKey);
+                var result = await _licenseService.ValidateLicenseAsync(LicenseKey);
 
-                if (isValid)
+                if (result.IsValid)
                 {
                     _licenseService.SaveLicenseKey(LicenseKey);
                     IsProUser = true;

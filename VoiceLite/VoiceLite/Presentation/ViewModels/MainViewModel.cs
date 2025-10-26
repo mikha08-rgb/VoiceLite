@@ -1,22 +1,27 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using VoiceLite.Core.Interfaces.Controllers;
 using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Core.Interfaces.Services;
 using VoiceLite.Presentation.Commands;
-using VoiceLite.Helpers;
+using VoiceLite.Models;
 
 namespace VoiceLite.Presentation.ViewModels
 {
     /// <summary>
-    /// ViewModel for the main window
+    /// Enhanced ViewModel for the main window with complete MVVM implementation
     /// </summary>
     public class MainViewModel : ViewModelBase
     {
+        #region Dependencies
+
         private readonly IRecordingController _recordingController;
         private readonly ITranscriptionController _transcriptionController;
         private readonly ISettingsService _settingsService;
@@ -26,20 +31,38 @@ namespace VoiceLite.Presentation.ViewModels
         private readonly ISystemTrayManager _systemTrayManager;
         private readonly IErrorLogger _errorLogger;
 
-        // State properties
+        #endregion
+
+        #region State Properties
+
         private bool _isRecording;
         private bool _isTranscribing;
-        private string _statusText = "Ready";
-        private string _recordButtonText = "Start Recording";
-        private int _progressValue;
-        private string _currentModelName = "Tiny";
-        private ObservableCollection<TranscriptionItem> _transcriptionHistory;
-        private TranscriptionItem? _selectedHistoryItem;
-        private bool _isModelDownloading;
-        private string _modelDownloadProgress = string.Empty;
-        private Visibility _proFeaturesVisibility = Visibility.Collapsed;
+        private bool _isProcessing;
+        private bool _isInitialized;
+        private bool _isApplicationExiting;
 
-        // Properties
+        private string _statusText = "Ready";
+        private Brush _statusTextColor = Brushes.Green;
+        private Brush _statusIndicatorColor = Brushes.LightGreen;
+
+        private string _hotkeyDisplayText = "Alt";
+        private string _currentModelName = "Tiny";
+        private string _progressMessage = "Processing...";
+        private int _progressValue;
+        private bool _isProgressIndeterminate;
+
+        private ObservableCollection<TranscriptionItem> _transcriptionHistory;
+        private ICollectionView _historyView;
+        private TranscriptionItem? _selectedHistoryItem;
+
+        private string _searchText = "";
+        private bool _isSearchVisible;
+        private string _emptyHistoryMessage = "No transcriptions yet. Press hotkey or click 'Start Recording' to begin.";
+
+        #endregion
+
+        #region Public Properties
+
         public bool IsRecording
         {
             get => _isRecording;
@@ -47,8 +70,8 @@ namespace VoiceLite.Presentation.ViewModels
             {
                 if (SetProperty(ref _isRecording, value))
                 {
-                    RecordButtonText = value ? "Stop Recording" : "Start Recording";
                     UpdateCommands();
+                    OnPropertyChanged(nameof(CanRecord));
                 }
             }
         }
@@ -61,8 +84,21 @@ namespace VoiceLite.Presentation.ViewModels
                 if (SetProperty(ref _isTranscribing, value))
                 {
                     UpdateCommands();
+                    OnPropertyChanged(nameof(CanRecord));
                 }
             }
+        }
+
+        public bool IsProcessing
+        {
+            get => _isProcessing;
+            set => SetProperty(ref _isProcessing, value);
+        }
+
+        public bool IsApplicationExiting
+        {
+            get => _isApplicationExiting;
+            set => SetProperty(ref _isApplicationExiting, value);
         }
 
         public string StatusText
@@ -71,16 +107,22 @@ namespace VoiceLite.Presentation.ViewModels
             set => SetProperty(ref _statusText, value);
         }
 
-        public string RecordButtonText
+        public Brush StatusTextColor
         {
-            get => _recordButtonText;
-            set => SetProperty(ref _recordButtonText, value);
+            get => _statusTextColor;
+            set => SetProperty(ref _statusTextColor, value);
         }
 
-        public int ProgressValue
+        public Brush StatusIndicatorColor
         {
-            get => _progressValue;
-            set => SetProperty(ref _progressValue, value);
+            get => _statusIndicatorColor;
+            set => SetProperty(ref _statusIndicatorColor, value);
+        }
+
+        public string HotkeyDisplayText
+        {
+            get => _hotkeyDisplayText;
+            set => SetProperty(ref _hotkeyDisplayText, value);
         }
 
         public string CurrentModelName
@@ -89,11 +131,31 @@ namespace VoiceLite.Presentation.ViewModels
             set => SetProperty(ref _currentModelName, value);
         }
 
+        public string ProgressMessage
+        {
+            get => _progressMessage;
+            set => SetProperty(ref _progressMessage, value);
+        }
+
+        public int ProgressValue
+        {
+            get => _progressValue;
+            set => SetProperty(ref _progressValue, value);
+        }
+
+        public bool IsProgressIndeterminate
+        {
+            get => _isProgressIndeterminate;
+            set => SetProperty(ref _isProgressIndeterminate, value);
+        }
+
         public ObservableCollection<TranscriptionItem> TranscriptionHistory
         {
             get => _transcriptionHistory;
             set => SetProperty(ref _transcriptionHistory, value);
         }
+
+        public ICollectionView FilteredTranscriptionHistory => _historyView;
 
         public TranscriptionItem? SelectedHistoryItem
         {
@@ -107,41 +169,73 @@ namespace VoiceLite.Presentation.ViewModels
             }
         }
 
-        public bool IsModelDownloading
+        public string SearchText
         {
-            get => _isModelDownloading;
+            get => _searchText;
             set
             {
-                if (SetProperty(ref _isModelDownloading, value))
+                if (SetProperty(ref _searchText, value))
                 {
-                    UpdateCommands();
+                    FilterHistory();
+                    OnPropertyChanged(nameof(HasSearchText));
                 }
             }
         }
 
-        public string ModelDownloadProgress
+        public bool IsSearchVisible
         {
-            get => _modelDownloadProgress;
-            set => SetProperty(ref _modelDownloadProgress, value);
+            get => _isSearchVisible;
+            set => SetProperty(ref _isSearchVisible, value);
         }
 
-        public Visibility ProFeaturesVisibility
+        public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+
+        public string EmptyHistoryMessage
         {
-            get => _proFeaturesVisibility;
-            set => SetProperty(ref _proFeaturesVisibility, value);
+            get => _emptyHistoryMessage;
+            set => SetProperty(ref _emptyHistoryMessage, value);
         }
 
-        // Commands
-        public ICommand StartStopRecordingCommand { get; }
+        public bool IsHistoryEmpty => TranscriptionHistory?.Count == 0;
+        public bool HasHistory => TranscriptionHistory?.Count > 0;
+        public bool CanRecord => !IsRecording && !IsTranscribing && !IsProcessing;
+
+        // Settings properties
+        public bool ShowInTaskbar => !_settingsService.MinimizeToTray;
+        public bool StartMinimized => _settingsService.StartMinimized;
+        public bool MinimizeToTray => _settingsService.MinimizeToTray;
+        public bool CloseToTray => _settingsService.CloseToTray;
+
+        #endregion
+
+        #region Commands
+
+        public ICommand ToggleRecordingCommand { get; }
         public ICommand OpenSettingsCommand { get; }
-        public ICommand ExitApplicationCommand { get; }
+        public ICommand ExitCommand { get; }
         public ICommand ClearHistoryCommand { get; }
-        public ICommand CopyTranscriptionCommand { get; }
+        public ICommand CopyToClipboardCommand { get; }
         public ICommand DeleteHistoryItemCommand { get; }
-        public ICommand PinHistoryItemCommand { get; }
+        public ICommand TogglePinCommand { get; }
         public ICommand RefreshCommand { get; }
-        public ICommand ShowAboutCommand { get; }
         public ICommand MinimizeToTrayCommand { get; }
+
+        // Search commands
+        public ICommand ToggleSearchCommand { get; }
+        public ICommand SearchCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+
+        #endregion
+
+        #region Events
+
+        public event EventHandler? MinimizeToTrayRequested;
+        public event EventHandler? ShowSettingsRequested;
+        public event EventHandler? CloseRequested;
+
+        #endregion
+
+        #region Constructor
 
         public MainViewModel(
             IRecordingController recordingController,
@@ -165,43 +259,53 @@ namespace VoiceLite.Presentation.ViewModels
 
             // Initialize collections
             _transcriptionHistory = new ObservableCollection<TranscriptionItem>();
+            _historyView = CollectionViewSource.GetDefaultView(_transcriptionHistory);
+            _historyView.Filter = FilterHistoryItem;
 
             // Initialize commands
-            StartStopRecordingCommand = new AsyncRelayCommand(ExecuteStartStopRecording, CanStartStopRecording);
+            ToggleRecordingCommand = new AsyncRelayCommand(ExecuteToggleRecording, CanToggleRecording);
             OpenSettingsCommand = new RelayCommand(ExecuteOpenSettings);
-            ExitApplicationCommand = new RelayCommand(ExecuteExitApplication);
-            ClearHistoryCommand = new RelayCommand(ExecuteClearHistory, CanClearHistory);
-            CopyTranscriptionCommand = new RelayCommand<TranscriptionItem>(ExecuteCopyTranscription);
+            ExitCommand = new RelayCommand(ExecuteExit);
+            ClearHistoryCommand = new RelayCommand(ExecuteClearHistory, () => HasHistory);
+            CopyToClipboardCommand = new RelayCommand<TranscriptionItem>(ExecuteCopyToClipboard);
             DeleteHistoryItemCommand = new RelayCommand<TranscriptionItem>(ExecuteDeleteHistoryItem);
-            PinHistoryItemCommand = new RelayCommand<TranscriptionItem>(ExecutePinHistoryItem);
+            TogglePinCommand = new RelayCommand<TranscriptionItem>(ExecuteTogglePin);
             RefreshCommand = new AsyncRelayCommand(ExecuteRefresh);
-            ShowAboutCommand = new RelayCommand(ExecuteShowAbout);
             MinimizeToTrayCommand = new RelayCommand(ExecuteMinimizeToTray);
 
-            // Subscribe to controller events
-            SubscribeToEvents();
+            // Search commands
+            ToggleSearchCommand = new RelayCommand(ExecuteToggleSearch);
+            SearchCommand = new RelayCommand(ExecuteSearch);
+            ClearSearchCommand = new RelayCommand(ExecuteClearSearch);
 
-            // Initialize
-            InitializeAsync();
+            // Subscribe to events
+            SubscribeToEvents();
         }
 
-        private async void InitializeAsync()
+        #endregion
+
+        #region Initialization
+
+        public async Task InitializeAsync(IntPtr windowHandle)
         {
+            if (_isInitialized) return;
+
             try
             {
+                UpdateStatus("Initializing...", Brushes.Orange);
+
                 // Load settings
                 await _settingsService.LoadSettingsAsync();
+                UpdateHotkeyDisplay();
+                CurrentModelName = GetModelDisplayName(_settingsService.SelectedModel);
 
-                // Update model name
-                CurrentModelName = _settingsService.SelectedModel.ToUpper();
+                // Register hotkeys
+                _hotkeyManager.RegisterHotkey(windowHandle);
 
                 // Load history
-                LoadTranscriptionHistory();
+                await LoadTranscriptionHistoryAsync();
 
-                // Update Pro features visibility
-                ProFeaturesVisibility = _proFeatureService.IsProUser ? Visibility.Visible : Visibility.Collapsed;
-
-                // Validate transcription setup
+                // Validate setup
                 var validation = await _transcriptionController.ValidateTranscriptionSetupAsync();
                 if (!validation.IsValid)
                 {
@@ -209,16 +313,337 @@ namespace VoiceLite.Presentation.ViewModels
                     {
                         _errorLogger.LogWarning($"Setup issue: {issue}");
                     }
+                    UpdateStatus("Ready (with warnings)", Brushes.Orange);
+                }
+                else
+                {
+                    UpdateStatus("Ready", Brushes.Green);
                 }
 
-                StatusText = "Ready";
+                _isInitialized = true;
             }
             catch (Exception ex)
             {
                 _errorLogger.LogError(ex, "Failed to initialize MainViewModel");
-                StatusText = "Initialization failed";
+                UpdateStatus("Initialization failed", Brushes.Red);
+
+                MessageBox.Show(
+                    $"Failed to initialize: {ex.Message}",
+                    "VoiceLite Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
+
+        public async Task ShutdownAsync()
+        {
+            IsApplicationExiting = true;
+
+            try
+            {
+                UpdateStatus("Shutting down...", Brushes.Orange);
+
+                // Stop any ongoing recording
+                if (IsRecording)
+                {
+                    await _recordingController.StopRecordingAsync(transcribe: false);
+                }
+
+                // Cancel any ongoing transcription
+                if (IsTranscribing)
+                {
+                    // TODO: Add CancelCurrentTranscriptionAsync to ITranscriptionController
+                    // await _transcriptionController.CancelCurrentTranscriptionAsync();
+                }
+
+                // Save settings
+                await _settingsService.SaveSettingsAsync();
+
+                // Unregister hotkeys
+                _hotkeyManager.UnregisterAllHotkeys();
+
+                // Dispose system tray
+                _systemTrayManager.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _errorLogger.LogError(ex, "Error during shutdown");
+            }
+        }
+
+        #endregion
+
+        #region Command Implementations
+
+        private async Task ExecuteToggleRecording()
+        {
+            try
+            {
+                if (!IsRecording)
+                {
+                    UpdateStatus("Starting recording...", Brushes.Orange);
+                    await _recordingController.StartRecordingAsync();
+                    IsRecording = true;
+                    UpdateStatus("Recording... (press hotkey to stop)", Brushes.Red);
+                }
+                else
+                {
+                    UpdateStatus("Stopping recording...", Brushes.Orange);
+                    IsRecording = false;
+
+                    var result = await _recordingController.RecordAndTranscribeAsync(
+                        _settingsService.GetModelPath(),
+                        _settingsService.InjectionMode);
+
+                    if (result.Success)
+                    {
+                        UpdateStatus($"Complete! ({result.ProcessingTime.TotalSeconds:F1}s)", Brushes.Green);
+
+                        // Add to history
+                        var item = new TranscriptionItem
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            Text = result.Text ?? "",
+                            Timestamp = DateTime.Now,
+                            ProcessingTime = result.ProcessingTime.TotalSeconds,
+                            ModelUsed = CurrentModelName
+                        };
+
+                        _historyService.AddItem(item);
+                    }
+                    else
+                    {
+                        UpdateStatus($"Failed: {result.Error}", Brushes.Red);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorLogger.LogError(ex, "Failed to toggle recording");
+                UpdateStatus($"Error: {ex.Message}", Brushes.Red);
+                IsRecording = false;
+            }
+        }
+
+        private bool CanToggleRecording()
+        {
+            return !IsTranscribing && !IsProcessing;
+        }
+
+        private void ExecuteOpenSettings()
+        {
+            ShowSettingsRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ExecuteExit()
+        {
+            IsApplicationExiting = true;
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ExecuteClearHistory()
+        {
+            var result = MessageBox.Show(
+                "Are you sure you want to clear all transcription history?\nPinned items will be preserved.",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                _historyService.ClearHistory(preservePinned: true);
+                _ = LoadTranscriptionHistoryAsync();
+                UpdateStatus("History cleared", Brushes.Green);
+            }
+        }
+
+        private void ExecuteCopyToClipboard(TranscriptionItem? item)
+        {
+            if (item?.Text != null)
+            {
+                try
+                {
+                    Clipboard.SetText(item.Text);
+                    UpdateStatus("Copied to clipboard", Brushes.Green);
+                }
+                catch (Exception ex)
+                {
+                    _errorLogger.LogError(ex, "Failed to copy to clipboard");
+                    UpdateStatus("Failed to copy", Brushes.Red);
+                }
+            }
+        }
+
+        private void ExecuteDeleteHistoryItem(TranscriptionItem? item)
+        {
+            if (item != null)
+            {
+                _historyService.RemoveItem(item.Id);
+                TranscriptionHistory.Remove(item);
+                UpdateStatus("Item deleted", Brushes.Green);
+                OnPropertyChanged(nameof(IsHistoryEmpty));
+                OnPropertyChanged(nameof(HasHistory));
+            }
+        }
+
+        private void ExecuteTogglePin(TranscriptionItem? item)
+        {
+            if (item != null)
+            {
+                _historyService.TogglePin(item.Id);
+                item.IsPinned = !item.IsPinned;
+                _historyView.Refresh(); // Refresh to re-sort
+                UpdateStatus(item.IsPinned ? "Item pinned" : "Item unpinned", Brushes.Green);
+            }
+        }
+
+        private async Task ExecuteRefresh()
+        {
+            UpdateStatus("Refreshing...", Brushes.Orange);
+            await LoadTranscriptionHistoryAsync();
+            UpdateStatus("Ready", Brushes.Green);
+        }
+
+        private void ExecuteMinimizeToTray()
+        {
+            MinimizeToTrayRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ExecuteToggleSearch()
+        {
+            IsSearchVisible = !IsSearchVisible;
+            if (!IsSearchVisible)
+            {
+                SearchText = "";
+            }
+        }
+
+        private void ExecuteSearch()
+        {
+            FilterHistory();
+        }
+
+        private void ExecuteClearSearch()
+        {
+            SearchText = "";
+            IsSearchVisible = false;
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private void UpdateStatus(string text, Brush color)
+        {
+            StatusText = text;
+            StatusTextColor = color;
+            StatusIndicatorColor = GetIndicatorColor(color);
+        }
+
+        private Brush GetIndicatorColor(Brush statusColor)
+        {
+            if (statusColor == Brushes.Green) return Brushes.LightGreen;
+            if (statusColor == Brushes.Red) return Brushes.LightCoral;
+            if (statusColor == Brushes.Orange) return Brushes.LightGoldenrodYellow;
+            return Brushes.LightGray;
+        }
+
+        private void UpdateHotkeyDisplay()
+        {
+            var key = _hotkeyManager.CurrentKey;
+            var modifiers = _hotkeyManager.CurrentModifiers;
+
+            var display = "";
+            if (modifiers.HasFlag(ModifierKeys.Control)) display += "Ctrl+";
+            if (modifiers.HasFlag(ModifierKeys.Alt)) display += "Alt+";
+            if (modifiers.HasFlag(ModifierKeys.Shift)) display += "Shift+";
+            if (modifiers.HasFlag(ModifierKeys.Windows)) display += "Win+";
+
+            display += key.ToString();
+            HotkeyDisplayText = display;
+        }
+
+        private string GetModelDisplayName(string modelPath)
+        {
+            if (modelPath.Contains("tiny")) return "Lite (Free)";
+            if (modelPath.Contains("base")) return "Swift";
+            if (modelPath.Contains("small")) return "Pro ⭐";
+            if (modelPath.Contains("medium")) return "Elite";
+            if (modelPath.Contains("large")) return "Ultra";
+            return "Unknown";
+        }
+
+        private async Task LoadTranscriptionHistoryAsync()
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var history = _historyService.GetHistory().Take(100).ToList();
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        TranscriptionHistory.Clear();
+                        foreach (var item in history)
+                        {
+                            TranscriptionHistory.Add(item);
+                        }
+
+                        OnPropertyChanged(nameof(IsHistoryEmpty));
+                        OnPropertyChanged(nameof(HasHistory));
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _errorLogger.LogError(ex, "Failed to load history");
+                }
+            });
+        }
+
+        private void FilterHistory()
+        {
+            _historyView?.Refresh();
+        }
+
+        private bool FilterHistoryItem(object item)
+        {
+            if (string.IsNullOrWhiteSpace(SearchText))
+                return true;
+
+            if (item is TranscriptionItem transcription)
+            {
+                return transcription.Text?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ?? false;
+            }
+
+            return true;
+        }
+
+        public void RefreshSettings()
+        {
+            // Reload settings after settings window closes
+            _ = _settingsService.LoadSettingsAsync();
+            UpdateHotkeyDisplay();
+            CurrentModelName = GetModelDisplayName(_settingsService.SelectedModel);
+
+            OnPropertyChanged(nameof(ShowInTaskbar));
+            OnPropertyChanged(nameof(StartMinimized));
+            OnPropertyChanged(nameof(MinimizeToTray));
+            OnPropertyChanged(nameof(CloseToTray));
+        }
+
+        public void ShowTrayNotification(string title, string message)
+        {
+            _systemTrayManager.ShowBalloonTip(title, message);
+        }
+
+        private void UpdateCommands()
+        {
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        #endregion
+
+        #region Event Handlers
 
         private void SubscribeToEvents()
         {
@@ -234,221 +659,68 @@ namespace VoiceLite.Presentation.ViewModels
 
             // Hotkey events
             _hotkeyManager.HotkeyPressed += OnHotkeyPressed;
+            _hotkeyManager.HotkeyReleased += OnHotkeyReleased;
 
             // Settings changed events
             _settingsService.SettingChanged += OnSettingChanged;
         }
 
-        private async Task ExecuteStartStopRecording()
-        {
-            try
-            {
-                if (!IsRecording)
-                {
-                    // Start recording
-                    StatusText = "Starting recording...";
-                    await _recordingController.StartRecordingAsync();
-                }
-                else
-                {
-                    // Stop recording and transcribe
-                    StatusText = "Stopping recording...";
-                    var result = await _recordingController.StopRecordingAsync(transcribe: true);
-
-                    if (result.Success)
-                    {
-                        StatusText = $"Transcription complete ({result.ProcessingTime.TotalSeconds:F1}s)";
-                    }
-                    else
-                    {
-                        StatusText = $"Transcription failed: {result.Error}";
-                        _errorLogger.LogError(new Exception(result.Error ?? "Unknown error"), "Transcription failed");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _errorLogger.LogError(ex, "Failed to start/stop recording");
-                StatusText = $"Error: {ex.Message}";
-            }
-        }
-
-        private bool CanStartStopRecording()
-        {
-            return !IsTranscribing && !IsModelDownloading;
-        }
-
-        private void ExecuteOpenSettings()
-        {
-            try
-            {
-                // This will be handled by the View layer
-                // For now, we can use a messenger or event
-                OnOpenSettingsRequested();
-            }
-            catch (Exception ex)
-            {
-                _errorLogger.LogError(ex, "Failed to open settings");
-            }
-        }
-
-        private void ExecuteExitApplication()
-        {
-            Application.Current.Shutdown();
-        }
-
-        private void ExecuteClearHistory()
-        {
-            var result = MessageBox.Show(
-                "Are you sure you want to clear all transcription history?\nPinned items will be preserved.",
-                "Clear History",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                _historyService.ClearHistory();
-                LoadTranscriptionHistory();
-                StatusText = "History cleared";
-            }
-        }
-
-        private bool CanClearHistory()
-        {
-            return TranscriptionHistory?.Any() == true;
-        }
-
-        private void ExecuteCopyTranscription(TranscriptionItem? item)
-        {
-            if (item?.Text != null)
-            {
-                try
-                {
-                    Clipboard.SetText(item.Text);
-                    StatusText = "Copied to clipboard";
-                }
-                catch (Exception ex)
-                {
-                    _errorLogger.LogError(ex, "Failed to copy to clipboard");
-                    StatusText = "Failed to copy";
-                }
-            }
-        }
-
-        private void ExecuteDeleteHistoryItem(TranscriptionItem? item)
-        {
-            if (item != null)
-            {
-                _historyService.RemoveItem(item.Id);
-                TranscriptionHistory.Remove(item);
-                StatusText = "Item removed";
-            }
-        }
-
-        private void ExecutePinHistoryItem(TranscriptionItem? item)
-        {
-            if (item != null)
-            {
-                _historyService.TogglePin(item.Id);
-                item.IsPinned = !item.IsPinned;
-                LoadTranscriptionHistory(); // Reload to reorder
-                StatusText = item.IsPinned ? "Item pinned" : "Item unpinned";
-            }
-        }
-
-        private async Task ExecuteRefresh()
-        {
-            StatusText = "Refreshing...";
-            await InitializeAsync();
-        }
-
-        private void ExecuteShowAbout()
-        {
-            MessageBox.Show(
-                "VoiceLite - AI-Powered Transcription\n\n" +
-                "Version: 1.0.96\n" +
-                "Powered by OpenAI Whisper\n\n" +
-                "© 2024 VoiceLite",
-                "About VoiceLite",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
-
-        private void ExecuteMinimizeToTray()
-        {
-            _systemTrayManager.MinimizeToTray();
-        }
-
-        private void LoadTranscriptionHistory()
-        {
-            try
-            {
-                var history = _historyService.GetHistory().Take(50);
-                TranscriptionHistory.Clear();
-
-                foreach (var item in history)
-                {
-                    TranscriptionHistory.Add(item);
-                }
-            }
-            catch (Exception ex)
-            {
-                _errorLogger.LogError(ex, "Failed to load history");
-            }
-        }
-
-        private void UpdateCommands()
-        {
-            CommandManager.InvalidateRequerySuggested();
-        }
-
-        // Event handlers
         private void OnRecordingStarted(object? sender, EventArgs e)
         {
-            IsRecording = true;
-            StatusText = "Recording...";
-            ProgressValue = 10;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                IsRecording = true;
+                UpdateStatus("Recording...", Brushes.Red);
+            });
         }
 
         private void OnRecordingStopped(object? sender, EventArgs e)
         {
-            IsRecording = false;
-            StatusText = "Processing audio...";
-            ProgressValue = 20;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                IsRecording = false;
+                UpdateStatus("Processing audio...", Brushes.Orange);
+            });
         }
 
         private void OnTranscriptionStarted(object? sender, EventArgs e)
         {
-            IsTranscribing = true;
-            StatusText = "Transcribing...";
-            ProgressValue = 30;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                IsTranscribing = true;
+                IsProcessing = true;
+                ProgressMessage = "Transcribing with " + CurrentModelName + "...";
+                IsProgressIndeterminate = true;
+                UpdateStatus("Transcribing...", Brushes.Orange);
+            });
         }
 
         private void OnTranscriptionCompleted(object? sender, TranscriptionResult e)
         {
-            IsTranscribing = false;
-            ProgressValue = 100;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                IsTranscribing = false;
+                IsProcessing = false;
 
-            if (e.Success)
-            {
-                StatusText = $"Complete! ({e.ProcessingTime.TotalSeconds:F1}s)";
-            }
-            else
-            {
-                StatusText = $"Failed: {e.Error}";
-            }
-
-            // Reset progress after a delay
-            Task.Delay(2000).ContinueWith(_ =>
-            {
-                ProgressValue = 0;
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+                if (e.Success)
+                {
+                    UpdateStatus($"Complete! ({e.ProcessingTime.TotalSeconds:F1}s)", Brushes.Green);
+                }
+                else
+                {
+                    UpdateStatus($"Failed: {e.Error}", Brushes.Red);
+                }
+            });
         }
 
         private void OnProgressChanged(object? sender, RecordingProgress e)
         {
-            StatusText = e.Status;
-            ProgressValue = e.PercentComplete;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ProgressMessage = e.Status;
+                ProgressValue = e.PercentComplete;
+                IsProgressIndeterminate = e.IsIndeterminate;
+            });
         }
 
         private void OnHistoryItemAdded(object? sender, TranscriptionItem e)
@@ -458,34 +730,62 @@ namespace VoiceLite.Presentation.ViewModels
                 TranscriptionHistory.Insert(0, e);
 
                 // Limit displayed history
-                while (TranscriptionHistory.Count > 50)
+                while (TranscriptionHistory.Count > 100)
                 {
                     TranscriptionHistory.RemoveAt(TranscriptionHistory.Count - 1);
                 }
+
+                OnPropertyChanged(nameof(IsHistoryEmpty));
+                OnPropertyChanged(nameof(HasHistory));
             });
         }
 
-        private async void OnHotkeyPressed(object? sender, HotkeyEventArgs e)
+        private async void OnHotkeyPressed(object? sender, EventArgs e)
         {
-            // Handle global hotkey
-            await ExecuteStartStopRecording();
+            if (!IsRecording && !IsTranscribing)
+            {
+                await ExecuteToggleRecording();
+            }
+        }
+
+        private async void OnHotkeyReleased(object? sender, EventArgs e)
+        {
+            if (IsRecording)
+            {
+                await ExecuteToggleRecording();
+            }
         }
 
         private void OnSettingChanged(object? sender, SettingChangedEventArgs e)
         {
-            if (e.SettingName == nameof(ISettingsService.SelectedModel))
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                CurrentModelName = e.NewValue?.ToString()?.ToUpper() ?? "UNKNOWN";
-            }
+                switch (e.SettingName)
+                {
+                    case nameof(ISettingsService.SelectedModel):
+                        CurrentModelName = GetModelDisplayName(e.NewValue?.ToString() ?? "");
+                        break;
+
+                    case nameof(ISettingsService.HotkeyKey):
+                    case nameof(ISettingsService.HotkeyModifiers):
+                        UpdateHotkeyDisplay();
+                        break;
+
+                    case nameof(ISettingsService.MinimizeToTray):
+                    case nameof(ISettingsService.CloseToTray):
+                    case nameof(ISettingsService.StartMinimized):
+                        OnPropertyChanged(nameof(ShowInTaskbar));
+                        OnPropertyChanged(nameof(StartMinimized));
+                        OnPropertyChanged(nameof(MinimizeToTray));
+                        OnPropertyChanged(nameof(CloseToTray));
+                        break;
+                }
+            });
         }
 
-        // Events for View layer
-        public event EventHandler? OpenSettingsRequested;
+        #endregion
 
-        protected virtual void OnOpenSettingsRequested()
-        {
-            OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
-        }
+        #region Disposal
 
         protected override void DisposeCore()
         {
@@ -497,10 +797,15 @@ namespace VoiceLite.Presentation.ViewModels
             _recordingController.ProgressChanged -= OnProgressChanged;
 
             _historyService.ItemAdded -= OnHistoryItemAdded;
+
             _hotkeyManager.HotkeyPressed -= OnHotkeyPressed;
+            _hotkeyManager.HotkeyReleased -= OnHotkeyReleased;
+
             _settingsService.SettingChanged -= OnSettingChanged;
 
             base.DisposeCore();
         }
+
+        #endregion
     }
 }

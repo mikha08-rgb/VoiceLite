@@ -1,5 +1,6 @@
 using System.Windows;
 using VoiceLite.Models;
+using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
@@ -7,7 +8,7 @@ namespace VoiceLite.Services
     /// Centralized service for managing Pro feature access and visibility.
     /// Adding new Pro features: Just add one property here + bind in XAML.
     /// </summary>
-    public class ProFeatureService
+    public class ProFeatureService : IProFeatureService
     {
         private readonly Settings _settings;
 
@@ -44,6 +45,10 @@ namespace VoiceLite.Services
         /// TODO: Add export functionality for transcription history (CSV, JSON, TXT formats)
         /// </summary>
         public Visibility ExportHistoryButtonVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
+
+        // Additional interface properties (aliases for consistency)
+        public Visibility ExportHistoryVisibility => ExportHistoryButtonVisibility;
+        public Visibility CustomDictionaryVisibility => CustomDictionaryTabVisibility;
 
         /// <summary>
         /// Custom Dictionary feature (Future Pro feature - NOT YET IMPLEMENTED)
@@ -95,5 +100,70 @@ namespace VoiceLite.Services
         public string TierDescription => IsProUser
             ? "Pro tier unlocked! You have access to all 5 AI models and future Pro features."
             : "Free tier includes the Tiny model (80-85% accuracy). Upgrade to Pro for all 5 models and 90-98% accuracy.";
+
+        #region IProFeatureService Methods
+
+        /// <summary>
+        /// Checks if a specific model is available
+        /// </summary>
+        public bool IsModelAvailable(string modelName)
+        {
+            if (IsProUser)
+                return true; // Pro users can use all models
+
+            // Free users can only use tiny model
+            return modelName?.ToLower().Contains("tiny") ?? false;
+        }
+
+        /// <summary>
+        /// Gets the list of available models based on license status
+        /// </summary>
+        public string[] GetAvailableModels()
+        {
+            if (IsProUser)
+            {
+                return new[]
+                {
+                    "ggml-tiny.bin",
+                    "ggml-base.bin",
+                    "ggml-small.bin",
+                    "ggml-medium.bin",
+                    "ggml-large-v3.bin"
+                };
+            }
+            else
+            {
+                return new[] { "ggml-tiny.bin" };
+            }
+        }
+
+        /// <summary>
+        /// Refreshes the Pro status from the license service
+        /// </summary>
+        public void RefreshProStatus()
+        {
+            // Force settings reload to get latest license status
+            _settings.Reload();
+        }
+
+        /// <summary>
+        /// Shows the upgrade prompt to the user
+        /// </summary>
+        public void ShowUpgradePrompt()
+        {
+            System.Windows.MessageBox.Show(
+                "Upgrade to VoiceLite Pro for just $20 (one-time payment) to unlock:\n\n" +
+                "• All 5 AI models (up to 98% accuracy)\n" +
+                "• Voice shortcuts\n" +
+                "• Export history\n" +
+                "• Custom dictionary\n" +
+                "• Priority support\n\n" +
+                "Visit voicelite.app to upgrade!",
+                "Upgrade to Pro",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        }
+
+        #endregion
     }
 }

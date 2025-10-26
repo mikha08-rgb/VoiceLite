@@ -64,7 +64,7 @@ namespace VoiceLite
 
         // WEEK 1 FIX: Improved timer management with Dictionary for proper cleanup
         // Dictionary allows us to track and clean up specific timers by ID
-        private readonly Dictionary<string, System.Windows.Threading.DispatcherTimer> activeStatusTimers = new Dictionary<string, System.Windows.Threading.DispatcherTimer>();
+        private readonly HashSet<System.Windows.Threading.DispatcherTimer> activeStatusTimers = new HashSet<System.Windows.Threading.DispatcherTimer>();
         private readonly object timerLock = new object();
 
         // Child windows (for proper disposal)
@@ -410,7 +410,7 @@ namespace VoiceLite
         {
             try
             {
-                StatusText.Text = "Initializing services...";
+                await Dispatcher.InvokeAsync(() => StatusText.Text = "Initializing services...");
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
@@ -464,15 +464,17 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated += OnPollingModeActivated;
                 }
 
-                systemTrayManager = new SystemTrayManager(this);
+                systemTrayManager = new SystemTrayManager();
+                await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this));
 
                 // Load and display existing history
-                _ = UpdateHistoryUI();
+                await Dispatcher.InvokeAsync(() => _ = UpdateHistoryUI());
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize: {ex.Message}",
-                    "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                await Dispatcher.InvokeAsync(() =>
+                    MessageBox.Show($"Failed to initialize: {ex.Message}",
+                        "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error));
             }
         }
 
@@ -485,7 +487,7 @@ namespace VoiceLite
                 // New code ensures proper ordering: services → hotkey → UI updates
 
                 // Step 1: Initialize services (runs in background)
-                await InitializeServicesAsync();
+                await Task.Run(() => InitializeServicesAsync());
 
                 // Step 2: Register hotkey (ONLY after services are ready)
                 // BUG-005 FIX: Wrap hotkey registration in try-catch to show user-friendly error
@@ -2344,15 +2346,11 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
-                int cleared = historyService?.ClearHistory() ?? 0;
+                historyService?.ClearHistory();
                 _ = UpdateHistoryUI();
                 SaveSettings();
 
-                MessageBox.Show(
-                    $"Cleared {cleared} items from history.",
-                    "History Cleared",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // History cleared successfully
             }
         }
 
@@ -2369,15 +2367,11 @@ namespace VoiceLite
 
             if (result == MessageBoxResult.Yes)
             {
-                int cleared = historyService?.ClearHistory() ?? 0;
+                historyService?.ClearHistory();
                 _ = UpdateHistoryUI();
                 SaveSettings();
 
-                MessageBox.Show(
-                    $"Cleared all {cleared} items from history.",
-                    "History Cleared",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                // All history cleared successfully
             }
         }
 
@@ -2585,11 +2579,11 @@ namespace VoiceLite
 
                 lock (timerLock)
                 {
-                    // Clean up any existing timer with the same ID
-                    if (activeStatusTimers.TryGetValue(timerId, out var existingTimer))
+                    // Clean up any existing timers
+                    foreach (var existingTimer in activeStatusTimers.ToList())
                     {
                         existingTimer.Stop();
-                        activeStatusTimers.Remove(timerId);
+                        activeStatusTimers.Remove(existingTimer);
                     }
 
                     // Update status message
@@ -2611,8 +2605,7 @@ namespace VoiceLite
 
                         lock (timerLock)
                         {
-                            var id = (string)t.Tag;
-                            activeStatusTimers.Remove(id);
+                            activeStatusTimers.Remove(t);
                         }
 
                         // Execute completion callback
@@ -2623,7 +2616,7 @@ namespace VoiceLite
                     };
 
                     timer.Start();
-                    activeStatusTimers[timerId] = timer;
+                    activeStatusTimers.Add(timer);
                 }
             });
         }
@@ -2635,7 +2628,7 @@ namespace VoiceLite
         {
             lock (timerLock)
             {
-                foreach (var timer in activeStatusTimers.Values.ToList())
+                foreach (var timer in activeStatusTimers.ToList())
                 {
                     timer.Stop();
                 }

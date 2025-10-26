@@ -50,6 +50,17 @@ namespace VoiceLite.Services
             }
         }
 
+        public bool CloseToTray
+        {
+            get => _settings.CloseToTray;
+            set
+            {
+                var oldValue = _settings.CloseToTray;
+                _settings.CloseToTray = value;
+                OnSettingChanged(nameof(CloseToTray), oldValue, value);
+            }
+        }
+
         public bool CheckForUpdates
         {
             get => _settings.CheckForUpdates;
@@ -130,6 +141,28 @@ namespace VoiceLite.Services
         }
 
         // Hotkey Settings
+        public System.Windows.Input.Key HotkeyKey
+        {
+            get => _settings.HotkeyKey;
+            set
+            {
+                var oldValue = _settings.HotkeyKey;
+                _settings.HotkeyKey = value;
+                OnSettingChanged(nameof(HotkeyKey), oldValue, value);
+            }
+        }
+
+        public System.Windows.Input.ModifierKeys HotkeyModifiers
+        {
+            get => _settings.HotkeyModifiers;
+            set
+            {
+                var oldValue = _settings.HotkeyModifiers;
+                _settings.HotkeyModifiers = value;
+                OnSettingChanged(nameof(HotkeyModifiers), oldValue, value);
+            }
+        }
+
         public string GlobalHotkey
         {
             get => _settings.GlobalHotkey;
@@ -328,6 +361,21 @@ namespace VoiceLite.Services
                 // Auto-save on change
                 _settings.Save();
             }
+        }
+
+        public string GetModelPath()
+        {
+            var modelFile = _settings.SelectedModel;
+            if (string.IsNullOrWhiteSpace(modelFile))
+            {
+                modelFile = "ggml-tiny.bin"; // Default model
+            }
+
+            var whisperPath = System.IO.Path.Combine(
+                System.AppDomain.CurrentDomain.BaseDirectory,
+                "whisper");
+
+            return System.IO.Path.Combine(whisperPath, modelFile);
         }
     }
 }

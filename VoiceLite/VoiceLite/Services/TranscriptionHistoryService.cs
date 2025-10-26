@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
@@ -8,7 +10,7 @@ namespace VoiceLite.Services
     /// <summary>
     /// Manages the transcription history, including adding, removing, pinning, and limiting items.
     /// </summary>
-    public class TranscriptionHistoryService
+    public class TranscriptionHistoryService : ITranscriptionHistoryService
     {
         private readonly Settings settings;
         private const int MAX_TEXT_LENGTH = 5000; // Prevent extremely long transcriptions from bloating settings file
@@ -103,12 +105,11 @@ namespace VoiceLite.Services
         /// <summary>
         /// Clears all items from the history.
         /// </summary>
-        public int ClearHistory()
+        public void ClearHistory()
         {
             int count = settings.TranscriptionHistory.Count;
             settings.TranscriptionHistory.Clear();
             ErrorLogger.LogMessage($"Cleared {count} history items");
-            return count;
         }
 
 
@@ -129,6 +130,106 @@ namespace VoiceLite.Services
                     : DateTime.Now
             };
         }
+
+        #region ITranscriptionHistoryService Implementation
+
+        public int MaxHistoryItems
+        {
+            get => settings.MaxHistoryItems;
+            set => settings.MaxHistoryItems = value;
+        }
+
+        public event EventHandler<TranscriptionItem>? ItemAdded;
+
+        public void AddTranscription(TranscriptionItem item)
+        {
+            // Convert TranscriptionItem to TranscriptionHistoryItem
+            var historyItem = new TranscriptionHistoryItem
+            {
+                Id = item.Id,
+                Text = item.Text,
+                Timestamp = item.Timestamp,
+                DurationSeconds = item.ProcessingTime,
+                ModelUsed = item.ModelUsed ?? "Unknown",
+                IsPinned = item.IsPinned
+            };
+
+            AddToHistory(historyItem);
+            ItemAdded?.Invoke(this, item);
+        }
+
+        public void AddItem(TranscriptionItem item) => AddTranscription(item);
+
+        public IEnumerable<TranscriptionItem> GetHistory()
+        {
+            // Convert TranscriptionHistoryItem to TranscriptionItem
+            return settings.TranscriptionHistory.Select(h => new TranscriptionItem
+            {
+                Id = h.Id,
+                Text = h.Text,
+                Timestamp = h.Timestamp,
+                ProcessingTime = h.DurationSeconds,
+                ModelUsed = h.ModelUsed,
+                IsPinned = h.IsPinned
+            });
+        }
+
+        public IEnumerable<TranscriptionItem> GetHistoryRange(DateTime from, DateTime to)
+        {
+            return GetHistory().Where(h => h.Timestamp >= from && h.Timestamp <= to);
+        }
+
+        public IEnumerable<TranscriptionItem> SearchHistory(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return GetHistory();
+
+            return GetHistory().Where(h => h.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public void ClearHistory(bool preservePinned)
+        {
+            if (preservePinned)
+            {
+                var pinned = settings.TranscriptionHistory.Where(h => h.IsPinned).ToList();
+                settings.TranscriptionHistory.Clear();
+                settings.TranscriptionHistory.AddRange(pinned);
+            }
+            else
+            {
+                ClearHistory();
+            }
+        }
+
+        public void RemoveItem(Guid itemId) => RemoveFromHistory(itemId.ToString());
+
+        public void RemoveItem(string itemId) => RemoveFromHistory(itemId);
+
+        public void TogglePin(Guid itemId) => TogglePin(itemId.ToString());
+
+        public void TogglePin(string itemId)
+        {
+            var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == itemId);
+            if (item != null)
+            {
+                item.IsPinned = !item.IsPinned;
+                settings.Save();
+            }
+        }
+
+        public IEnumerable<TranscriptionItem> GetPinnedItems()
+        {
+            return GetHistory().Where(h => h.IsPinned);
+        }
+
+        public async Task ExportHistoryAsync(string filePath, ExportFormat format)
+        {
+            // Export implementation
+            await Task.CompletedTask;
+            throw new NotImplementedException("Export functionality not yet implemented");
+        }
+
+        #endregion
     }
 
     /// <summary>

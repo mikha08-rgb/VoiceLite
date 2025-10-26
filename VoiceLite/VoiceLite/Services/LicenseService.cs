@@ -3,10 +3,11 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
-    public class LicenseService : IDisposable
+    public class LicenseService : ILicenseService, IDisposable
     {
         // WEEK 1 FIX: Static HttpClient prevents socket exhaustion
         // Single instance shared across all LicenseService instances
@@ -21,6 +22,13 @@ namespace VoiceLite.Services
 
         private readonly string _apiBaseUrl;
         private bool _disposed = false;
+        private bool _isLicenseValid = false;
+        private string? _storedLicenseKey = null;
+        private string? _licenseEmail = null;
+        private int _activationCount = 0;
+        private int _maxActivations = 3;
+
+        public event EventHandler<bool>? LicenseStatusChanged;
 
         static LicenseService()
         {
@@ -37,7 +45,7 @@ namespace VoiceLite.Services
         /// Validates a license key with the VoiceLite API
         /// </summary>
         /// <param name="licenseKey">The license key to validate</param>
-        /// <returns>True if the license is valid and active, false otherwise</returns>
+        /// <returns>Validation result</returns>
         public async Task<LicenseValidationResult> ValidateLicenseAsync(string licenseKey)
         {
             try
@@ -120,6 +128,48 @@ namespace VoiceLite.Services
             }
         }
 
+        #region ILicenseService Implementation
+
+        public bool IsLicenseValid => _isLicenseValid;
+
+
+        public string GetStoredLicenseKey()
+        {
+            return _storedLicenseKey ?? string.Empty;
+        }
+
+        public void SaveLicenseKey(string licenseKey)
+        {
+            _storedLicenseKey = licenseKey;
+            // TODO: Save to secure storage
+        }
+
+        public void RemoveLicenseKey()
+        {
+            _storedLicenseKey = null;
+            _isLicenseValid = false;
+            _licenseEmail = null;
+            _activationCount = 0;
+            LicenseStatusChanged?.Invoke(this, false);
+        }
+
+        public string GetLicenseEmail()
+        {
+            return _licenseEmail ?? string.Empty;
+        }
+
+        public int GetActivationCount()
+        {
+            return _activationCount;
+        }
+
+        public int GetMaxActivations()
+        {
+            return _maxActivations;
+        }
+
+        #endregion
+
         public void Dispose()
         {
             if (!_disposed)
@@ -140,10 +190,4 @@ namespace VoiceLite.Services
         }
     }
 
-    public class LicenseValidationResult
-    {
-        public bool IsValid { get; set; }
-        public string Tier { get; set; } = "free";
-        public string? ErrorMessage { get; set; }
-    }
 }

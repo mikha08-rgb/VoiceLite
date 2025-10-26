@@ -180,11 +180,11 @@ namespace VoiceLite.Core.Controllers
                 {
                     var historyItem = new TranscriptionItem
                     {
-                        Id = Guid.NewGuid(),
+                        Id = Guid.NewGuid().ToString(),
                         Text = result.Text,
                         Timestamp = DateTime.Now,
                         ModelUsed = result.ModelUsed,
-                        ProcessingTime = result.ProcessingTime,
+                        ProcessingTime = result.ProcessingTime.TotalSeconds,
                         ApplicationContext = _textInjector.GetFocusedApplicationName()
                     };
 

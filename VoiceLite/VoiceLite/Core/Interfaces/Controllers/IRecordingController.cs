@@ -101,5 +101,6 @@ namespace VoiceLite.Core.Interfaces.Controllers
         public string Status { get; set; }
         public int PercentComplete { get; set; }
         public TimeSpan Elapsed { get; set; }
+        public bool IsIndeterminate { get; set; }
     }
 }

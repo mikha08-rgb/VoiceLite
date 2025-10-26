@@ -40,6 +40,11 @@ namespace VoiceLite.Core.Interfaces.Services
         void ShowNotification(string title, string message, int durationMs = 3000);
 
         /// <summary>
+        /// Shows a balloon tip notification (alias for ShowNotification)
+        /// </summary>
+        void ShowBalloonTip(string title, string message, int durationMs = 3000);
+
+        /// <summary>
         /// Updates the tray icon to indicate recording status
         /// </summary>
         void SetRecordingStatus(bool isRecording);
