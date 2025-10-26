@@ -7,6 +7,7 @@ using VoiceLite.Core.Controllers;
 using VoiceLite.Core.Interfaces.Controllers;
 using VoiceLite.Core.Interfaces.Services;
 using VoiceLite.Core.Interfaces.Features;
+using VoiceLite.Models;
 
 namespace VoiceLite.Tests.Controllers
 {
@@ -170,7 +171,7 @@ namespace VoiceLite.Tests.Controllers
             await act.Should().ThrowAsync<Exception>()
                 .WithMessage("Test recording error");
             _controller.IsRecording.Should().BeFalse();
-            _mockErrorLogger.Verify(x => x.LogError(testException, It.IsAny<string>()), Times.Once);
+            _mockErrorLogger.Verify(x => x.LogError(testException, It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
         }
 
         [Fact]
@@ -194,7 +195,7 @@ namespace VoiceLite.Tests.Controllers
             // Assert
             result.Success.Should().BeFalse();
             result.Error.Should().Be("Transcription failed");
-            _mockErrorLogger.Verify(x => x.LogError(testException, It.IsAny<string>()), Times.Once);
+            _mockErrorLogger.Verify(x => x.LogError(testException, It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
         }
 
         [Fact]

@@ -2,10 +2,13 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Windows.Input;
 using Xunit;
 using FluentAssertions;
 using VoiceLite.Services;
 using VoiceLite.Models;
+using VoiceLite.Core.Interfaces.Features;
+using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Tests.Integration
 {
@@ -31,14 +34,14 @@ namespace VoiceLite.Tests.Integration
             _testSettings = new Settings
             {
                 SelectedModel = "tiny",
-                InjectionMode = InjectionMode.Type,
-                RecordHotkey = "F8",
-                HotkeyModifiers = "Alt"
+                TextInjectionMode = TextInjectionMode.AlwaysType,
+                RecordHotkey = Key.F8,
+                HotkeyModifiers = ModifierKeys.Alt
             };
 
             _audioRecorder = new AudioRecorder();
-            _whisperService = new PersistentWhisperService();
-            _textInjector = new TextInjector();
+            _whisperService = new PersistentWhisperService(_testSettings);
+            _textInjector = new TextInjector(_testSettings);
         }
 
         [Fact]
@@ -146,14 +149,13 @@ namespace VoiceLite.Tests.Integration
             var testText = "Test transcription text";
 
             // Act
-            var result = await _textInjector.InjectTextAsync(testText, InjectionMode.Paste);
+            await _textInjector.InjectTextAsync(testText, ITextInjector.InjectionMode.Paste);
 
             // Wait for clipboard restoration
             await Task.Delay(200);
 
             // Assert
             var finalClipboard = System.Windows.Clipboard.GetText();
-            result.Success.Should().BeTrue("Injection should succeed");
             finalClipboard.Should().Be(originalClipboard, "Original clipboard should be restored");
         }
 
@@ -232,8 +234,8 @@ namespace VoiceLite.Tests.Integration
         {
             // Arrange
             var settingsPath = Path.Combine(_testDataPath, "test-settings.json");
-            var settings1 = new Settings { SelectedModel = "tiny", RecordHotkey = "F8" };
-            var settings2 = new Settings { SelectedModel = "base", RecordHotkey = "F9" };
+            var settings1 = new Settings { SelectedModel = "tiny", RecordHotkey = Key.F8 };
+            var settings2 = new Settings { SelectedModel = "base", RecordHotkey = Key.F9 };
 
             // Act - Save multiple times rapidly (simulating race condition)
             var tasks = new[]
@@ -251,7 +253,7 @@ namespace VoiceLite.Tests.Integration
             // Assert - Should have valid settings (either one)
             loadedSettings.Should().NotBeNull();
             loadedSettings.SelectedModel.Should().BeOneOf("tiny", "base");
-            loadedSettings.RecordHotkey.Should().BeOneOf("F8", "F9");
+            loadedSettings.RecordHotkey.Should().BeOneOf(Key.F8, Key.F9);
         }
 
         private string CreateTestAudioFile()
@@ -319,7 +321,7 @@ namespace VoiceLite.Tests.Integration
             {
                 _audioRecorder?.Dispose();
                 _whisperService?.Dispose();
-                _textInjector?.Dispose();
+                // TextInjector no longer implements IDisposable after refactoring
 
                 if (Directory.Exists(_testDataPath))
                 {
