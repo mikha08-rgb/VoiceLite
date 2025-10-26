@@ -216,8 +216,8 @@ namespace VoiceLite.Services
                 var modelPath = cachedModelPath ?? ResolveModelPath();
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
-                // PERFORMANCE: Use physical cores for compute-intensive workload
-                int optimalThreads = Math.Max(1, Environment.ProcessorCount / 2);
+                // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
+                int optimalThreads = 4;
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{dummyAudioPath}\" " +
                               $"--threads {optimalThreads} " +
@@ -361,7 +361,8 @@ namespace VoiceLite.Services
                 // - Add no-fallback to skip temperature retries (~15-25% faster)
                 // - Add max-context limit for short audio clips (~10-15% faster)
                 // - Flash attention for modern CPU/GPU optimization (~15-30% faster)
-                int optimalThreads = Math.Max(1, Environment.ProcessorCount / 2); // Physical cores
+                // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
+                int optimalThreads = 4; // Fixed optimal thread count
                 var arguments = $"-m \"{effectiveModelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
                               $"--threads {optimalThreads} " +
@@ -372,8 +373,6 @@ namespace VoiceLite.Services
                               $"--no-fallback " +            // Skip temperature fallback
                               $"--max-context 64 " +         // Limit context for short clips
                               $"--flash-attn";               // Flash attention optimization (v1.7.6)
-
-                // Command prepared (no logging to reduce noise and avoid exposing file paths)
 
                 var processStartInfo = new ProcessStartInfo
                 {
