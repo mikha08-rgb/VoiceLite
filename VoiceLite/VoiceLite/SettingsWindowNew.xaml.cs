@@ -44,40 +44,54 @@ namespace VoiceLite
 
         private void LoadSettings()
         {
-            // Hotkey Settings
-            UpdateHotkeyDisplay(settings.RecordHotkey, settings.HotkeyModifiers);
-
-            // Recording Mode
-            if (settings.Mode == RecordMode.PushToTalk)
-                PushToTalkRadio.IsChecked = true;
-            else
-                ToggleRadio.IsChecked = true;
-
-            // System Settings
-            MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
-
-            // Transcription Preset
-            LoadTranscriptionPreset();
-
-            // Audio Settings
-            LoadMicrophones();
-            AutoPasteCheckBox.IsChecked = settings.AutoPaste;
-
-            // Audio Enhancement - sync UI from settings
-            SyncAudioUIFromSettings();
-
-            // Current Model is set in SetupModelComparison
-
-            // License Settings
-            LoadLicenseStatus();
-
-            // Pro Features - Control visibility of AI Models tab
-            UpdateProFeatureVisibility();
-
-            // Initialize Model Download Control (Pro users only)
-            if (proFeatureService?.IsProUser == true)
+            try
             {
-                ModelDownloadControl.Initialize(settings, () => saveSettingsCallback?.Invoke());
+                // Hotkey Settings
+                UpdateHotkeyDisplay(settings.RecordHotkey, settings.HotkeyModifiers);
+
+                // Recording Mode
+                if (PushToTalkRadio != null && ToggleRadio != null)
+                {
+                    if (settings.Mode == RecordMode.PushToTalk)
+                        PushToTalkRadio.IsChecked = true;
+                    else
+                        ToggleRadio.IsChecked = true;
+                }
+
+                // System Settings
+                if (MinimizeToTrayCheckBox != null)
+                    MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
+
+                // Transcription Preset
+                LoadTranscriptionPreset();
+
+                // Audio Settings
+                LoadMicrophones();
+                if (AutoPasteCheckBox != null)
+                    AutoPasteCheckBox.IsChecked = settings.AutoPaste;
+
+                // Audio Enhancement - sync UI from settings
+                SyncAudioUIFromSettings();
+
+                // Current Model is set in SetupModelComparison
+
+                // License Settings
+                LoadLicenseStatus();
+
+                // Pro Features - Control visibility of AI Models tab
+                UpdateProFeatureVisibility();
+
+                // Initialize Model Download Control (Pro users only)
+                if (proFeatureService?.IsProUser == true)
+                {
+                    ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("LoadSettings failed", ex);
+                MessageBox.Show($"Error loading settings: {ex.Message}\n\nStack Trace:\n{ex.StackTrace}",
+                    "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -125,30 +139,43 @@ namespace VoiceLite
         private void LoadTranscriptionPreset()
         {
             // Select the appropriate preset based on settings
-            string presetTag = settings.TranscriptionPreset.ToString();
-            foreach (ComboBoxItem item in TranscriptionPresetComboBox.Items)
+            if (TranscriptionPresetComboBox != null)
             {
-                if (item.Tag?.ToString() == presetTag)
+                string presetTag = settings.TranscriptionPreset.ToString();
+                foreach (ComboBoxItem item in TranscriptionPresetComboBox.Items)
                 {
-                    TranscriptionPresetComboBox.SelectedItem = item;
-                    break;
+                    if (item.Tag?.ToString() == presetTag)
+                    {
+                        TranscriptionPresetComboBox.SelectedItem = item;
+                        break;
+                    }
                 }
             }
 
             // Update description
             UpdatePresetDescription(settings.TranscriptionPreset);
 
-            // Load VAD settings
-            EnableVADCheckBox.IsChecked = settings.EnableVAD;
-            VADThresholdSlider.Value = settings.VADThreshold;
-            VADThresholdText.Text = settings.VADThreshold.ToString("F2");
-            VADSettingsPanel.IsEnabled = settings.EnableVAD;
+            // Load VAD settings (with null checks for safety)
+            if (EnableVADCheckBox != null)
+                EnableVADCheckBox.IsChecked = settings.EnableVAD;
+
+            if (VADThresholdSlider != null)
+                VADThresholdSlider.Value = settings.VADThreshold;
+
+            if (VADThresholdText != null)
+                VADThresholdText.Text = settings.VADThreshold.ToString("F2");
+
+            if (VADSettingsPanel != null)
+                VADSettingsPanel.IsEnabled = settings.EnableVAD;
         }
 
         private void UpdatePresetDescription(TranscriptionPreset preset)
         {
-            var config = WhisperPresetConfig.GetPresetConfig(preset);
-            PresetDescriptionText.Text = config.Description;
+            if (PresetDescriptionText != null)
+            {
+                var config = WhisperPresetConfig.GetPresetConfig(preset);
+                PresetDescriptionText.Text = config.Description;
+            }
         }
 
         private void LoadMicrophones()
