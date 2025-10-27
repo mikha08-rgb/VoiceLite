@@ -5,7 +5,7 @@
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.1.6
+AppVersion=1.1.51
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.1.6
+OutputBaseFilename=VoiceLite-Setup-1.1.51
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
