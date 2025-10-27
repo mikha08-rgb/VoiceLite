@@ -70,6 +70,9 @@ namespace VoiceLite
         // Child windows (for proper disposal)
         private SettingsWindowNew? currentSettingsWindow;
 
+        // Timing constants (in milliseconds)
+        private const int STATUS_MESSAGE_DISPLAY_DURATION_MS = 3000; // How long to show status messages
+
         #endregion
 
         #region Initialization & Lifecycle
@@ -1218,7 +1221,7 @@ namespace VoiceLite
                 {
                     try
                     {
-                        await Task.Delay(3000);
+                        await Task.Delay(STATUS_MESSAGE_DISPLAY_DURATION_MS);
                         await Dispatcher.InvokeAsync(() =>
                         {
                             if (!isRecording && TranscriptionText.Text == "(Timeout - recovered)")
@@ -1461,7 +1464,7 @@ namespace VoiceLite
                     {
                         try
                         {
-                            await Task.Delay(3000);
+                            await Task.Delay(STATUS_MESSAGE_DISPLAY_DURATION_MS);
                             await Dispatcher.InvokeAsync(() =>
                             {
                                 if (!isRecording)

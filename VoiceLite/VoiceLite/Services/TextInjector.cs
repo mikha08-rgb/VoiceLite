@@ -15,9 +15,19 @@ namespace VoiceLite.Services
     public class TextInjector : ITextInjector
     {
         public bool AutoPaste { get; set; } = true;
+
+        // Text length thresholds for injection mode selection
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
         private const int LONG_TEXT_THRESHOLD = 100; // Text longer than this is considered "long"
+
+        // Timing constants (in milliseconds)
         private const int TYPING_DELAY_MS = 2; // Delay between keystrokes when typing
+        private const int CLIPBOARD_RETRY_DELAY_MS = 10; // Delay before retrying clipboard operation
+        private const int CLIPBOARD_SETTLE_DELAY_MS = 50; // Wait for clipboard to settle after set
+        private const int CLIPBOARD_READY_DELAY_MS = 20; // Ensure clipboard is ready across applications
+        private const int KEY_MODIFIER_DELAY_MS = 5; // Delay for modifier keys (Ctrl, Alt, etc.)
+        private const int KEY_RELEASE_DELAY_MS = 2; // Delay after releasing keys
+
         private readonly InputSimulator inputSimulator;
         private readonly Settings settings;
 
@@ -241,7 +251,7 @@ namespace VoiceLite.Services
                     ErrorLogger.LogMessage($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
 #endif
                     if (attempt < 1)
-                        Thread.Sleep(10); // Brief delay before retry
+                        Thread.Sleep(CLIPBOARD_RETRY_DELAY_MS);
                 }
             }
 
@@ -265,7 +275,7 @@ namespace VoiceLite.Services
                             // QUICK WIN 2: Reduced delay from 300ms → 50ms
                             // Paste completes in <10ms on modern systems, 300ms created 5x larger race window
                             // This reduces chance of external clipboard modification and speeds up completion by 250ms
-                            await Task.Delay(50);
+                            await Task.Delay(CLIPBOARD_SETTLE_DELAY_MS);
 
                             // CRITICAL FIX: Check if clipboard was modified by user before restoring
                             // Only restore if clipboard still contains our transcription text
@@ -316,7 +326,7 @@ namespace VoiceLite.Services
                                         ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
 #endif
                                         if (attempt < 1)
-                                            await Task.Delay(50);
+                                            await Task.Delay(CLIPBOARD_SETTLE_DELAY_MS);
                                         else
                                         {
 #if DEBUG
@@ -357,7 +367,7 @@ namespace VoiceLite.Services
                     {
                         // RELIABILITY FIX: Increased delay from 5ms to 20ms for better compatibility
                         // Some applications need more time to process clipboard changes
-                        Thread.Sleep(20); // Ensure clipboard is ready across all applications
+                        Thread.Sleep(CLIPBOARD_READY_DELAY_MS);
                         SimulateCtrlV();
                     }
                 }
@@ -428,17 +438,17 @@ namespace VoiceLite.Services
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYDOWN, 0);
 
                 // Press V (5ms delay to ensure Ctrl is registered across all applications)
-                Thread.Sleep(5);
+                Thread.Sleep(KEY_MODIFIER_DELAY_MS);
                 keybd_event(VK_V, 0, KEYEVENTF_KEYDOWN, 0);
 
                 // Small delay before releasing (helps with slower applications)
-                Thread.Sleep(2);
+                Thread.Sleep(KEY_RELEASE_DELAY_MS);
 
                 // Release V
                 keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0);
 
                 // Release Ctrl (5ms delay to ensure proper key sequence completion)
-                Thread.Sleep(5);
+                Thread.Sleep(KEY_MODIFIER_DELAY_MS);
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
 
 #if DEBUG

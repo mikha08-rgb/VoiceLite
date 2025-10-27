@@ -34,6 +34,10 @@ namespace VoiceLite.Services
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
         private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
 
+        // Timing constants (in milliseconds)
+        private const int NAUDIO_BUFFER_FLUSH_DELAY_MS = 10; // Minimal delay for NAudio buffer flush
+        private const int STOP_COMPLETION_DELAY_MS = 10; // Brief pause to let stop complete
+
         public bool IsRecording => isRecording;
         public event EventHandler<string>? AudioFileReady;
         public event EventHandler<byte[]>? AudioDataReady; // New event for memory buffer mode
@@ -128,7 +132,7 @@ namespace VoiceLite.Services
                     if (waveIn.WaveFormat != null) // Check if device is initialized
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(10); // Minimal delay for NAudio buffer flush
+                        Thread.Sleep(NAUDIO_BUFFER_FLUSH_DELAY_MS);
                     }
                 }
                 catch (Exception ex)
@@ -524,7 +528,7 @@ namespace VoiceLite.Services
                     try
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(10); // Brief pause to let stop complete
+                        Thread.Sleep(STOP_COMPLETION_DELAY_MS);
 
                         // Detach handlers before disposal
                         if (eventHandlersAttached)
