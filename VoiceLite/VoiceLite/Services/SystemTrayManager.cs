@@ -77,14 +77,17 @@ namespace VoiceLite.Services
 
         private void ShowMainWindow()
         {
-            mainWindow.Show();
-            mainWindow.WindowState = WindowState.Normal;
-            mainWindow.Activate();
+            mainWindow?.Show();
+            if (mainWindow != null)
+            {
+                mainWindow.WindowState = WindowState.Normal;
+                mainWindow.Activate();
+            }
         }
 
         public void MinimizeToTray()
         {
-            mainWindow.Hide();
+            mainWindow?.Hide();
             ShowBalloonTip("VoiceLite", "Running in background. Hold Alt to dictate.");
         }
 

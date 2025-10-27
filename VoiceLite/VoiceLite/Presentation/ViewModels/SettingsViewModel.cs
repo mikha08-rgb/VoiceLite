@@ -28,25 +28,25 @@ namespace VoiceLite.Presentation.ViewModels
         private bool _checkForUpdates;
 
         // AI Model settings
-        private string _selectedModel;
-        private string _transcriptionLanguage;
-        private ObservableCollection<string> _availableModels;
-        private ObservableCollection<string> _availableLanguages;
+        private string _selectedModel = null!; // Initialized in InitializeCollections()
+        private string _transcriptionLanguage = null!; // Initialized in InitializeCollections()
+        private ObservableCollection<string> _availableModels = null!; // Initialized in InitializeCollections()
+        private ObservableCollection<string> _availableLanguages = null!; // Initialized in InitializeCollections()
         private bool _useGpuAcceleration;
 
         // Text injection settings
-        private string _injectionMode;
+        private string _injectionMode = null!; // Initialized in InitializeCollections()
         private int _typingDelayMs;
         private bool _addSpaceAfterInjection;
-        private ObservableCollection<string> _injectionModes;
+        private ObservableCollection<string> _injectionModes = null!; // Initialized in InitializeCollections()
 
         // Hotkey settings
-        private string _globalHotkey;
+        private string _globalHotkey = null!; // Initialized in InitializeCollections()
         private bool _hotkeysEnabled;
 
         // Audio settings
-        private string _selectedAudioDevice;
-        private ObservableCollection<string> _availableAudioDevices;
+        private string _selectedAudioDevice = null!; // Initialized in InitializeCollections()
+        private ObservableCollection<string> _availableAudioDevices = null!; // Initialized in InitializeCollections()
         private bool _playSoundFeedback;
 
         // History settings

@@ -86,11 +86,11 @@ namespace VoiceLite.Core.Interfaces.Controllers
     public class TranscriptionResult
     {
         public bool Success { get; set; }
-        public string Text { get; set; }
-        public string Error { get; set; }
+        public string Text { get; set; } = string.Empty;
+        public string Error { get; set; } = string.Empty;
         public TimeSpan ProcessingTime { get; set; }
-        public string ModelUsed { get; set; }
-        public string AudioFilePath { get; set; }
+        public string ModelUsed { get; set; } = string.Empty;
+        public string AudioFilePath { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ namespace VoiceLite.Core.Interfaces.Controllers
     /// </summary>
     public class RecordingProgress
     {
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public int PercentComplete { get; set; }
         public TimeSpan Elapsed { get; set; }
         public bool IsIndeterminate { get; set; }

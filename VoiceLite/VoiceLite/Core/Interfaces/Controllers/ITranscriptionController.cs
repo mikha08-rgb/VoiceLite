@@ -82,7 +82,7 @@ namespace VoiceLite.Core.Interfaces.Controllers
         public int FailedTranscriptions { get; set; }
         public TimeSpan AverageProcessingTime { get; set; }
         public TimeSpan TotalProcessingTime { get; set; }
-        public Dictionary<string, int> ModelUsageCount { get; set; }
+        public Dictionary<string, int> ModelUsageCount { get; set; } = new();
         public DateTime LastTranscription { get; set; }
     }
 
@@ -93,7 +93,7 @@ namespace VoiceLite.Core.Interfaces.Controllers
     {
         public int CurrentItem { get; set; }
         public int TotalItems { get; set; }
-        public string CurrentFile { get; set; }
-        public TranscriptionResult Result { get; set; }
+        public string CurrentFile { get; set; } = string.Empty;
+        public TranscriptionResult Result { get; set; } = new();
     }
 }

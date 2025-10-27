@@ -157,8 +157,8 @@ namespace VoiceLite.Core.Interfaces.Features
     /// </summary>
     public class SettingChangedEventArgs : EventArgs
     {
-        public string SettingName { get; set; }
-        public object OldValue { get; set; }
-        public object NewValue { get; set; }
+        public string SettingName { get; set; } = string.Empty;
+        public object OldValue { get; set; } = new();
+        public object NewValue { get; set; } = new();
     }
 }
