@@ -742,18 +742,17 @@ namespace VoiceLite.Presentation.ViewModels
 
         private async void OnHotkeyPressed(object? sender, EventArgs e)
         {
-            if (!IsRecording && !IsTranscribing)
+            // Toggle mode (default): Press once to start/stop (Dragon-like behavior)
+            if (!IsTranscribing)
             {
                 await ExecuteToggleRecording();
             }
         }
 
-        private async void OnHotkeyReleased(object? sender, EventArgs e)
+        private void OnHotkeyReleased(object? sender, EventArgs e)
         {
-            if (IsRecording)
-            {
-                await ExecuteToggleRecording();
-            }
+            // Toggle mode: Do nothing on key release
+            // Note: PushToTalk mode can be re-enabled in future by checking RecordMode setting
         }
 
         private void OnSettingChanged(object? sender, SettingChangedEventArgs e)

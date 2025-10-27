@@ -79,13 +79,18 @@
                         <!-- Recording Mode -->
                         <GroupBox Header="Recording Mode" Margin="0,0,0,15">
                             <StackPanel Margin="10">
-                                <RadioButton Name="PushToTalkRadio"
-                                             Content="Push-to-Talk (Hold key to record)"
+                                <RadioButton Name="ToggleRadio"
+                                             Content="Toggle (Press once to start, press again to stop) - Recommended"
                                              IsChecked="True"
                                              Margin="0,0,0,5"/>
-                                <RadioButton Name="ToggleRadio"
-                                             Content="Toggle (Press once to start, again to stop)"
+                                <RadioButton Name="PushToTalkRadio"
+                                             Content="Push-to-Talk (Hold key while speaking)"
                                              IsEnabled="True"/>
+                                <TextBlock Text="Toggle mode provides a Dragon-like experience for longer dictation sessions."
+                                          Foreground="Gray"
+                                          FontSize="11"
+                                          Margin="20,5,0,0"
+                                          TextWrapping="Wrap"/>
                             </StackPanel>
                         </GroupBox>
 

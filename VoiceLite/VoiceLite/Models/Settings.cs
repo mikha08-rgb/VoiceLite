@@ -87,7 +87,7 @@ namespace VoiceLite.Models
         // Use this when reading/writing settings from different threads
         public readonly object SyncRoot = new object();
 
-        private RecordMode _mode = RecordMode.PushToTalk;
+        private RecordMode _mode = RecordMode.Toggle; // Default to Toggle mode (Dragon-like behavior)
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
