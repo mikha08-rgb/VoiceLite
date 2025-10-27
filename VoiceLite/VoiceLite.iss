@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6.2.0 or later
 
 #define MyAppName "VoiceLite"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.51"
 #define MyAppPublisher "VoiceLite Software"
 #define MyAppURL "https://voicelite.com"
 #define MyAppExeName "VoiceLite.exe"
@@ -27,7 +27,7 @@ DisableProgramGroupPage=yes
 ; Output Settings
 OutputDir=Installer
 OutputBaseFilename=VoiceLite-Setup-{#MyAppVersion}
-SetupIconFile=VoiceLite\VoiceLite\VoiceLite.ico
+SetupIconFile=VoiceLite\VoiceLite.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 InternalCompressLevel=ultra64
@@ -41,15 +41,15 @@ PrivilegesRequiredOverridesAllowed=dialog
 
 ; UI Settings
 WizardStyle=modern
-WizardImageFile=installer-wizard.bmp
-WizardSmallImageFile=installer-small.bmp
+; WizardImageFile=installer-wizard.bmp
+; WizardSmallImageFile=installer-small.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ShowLanguageDialog=no
 DisableWelcomePage=no
 DisableReadyPage=no
 DisableDirPage=no
-LicenseFile=VoiceLite\EULA.txt
+LicenseFile=..\EULA.txt
 
 ; Versioning
 VersionInfoVersion={#MyAppVersion}
@@ -69,23 +69,23 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 ; Main Application
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\VoiceLite.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\VoiceLite.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\VoiceLite.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\VoiceLite.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Dependencies
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "VoiceLite\bin\Release\net8.0-windows\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Whisper Files (Encrypted models will be included)
-Source: "VoiceLite\VoiceLite\bin\Release\net8.0-windows\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
+Source: "VoiceLite\bin\Release\net8.0-windows\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
-; Visual C++ Runtime Redistributable
-Source: "vcredist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+; Visual C++ Runtime Redistributable (not bundled in lean MVP - users must install separately)
+; Source: "vcredist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; License Files
-Source: "VoiceLite\EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "VoiceLite\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
+; Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -108,8 +108,8 @@ Root: HKLM; Subkey: "Software\{#MyAppPublisher}\{#MyAppName}"; ValueType: string
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 
 [Run]
-; Install Visual C++ Runtime
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waituntilterminated
+; Install Visual C++ Runtime (not bundled in lean MVP)
+; Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waituntilterminated
 
 ; Launch application after installation
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
