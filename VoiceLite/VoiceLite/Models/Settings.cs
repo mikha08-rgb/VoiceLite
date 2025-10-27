@@ -25,6 +25,62 @@ namespace VoiceLite.Models
         Compact         // Power user - maximum density
     }
 
+    public enum TranscriptionPreset
+    {
+        Speed,          // Ultra-fast transcription (beam_size=1, all speed optimizations) - Current performance
+        Balanced,       // Good balance of speed and accuracy (beam_size=3, moderate optimizations) - Recommended
+        Accuracy        // Best transcription quality (beam_size=5, minimal optimizations) - Slower but more accurate
+    }
+
+    public class WhisperPresetConfig
+    {
+        public int BeamSize { get; set; }
+        public int BestOf { get; set; }
+        public double EntropyThreshold { get; set; }
+        public bool UseFallback { get; set; }
+        public int MaxContext { get; set; }
+        public bool UseFlashAttention { get; set; }
+        public string Description { get; set; } = string.Empty;
+
+        public static WhisperPresetConfig GetPresetConfig(TranscriptionPreset preset)
+        {
+            return preset switch
+            {
+                TranscriptionPreset.Speed => new WhisperPresetConfig
+                {
+                    BeamSize = 1,
+                    BestOf = 1,
+                    EntropyThreshold = 3.0,
+                    UseFallback = false,
+                    MaxContext = 64,
+                    UseFlashAttention = true,
+                    Description = "Fastest transcription - Good for quick notes and commands"
+                },
+                TranscriptionPreset.Balanced => new WhisperPresetConfig
+                {
+                    BeamSize = 3,
+                    BestOf = 2,
+                    EntropyThreshold = 2.5,
+                    UseFallback = true,
+                    MaxContext = 224,
+                    UseFlashAttention = true,
+                    Description = "Balanced speed and accuracy - Recommended for most users"
+                },
+                TranscriptionPreset.Accuracy => new WhisperPresetConfig
+                {
+                    BeamSize = 5,           // Higher beam search for better quality
+                    BestOf = 5,             // More candidates for best result (increased from 3)
+                    EntropyThreshold = 2.4, // Default Whisper value for better stability
+                    UseFallback = true,     // Enable temperature fallback for difficult audio
+                    MaxContext = -1,        // Use all available context (no limit)
+                    UseFlashAttention = true,
+                    Description = "Highest quality - Professional transcription (recommended default)"
+                },
+                _ => GetPresetConfig(TranscriptionPreset.Balanced)
+            };
+        }
+    }
+
     public class Settings
     {
         // THREAD SAFETY: Lock object for synchronizing access from multiple threads
@@ -37,6 +93,9 @@ namespace VoiceLite.Models
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
         private string _whisperModel = "ggml-tiny.bin"; // MVP default - fastest model, bundled with installer
         private double _whisperTimeoutMultiplier = 2.0;
+        private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced; // Default to balanced for good speed/accuracy tradeoff
+        private bool _enableVAD = true; // CRITICAL: Enable VAD by default for better accuracy and noise filtering
+        private double _vadThreshold = 0.5; // Default VAD threshold (0.0-1.0) - calibrated for balanced sensitivity
 
         public RecordMode Mode
         {
@@ -68,17 +127,34 @@ namespace VoiceLite.Models
             set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
         }
 
-        // CRITICAL: BeamSize and BestOf are HARD-CODED to optimal values
-        // These are no longer user-configurable to prevent performance regressions
-        // v1.1.6: Made read-only after recurring issues with persisted bad settings causing 20+ second transcriptions
-        // Greedy decoding (beam_size=1, best_of=1) provides optimal speed with minimal accuracy tradeoff
-        public int BeamSize => 1; // HARD-CODED: Greedy decoding (5x faster than beam_size=3)
-        public int BestOf => 1;   // HARD-CODED: Single sampling (5x faster than best_of=3)
+        public TranscriptionPreset TranscriptionPreset
+        {
+            get => _transcriptionPreset;
+            set => _transcriptionPreset = Enum.IsDefined(typeof(TranscriptionPreset), value) ? value : TranscriptionPreset.Balanced;
+        }
+
+        // UPDATED v1.2.0: BeamSize and BestOf are now driven by TranscriptionPreset
+        // Users can choose Speed/Balanced/Accuracy presets in Settings UI
+        // This provides better UX than exposing raw Whisper parameters
+        public int BeamSize => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BeamSize;
+        public int BestOf => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BestOf;
 
         public double WhisperTimeoutMultiplier
         {
             get => _whisperTimeoutMultiplier;
             set => _whisperTimeoutMultiplier = Math.Clamp(value, 0.5, 10.0);
+        }
+
+        public bool EnableVAD
+        {
+            get => _enableVAD;
+            set => _enableVAD = value;
+        }
+
+        public double VADThreshold
+        {
+            get => _vadThreshold;
+            set => _vadThreshold = Math.Clamp(value, 0.0, 1.0);
         }
 
         public bool ShowTrayIcon { get; set; } = true;

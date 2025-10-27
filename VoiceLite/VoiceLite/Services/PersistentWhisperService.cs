@@ -172,6 +172,48 @@ namespace VoiceLite.Services
                 $"- Downloaded: {localDataPath}");
         }
 
+        private string? ResolveVADModelPath()
+        {
+            // CRITICAL: High-quality VAD model resolution with multiple fallback locations
+            const string vadModelFile = "ggml-silero-vad.bin";
+
+            // Priority 1: Bundled with application (Program Files)
+            var bundledPath = Path.Combine(baseDir, "whisper", vadModelFile);
+            if (File.Exists(bundledPath))
+            {
+                ErrorLogger.LogMessage($"VAD model found (bundled): {bundledPath}");
+                return bundledPath;
+            }
+
+            // Priority 2: Base directory fallback
+            var basePath = Path.Combine(baseDir, vadModelFile);
+            if (File.Exists(basePath))
+            {
+                ErrorLogger.LogMessage($"VAD model found (base dir): {basePath}");
+                return basePath;
+            }
+
+            // Priority 3: User-downloaded models in LocalApplicationData
+            var localDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite",
+                "whisper",
+                vadModelFile
+            );
+            if (File.Exists(localDataPath))
+            {
+                ErrorLogger.LogMessage($"VAD model found (local data): {localDataPath}");
+                return localDataPath;
+            }
+
+            // VAD is optional - gracefully degrade if not found
+            ErrorLogger.LogWarning($"VAD model '{vadModelFile}' not found. Checked locations:\n" +
+                                 $"1. {bundledPath}\n" +
+                                 $"2. {basePath}\n" +
+                                 $"3. {localDataPath}");
+            return null;
+        }
+
         private void CreateDummyAudioFile()
         {
             try
@@ -221,17 +263,19 @@ namespace VoiceLite.Services
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
                 // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
+                // Always use Speed preset for warmup (fastest possible)
                 int optimalThreads = 4;
+                var warmupPreset = WhisperPresetConfig.GetPresetConfig(TranscriptionPreset.Speed);
                 var arguments = $"-m \"{modelPath}\" " +
                               $"-f \"{dummyAudioPath}\" " +
                               $"--threads {optimalThreads} " +
                               $"--no-timestamps --language {settings.Language} " +
-                              "--beam-size 1 " +          // Fastest possible
-                              "--best-of 1 " +            // Single candidate
-                              "--entropy-thold 3.0 " +    // Prevent retries
-                              "--no-fallback " +          // Skip temperature fallback
-                              "--max-context 64 " +       // Limit context
-                              "--flash-attn";             // Flash attention (v1.7.6)
+                              $"--beam-size {warmupPreset.BeamSize} " +
+                              $"--best-of {warmupPreset.BestOf} " +
+                              $"--entropy-thold {warmupPreset.EntropyThreshold:F1} " +
+                              "--no-fallback " +
+                              $"--max-context {warmupPreset.MaxContext} " +
+                              "--flash-attn";
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -358,25 +402,67 @@ namespace VoiceLite.Services
                 var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? ResolveModelPath());
                 var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
 
-                // Build arguments using user settings for optimal accuracy/speed balance
-                // PERFORMANCE OPTIMIZATIONS (v1.0.87):
-                // - Use physical cores instead of logical processors (compute-intensive workload)
-                // - Add entropy threshold to prevent hallucination retries (~20-30% faster)
-                // - Add no-fallback to skip temperature retries (~15-25% faster)
-                // - Add max-context limit for short audio clips (~10-15% faster)
-                // - Flash attention for modern CPU/GPU optimization (~15-30% faster)
+                // Build arguments using user-selected transcription preset
+                // v1.2.0: Preset-driven configuration (Speed/Balanced/Accuracy)
+                // - Speed: beam_size=1, aggressive optimizations (current v1.0.87 performance)
+                // - Balanced: beam_size=3, moderate optimizations (recommended default)
+                // - Accuracy: beam_size=5, minimal optimizations (best quality)
                 // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
                 int optimalThreads = 4; // Fixed optimal thread count
+                var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
+
                 var arguments = $"-m \"{effectiveModelPath}\" " +
                               $"-f \"{audioFilePath}\" " +
                               $"--threads {optimalThreads} " +
                               $"--no-timestamps --language {settings.Language} " +
-                              $"--beam-size {settings.BeamSize} " +
-                              $"--best-of {settings.BestOf} " +
-                              $"--entropy-thold 3.0 " +      // Prevent repetition retries
-                              $"--no-fallback " +            // Skip temperature fallback
-                              $"--max-context 64 " +         // Limit context for short clips
-                              $"--flash-attn";               // Flash attention optimization (v1.7.6)
+                              $"--beam-size {presetConfig.BeamSize} " +
+                              $"--best-of {presetConfig.BestOf} " +
+                              $"--entropy-thold {presetConfig.EntropyThreshold:F1} ";
+
+                // Add optional flags based on preset
+                if (!presetConfig.UseFallback)
+                    arguments += "--no-fallback ";
+
+                arguments += $"--max-context {presetConfig.MaxContext} ";
+
+                if (presetConfig.UseFlashAttention)
+                    arguments += "--flash-attn ";
+
+                // VAD (Voice Activity Detection) support (v1.2.0)
+                // CRITICAL: High-quality VAD implementation using Silero VAD v5.1.2
+                // Benefits: Filters out silence/noise, improves speed and accuracy, reduces hallucinations
+                if (settings.EnableVAD)
+                {
+                    var vadModelPath = ResolveVADModelPath();
+                    if (!string.IsNullOrEmpty(vadModelPath) && File.Exists(vadModelPath))
+                    {
+                        // Validate VAD model file integrity
+                        var vadFileInfo = new FileInfo(vadModelPath);
+                        if (vadFileInfo.Length < 100000) // Silero VAD should be ~865KB
+                        {
+                            ErrorLogger.LogWarning($"VAD model file appears corrupted (size: {vadFileInfo.Length} bytes). Expected ~865KB. Disabling VAD.");
+                        }
+                        else
+                        {
+                            // Clamp threshold to safe range
+                            var safeThreshold = Math.Clamp(settings.VADThreshold, 0.3, 0.8);
+
+                            // Optimized VAD parameters for high-quality speech detection
+                            arguments += $"--vad --vad-model \"{vadModelPath}\" " +
+                                       $"--vad-threshold {safeThreshold:F2} " +
+                                       "--vad-min-speech-duration-ms 250 " +    // Filter out brief noise/clicks
+                                       "--vad-min-silence-duration-ms 100 " +   // Split on 100ms+ silence (natural pauses)
+                                       "--vad-speech-pad-ms 30";                // 30ms padding to avoid clipping speech edges
+
+                            ErrorLogger.LogMessage($"VAD enabled with threshold {safeThreshold:F2}, model: {Path.GetFileName(vadModelPath)}");
+                        }
+                    }
+                    else
+                    {
+                        ErrorLogger.LogWarning($"VAD enabled but model not found. Transcription will continue without VAD. " +
+                                             $"Expected location: {vadModelPath ?? "unknown"}");
+                    }
+                }
 
                 // DIAGNOSTIC: Log exact whisper command with thread count
                 try
@@ -540,9 +626,34 @@ namespace VoiceLite.Services
                     throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
                 }
 
-                // SIMPLIFICATION: Return 100% raw Whisper output (zero filtering)
-                // All post-processing and cleanup removed - rebuild from clean slate
-                var result = outputBuilder.ToString().Trim();
+                // Get raw Whisper output
+                var rawResult = outputBuilder.ToString().Trim();
+
+                // Apply text post-processing (punctuation and capitalization)
+                // IMPORTANT: Only apply if user has it enabled in settings
+                var result = rawResult;
+                if (!string.IsNullOrWhiteSpace(rawResult))
+                {
+                    try
+                    {
+                        // Apply punctuation and capitalization post-processing
+                        // Default: both enabled for better transcription quality
+                        result = TextPostProcessor.Process(rawResult,
+                            enablePunctuation: true,
+                            enableCapitalization: true);
+
+                        if (result != rawResult)
+                        {
+                            ErrorLogger.LogDebug($"Text post-processing applied: '{rawResult}' -> '{result}'");
+                        }
+                    }
+                    catch (Exception postProcessEx)
+                    {
+                        // Fallback to raw output if post-processing fails
+                        ErrorLogger.LogWarning($"Text post-processing failed, using raw output: {postProcessEx.Message}");
+                        result = rawResult;
+                    }
+                }
 
                 var totalTime = DateTime.Now - startTime;
                 ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {result.Length} chars");

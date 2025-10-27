@@ -56,6 +56,9 @@ namespace VoiceLite
             // System Settings
             MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
 
+            // Transcription Preset
+            LoadTranscriptionPreset();
+
             // Audio Settings
             LoadMicrophones();
             AutoPasteCheckBox.IsChecked = settings.AutoPaste;
@@ -117,6 +120,35 @@ namespace VoiceLite
             // Example:
             // VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
             // ExportHistoryButton.Visibility = proFeatureService.ExportHistoryButtonVisibility;
+        }
+
+        private void LoadTranscriptionPreset()
+        {
+            // Select the appropriate preset based on settings
+            string presetTag = settings.TranscriptionPreset.ToString();
+            foreach (ComboBoxItem item in TranscriptionPresetComboBox.Items)
+            {
+                if (item.Tag?.ToString() == presetTag)
+                {
+                    TranscriptionPresetComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // Update description
+            UpdatePresetDescription(settings.TranscriptionPreset);
+
+            // Load VAD settings
+            EnableVADCheckBox.IsChecked = settings.EnableVAD;
+            VADThresholdSlider.Value = settings.VADThreshold;
+            VADThresholdText.Text = settings.VADThreshold.ToString("F2");
+            VADSettingsPanel.IsEnabled = settings.EnableVAD;
+        }
+
+        private void UpdatePresetDescription(TranscriptionPreset preset)
+        {
+            var config = WhisperPresetConfig.GetPresetConfig(preset);
+            PresetDescriptionText.Text = config.Description;
         }
 
         private void LoadMicrophones()
@@ -267,6 +299,19 @@ namespace VoiceLite
             // System Settings
             settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
 
+            // Transcription Preset
+            if (TranscriptionPresetComboBox.SelectedItem is ComboBoxItem selectedPreset)
+            {
+                if (Enum.TryParse<TranscriptionPreset>(selectedPreset.Tag?.ToString(), out var preset))
+                {
+                    settings.TranscriptionPreset = preset;
+                }
+            }
+
+            // VAD Settings
+            settings.EnableVAD = EnableVADCheckBox.IsChecked ?? true;
+            settings.VADThreshold = VADThresholdSlider.Value;
+
             // Audio Settings
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
 
@@ -382,6 +427,33 @@ namespace VoiceLite
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+            }
+        }
+
+        private void TranscriptionPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (TranscriptionPresetComboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                if (Enum.TryParse<TranscriptionPreset>(selectedItem.Tag?.ToString(), out var preset))
+                {
+                    UpdatePresetDescription(preset);
+                }
+            }
+        }
+
+        private void EnableVADCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (VADSettingsPanel != null)
+            {
+                VADSettingsPanel.IsEnabled = EnableVADCheckBox.IsChecked ?? false;
+            }
+        }
+
+        private void VADThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (VADThresholdText != null)
+            {
+                VADThresholdText.Text = e.NewValue.ToString("F2");
             }
         }
 

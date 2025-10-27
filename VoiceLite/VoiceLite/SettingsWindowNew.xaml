@@ -89,6 +89,73 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- Transcription Quality -->
+                        <GroupBox Header="Transcription Quality" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Quality Preset:" Margin="0,0,0,5"/>
+                                <ComboBox Name="TranscriptionPresetComboBox"
+                                          Margin="0,0,0,10"
+                                          MaxWidth="400"
+                                          HorizontalAlignment="Left"
+                                          SelectionChanged="TranscriptionPresetComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="⚖️ Balanced - Good speed and accuracy (recommended)" Tag="Balanced" IsSelected="True"/>
+                                    <ComboBoxItem Content="🎯 Accuracy - Highest quality (slower)" Tag="Accuracy"/>
+                                    <ComboBoxItem Content="⚡ Speed - Fastest transcription" Tag="Speed"/>
+                                </ComboBox>
+                                <TextBlock Name="PresetDescriptionText"
+                                           Text="Balanced speed and accuracy - Recommended for most users"
+                                           FontSize="11"
+                                           Foreground="Gray"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,10"/>
+
+                                <!-- VAD Settings -->
+                                <CheckBox Name="EnableVADCheckBox"
+                                          Content="Enable Voice Activity Detection (VAD)"
+                                          IsChecked="True"
+                                          Margin="0,0,0,5"
+                                          Checked="EnableVADCheckBox_Changed"
+                                          Unchecked="EnableVADCheckBox_Changed"
+                                          ToolTip="Automatically removes silence and background noise before transcription"/>
+
+                                <StackPanel Name="VADSettingsPanel" Margin="20,5,0,0">
+                                    <TextBlock Text="VAD Sensitivity:" Margin="0,0,0,5" FontSize="11"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MaxWidth="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Slider Name="VADThresholdSlider"
+                                                Grid.Column="0"
+                                                Minimum="0.3"
+                                                Maximum="0.8"
+                                                Value="0.5"
+                                                TickFrequency="0.1"
+                                                IsSnapToTickEnabled="True"
+                                                TickPlacement="BottomRight"
+                                                Margin="0,0,10,0"
+                                                ValueChanged="VADThresholdSlider_ValueChanged"/>
+                                        <TextBlock Name="VADThresholdText"
+                                                   Grid.Column="1"
+                                                   Text="0.50"
+                                                   FontSize="11"
+                                                   VerticalAlignment="Center"
+                                                   MinWidth="35"
+                                                   TextAlignment="Right"/>
+                                    </Grid>
+                                    <TextBlock Text="Lower = More sensitive (may include background noise)"
+                                               FontSize="10"
+                                               Foreground="Gray"
+                                               Margin="0,3,0,0"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="Higher = Less sensitive (may cut off quiet speech)"
+                                               FontSize="10"
+                                               Foreground="Gray"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
                         <!-- Audio Settings -->
                         <GroupBox Header="Audio Settings" Margin="0,0,0,15">
                             <StackPanel Margin="10">

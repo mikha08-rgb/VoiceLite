@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
 using VoiceLite.Core.Interfaces.Services;
+using VoiceLite.Services.Audio;
 
 namespace VoiceLite.Services
 {
@@ -25,7 +26,6 @@ namespace VoiceLite.Services
         private string? currentAudioFilePath;
         private volatile bool isRecording; // volatile for thread-safe reads
         private int selectedDeviceIndex = -1; // -1 means default device
-        private const float InputVolumeScale = 0.8f;
         private bool eventHandlersAttached = false;
         private readonly object lockObject = new object();
         private System.Timers.Timer? cleanupTimer;
@@ -33,6 +33,9 @@ namespace VoiceLite.Services
         private const bool useMemoryBuffer = true; // QUICK WIN 1: Force memory mode to eliminate file I/O latency (50-100ms)
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
         private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
+
+        // Audio preprocessing settings (enabled by default for better transcription quality)
+        private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
 
         // Timing constants (in milliseconds)
         private const int NAUDIO_BUFFER_FLUSH_DELAY_MS = 10; // Minimal delay for NAudio buffer flush
@@ -233,6 +236,18 @@ namespace VoiceLite.Services
             selectedDeviceIndex = deviceIndex;
         }
 
+        /// <summary>
+        /// Configures audio preprocessing settings. Must be called before StartRecording().
+        /// </summary>
+        /// <param name="settings">Preprocessing configuration (null to use defaults)</param>
+        public void SetPreprocessingSettings(AudioPreprocessingSettings? settings)
+        {
+            if (isRecording)
+                throw new InvalidOperationException("Cannot change preprocessing settings while recording");
+
+            preprocessingSettings = settings ?? new AudioPreprocessingSettings();
+        }
+
         public void StartRecording()
         {
             lock (lockObject)
@@ -342,54 +357,24 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                // CRIT-004 FIX: Move ArrayPool.Rent() inside try block and under lock
-                // Ensures buffer is always returned even on early exit
-                byte[]? buffer = null;
                 try
                 {
-                    // CRITICAL FIX: Remove nested lock to prevent deadlock
-                    // We're already inside the lock from line 334, no need to lock again
-                    // BUG FIX (BUG-012): Capture waveFile reference (already under lock from line 334)
+                    // BUG FIX (BUG-012): Capture waveFile reference (already under lock)
                     WaveFileWriter? localWaveFile = waveFile;
                     if (localWaveFile == null || !isRecording || e.BytesRecorded <= 0)
                     {
                         return; // Exit early if disposed or not recording
                     }
 
-                    // Now safe to use localWaveFile outside lock (we have a reference)
-                    // Apply volume scaling (InputVolumeScale is const 0.8f)
-                    // CRITICAL FIX: Rent buffer INSIDE try to ensure finally always returns it
-                    buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(e.BytesRecorded);
-
-                    Array.Copy(e.Buffer, buffer, e.BytesRecorded);
-
-                    // ISSUE #10 FIX: Ensure we process pairs of bytes only to prevent out-of-bounds access
-                    int pairCount = e.BytesRecorded / 2;
-                    for (int i = 0; i < pairCount * 2; i += 2)
-                    {
-                        short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
-                        int scaled = (int)Math.Round(sample * InputVolumeScale);
-                        scaled = Math.Clamp(scaled, short.MinValue, short.MaxValue);
-                        short clamped = (short)scaled;
-                        buffer[i] = (byte)(clamped & 0xFF);
-                        buffer[i + 1] = (byte)((clamped >> 8) & 0xFF);
-                    }
-                    localWaveFile.Write(buffer, 0, pairCount * 2);
+                    // Write raw audio data directly (no volume scaling - AGC will handle normalization)
+                    // This provides cleaner input for audio preprocessing pipeline
+                    localWaveFile.Write(e.Buffer, 0, e.BytesRecorded);
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("OnDataAvailable: Audio write failed", ex);
                     // Mic disconnected or error - stop this session gracefully
                     StopRecording();
-                }
-                finally
-                {
-                    // CRIT-004 FIX: Always return buffer to pool, even on early return or exception
-                    if (buffer != null)
-                    {
-                        // SECURITY: Clear buffer to prevent audio data leakage in pooled memory
-                        System.Buffers.ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
-                    }
                 }
             }
         }
@@ -592,10 +577,30 @@ namespace VoiceLite.Services
 
                 ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: About to write {audioData.Length} bytes to {currentAudioFilePath}");
 
-                // Write the complete WAV data to file
-                File.WriteAllBytes(currentAudioFilePath, audioData);
+                // Apply audio preprocessing if any features are enabled
+                byte[] processedAudioData = audioData;
+                if (preprocessingSettings.EnableHighPassFilter ||
+                    preprocessingSettings.EnableAGC ||
+                    preprocessingSettings.EnableNoiseGate)
+                {
+                    try
+                    {
+                        ErrorLogger.LogDebug("SaveMemoryBufferToTempFile: Applying audio preprocessing...");
+                        processedAudioData = AudioPreprocessor.ProcessAudioData(audioData, preprocessingSettings);
+                        ErrorLogger.LogDebug($"SaveMemoryBufferToTempFile: Preprocessing complete - {processedAudioData.Length} bytes");
+                    }
+                    catch (Exception preprocessEx)
+                    {
+                        // Fallback to unprocessed audio if preprocessing fails
+                        ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: Preprocessing failed, using raw audio: {preprocessEx.Message}");
+                        processedAudioData = audioData;
+                    }
+                }
 
-                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: SUCCESS - Saved {audioData.Length} bytes to {currentAudioFilePath}");
+                // Write the complete WAV data to file
+                File.WriteAllBytes(currentAudioFilePath, processedAudioData);
+
+                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: SUCCESS - Saved {processedAudioData.Length} bytes to {currentAudioFilePath}");
 
                 // Notify about the file
                 AudioFileReady?.Invoke(this, currentAudioFilePath);
