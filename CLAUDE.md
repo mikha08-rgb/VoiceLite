@@ -26,7 +26,7 @@ dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect:"XPlat Co
 
 ### Installer (Inno Setup)
 ```bash
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLiteSetup_Simple.iss
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup.iss
 ```
 
 ### Web App (voicelite-web/)

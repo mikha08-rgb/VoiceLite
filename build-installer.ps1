@@ -6,6 +6,24 @@ Write-Host "VoiceLite Installer Build Script" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Step 0: Read version from csproj
+Write-Host "Reading version from VoiceLite.csproj..." -ForegroundColor Yellow
+$csprojPath = "VoiceLite\VoiceLite\VoiceLite.csproj"
+if (!(Test-Path $csprojPath)) {
+    Write-Host "Error: VoiceLite.csproj not found at $csprojPath" -ForegroundColor Red
+    exit 1
+}
+
+$csprojContent = Get-Content $csprojPath -Raw
+if ($csprojContent -match '<Version>(\d+\.\d+\.\d+)</Version>') {
+    $version = $matches[1]
+    Write-Host "✓ Version: $version" -ForegroundColor Green
+} else {
+    Write-Host "Error: Could not find version in VoiceLite.csproj" -ForegroundColor Red
+    exit 1
+}
+Write-Host ""
+
 # Step 1: Build the release version
 Write-Host "Step 1: Building Release version..." -ForegroundColor Yellow
 cd VoiceLite
@@ -28,7 +46,7 @@ if (!(Test-Path $innoPath)) {
     Write-Host "Alternative: Creating ZIP package instead..." -ForegroundColor Yellow
 
     # Create ZIP package as fallback
-    $zipName = "VoiceLite-1.0.0-Windows.zip"
+    $zipName = "VoiceLite-$version-Windows.zip"
     Write-Host "Creating $zipName..." -ForegroundColor Yellow
 
     # Ensure the publish directory exists
@@ -43,11 +61,12 @@ if (!(Test-Path $innoPath)) {
 } else {
     # Step 3: Build installer with Inno Setup
     Write-Host "Step 2: Building installer with Inno Setup..." -ForegroundColor Yellow
-    & $innoPath "VoiceLite.iss"
+    & $innoPath "Installer\VoiceLiteSetup.iss"
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✓ Installer created successfully" -ForegroundColor Green
-        $installerPath = "Installer\VoiceLite-Setup-1.0.0.exe"
+        # Installer outputs to root (OutputDir=..\..\ in .iss)
+        $installerPath = "..\VoiceLite-Setup-$version.exe"
         if (Test-Path $installerPath) {
             Write-Host "  Location: $installerPath" -ForegroundColor Gray
             Write-Host "  Size: $((Get-Item $installerPath).Length / 1MB) MB" -ForegroundColor Gray

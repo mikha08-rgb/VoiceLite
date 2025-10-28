@@ -128,6 +128,19 @@ begin
   Lbl.AutoSize := True;
 end;
 
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  // Check if VoiceLite is currently running
+  if CheckForMutexes('VoiceLite_SingleInstance') then
+  begin
+    Result := 'VoiceLite is currently running. Please close it before continuing.';
+  end
+  else
+  begin
+    Result := '';
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   AppDataDir: String;
