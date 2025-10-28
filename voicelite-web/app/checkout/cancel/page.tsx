@@ -27,8 +27,8 @@ export default function CheckoutCancelPage() {
         <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8 text-left">
           <p className="text-stone-700 dark:text-stone-300">
             If you experienced any issues during checkout or have questions, please contact us at{' '}
-            <a href="mailto:support@voicelite.app" className="text-blue-600 dark:text-blue-400 underline hover:no-underline">
-              support@voicelite.app
+            <a href="mailto:BasmentHustleLLC@gmail.com" className="text-blue-600 dark:text-blue-400 underline hover:no-underline">
+              BasmentHustleLLC@gmail.com
             </a>
           </p>
         </div>

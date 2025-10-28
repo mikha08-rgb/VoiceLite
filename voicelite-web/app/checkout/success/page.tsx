@@ -64,8 +64,8 @@ function SuccessContent() {
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-8 text-left">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             <strong>Don't see the email?</strong> Check your spam folder or contact support at{' '}
-            <a href="mailto:support@voicelite.app" className="underline hover:no-underline">
-              support@voicelite.app
+            <a href="mailto:BasmentHustleLLC@gmail.com" className="underline hover:no-underline">
+              BasmentHustleLLC@gmail.com
             </a>
           </p>
         </div>

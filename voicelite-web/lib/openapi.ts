@@ -595,7 +595,7 @@ All license validation happens **offline** after initial license fetch.
       contact: {
         name: 'VoiceLite Support',
         url: 'https://voicelite.app',
-        email: 'support@voicelite.app',
+        email: 'BasmentHustleLLC@gmail.com',
       },
       license: {
         name: 'Proprietary',
