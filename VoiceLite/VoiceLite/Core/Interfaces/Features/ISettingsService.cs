@@ -67,6 +67,11 @@ namespace VoiceLite.Core.Interfaces.Features
         /// </summary>
         bool AddSpaceAfterInjection { get; set; }
 
+        /// <summary>
+        /// Gets or sets the clipboard restoration delay in milliseconds (30-100ms)
+        /// </summary>
+        int ClipboardRestorationDelayMs { get; set; }
+
         // Hotkey Settings
         /// <summary>
         /// Gets or sets the global hotkey

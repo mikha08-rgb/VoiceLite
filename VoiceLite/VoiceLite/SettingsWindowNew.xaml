@@ -188,8 +188,44 @@
                                 <CheckBox Name="AutoPasteCheckBox"
                                           Content="Auto-paste transcribed text (Ctrl+V)"
                                           IsChecked="True"
-                                          Margin="0,0,0,0"
+                                          Margin="0,0,0,10"
                                           ToolTip="When enabled, transcribed text will automatically paste into the active application. When disabled, text is only copied to clipboard."/>
+
+                                <!-- Clipboard Restoration Delay -->
+                                <TextBlock Text="Clipboard Restoration Delay:" Margin="0,0,0,5" FontSize="11"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MaxWidth="300"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Name="ClipboardDelaySlider"
+                                            Grid.Column="0"
+                                            Minimum="30"
+                                            Maximum="100"
+                                            Value="50"
+                                            TickFrequency="10"
+                                            IsSnapToTickEnabled="True"
+                                            TickPlacement="BottomRight"
+                                            Margin="0,0,10,0"
+                                            ValueChanged="ClipboardDelaySlider_ValueChanged"
+                                            ToolTip="Time to wait before restoring your original clipboard content (30-100ms)"/>
+                                    <TextBlock Name="ClipboardDelayLabel"
+                                               Grid.Column="1"
+                                               Text="50ms"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               MinWidth="45"
+                                               TextAlignment="Right"/>
+                                </Grid>
+                                <TextBlock Text="Lower = Faster but may lose clipboard data on slow systems"
+                                           FontSize="10"
+                                           Foreground="Gray"
+                                           Margin="0,3,0,0"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Text="Higher = Slower but more reliable clipboard restoration"
+                                           FontSize="10"
+                                           Foreground="Gray"
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
                         </GroupBox>
 

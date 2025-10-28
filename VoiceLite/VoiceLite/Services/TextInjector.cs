@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Automation;
 using WindowsInput;
 using WindowsInput.Native;
 using VoiceLite.Models;
@@ -53,7 +54,35 @@ namespace VoiceLite.Services
 
             try
             {
-                // Decide injection method based on text length and context
+                // Respect explicit user preferences - skip UI Automation for these modes
+                if (settings.TextInjectionMode == TextInjectionMode.AlwaysType)
+                {
+                    InjectViaTyping(text);
+#if DEBUG
+                    ErrorLogger.LogMessage($"Text injected via typing (AlwaysType mode, {text.Length} chars)");
+#endif
+                    return;
+                }
+
+                if (settings.TextInjectionMode == TextInjectionMode.AlwaysPaste)
+                {
+                    InjectViaClipboard(text);
+#if DEBUG
+                    ErrorLogger.LogMessage($"Text injected via clipboard (AlwaysPaste mode, {text.Length} chars)");
+#endif
+                    return;
+                }
+
+                // For SmartAuto/PreferType/PreferPaste: Try UI Automation first (fastest ~5ms)
+                if (TryInjectViaUIAutomation(text))
+                {
+#if DEBUG
+                    ErrorLogger.LogMessage($"Text injected via UI Automation ({text.Length} chars)");
+#endif
+                    return;
+                }
+
+                // Fallback to existing smart logic
                 if (ShouldUseTyping(text))
                 {
                     InjectViaTyping(text);
@@ -195,8 +224,132 @@ namespace VoiceLite.Services
         private const int GWL_STYLE = -16;
         private const long ES_PASSWORD = 0x0020;
 
+        /// <summary>
+        /// Attempts to inject text via Windows UI Automation API (fastest method ~5ms)
+        /// DISABLED: SetValue() replaces entire field content instead of inserting at cursor
+        /// TODO: Implement proper cursor-position-aware insertion using TextPattern
+        /// </summary>
+        private bool TryInjectViaUIAutomation(string text)
+        {
+            // CRITICAL BUG FIX: UI Automation ValuePattern.SetValue() replaces ALL text in field
+            // This causes data loss when user has existing content in the field
+            // Disabling until proper TextPattern implementation with cursor position support
+#if DEBUG
+            ErrorLogger.LogMessage("UI Automation currently disabled - using fallback methods");
+#endif
+            return false;
+
+            /* DISABLED CODE - Causes data loss
+            try
+            {
+                // UI Automation may require STA thread - handle gracefully
+                AutomationElement focusedElement = AutomationElement.FocusedElement;
+                if (focusedElement == null)
+                    return false;
+
+                // Try to get the ValuePattern (standard editable text control interface)
+                if (focusedElement.TryGetCurrentPattern(ValuePattern.Pattern, out object patternObj))
+                {
+                    ValuePattern valuePattern = (ValuePattern)patternObj;
+
+                    // Only inject if the field is editable
+                    if (!valuePattern.Current.IsReadOnly)
+                    {
+                        // BUG: SetValue() replaces entire content, doesn't insert at cursor!
+                        valuePattern.SetValue(text);
+#if DEBUG
+                        ErrorLogger.LogMessage("UI Automation injection successful");
+#endif
+                        return true;
+                    }
+#if DEBUG
+                    else
+                    {
+                        ErrorLogger.LogMessage("UI Automation skipped: Field is read-only");
+                    }
+#endif
+                }
+#if DEBUG
+                else
+                {
+                    ErrorLogger.LogMessage("UI Automation not supported: No ValuePattern available");
+                }
+#endif
+            }
+            catch (Exception
+#if DEBUG
+            ex
+#endif
+            )
+            {
+                // Silently fail and fallback - don't disrupt user experience
+#if DEBUG
+                ErrorLogger.LogMessage($"UI Automation failed (expected for some apps): {ex.Message}");
+#endif
+            }
+
+            return false;
+            */
+        }
+
+        /// <summary>
+        /// Gets adaptive typing delay based on focused application
+        /// Returns optimal delay for compatibility vs speed balance
+        /// </summary>
+        private int GetTypingDelayForApplication()
+        {
+            string appName = GetFocusedApplicationName().ToLower();
+
+            // Modern applications - minimal delay (1ms is 50% faster than original 2ms)
+            // NOTE: 0ms was too aggressive and caused dropped keystrokes
+            if (appName.Contains("notepad") ||
+                appName.Contains("code") ||       // VS Code
+                appName.Contains("chrome") ||
+                appName.Contains("firefox") ||
+                appName.Contains("edge") ||
+                appName.Contains("slack") ||
+                appName.Contains("discord") ||
+                appName.Contains("teams"))
+            {
+                return 1; // 1ms - fast but reliable (was 0ms, caused drops)
+            }
+
+            // Office applications - standard delay for reliability
+            if (appName.Contains("word") ||
+                appName.Contains("excel") ||
+                appName.Contains("powerpoint") ||
+                appName.Contains("outlook"))
+            {
+                return 2; // 2ms - matches original reliability
+            }
+
+            // Terminal/console applications - need more delay
+            if (appName.Contains("cmd") ||
+                appName.Contains("powershell") ||
+                appName.Contains("windowsterminal") ||
+                appName.Contains("terminal"))
+            {
+                return 5; // 5ms - slower but reliable for terminals
+            }
+
+            // Default for unknown applications - match original behavior
+            return 2; // 2ms - original TYPING_DELAY_MS value (proven reliable)
+        }
+
+        /// <summary>
+        /// Wrapper method for getting current typing delay
+        /// Enables future configuration/override if needed
+        /// </summary>
+        private int GetTypingDelay()
+        {
+            return GetTypingDelayForApplication();
+        }
+
         private void InjectViaTyping(string text)
         {
+            // Get adaptive delay based on current application
+            int delay = GetTypingDelay();
+
             // Type each character using InputSimulator
             foreach (char c in text)
             {
@@ -213,10 +366,10 @@ namespace VoiceLite.Services
                     inputSimulator.Keyboard.TextEntry(c.ToString());
                 }
 
-                // Small delay to ensure keystrokes register properly
-                if (TYPING_DELAY_MS > 0)
+                // Small delay to ensure keystrokes register properly (adaptive per-app)
+                if (delay > 0)
                 {
-                    Thread.Sleep(TYPING_DELAY_MS);
+                    Thread.Sleep(delay);
                 }
             }
         }
@@ -272,10 +425,10 @@ namespace VoiceLite.Services
                     {
                         try
                         {
-                            // QUICK WIN 2: Reduced delay from 300ms → 50ms
-                            // Paste completes in <10ms on modern systems, 300ms created 5x larger race window
-                            // This reduces chance of external clipboard modification and speeds up completion by 250ms
-                            await Task.Delay(CLIPBOARD_SETTLE_DELAY_MS);
+                            // QUICK WIN 2: User-configurable delay (30-100ms, default 50ms)
+                            // Paste completes in <10ms on modern systems
+                            // Configurable delay balances speed vs reliability for different system configurations
+                            await Task.Delay(settings.ClipboardRestorationDelayMs);
 
                             // CRITICAL FIX: Check if clipboard was modified by user before restoring
                             // Only restore if clipboard still contains our transcription text

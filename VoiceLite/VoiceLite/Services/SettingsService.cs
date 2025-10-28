@@ -140,6 +140,17 @@ namespace VoiceLite.Services
             }
         }
 
+        public int ClipboardRestorationDelayMs
+        {
+            get => _settings.ClipboardRestorationDelayMs;
+            set
+            {
+                var oldValue = _settings.ClipboardRestorationDelayMs;
+                _settings.ClipboardRestorationDelayMs = value;
+                OnSettingChanged(nameof(ClipboardRestorationDelayMs), oldValue, value);
+            }
+        }
+
         // Hotkey Settings
         public System.Windows.Input.Key HotkeyKey
         {
@@ -322,6 +333,7 @@ namespace VoiceLite.Services
             target.MaxHistoryItems = source.MaxHistoryItems;
             target.SaveHistory = source.SaveHistory;
             target.TextInjectionMode = source.TextInjectionMode;
+            target.ClipboardRestorationDelayMs = source.ClipboardRestorationDelayMs;
             target.LicenseKey = source.LicenseKey;
             target.ActivationCount = source.ActivationCount;
         }

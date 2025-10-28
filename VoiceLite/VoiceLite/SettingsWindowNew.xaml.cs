@@ -70,6 +70,13 @@ namespace VoiceLite
                 if (AutoPasteCheckBox != null)
                     AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
+                // Clipboard Delay Settings
+                if (ClipboardDelaySlider != null)
+                {
+                    ClipboardDelaySlider.Value = settings.ClipboardRestorationDelayMs;
+                    UpdateClipboardDelayLabel();
+                }
+
                 // Audio Enhancement - sync UI from settings
                 SyncAudioUIFromSettings();
 
@@ -341,6 +348,7 @@ namespace VoiceLite
 
             // Audio Settings
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
+            settings.ClipboardRestorationDelayMs = (int)ClipboardDelaySlider.Value;
 
             if (MicrophoneComboBox.SelectedItem is AudioDevice selectedDevice)
             {
@@ -481,6 +489,19 @@ namespace VoiceLite
             if (VADThresholdText != null)
             {
                 VADThresholdText.Text = e.NewValue.ToString("F2");
+            }
+        }
+
+        private void ClipboardDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateClipboardDelayLabel();
+        }
+
+        private void UpdateClipboardDelayLabel()
+        {
+            if (ClipboardDelayLabel != null && ClipboardDelaySlider != null)
+            {
+                ClipboardDelayLabel.Text = $"{(int)ClipboardDelaySlider.Value}ms";
             }
         }
 

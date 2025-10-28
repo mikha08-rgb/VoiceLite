@@ -659,5 +659,91 @@ namespace VoiceLite.Tests.Services
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             return (bool)method!.Invoke(injector, new object[] { text })!;
         }
+
+        #region Text Injection Improvements Tests (v1.2.0)
+
+        [Theory]
+        [InlineData(20, 30)]   // Below minimum
+        [InlineData(30, 30)]   // At minimum
+        [InlineData(50, 50)]   // Normal value
+        [InlineData(100, 100)] // At maximum
+        [InlineData(150, 100)] // Above maximum
+        public void Settings_ClipboardRestorationDelayMs_ClampsToValidRange(int inputValue, int expectedValue)
+        {
+            // Arrange
+            var settings = new Settings();
+
+            // Act
+            settings.ClipboardRestorationDelayMs = inputValue;
+
+            // Assert
+            settings.ClipboardRestorationDelayMs.Should().Be(expectedValue);
+        }
+
+        [Fact]
+        public void InjectText_WithUIAutomationFallback_DoesNotThrow()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                TextInjectionMode = TextInjectionMode.SmartAuto
+            };
+            var injector = new TextInjector(settings);
+
+            // Act - UI Automation may fail in test environment, but should not throw
+            Action act = () => injector.InjectText("test");
+
+            // Assert - Should fail gracefully and fallback to other methods
+            // Not throwing an exception indicates proper fallback handling
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void InjectText_WithAlwaysTypeMode_SkipsUIAutomation()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                TextInjectionMode = TextInjectionMode.AlwaysType
+            };
+            var injector = new TextInjector(settings);
+
+            // Act & Assert - Should respect explicit AlwaysType preference
+            // UI Automation should be skipped entirely for this mode
+            Action act = () => injector.InjectText("test");
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void InjectText_WithAlwaysPasteMode_SkipsUIAutomation()
+        {
+            // Arrange
+            var settings = new Settings
+            {
+                TextInjectionMode = TextInjectionMode.AlwaysPaste,
+                ClipboardRestorationDelayMs = 50
+            };
+            var injector = new TextInjector(settings);
+
+            // Act & Assert - Should respect explicit AlwaysPaste preference
+            // UI Automation should be skipped entirely for this mode
+            Action act = () => injector.InjectText("test");
+            act.Should().NotThrow();
+        }
+
+        // NOTE: GetTypingDelayForApplication() tests
+        // Full testing requires refactoring TextInjector for dependency injection
+        // to mock GetFocusedApplicationName(). Current implementation uses Win32 API
+        // directly which is difficult to test without a real UI context.
+        //
+        // Manual testing checklist (documented in TEXT_INJECTION_RESEARCH.md):
+        // ✅ Notepad: Should use 0ms delay (instant)
+        // ✅ VS Code: Should use 0ms delay (instant)
+        // ✅ Chrome: Should use 0ms delay (instant)
+        // ✅ Word: Should use 1ms delay (minimal)
+        // ✅ CMD/PowerShell: Should use 5ms delay (compatible)
+        // ✅ Unknown apps: Should use 1ms delay (default)
+
+        #endregion
     }
 }

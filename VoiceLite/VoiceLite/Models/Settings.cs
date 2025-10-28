@@ -176,6 +176,16 @@ namespace VoiceLite.Models
         public int TypingDelayMs { get; set; } = 10;
         public bool AddSpaceAfter { get; set; } = false;
         public bool AddSpaceAfterInjection { get; set; } = false;
+
+        // Clipboard Restoration Delay (v1.2.0)
+        // Controls how long to wait before restoring user's original clipboard content
+        // Range: 30-100ms (balance between speed and reliability)
+        private int _clipboardRestorationDelayMs = 50;
+        public int ClipboardRestorationDelayMs
+        {
+            get => _clipboardRestorationDelayMs;
+            set => _clipboardRestorationDelayMs = Math.Clamp(value, 30, 100);
+        }
         public Key HotkeyKey { get; set; } = Key.LeftAlt;
         public string GlobalHotkey { get; set; } = "Alt";
         public bool HotkeyEnabled { get; set; } = true;
