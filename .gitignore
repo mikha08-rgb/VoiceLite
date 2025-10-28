@@ -107,3 +107,4 @@ verify-*.ps1
 *_VERIFICATION_*.md
 *_REPORT.md
 CLEANUP_*.md
+coverage/
