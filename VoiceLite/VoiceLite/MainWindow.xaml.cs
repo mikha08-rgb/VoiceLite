@@ -30,6 +30,7 @@ namespace VoiceLite
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
         private TranscriptionHistoryService? historyService;
+        private CustomShortcutService? customShortcutService;
         // SoundService removed per user request - no audio feedback
 
         // Recording state
@@ -443,11 +444,12 @@ namespace VoiceLite
 
                 // Initialize services
                 historyService = new TranscriptionHistoryService(settings);
+                customShortcutService = new CustomShortcutService(settings);
                 // SoundService removed per user request - no audio feedback
 
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
                 if (audioRecorder == null || whisperService == null || textInjector == null ||
-                    historyService == null)
+                    historyService == null || customShortcutService == null)
                 {
                     throw new InvalidOperationException(
                         "Failed to initialize core services - one or more required services is null. " +
@@ -1402,7 +1404,9 @@ namespace VoiceLite
                         {
                             try
                             {
-                                textInjector?.InjectText(transcription);
+                                // Apply custom shortcuts before text injection
+                                var processedText = customShortcutService?.ProcessShortcuts(transcription) ?? transcription;
+                                textInjector?.InjectText(processedText);
                             }
                             catch (Exception ex)
                             {
@@ -2037,7 +2041,9 @@ namespace VoiceLite
             {
                 try
                 {
-                    textInjector?.InjectText(item.Text);
+                    // Apply custom shortcuts before re-injection (consistent with initial transcription)
+                    var processedText = customShortcutService?.ProcessShortcuts(item.Text) ?? item.Text;
+                    textInjector?.InjectText(processedText);
                 }
                 catch (Exception ex)
                 {

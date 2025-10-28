@@ -211,6 +211,9 @@ namespace VoiceLite.Models
         public bool EnableHistory { get; set; } = true; // Allow users to disable history tracking
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
 
+        // Custom Shortcuts (Text Expansion)
+        public List<CustomShortcut> CustomShortcuts { get; set; } = new List<CustomShortcut>();
+
         // History Display Preferences
         public bool ShowHistoryPanel { get; set; } = true; // Toggle history panel visibility
         public bool HistoryShowWordCount { get; set; } = true; // Show word count in history items

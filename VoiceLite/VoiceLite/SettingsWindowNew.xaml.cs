@@ -93,6 +93,9 @@ namespace VoiceLite
                 {
                     ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
                 }
+
+                // Load Custom Shortcuts
+                LoadShortcuts();
             }
             catch (Exception ex)
             {
@@ -516,5 +519,118 @@ namespace VoiceLite
         private void NoiseGate_Changed(object sender, RoutedEventArgs e) { }
         private void TestAudio_Click(object sender, RoutedEventArgs e) { }
         private void AdvancedAudioSetting_Changed(object sender, RoutedEventArgs e) { }
+
+        // ========== Custom Shortcuts Management ==========
+
+        private void LoadShortcuts()
+        {
+            try
+            {
+                if (ShortcutsListView != null)
+                {
+                    RefreshShortcutsList();
+                    ShortcutsListView.SelectionChanged += ShortcutsListView_SelectionChanged;
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("LoadShortcuts failed", ex);
+            }
+        }
+
+        private void RefreshShortcutsList()
+        {
+            if (ShortcutsListView == null) return;
+
+            ShortcutsListView.ItemsSource = null;
+            ShortcutsListView.ItemsSource = settings.CustomShortcuts;
+        }
+
+        private void ShortcutsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var hasSelection = ShortcutsListView.SelectedItem != null;
+            if (EditShortcutButton != null)
+                EditShortcutButton.IsEnabled = hasSelection;
+            if (DeleteShortcutButton != null)
+                DeleteShortcutButton.IsEnabled = hasSelection;
+        }
+
+        private void AddShortcutButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new ShortcutEditDialog();
+                if (dialog.ShowDialog() == true)
+                {
+                    settings.CustomShortcuts.Add(dialog.Shortcut);
+                    RefreshShortcutsList();
+                    saveSettingsCallback?.Invoke(); // Persist to disk
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("AddShortcutButton_Click failed", ex);
+                MessageBox.Show($"Error adding shortcut: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void EditShortcutButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ShortcutsListView.SelectedItem is CustomShortcut selectedShortcut)
+                {
+                    var dialog = new ShortcutEditDialog(selectedShortcut);
+                    if (dialog.ShowDialog() == true)
+                    {
+                        RefreshShortcutsList();
+                        saveSettingsCallback?.Invoke(); // Persist to disk
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("EditShortcutButton_Click failed", ex);
+                MessageBox.Show($"Error editing shortcut: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void DeleteShortcutButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ShortcutsListView.SelectedItem is CustomShortcut selectedShortcut)
+                {
+                    var result = MessageBox.Show(
+                        $"Are you sure you want to delete this shortcut?\n\n{selectedShortcut.Trigger} → {selectedShortcut.Replacement}",
+                        "Confirm Delete",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        settings.CustomShortcuts.Remove(selectedShortcut);
+                        RefreshShortcutsList();
+                        saveSettingsCallback?.Invoke(); // Persist to disk
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("DeleteShortcutButton_Click failed", ex);
+                MessageBox.Show($"Error deleting shortcut: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ShortcutsListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ShortcutsListView.SelectedItem != null)
+            {
+                EditShortcutButton_Click(sender, e);
+            }
+        }
     }
 }

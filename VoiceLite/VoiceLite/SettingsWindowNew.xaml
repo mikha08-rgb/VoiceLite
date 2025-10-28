@@ -242,6 +242,76 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Custom Shortcuts Tab -->
+            <TabItem Header="Shortcuts" Name="ShortcutsTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <!-- Header -->
+                        <TextBlock Text="Custom Shortcuts"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,20"
+                                   FontSize="12">
+                            <Run Text="Create custom text expansion shortcuts. When you say the trigger phrase, it will be replaced with your custom text."/>
+                            <LineBreak/>
+                            <Run Text="Example: Say 'my email' → appears as 'john@example.com'"/>
+                        </TextBlock>
+
+                        <!-- Shortcuts List -->
+                        <GroupBox Header="Your Shortcuts" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <ListView Name="ShortcutsListView"
+                                          Height="250"
+                                          Margin="0,0,0,10"
+                                          SelectionMode="Single"
+                                          MouseDoubleClick="ShortcutsListView_MouseDoubleClick">
+                                    <ListView.View>
+                                        <GridView>
+                                            <GridViewColumn Header="Trigger" Width="150" DisplayMemberBinding="{Binding Trigger}"/>
+                                            <GridViewColumn Header="Replacement" Width="250" DisplayMemberBinding="{Binding Replacement}"/>
+                                            <GridViewColumn Header="Enabled" Width="70">
+                                                <GridViewColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding IsEnabled}" IsHitTestVisible="False"/>
+                                                    </DataTemplate>
+                                                </GridViewColumn.CellTemplate>
+                                            </GridViewColumn>
+                                        </GridView>
+                                    </ListView.View>
+                                </ListView>
+
+                                <!-- Action Buttons -->
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Name="AddShortcutButton"
+                                            Content="Add Shortcut"
+                                            Width="100"
+                                            Height="32"
+                                            Click="AddShortcutButton_Click"
+                                            Margin="0,0,5,0"/>
+                                    <Button Name="EditShortcutButton"
+                                            Content="Edit"
+                                            Width="80"
+                                            Height="32"
+                                            Click="EditShortcutButton_Click"
+                                            IsEnabled="False"
+                                            Margin="0,0,5,0"/>
+                                    <Button Name="DeleteShortcutButton"
+                                            Content="Delete"
+                                            Width="80"
+                                            Height="32"
+                                            Click="DeleteShortcutButton_Click"
+                                            IsEnabled="False"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- AI Models Tab (Pro Only) -->
             <TabItem Header="AI Models" Name="AIModelsTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">

@@ -34,6 +34,7 @@ namespace VoiceLite.Infrastructure.DependencyInjection
             services.AddSingleton<ILicenseService, LicenseService>();
             services.AddSingleton<IProFeatureService, ProFeatureService>();
             services.AddSingleton<ITranscriptionHistoryService, TranscriptionHistoryService>();
+            services.AddSingleton<ICustomShortcutService, CustomShortcutService>();
             services.AddSingleton<ISettingsService, SettingsService>();
 
             // Register Controllers (Scoped - new instance per request/window)
