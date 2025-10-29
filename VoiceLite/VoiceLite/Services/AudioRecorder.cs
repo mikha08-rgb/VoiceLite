@@ -30,7 +30,10 @@ namespace VoiceLite.Services
         private readonly object lockObject = new object();
         private System.Timers.Timer? cleanupTimer;
         private const int CleanupIntervalMinutes = 30;
-        private const bool useMemoryBuffer = true; // QUICK WIN 1: Force memory mode to eliminate file I/O latency (50-100ms)
+
+        // BUG FIX (DEAD-CODE-002): Removed useMemoryBuffer constant - memory mode is now permanent
+        // All file-mode code paths have been removed - memory buffering is the only implementation
+        // This eliminates dead code and makes the codebase clearer
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
         private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
 
@@ -326,19 +329,14 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            // CRITICAL FIX #1: Capture session ID before any other checks
-            int callbackSessionId = currentSessionId;
-
-            // Quick pre-lock check for obvious late callbacks
-            if (!isRecording)
-            {
-                // Silently discard late audio data - this is normal when stopping
-                return;
-            }
-
-            // Additional safety check in lock to prevent race conditions
+            // BUG FIX (RACE-001): Hold lock for entire method to prevent TOCTOU vulnerabilities
+            // Previous code had pre-lock check that created race condition window
+            // Now all validation happens atomically inside single lock block
             lock (lockObject)
             {
+                // CRITICAL FIX #1: Capture and validate session ID inside lock
+                int callbackSessionId = currentSessionId;
+
                 // CRITICAL FIX #1: Reject callbacks from old sessions
                 if (callbackSessionId != currentSessionId)
                 {
@@ -346,9 +344,12 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                // Re-check after acquiring lock - state might have changed
+                // Check recording state - must be inside lock to prevent race
                 if (!isRecording)
+                {
+                    // Silently discard late audio data - this is normal when stopping
                     return;
+                }
 
                 // Validate sender is current waveIn instance (prevents stale callbacks)
                 if (sender is WaveInEvent senderWaveIn && senderWaveIn != waveIn)
@@ -357,13 +358,19 @@ namespace VoiceLite.Services
                     return;
                 }
 
+                // Validate audio data size
+                if (e.BytesRecorded <= 0)
+                {
+                    return; // No data to write
+                }
+
                 try
                 {
-                    // BUG FIX (BUG-012): Capture waveFile reference (already under lock)
+                    // BUG FIX (BUG-012): Capture waveFile reference atomically under lock
                     WaveFileWriter? localWaveFile = waveFile;
-                    if (localWaveFile == null || !isRecording || e.BytesRecorded <= 0)
+                    if (localWaveFile == null)
                     {
-                        return; // Exit early if disposed or not recording
+                        return; // Exit early if disposed
                     }
 
                     // Write raw audio data directly (no volume scaling - AGC will handle normalization)
@@ -374,7 +381,18 @@ namespace VoiceLite.Services
                 {
                     ErrorLogger.LogError("OnDataAvailable: Audio write failed", ex);
                     // Mic disconnected or error - stop this session gracefully
-                    StopRecording();
+                    // NOTE: StopRecording will try to acquire lock, but we already hold it
+                    // This could cause deadlock - need to handle differently
+                    try
+                    {
+                        // Set flag to stop without calling StopRecording (avoid deadlock)
+                        isRecording = false;
+                        ErrorLogger.LogMessage("OnDataAvailable: Recording stopped due to write error");
+                    }
+                    catch (Exception stopEx)
+                    {
+                        ErrorLogger.LogError("OnDataAvailable: Failed to stop recording after error", stopEx);
+                    }
                 }
             }
         }

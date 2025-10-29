@@ -22,8 +22,12 @@ namespace VoiceLite.Services
         private string? dummyAudioPath;
         private volatile bool isWarmedUp = false;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
-        private readonly CancellationTokenSource disposeCts = new();
-        private readonly CancellationTokenSource disposalCts = new CancellationTokenSource(); // CRITICAL FIX: Cancellation for semaphore during disposal
+
+        // BUG FIX (CTS-NAMING-001): Renamed for clarity to indicate what each token controls
+        // - warmupCts: Cancels background warmup task on disposal
+        // - transcriptionCts: Cancels semaphore waits during disposal to prevent deadlock
+        private readonly CancellationTokenSource warmupCts = new();
+        private readonly CancellationTokenSource transcriptionCts = new CancellationTokenSource();
         private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
         private volatile bool isDisposed = false;
         private static bool _integrityWarningLogged = false;
@@ -53,7 +57,7 @@ namespace VoiceLite.Services
             {
                 try
                 {
-                    if (!disposeCts.IsCancellationRequested)
+                    if (!warmupCts.IsCancellationRequested)
                     {
                         CreateDummyAudioFile();
                         await WarmUpWhisperAsync();
@@ -63,7 +67,7 @@ namespace VoiceLite.Services
                 {
                     ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
                 }
-            }, disposeCts.Token);
+            }, warmupCts.Token);
         }
 
         private string ResolveWhisperExePath()
@@ -376,7 +380,7 @@ namespace VoiceLite.Services
             {
                 // Use semaphore to ensure only one transcription at a time
                 // CRITICAL FIX: Add cancellation token support to prevent deadlock during disposal
-                await transcriptionSemaphore.WaitAsync(disposalCts.Token);
+                await transcriptionSemaphore.WaitAsync(transcriptionCts.Token);
                 semaphoreAcquired = true;
                 // Preprocess audio if needed
                 try
@@ -693,16 +697,43 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // Dispose process if created
+                // BUG FIX (PROC-DISP-001): Robust process disposal with timeout to prevent hangs
+                // Dispose process if created - use timeout to prevent indefinite hangs
                 if (process != null)
                 {
                     try
                     {
-                        process.Dispose();
+                        // Attempt disposal with 2-second timeout
+                        var disposeTask = Task.Run(() =>
+                        {
+                            try
+                            {
+                                process.Dispose();
+                                return true;
+                            }
+                            catch (Exception innerEx)
+                            {
+                                ErrorLogger.LogWarning($"Process disposal threw exception: {innerEx.Message}");
+                                return false;
+                            }
+                        });
+
+                        // Wait up to 2 seconds for disposal
+                        if (!disposeTask.Wait(2000))
+                        {
+                            ErrorLogger.LogWarning("Process disposal timed out after 2 seconds - potential zombie process");
+                            // Process becomes zombie but app continues - better than hanging forever
+                        }
+                        else if (!disposeTask.Result)
+                        {
+                            ErrorLogger.LogWarning("Process disposal completed but threw exception (logged above)");
+                        }
                     }
                     catch (Exception disposeEx)
                     {
-                        ErrorLogger.LogError("Failed to dispose process", disposeEx);
+                        // Catch any timeout/aggregate exceptions from Task.Wait
+                        ErrorLogger.LogError("Failed to dispose process (outer catch)", disposeEx);
+                        // Continue with cleanup - don't let disposal failure break finally block
                     }
                 }
 
@@ -719,7 +750,7 @@ namespace VoiceLite.Services
                     catch (ObjectDisposedException)
                     {
                         // Semaphore was disposed during shutdown - this is OK
-                        // The semaphore is disposed at line 613 in Dispose()
+                        // The semaphore is disposed at line 855 in Dispose()
                     }
                     catch (SemaphoreFullException)
                     {
@@ -766,8 +797,8 @@ namespace VoiceLite.Services
         // Interface implementation methods
         public void CancelTranscription()
         {
-            // Signal cancellation
-            disposalCts?.Cancel();
+            // Signal cancellation of transcription operations
+            transcriptionCts?.Cancel();
         }
 
         public bool ValidateWhisperExecutable()
@@ -835,8 +866,8 @@ namespace VoiceLite.Services
             // CRITICAL FIX: Cancel all operations immediately
             try
             {
-                disposeCts.Cancel(); // Cancel warmup tasks
-                disposalCts.Cancel(); // Cancel semaphore waits to unblock transcriptions
+                warmupCts.Cancel(); // Cancel warmup tasks
+                transcriptionCts.Cancel(); // Cancel semaphore waits to unblock transcriptions
             }
             catch { /* Ignore cancellation errors */ }
 
@@ -860,20 +891,20 @@ namespace VoiceLite.Services
                 }
             }
 
-            // Dispose cancellation token source
+            // Dispose cancellation token sources
             try
             {
-                disposeCts.Dispose();
+                warmupCts.Dispose();
             }
             catch (ObjectDisposedException)
             {
                 // Already disposed, ignore
             }
 
-            // CRITICAL FIX: Dispose new disposal coordination resources
+            // CRITICAL FIX: Dispose transcription cancellation token source
             try
             {
-                disposalCts.Dispose();
+                transcriptionCts.Dispose();
             }
             catch (ObjectDisposedException) { }
 

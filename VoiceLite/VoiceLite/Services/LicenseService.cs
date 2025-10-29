@@ -10,8 +10,28 @@ namespace VoiceLite.Services
 {
     public class LicenseService : ILicenseService, IDisposable
     {
-        // WEEK 1 FIX: Static HttpClient prevents socket exhaustion
-        // Single instance shared across all LicenseService instances
+        /// <summary>
+        /// Static HttpClient for license validation requests.
+        ///
+        /// BUG FIX (HTTPCLIENT-DOC-001): Documented intentional static HttpClient pattern.
+        ///
+        /// Why static:
+        /// - Prevents socket exhaustion (creating/disposing HttpClient rapidly exhausts ports)
+        /// - Microsoft best practice: reuse HttpClient instances
+        /// - Single client sufficient for single API endpoint (voicelite.app)
+        ///
+        /// Why not IHttpClientFactory:
+        /// - Overkill for single client scenario
+        /// - IHttpClientFactory is designed for multi-client/multi-endpoint scenarios
+        /// - Would add unnecessary DI complexity for minimal benefit
+        ///
+        /// Disposal:
+        /// - Intentionally NOT disposed in Dispose() method
+        /// - Lives for application lifetime (process exit handles cleanup)
+        /// - Disposing would break other LicenseService instances (static shared state)
+        ///
+        /// Reference: https://docs.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines
+        /// </summary>
         private static readonly HttpClient _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(10),
@@ -240,8 +260,9 @@ namespace VoiceLite.Services
         {
             if (!_disposed)
             {
-                // WEEK 1 FIX: Don't dispose static HttpClient
-                // Static instance lives for application lifetime
+                // BUG FIX (HTTPCLIENT-DOC-001): Intentionally NOT disposing static HttpClient
+                // See detailed explanation in HttpClient field documentation above
+                // Static instance lives for application lifetime - disposing would break other instances
                 // This prevents socket exhaustion from creating/disposing multiple instances
                 _disposed = true;
             }

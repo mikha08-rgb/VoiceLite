@@ -225,71 +225,28 @@ namespace VoiceLite.Services
         private const long ES_PASSWORD = 0x0020;
 
         /// <summary>
-        /// Attempts to inject text via Windows UI Automation API (fastest method ~5ms)
-        /// DISABLED: SetValue() replaces entire field content instead of inserting at cursor
-        /// TODO: Implement proper cursor-position-aware insertion using TextPattern
+        /// UI Automation injection is DISABLED due to fundamental limitations.
+        ///
+        /// BUG FIX (DEAD-CODE-001): Removed 60+ lines of commented-out UI Automation code.
+        ///
+        /// Why disabled:
+        /// - ValuePattern.SetValue() replaces ENTIRE field content instead of inserting at cursor
+        /// - This causes data loss when user has existing text in the field
+        /// - TextPattern API would be needed for proper cursor-aware insertion, but it's complex
+        ///   and not universally supported across all text controls
+        ///
+        /// Fallback methods (clipboard/typing) work reliably across all applications.
+        ///
+        /// TODO: If performance becomes critical, investigate TextPattern implementation with:
+        ///   1. Get cursor position via TextPatternRange
+        ///   2. Insert text at cursor using RangeFromPoint
+        ///   3. Handle applications that don't support TextPattern gracefully
         /// </summary>
         private bool TryInjectViaUIAutomation(string text)
         {
-            // CRITICAL BUG FIX: UI Automation ValuePattern.SetValue() replaces ALL text in field
-            // This causes data loss when user has existing content in the field
-            // Disabling until proper TextPattern implementation with cursor position support
-#if DEBUG
-            ErrorLogger.LogMessage("UI Automation currently disabled - using fallback methods");
-#endif
+            // Always return false - UI Automation not implemented
+            // Fallback to clipboard/typing methods which work universally
             return false;
-
-            /* DISABLED CODE - Causes data loss
-            try
-            {
-                // UI Automation may require STA thread - handle gracefully
-                AutomationElement focusedElement = AutomationElement.FocusedElement;
-                if (focusedElement == null)
-                    return false;
-
-                // Try to get the ValuePattern (standard editable text control interface)
-                if (focusedElement.TryGetCurrentPattern(ValuePattern.Pattern, out object patternObj))
-                {
-                    ValuePattern valuePattern = (ValuePattern)patternObj;
-
-                    // Only inject if the field is editable
-                    if (!valuePattern.Current.IsReadOnly)
-                    {
-                        // BUG: SetValue() replaces entire content, doesn't insert at cursor!
-                        valuePattern.SetValue(text);
-#if DEBUG
-                        ErrorLogger.LogMessage("UI Automation injection successful");
-#endif
-                        return true;
-                    }
-#if DEBUG
-                    else
-                    {
-                        ErrorLogger.LogMessage("UI Automation skipped: Field is read-only");
-                    }
-#endif
-                }
-#if DEBUG
-                else
-                {
-                    ErrorLogger.LogMessage("UI Automation not supported: No ValuePattern available");
-                }
-#endif
-            }
-            catch (Exception
-#if DEBUG
-            ex
-#endif
-            )
-            {
-                // Silently fail and fallback - don't disrupt user experience
-#if DEBUG
-                ErrorLogger.LogMessage($"UI Automation failed (expected for some apps): {ex.Message}");
-#endif
-            }
-
-            return false;
-            */
         }
 
         /// <summary>

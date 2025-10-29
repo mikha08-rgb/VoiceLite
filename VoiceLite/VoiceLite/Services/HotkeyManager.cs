@@ -275,6 +275,14 @@ namespace VoiceLite.Services
 
         private void StopKeyMonitor()
         {
+            // BUG FIX (BLOCKING-001): Log warning if called on UI thread
+            // This method can block for up to 2 seconds, so it should ideally not be called on UI thread
+            // However, in tests and some disposal scenarios, it may be unavoidable
+            if (dispatcher.CheckAccess())
+            {
+                ErrorLogger.LogWarning("StopKeyMonitor called on UI thread - may cause brief UI freeze (up to 2s)");
+            }
+
             CancellationTokenSource? cts;
             Task? task;
             lock (stateLock)
@@ -301,8 +309,9 @@ namespace VoiceLite.Services
             }
 
             // CRIT-003 FIX: Use ManualResetEventSlim for non-blocking coordination instead of Task.Wait()
-            // Task.Wait() blocks UI thread for up to 5 seconds, causing UI freezes
-            // ManualResetEventSlim allows efficient signaling without blocking
+            // BUG FIX (BLOCKING-001): Reduced timeout from 5s to 2s for faster shutdown
+            // Task.Wait() blocks calling thread for up to 2 seconds, but should not be called on UI thread
+            // ManualResetEventSlim allows efficient signaling without busy-waiting
             if (task != null && !task.IsCompleted)
             {
                 try
@@ -312,10 +321,10 @@ namespace VoiceLite.Services
                     // Start async task to signal completion
                     _ = task.ContinueWith(_ => unregisterComplete.Set(), TaskScheduler.Default);
 
-                    // Wait with timeout - non-blocking on background thread
-                    if (!unregisterComplete.Wait(TimeSpan.FromSeconds(5)))
+                    // Wait with timeout - should be on background thread (assertion above checks this)
+                    if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
                     {
-                        ErrorLogger.LogError("HotkeyManager: Key monitor task did not complete within 5 seconds", new TimeoutException());
+                        ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds - continuing anyway");
                     }
                 }
                 catch (AggregateException ex) when (ex.InnerException is TaskCanceledException)
