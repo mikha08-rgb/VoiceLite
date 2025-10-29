@@ -419,14 +419,34 @@ namespace VoiceLite.Services
                               $"--best-of {presetConfig.BestOf} " +
                               $"--entropy-thold {presetConfig.EntropyThreshold:F1} ";
 
+                // DRAGON-LEVEL OPTIMIZATION: Temperature fallback (critical for accuracy)
+                // Dragon retries failed decoding with different parameters - we do the same
+                // Temperature fallback is "the main thing that helps with resolving repetitions and other failure cases"
                 // Add optional flags based on preset
                 if (!presetConfig.UseFallback)
+                {
                     arguments += "--no-fallback ";
+                }
+                else
+                {
+                    // Use Whisper default temperature fallback: [0.0, 0.4, 0.8]
+                    // This allows retries with increasing randomness if initial decode fails
+                    arguments += "--temperature 0.0 --temperature-inc 0.4 ";
+                }
 
                 arguments += $"--max-context {presetConfig.MaxContext} ";
 
                 if (presetConfig.UseFlashAttention)
                     arguments += "--flash-attn ";
+
+                // DRAGON-LEVEL OPTIMIZATION: Initial prompt (vocabulary/context adaptation)
+                // Dragon uses custom vocabularies to improve accuracy on technical terms
+                // Whisper's initial prompt serves the same purpose - guides recognition context
+                // This helps with: proper nouns, technical jargon, programming terms, brand names
+                var initialPrompt = "Transcribe the following dictation with proper capitalization and punctuation. " +
+                                   "Common terms: VoiceLite, GitHub, JavaScript, TypeScript, Python, C#, .NET, React, " +
+                                   "Node.js, API, JSON, SQL, database, function, variable, component, repository.";
+                arguments += $"--prompt \"{initialPrompt}\" ";
 
                 // VAD (Voice Activity Detection) support (v1.2.0)
                 // CRITICAL: High-quality VAD implementation using Silero VAD v5.1.2
@@ -444,15 +464,16 @@ namespace VoiceLite.Services
                         }
                         else
                         {
-                            // Clamp threshold to safe range
+                            // Clamp threshold to safe range (0.3-0.8 validated by Silero VAD best practices)
                             var safeThreshold = Math.Clamp(settings.VADThreshold, 0.3, 0.8);
 
-                            // Optimized VAD parameters for high-quality speech detection
+                            // TUNED VAD parameters based on Windows Voice Access behavior and Silero best practices
+                            // Key insight: We want to KEEP speech, not aggressively filter it
                             arguments += $"--vad --vad-model \"{vadModelPath}\" " +
                                        $"--vad-threshold {safeThreshold:F2} " +
-                                       "--vad-min-speech-duration-ms 250 " +    // Filter out brief noise/clicks
-                                       "--vad-min-silence-duration-ms 100 " +   // Split on 100ms+ silence (natural pauses)
-                                       "--vad-speech-pad-ms 30";                // 30ms padding to avoid clipping speech edges
+                                       "--vad-min-speech-duration-ms 80 " +     // 80ms: Catches short words/syllables (was 250ms - TOO HIGH!)
+                                       "--vad-min-silence-duration-ms 500 " +   // 500ms: Only split on clear pauses, not mid-phrase (was 100ms - too aggressive)
+                                       "--vad-speech-pad-ms 200";               // 200ms: Generous padding to avoid clipping word edges (was 30ms - too small)
 
                             ErrorLogger.LogMessage($"VAD enabled with threshold {safeThreshold:F2}, model: {Path.GetFileName(vadModelPath)}");
                         }

@@ -19,9 +19,16 @@ namespace VoiceLite.Models
         public DateTime Timestamp { get; set; } = DateTime.Now;
 
         /// <summary>
-        /// The transcribed text content
+        /// The transcribed text content (AFTER shortcut processing)
+        /// This is what was actually injected/displayed to the user
         /// </summary>
         public string Text { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The original transcription from Whisper (BEFORE shortcut processing)
+        /// Used for re-injection to avoid double-processing shortcuts
+        /// </summary>
+        public string? OriginalText { get; set; }
 
         /// <summary>
         /// Number of words in the transcription (for quick metrics)

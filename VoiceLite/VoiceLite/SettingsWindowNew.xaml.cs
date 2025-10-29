@@ -559,12 +559,16 @@ namespace VoiceLite
         {
             try
             {
-                var dialog = new ShortcutEditDialog();
-                if (dialog.ShowDialog() == true)
+                // Thread-safe: lock while reading shortcuts list
+                lock (settings.SyncRoot)
                 {
-                    settings.CustomShortcuts.Add(dialog.Shortcut);
-                    RefreshShortcutsList();
-                    saveSettingsCallback?.Invoke(); // Persist to disk
+                    var dialog = new ShortcutEditDialog(settings.CustomShortcuts);
+                    if (dialog.ShowDialog() == true)
+                    {
+                        settings.CustomShortcuts.Add(dialog.Shortcut);
+                        RefreshShortcutsList();
+                        saveSettingsCallback?.Invoke(); // Persist to disk
+                    }
                 }
             }
             catch (Exception ex)
@@ -581,11 +585,15 @@ namespace VoiceLite
             {
                 if (ShortcutsListView.SelectedItem is CustomShortcut selectedShortcut)
                 {
-                    var dialog = new ShortcutEditDialog(selectedShortcut);
-                    if (dialog.ShowDialog() == true)
+                    // Thread-safe: lock while reading shortcuts list
+                    lock (settings.SyncRoot)
                     {
-                        RefreshShortcutsList();
-                        saveSettingsCallback?.Invoke(); // Persist to disk
+                        var dialog = new ShortcutEditDialog(selectedShortcut, settings.CustomShortcuts);
+                        if (dialog.ShowDialog() == true)
+                        {
+                            RefreshShortcutsList();
+                            saveSettingsCallback?.Invoke(); // Persist to disk
+                        }
                     }
                 }
             }
@@ -611,9 +619,13 @@ namespace VoiceLite
 
                     if (result == MessageBoxResult.Yes)
                     {
-                        settings.CustomShortcuts.Remove(selectedShortcut);
-                        RefreshShortcutsList();
-                        saveSettingsCallback?.Invoke(); // Persist to disk
+                        // Thread-safe: lock while modifying shortcuts list
+                        lock (settings.SyncRoot)
+                        {
+                            settings.CustomShortcuts.Remove(selectedShortcut);
+                            RefreshShortcutsList();
+                            saveSettingsCallback?.Invoke(); // Persist to disk
+                        }
                     }
                 }
             }

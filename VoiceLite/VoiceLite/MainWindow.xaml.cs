@@ -1390,9 +1390,14 @@ namespace VoiceLite
                         }
                         UpdateStatus("Ready", Brushes.Green);
 
+                        // Apply custom shortcuts before text injection
+                        var processedText = customShortcutService?.ProcessShortcuts(transcription) ?? transcription;
+
+                        // Store BOTH original (before shortcuts) and processed (after shortcuts) text
                         var historyItem = new TranscriptionHistoryItem
                         {
-                            Text = transcription,
+                            Text = processedText,           // Processed text (what user sees)
+                            OriginalText = transcription,   // Original from Whisper (for re-injection)
                             Timestamp = DateTime.Now,
                             ModelUsed = settings.WhisperModel
                         };
@@ -1404,8 +1409,6 @@ namespace VoiceLite
                         {
                             try
                             {
-                                // Apply custom shortcuts before text injection
-                                var processedText = customShortcutService?.ProcessShortcuts(transcription) ?? transcription;
                                 textInjector?.InjectText(processedText);
                             }
                             catch (Exception ex)
@@ -2041,8 +2044,10 @@ namespace VoiceLite
             {
                 try
                 {
-                    // Apply custom shortcuts before re-injection (consistent with initial transcription)
-                    var processedText = customShortcutService?.ProcessShortcuts(item.Text) ?? item.Text;
+                    // Use OriginalText if available (before shortcuts), otherwise use Text (already processed)
+                    // This prevents double-processing shortcuts on re-injection
+                    var textToProcess = item.OriginalText ?? item.Text;
+                    var processedText = customShortcutService?.ProcessShortcuts(textToProcess) ?? textToProcess;
                     textInjector?.InjectText(processedText);
                 }
                 catch (Exception ex)

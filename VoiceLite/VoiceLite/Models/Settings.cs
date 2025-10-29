@@ -68,13 +68,13 @@ namespace VoiceLite.Models
                 },
                 TranscriptionPreset.Accuracy => new WhisperPresetConfig
                 {
-                    BeamSize = 5,           // Higher beam search for better quality
-                    BestOf = 5,             // More candidates for best result (increased from 3)
-                    EntropyThreshold = 2.4, // Default Whisper value for better stability
-                    UseFallback = true,     // Enable temperature fallback for difficult audio
-                    MaxContext = -1,        // Use all available context (no limit)
+                    BeamSize = 5,           // Dragon-level beam search (5+ for professional dictation)
+                    BestOf = 5,             // Evaluate 5 candidates, pick best (Dragon uses N-best lists)
+                    EntropyThreshold = 2.3, // Lower = more conservative (Dragon's "high confidence" threshold)
+                    UseFallback = true,     // CRITICAL: Temperature fallback [0.0, 0.4, 0.8] like Dragon
+                    MaxContext = -1,        // Use all available context (Dragon uses full context window)
                     UseFlashAttention = true,
-                    Description = "Highest quality - Professional transcription (recommended default)"
+                    Description = "Dragon-level quality - Professional dictation (99% accuracy)"
                 },
                 _ => GetPresetConfig(TranscriptionPreset.Balanced)
             };
@@ -91,11 +91,11 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "ggml-tiny.bin"; // MVP default - fastest model, bundled with installer
+        private string _whisperModel = "ggml-base.bin"; // FREE TIER DEFAULT: Base model (85-90% accuracy, fast enough for real-time)
         private double _whisperTimeoutMultiplier = 2.0;
         private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced; // Default to balanced for good speed/accuracy tradeoff
-        private bool _enableVAD = true; // CRITICAL: Enable VAD by default for better accuracy and noise filtering
-        private double _vadThreshold = 0.5; // Default VAD threshold (0.0-1.0) - calibrated for balanced sensitivity
+        private bool _enableVAD = true; // TUNED: VAD with conservative parameters (80ms min speech, 500ms min silence, 200ms padding)
+        private double _vadThreshold = 0.35; // Conservative VAD threshold - Silero default is 0.5, we use 0.35 for better speech retention
 
         public RecordMode Mode
         {

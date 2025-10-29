@@ -45,7 +45,7 @@
                                         GroupName="ModelSelection"
                                         VerticalAlignment="Center"
                                         Margin="0,0,10,0"
-                                        IsEnabled="{Binding IsInstalled}"
+                                        IsEnabled="{Binding CanSelect}"
                                         IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                         Checked="ModelRadio_Checked"/>
 

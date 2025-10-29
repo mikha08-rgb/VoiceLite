@@ -24,10 +24,11 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Controls visibility of AI Models tab in Settings.
-        /// Free users: Hidden (only Tiny model available)
-        /// Pro users: Visible (can download/select all 5 models)
+        /// Always visible for everyone.
+        /// Free users: Only see Base model (bundled with installer)
+        /// Pro users: See all 5 models (Tiny, Base, Small, Medium, Large)
         /// </summary>
-        public Visibility AIModelsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility AIModelsTabVisibility => Visibility.Visible;
 
         // ============================================================
         // Future Pro Features - PLANNED BUT NOT YET IMPLEMENTED
@@ -64,7 +65,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Checks if user can use a specific Whisper model.
-        /// Free tier: Only Tiny model (ggml-tiny.bin)
+        /// Free tier: Base only (bundled with installer)
         /// Pro tier: All 5 models (Tiny, Base, Small, Medium, Large)
         /// </summary>
         /// <param name="modelFileName">Model file name (e.g., "ggml-small.bin")</param>
@@ -74,8 +75,9 @@ namespace VoiceLite.Services
             if (IsProUser)
                 return true; // Pro users can use any model
 
-            // Free tier: Only Tiny model
-            return modelFileName?.ToLower() == "ggml-tiny.bin";
+            // Free tier: Base only
+            var lowerFileName = modelFileName?.ToLower();
+            return lowerFileName == "ggml-base.bin";
         }
 
         /// <summary>
@@ -99,7 +101,7 @@ namespace VoiceLite.Services
         /// </summary>
         public string TierDescription => IsProUser
             ? "Pro tier unlocked! You have access to all 5 AI models and future Pro features."
-            : "Free tier includes the Tiny model (80-85% accuracy). Upgrade to Pro for all 5 models and 90-98% accuracy.";
+            : "Free tier includes Base model (85-90% accuracy). Upgrade to Pro for all 5 models and up to 98% accuracy.";
 
         #region IProFeatureService Methods
 
@@ -111,8 +113,9 @@ namespace VoiceLite.Services
             if (IsProUser)
                 return true; // Pro users can use all models
 
-            // Free users can only use tiny model
-            return modelName?.ToLower().Contains("tiny") ?? false;
+            // Free users can only use base model
+            var lowerName = modelName?.ToLower();
+            return lowerName?.Contains("base") == true;
         }
 
         /// <summary>
@@ -133,7 +136,7 @@ namespace VoiceLite.Services
             }
             else
             {
-                return new[] { "ggml-tiny.bin" };
+                return new[] { "ggml-base.bin" };
             }
         }
 

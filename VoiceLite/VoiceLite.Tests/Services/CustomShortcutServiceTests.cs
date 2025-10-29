@@ -55,13 +55,13 @@ namespace VoiceLite.Tests.Services
         #region ProcessShortcuts Tests
 
         [Fact]
-        public void ProcessShortcuts_WithNullText_ReturnsNull()
+        public void ProcessShortcuts_WithNullText_ReturnsEmptyString()
         {
             // Act
             var result = _service.ProcessShortcuts(null!);
 
-            // Assert
-            result.Should().BeNull();
+            // Assert - Returns empty string instead of null for safety
+            result.Should().Be(string.Empty);
         }
 
         [Fact]
@@ -304,6 +304,151 @@ John Doe";
 
             // Assert
             result.Should().Be("This is REPLACED and disabled");
+        }
+
+        [Fact]
+        public void ProcessShortcuts_WithWordBoundaries_OnlyReplacesWholeWords()
+        {
+            // Arrange
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "my email",
+                Replacement = "john@example.com",
+                IsEnabled = true
+            });
+
+            // Act - should NOT match partial words
+            var result1 = _service.ProcessShortcuts("The enemy email server is down");
+            var result2 = _service.ProcessShortcuts("Contact my email address");
+            var result3 = _service.ProcessShortcuts("my email");
+
+            // Assert
+            result1.Should().Be("The enemy email server is down"); // "enemy email" != "my email"
+            result2.Should().Be("Contact john@example.com address"); // Exact match
+            result3.Should().Be("john@example.com"); // Exact match
+        }
+
+        [Fact]
+        public void ProcessShortcuts_PartialWordMatch_DoesNotReplace()
+        {
+            // Arrange
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "test",
+                Replacement = "TESTED",
+                IsEnabled = true
+            });
+
+            // Act - should NOT match inside words
+            var result1 = _service.ProcessShortcuts("testing");
+            var result2 = _service.ProcessShortcuts("test");
+            var result3 = _service.ProcessShortcuts("This is a test case");
+
+            // Assert
+            result1.Should().Be("testing"); // Partial match - should NOT replace
+            result2.Should().Be("TESTED"); // Whole word - should replace
+            result3.Should().Be("This is a TESTED case"); // Whole word - should replace
+        }
+
+        [Fact]
+        public void ProcessShortcuts_ThreadSafe_NoExceptionWhenCalledConcurrently()
+        {
+            // Arrange
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "test",
+                Replacement = "REPLACED",
+                IsEnabled = true
+            });
+
+            var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+            var tasks = new System.Collections.Generic.List<System.Threading.Tasks.Task>();
+
+            // Act - Call ProcessShortcuts from multiple threads concurrently
+            for (int i = 0; i < 10; i++)
+            {
+                tasks.Add(System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        for (int j = 0; j < 100; j++)
+                        {
+                            _service.ProcessShortcuts("This is a test message");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }));
+            }
+
+            System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
+
+            // Assert - No exceptions should be thrown
+            exceptions.Should().BeEmpty();
+        }
+
+        [Fact]
+        public void ProcessShortcuts_WithPunctuationBoundaries_ReplacesCorrectly()
+        {
+            // Arrange
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "btw",
+                Replacement = "by the way",
+                IsEnabled = true
+            });
+
+            // Act
+            var result1 = _service.ProcessShortcuts("btw, I forgot to mention");
+            var result2 = _service.ProcessShortcuts("(btw)");
+            var result3 = _service.ProcessShortcuts("btw!");
+
+            // Assert - Word boundaries work with punctuation
+            result1.Should().Be("by the way, I forgot to mention");
+            result2.Should().Be("(by the way)");
+            result3.Should().Be("by the way!");
+        }
+
+        [Fact]
+        public void ProcessShortcuts_WithRegexSpecialCharacters_EscapesCorrectly()
+        {
+            // Arrange
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "email@test",
+                Replacement = "admin@example.com",
+                IsEnabled = true
+            });
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "price.value",
+                Replacement = "$19.99",
+                IsEnabled = true
+            });
+
+            // Act
+            var result1 = _service.ProcessShortcuts("Contact email@test for help");
+            var result2 = _service.ProcessShortcuts("Check price.value for details");
+
+            // Assert - Special regex characters (@, .) should be escaped
+            result1.Should().Be("Contact admin@example.com for help");
+            result2.Should().Be("Check $19.99 for details");
+        }
+
+        [Fact]
+        public void ProcessShortcuts_EmptyOrNull_ReturnsExpectedValue()
+        {
+            // Act
+            var result1 = _service.ProcessShortcuts(null!);
+            var result2 = _service.ProcessShortcuts("");
+            var result3 = _service.ProcessShortcuts("   ");
+
+            // Assert
+            result1.Should().Be(""); // Returns empty string instead of null
+            result2.Should().Be("");
+            result3.Should().Be("   "); // Whitespace preserved
         }
 
         #endregion

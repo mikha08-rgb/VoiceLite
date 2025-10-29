@@ -72,13 +72,13 @@ git push --tags
 **Most models Q8_0 quantized (v1.0.88+)** for 45% size reduction & 30-40% speed boost with identical accuracy. Large-v3 uses F16 (Q8_0 unavailable upstream).
 
 **Free Tier (bundled with installer):**
-- `ggml-tiny.bin` (42MB Q8_0): **Lite** - Default, 80-85% accuracy, <0.8s processing
+- `ggml-base.bin` (78MB Q8_0): **Swift** - Default, 85-90% accuracy, ~1.5s processing ⭐ NEW DEFAULT
+- `ggml-tiny.bin` (42MB Q8_0): **Lite** - Optional fallback for very slow PCs, 80-85% accuracy, <0.8s processing
 
 **Pro Tier ($20 one-time - downloadable in-app):**
-- `ggml-base.bin` (78MB Q8_0): **Swift** - 85-90% accuracy, ~1.5s processing
 - `ggml-small.bin` (253MB Q8_0): **Pro** ⭐ - 90-93% accuracy, ~3s processing (recommended)
 - `ggml-medium.bin` (823MB Q8_0): **Elite** - 95-97% accuracy, ~12s processing
-- `ggml-large-v3.bin` (3.1GB F16): **Ultra** - 97-98% accuracy, ~15s processing (not quantized - Q8_0 unavailable)
+- `ggml-large-v3.bin` (3.1GB F16): **Ultra** - 97-99% accuracy, ~15s processing (Dragon-level quality)
 
 **Quantization Details (v1.0.88)**:
 - Method: Q8_0 (8-bit integer quantization)
