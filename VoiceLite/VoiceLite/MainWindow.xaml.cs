@@ -629,7 +629,7 @@ namespace VoiceLite
             else if (modelName.Contains("large"))
                 return "Large";
             else
-                return "Tiny (Free)"; // Default fallback
+                return "Base (Free)"; // Default fallback
         }
 
         private void UpdateUIForCurrentMode()
@@ -1748,20 +1748,20 @@ namespace VoiceLite
                     "small" => "ggml-small.bin",
                     "medium" => "ggml-medium.bin",
                     "large" => "ggml-large-v3.bin",
-                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-tiny.bin"
+                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-base.bin"
                 };
 
-                // CRITICAL FIX: If user manually edited settings.json to set Pro model without license, revert to Tiny
+                // CRITICAL FIX: If user manually edited settings.json to set Pro model without license, revert to Base
                 if (!proService.CanUseModel(modelFile))
                 {
-                    ErrorLogger.LogWarning($"SECURITY: Free user had Pro model '{modelFile}' in settings.json - reverting to Tiny (possible manual edit)");
-                    settings.WhisperModel = "ggml-tiny.bin";
-                    modelFile = "ggml-tiny.bin";
+                    ErrorLogger.LogWarning($"SECURITY: Free user had Pro model '{modelFile}' in settings.json - reverting to Base (possible manual edit)");
+                    settings.WhisperModel = "ggml-base.bin";
+                    modelFile = "ggml-base.bin";
                     _ = SaveSettingsInternalAsync(); // Save corrected settings
 
                     MessageBox.Show(
-                        "VoiceLite Free includes the Tiny model only.\n\n" +
-                        "The selected AI model has been reset to Tiny.\n\n" +
+                        "VoiceLite Free includes the Base model as default.\n\n" +
+                        "The selected AI model has been reset to Base.\n\n" +
                         "To use Base, Small, Medium, or Large models, upgrade to VoiceLite Pro for $20.\n\n" +
                         "Visit Settings → License to upgrade.",
                         "Free Tier Model Limit",

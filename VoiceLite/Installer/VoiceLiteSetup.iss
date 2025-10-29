@@ -35,10 +35,10 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (Tiny model only - 42MB Q8_0 quantized)
-; CRITICAL FIX v1.0.95: Copy from publish directory (consistent with .exe/.dll copying above)
-; CRITICAL FIX v1.0.96: ggml-tiny.bin added to git at VoiceLite/whisper/ (force-added despite *.bin in .gitignore)
-; Previous bug: Copied from whisper_installer_lite/ (GitHub Actions temp dir) which doesn't exist in local builds
+; Whisper files (Base model bundled - 78MB Q8_0 quantized)
+; CRITICAL FIX v1.2.0.1: ggml-base.bin is the new default bundled model (was tiny)
+; Copy from publish directory (consistent with .exe/.dll copying above)
+; Tiny model is downloadable via AI Models tab for users with slow PCs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file

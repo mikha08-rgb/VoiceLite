@@ -379,7 +379,7 @@ namespace VoiceLite.Services
             var modelFile = _settings.SelectedModel;
             if (string.IsNullOrWhiteSpace(modelFile))
             {
-                modelFile = "ggml-tiny.bin"; // Default model
+                modelFile = "ggml-base.bin"; // Default model (bundled with installer)
             }
 
             var whisperPath = System.IO.Path.Combine(

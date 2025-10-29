@@ -124,7 +124,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-tiny.bin" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-base.bin" : value;
         }
 
         public TranscriptionPreset TranscriptionPreset
@@ -163,7 +163,7 @@ namespace VoiceLite.Models
         public bool LaunchAtStartup { get; set; } = false;
         public bool CloseToTray { get; set; } = false;
         public bool CheckForUpdates { get; set; } = true;
-        public string SelectedModel { get; set; } = "ggml-tiny.bin";
+        public string SelectedModel { get; set; } = "ggml-base.bin";
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }

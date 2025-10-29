@@ -28,8 +28,9 @@ temp/
 *.wav
 recording.wav
 
-# Whisper model (large file)
+# Whisper models (large files - except bundled base model)
 whisper/ggml-*.bin
+!whisper/ggml-base.bin
 
 # Windows
 Thumbs.db

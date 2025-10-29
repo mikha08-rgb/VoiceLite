@@ -1,6 +1,6 @@
-# Large model files (EXCEPT bundled tiny model)
+# Large model files (EXCEPT bundled base model)
 *.bin
-!VoiceLite/whisper/ggml-tiny.bin
+!VoiceLite/whisper/ggml-base.bin
 
 # Build outputs
 bin/

@@ -10,7 +10,7 @@ namespace VoiceLite.Controls
     public partial class SimpleModelSelector : UserControl
     {
         public event EventHandler<string>? ModelSelected;
-        private string selectedModel = "ggml-tiny.bin"; // Default to Tiny (free tier)
+        private string selectedModel = "ggml-base.bin"; // Default to Base (bundled with installer)
         private ProFeatureService? proFeatureService;
         private Settings? settings;
 
@@ -56,13 +56,13 @@ namespace VoiceLite.Controls
             MediumRadio.Visibility = isProUser ? Visibility.Visible : Visibility.Collapsed;
             LargeRadio.Visibility = isProUser ? Visibility.Visible : Visibility.Collapsed;
 
-            // If free user somehow has a Pro model selected, revert to Tiny
-            if (!isProUser && selectedModel != "ggml-tiny.bin")
+            // If free user somehow has a Pro model selected, revert to Base (bundled default)
+            if (!isProUser && proFeatureService != null && !proFeatureService.CanUseModel(selectedModel))
             {
-                selectedModel = "ggml-tiny.bin";
+                selectedModel = "ggml-base.bin";
                 if (settings != null)
                 {
-                    settings.WhisperModel = "ggml-tiny.bin";
+                    settings.WhisperModel = "ggml-base.bin";
                 }
                 UpdateSelection();
             }
@@ -119,11 +119,11 @@ namespace VoiceLite.Controls
                         MessageBoxImage.Information
                     );
 
-                    // Revert to Tiny model
-                    selectedModel = "ggml-tiny.bin";
+                    // Revert to Base model (bundled default)
+                    selectedModel = "ggml-base.bin";
                     if (settings != null)
                     {
-                        settings.WhisperModel = "ggml-tiny.bin";
+                        settings.WhisperModel = "ggml-base.bin";
                     }
                     UpdateSelection();
                     return;
