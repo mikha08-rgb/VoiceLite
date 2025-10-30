@@ -17,6 +17,7 @@ namespace VoiceLite.Services
     {
         private readonly Settings settings;
         private readonly string baseDir;
+        private readonly IModelResolverService modelResolver;
         private string? cachedWhisperExePath;
         private string? cachedModelPath;
         private string? dummyAudioPath;
@@ -30,7 +31,6 @@ namespace VoiceLite.Services
         private readonly CancellationTokenSource transcriptionCts = new CancellationTokenSource();
         private readonly ManualResetEventSlim disposalComplete = new ManualResetEventSlim(false); // CRITICAL FIX: Non-blocking disposal wait
         private volatile bool isDisposed = false;
-        private static bool _integrityWarningLogged = false;
         private volatile bool isProcessing = false;
 
         // Timeout constants for process lifecycle management
@@ -64,14 +64,17 @@ namespace VoiceLite.Services
         public event EventHandler<int>? ProgressChanged;
 #pragma warning restore CS0067
 
-        public PersistentWhisperService(Settings settings)
+        public PersistentWhisperService(Settings settings, IModelResolverService? modelResolver = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
+            // Create ModelResolverService if not injected (backward compatibility)
+            this.modelResolver = modelResolver ?? new ModelResolverService(baseDir);
+
             // Cache paths at initialization
-            cachedWhisperExePath = ResolveWhisperExePath();
-            cachedModelPath = ResolveModelPath();
+            cachedWhisperExePath = this.modelResolver.ResolveWhisperExePath();
+            cachedModelPath = this.modelResolver.ResolveModelPath(settings.WhisperModel);
 
             // Create dummy audio file and start warmup process
             _ = Task.Run(async () =>
@@ -91,111 +94,6 @@ namespace VoiceLite.Services
             }, warmupCts.Token);
         }
 
-        private string ResolveWhisperExePath()
-        {
-            var whisperExePath = Path.Combine(baseDir, "whisper", "whisper.exe");
-            if (File.Exists(whisperExePath))
-            {
-                // Validate integrity before using (warns if hash mismatch but continues)
-                ValidateWhisperExecutable(whisperExePath);
-                return whisperExePath;
-            }
-
-            whisperExePath = Path.Combine(baseDir, "whisper.exe");
-            if (File.Exists(whisperExePath))
-            {
-                ValidateWhisperExecutable(whisperExePath);
-                return whisperExePath;
-            }
-
-            throw new FileNotFoundException("Whisper.exe not found");
-        }
-
-        private bool ValidateWhisperExecutable(string path)
-        {
-            try
-            {
-                // Expected SHA256 hash of the official whisper.exe binary (whisper.cpp build)
-                // Hash verified: B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF
-                // File size: 469KB (480,768 bytes)
-                // Build version: whisper.cpp v1.7.6 (Oct 2024) - Q8_0 quantization support
-                const string EXPECTED_HASH = "B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF";
-
-                using var sha256 = System.Security.Cryptography.SHA256.Create();
-                using var stream = File.OpenRead(path);
-                var hash = sha256.ComputeHash(stream);
-                var hashString = BitConverter.ToString(hash).Replace("-", "");
-
-                if (!hashString.Equals(EXPECTED_HASH, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Integrity check failed - log warning only once per session to reduce log noise
-                    if (!_integrityWarningLogged)
-                    {
-                        ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (fail-open mode).");
-                        _integrityWarningLogged = true;
-                    }
-
-                    // Log warning but allow execution - fail open to avoid breaking legitimate updates
-                    // Users should verify they have the correct whisper.exe from official sources
-                    return true; // Changed from false to true - warn but don't block
-                }
-
-                // Only log success on first check to avoid spam
-                if (!_integrityWarningLogged)
-                {
-                    ErrorLogger.LogMessage("Whisper.exe integrity check passed");
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Failed to validate whisper.exe integrity", ex);
-                // Allow execution on validation error (fail open) to avoid breaking legitimate use
-                return true;
-            }
-        }
-
-        private string ResolveModelPath()
-        {
-            // Support both short names (tiny, base, small) and full filenames (ggml-tiny.bin)
-            var modelFile = settings.WhisperModel switch
-            {
-                "tiny" => "ggml-tiny.bin",
-                "base" => "ggml-base.bin",
-                "small" => "ggml-small.bin",
-                "medium" => "ggml-medium.bin",
-                "large" => "ggml-large-v3.bin",
-                _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-small.bin"
-            };
-
-            // Check bundled models in Program Files (read-only)
-            var modelPath = Path.Combine(baseDir, "whisper", modelFile);
-            if (File.Exists(modelPath))
-                return modelPath;
-
-            modelPath = Path.Combine(baseDir, modelFile);
-            if (File.Exists(modelPath))
-                return modelPath;
-
-            // Check downloaded models in LocalApplicationData (user-writable)
-            var localDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VoiceLite",
-                "whisper",
-                modelFile
-            );
-            if (File.Exists(localDataPath))
-                return localDataPath;
-
-            // No fallback - fail fast with clear error message
-            // Exception is caught by MainWindow and shown to user with reinstall instructions
-            throw new FileNotFoundException(
-                $"Whisper model '{modelFile}' not found.\n\n" +
-                $"Please download it from Settings → AI Models tab, or reinstall VoiceLite.\n\n" +
-                $"Expected locations:\n" +
-                $"- Bundled: {modelPath}\n" +
-                $"- Downloaded: {localDataPath}");
-        }
 
         private string? ResolveVADModelPath()
         {
@@ -284,8 +182,8 @@ namespace VoiceLite.Services
                 var startTime = DateTime.Now;
 
                 // Use the fastest possible settings for warmup
-                var modelPath = cachedModelPath ?? ResolveModelPath();
-                var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                var modelPath = cachedModelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel);
+                var whisperExePath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
 
                 // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
                 // Always use Speed preset for warmup (fastest possible)
@@ -372,7 +270,7 @@ namespace VoiceLite.Services
         // Backward compatibility overload
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
-            return await TranscribeAsync(audioFilePath, cachedModelPath ?? ResolveModelPath());
+            return await TranscribeAsync(audioFilePath, cachedModelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel));
         }
 
         // Interface implementation
@@ -424,8 +322,8 @@ namespace VoiceLite.Services
                 }
 
                 // Use the passed modelPath parameter, fall back to cached if empty
-                var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? ResolveModelPath());
-                var whisperExePath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel));
+                var whisperExePath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
 
                 // Build arguments using user-selected transcription preset
                 // v1.2.0: Preset-driven configuration (Speed/Balanced/Accuracy)
@@ -826,7 +724,7 @@ namespace VoiceLite.Services
         {
             try
             {
-                var whisperPath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                var whisperPath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
                 if (string.IsNullOrEmpty(whisperPath) || !File.Exists(whisperPath))
                 {
                     TranscriptionError?.Invoke(this, new FileNotFoundException("Whisper executable not found"));
@@ -845,7 +743,7 @@ namespace VoiceLite.Services
         {
             try
             {
-                var whisperPath = cachedWhisperExePath ?? ResolveWhisperExePath();
+                var whisperPath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
                 if (string.IsNullOrEmpty(whisperPath) || !File.Exists(whisperPath))
                 {
                     return "Unknown";
