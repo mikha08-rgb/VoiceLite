@@ -137,17 +137,24 @@ namespace VoiceLite.Tests.Services
             {
                 var settings = new Settings { WhisperModel = modelType };
 
-                // Should not throw during construction
                 Action act = () =>
                 {
                     using var service = new PersistentWhisperService(settings);
                 };
 
-                // If model file doesn't exist, it will throw FileNotFoundException
-                // which is expected behavior
-                if (!File.Exists(GetExpectedModelPath(modelType)))
+                var modelPath = GetExpectedModelPath(modelType);
+
+                // If model file doesn't exist in any location, should throw FileNotFoundException
+                if (!File.Exists(modelPath))
                 {
-                    act.Should().Throw<FileNotFoundException>();
+                    act.Should().Throw<FileNotFoundException>(
+                        $"model '{modelType}' doesn't exist in any checked location");
+                }
+                else
+                {
+                    // If model exists, construction should succeed without throwing
+                    act.Should().NotThrow(
+                        $"model '{modelType}' exists at {modelPath}");
                 }
             }
         }
@@ -230,10 +237,24 @@ namespace VoiceLite.Tests.Services
                 _ => "ggml-small.bin"
             };
 
+            // Check bundled models (matches PersistentWhisperService.ResolveModelPath logic)
             var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
             if (File.Exists(path)) return path;
 
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, modelFile);
+            path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, modelFile);
+            if (File.Exists(path)) return path;
+
+            // Check downloaded models in LocalApplicationData
+            var localDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite",
+                "whisper",
+                modelFile
+            );
+            if (File.Exists(localDataPath)) return localDataPath;
+
+            // Return the bundled path as default (even if not exists)
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
         }
 
         private void CreateSilentWavFile(string path, int durationSeconds)

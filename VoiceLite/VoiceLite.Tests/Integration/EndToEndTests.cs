@@ -316,6 +316,37 @@ namespace VoiceLite.Tests.Integration
             // Use unique temp file to avoid concurrent write conflicts
             var tempPath = path + $".tmp.{Guid.NewGuid()}";
 
+            // Retry logic to handle concurrent access (simulates real-world atomic write patterns)
+            const int maxRetries = 5;
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    File.WriteAllText(tempPath, json);
+                    File.Move(tempPath, path, overwrite: true);
+                    return; // Success
+                }
+                catch (IOException) when (attempt < maxRetries - 1)
+                {
+                    // File locked or access denied - retry after brief delay
+                    Thread.Sleep(10 * (attempt + 1)); // Exponential backoff: 10ms, 20ms, 30ms, 40ms
+                }
+                catch (UnauthorizedAccessException) when (attempt < maxRetries - 1)
+                {
+                    // Access denied - retry after brief delay
+                    Thread.Sleep(10 * (attempt + 1));
+                }
+                finally
+                {
+                    // Clean up temp file if it still exists
+                    if (File.Exists(tempPath))
+                    {
+                        try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }
+                    }
+                }
+            }
+
+            // Final attempt without retry
             try
             {
                 File.WriteAllText(tempPath, json);
@@ -323,7 +354,6 @@ namespace VoiceLite.Tests.Integration
             }
             finally
             {
-                // Clean up temp file if it still exists
                 if (File.Exists(tempPath))
                 {
                     try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }

@@ -19,38 +19,41 @@ namespace VoiceLite.Tests.Resources
         private readonly List<IDisposable> _disposables = new();
 
         [Fact]
-        public async Task LicenseService_MultipleInstances_ShouldNotCreateMultipleHttpClients()
+        public void LicenseService_MultipleInstances_ShouldNotCreateMultipleHttpClients()
         {
-            // Arrange - Get initial socket count
-            var initialSockets = GetActiveSocketCount();
+            // This test verifies that multiple LicenseService instances share the same static HttpClient
+            // Using reflection to check instance reuse is more reliable than measuring socket/handle counts
 
-            // Act - Create multiple LicenseService instances
+            var serviceType = typeof(LicenseService);
+            var httpClientField = serviceType.GetField("_httpClient",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            httpClientField.Should().NotBeNull("HttpClient field should exist");
+
+            // Get the static HttpClient instance before creating services
+            var httpClientBefore = httpClientField?.GetValue(null);
+
+            // Create multiple LicenseService instances
+            var services = new List<LicenseService>();
             for (int i = 0; i < 10; i++)
             {
                 var service = new LicenseService();
+                services.Add(service);
                 _disposables.Add(service);
-
-                // Try to validate a license (will fail but that's okay)
-                try
-                {
-                    await service.ValidateLicenseAsync("test-key");
-                }
-                catch { /* Expected to fail */ }
             }
 
-            // Force garbage collection
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            // Get the static HttpClient instance after creating services
+            var httpClientAfter = httpClientField?.GetValue(null);
 
-            // Assert - Socket count should not have grown significantly
-            var finalSockets = GetActiveSocketCount();
-            var socketGrowth = finalSockets - initialSockets;
+            // Assert - The same static HttpClient instance should be reused
+            httpClientBefore.Should().BeSameAs(httpClientAfter,
+                "Multiple LicenseService instances should share the same static HttpClient instance");
 
-            // With static HttpClient, growth should be minimal (< 5)
-            // With instance HttpClient, it would be 10+
-            socketGrowth.Should().BeLessThan(5,
-                "Multiple LicenseService instances should share HttpClient");
+            // Clean up
+            foreach (var service in services)
+            {
+                service.Dispose();
+            }
         }
 
         [Fact]
@@ -73,34 +76,38 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task MainWindow_TimerManagement_ShouldNotAccumulateTimers()
         {
-            // This test would require MainWindow refactoring to be testable
-            // For now, we'll create a simpler test that validates the pattern
+            // This test validates that timer cleanup works correctly
+            // Instead of measuring memory (which is non-deterministic), we verify:
+            // 1. Timers fire and clean themselves up
+            // 2. Dispose() cleans up any remaining timers
+            // 3. No timers remain after disposal
 
             // Arrange
-            var timerManager = new TimerManager(); // We'll create this helper class
-            var initialMemory = GC.GetTotalMemory(true);
+            var timerManager = new TimerManager();
 
-            // Act - Create and dispose many timers
+            // Act - Create many timers with different IDs
             for (int i = 0; i < 100; i++)
             {
                 timerManager.StartStatusTimer($"timer-{i}", "Test message", TimeSpan.FromMilliseconds(10));
-                await Task.Delay(15); // Let timer fire
+                await Task.Delay(15); // Let timer fire and self-cleanup
             }
 
-            // Clean up
+            // Allow extra time for any pending timer events to complete
+            await Task.Delay(50);
+
+            // At this point, most/all timers should have fired and cleaned themselves up
+            var activeTimersBeforeDispose = timerManager.ActiveTimerCount;
+
+            // Clean up any remaining timers
             timerManager.Dispose();
 
-            // Force GC
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            // Assert - verify cleanup worked
+            var activeTimersAfterDispose = timerManager.ActiveTimerCount;
 
-            // Assert
-            var finalMemory = GC.GetTotalMemory(true);
-            var memoryGrowth = finalMemory - initialMemory;
-
-            memoryGrowth.Should().BeLessThan(1_000_000, // Less than 1MB
-                "Timer management should not leak memory");
+            activeTimersBeforeDispose.Should().BeLessThan(10,
+                "Most timers should have self-cleaned after firing");
+            activeTimersAfterDispose.Should().Be(0,
+                "All timers should be cleaned up after Dispose()");
         }
 
         [Fact]
@@ -245,6 +252,17 @@ namespace VoiceLite.Tests.Resources
     {
         private readonly Dictionary<string, System.Timers.Timer> _timers = new();
         private readonly object _lock = new object();
+
+        public int ActiveTimerCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _timers.Count;
+                }
+            }
+        }
 
         public void StartStatusTimer(string id, string message, TimeSpan duration)
         {
