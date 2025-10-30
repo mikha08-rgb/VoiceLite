@@ -276,19 +276,9 @@ namespace VoiceLite.Services
         // Interface implementation
         public async Task<string> TranscribeAsync(string audioFilePath, string modelPath)
         {
-            if (isDisposed)
-                throw new ObjectDisposedException(nameof(PersistentWhisperService));
-
-            if (!File.Exists(audioFilePath))
-                throw new FileNotFoundException($"Audio file not found: {audioFilePath}");
-
-            // Check if file has actual audio data (not just headers)
-            var fileInfo = new FileInfo(audioFilePath);
-            if (fileInfo.Length < 100)
-            {
-                ErrorLogger.LogMessage($"TranscribeAsync: Skipping empty audio file - {audioFilePath} ({fileInfo.Length} bytes)");
+            // Validate audio file (throws on disposed/missing, returns false if empty)
+            if (!ValidateAudioFile(audioFilePath))
                 return string.Empty;
-            }
 
             // BUG FIX (CRIT-004): Track semaphore acquisition to prevent double-release
             // CRITICAL: WaitAsync must be inside try block to ensure proper cleanup in all exception paths
@@ -325,88 +315,8 @@ namespace VoiceLite.Services
                 var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel));
                 var whisperExePath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
 
-                // Build arguments using user-selected transcription preset
-                // v1.2.0: Preset-driven configuration (Speed/Balanced/Accuracy)
-                // - Speed: beam_size=1, aggressive optimizations (current v1.0.87 performance)
-                // - Balanced: beam_size=3, moderate optimizations (recommended default)
-                // - Accuracy: beam_size=5, minimal optimizations (best quality)
-                // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
-                int optimalThreads = 4; // Fixed optimal thread count
-                var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
-
-                var arguments = $"-m \"{effectiveModelPath}\" " +
-                              $"-f \"{audioFilePath}\" " +
-                              $"--threads {optimalThreads} " +
-                              $"--no-timestamps --language {settings.Language} " +
-                              $"--beam-size {presetConfig.BeamSize} " +
-                              $"--best-of {presetConfig.BestOf} " +
-                              $"--entropy-thold {presetConfig.EntropyThreshold:F1} ";
-
-                // DRAGON-LEVEL OPTIMIZATION: Temperature fallback (critical for accuracy)
-                // Dragon retries failed decoding with different parameters - we do the same
-                // Temperature fallback is "the main thing that helps with resolving repetitions and other failure cases"
-                // Add optional flags based on preset
-                if (!presetConfig.UseFallback)
-                {
-                    arguments += "--no-fallback ";
-                }
-                else
-                {
-                    // Use Whisper default temperature fallback: [0.0, 0.4, 0.8]
-                    // This allows retries with increasing randomness if initial decode fails
-                    arguments += "--temperature 0.0 --temperature-inc 0.4 ";
-                }
-
-                arguments += $"--max-context {presetConfig.MaxContext} ";
-
-                if (presetConfig.UseFlashAttention)
-                    arguments += "--flash-attn ";
-
-                // DRAGON-LEVEL OPTIMIZATION: Initial prompt (vocabulary/context adaptation)
-                // Dragon uses custom vocabularies to improve accuracy on technical terms
-                // Whisper's initial prompt serves the same purpose - guides recognition context
-                // This helps with: proper nouns, technical jargon, programming terms, brand names
-                var initialPrompt = "Transcribe the following dictation with proper capitalization and punctuation. " +
-                                   "Common terms: VoiceLite, GitHub, JavaScript, TypeScript, Python, C#, .NET, React, " +
-                                   "Node.js, API, JSON, SQL, database, function, variable, component, repository.";
-                arguments += $"--prompt \"{initialPrompt}\" ";
-
-                // VAD (Voice Activity Detection) support (v1.2.0)
-                // CRITICAL: High-quality VAD implementation using Silero VAD v5.1.2
-                // Benefits: Filters out silence/noise, improves speed and accuracy, reduces hallucinations
-                if (settings.EnableVAD)
-                {
-                    var vadModelPath = ResolveVADModelPath();
-                    if (!string.IsNullOrEmpty(vadModelPath) && File.Exists(vadModelPath))
-                    {
-                        // Validate VAD model file integrity
-                        var vadFileInfo = new FileInfo(vadModelPath);
-                        if (vadFileInfo.Length < 100000) // Silero VAD should be ~865KB
-                        {
-                            ErrorLogger.LogWarning($"VAD model file appears corrupted (size: {vadFileInfo.Length} bytes). Expected ~865KB. Disabling VAD.");
-                        }
-                        else
-                        {
-                            // Clamp threshold to safe range (0.3-0.8 validated by Silero VAD best practices)
-                            var safeThreshold = Math.Clamp(settings.VADThreshold, 0.3, 0.8);
-
-                            // TUNED VAD parameters based on Windows Voice Access behavior and Silero best practices
-                            // Key insight: We want to KEEP speech, not aggressively filter it
-                            arguments += $"--vad --vad-model \"{vadModelPath}\" " +
-                                       $"--vad-threshold {safeThreshold:F2} " +
-                                       "--vad-min-speech-duration-ms 80 " +     // 80ms: Catches short words/syllables (was 250ms - TOO HIGH!)
-                                       "--vad-min-silence-duration-ms 500 " +   // 500ms: Only split on clear pauses, not mid-phrase (was 100ms - too aggressive)
-                                       "--vad-speech-pad-ms 200";               // 200ms: Generous padding to avoid clipping word edges (was 30ms - too small)
-
-                            ErrorLogger.LogMessage($"VAD enabled with threshold {safeThreshold:F2}, model: {Path.GetFileName(vadModelPath)}");
-                        }
-                    }
-                    else
-                    {
-                        ErrorLogger.LogWarning($"VAD enabled but model not found. Transcription will continue without VAD. " +
-                                             $"Expected location: {vadModelPath ?? "unknown"}");
-                    }
-                }
+                // Build Whisper command-line arguments
+                var arguments = BuildWhisperArguments(audioFilePath, effectiveModelPath, out int optimalThreads);
 
                 // DIAGNOSTIC: Log exact whisper command with thread count
                 try
@@ -422,52 +332,9 @@ namespace VoiceLite.Services
                     // Ignore diagnostic logging failures - don't let them break transcription
                 }
 
-                var processStartInfo = new ProcessStartInfo
-                {
-                    FileName = whisperExePath,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-
+                // Execute Whisper process and capture output
                 // TIER 1.3: Assign to method-scoped variable for finally block access
-                process = new Process { StartInfo = processStartInfo };
-                var outputBuilder = new StringBuilder(4096); // PERFORMANCE: Pre-size for typical Whisper output (1-3KB)
-                var errorBuilder = new StringBuilder(512);   // PERFORMANCE: Pre-size for error messages
-
-                process.OutputDataReceived += (s, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        outputBuilder.AppendLine(e.Data);
-                    }
-                };
-
-                process.ErrorDataReceived += (s, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        errorBuilder.AppendLine(e.Data);
-                    }
-                };
-
-                process.Start();
-
-                // PERFORMANCE FIX: Use Normal priority instead of High to prevent UI thread starvation
-                // On systems with limited cores (2-4), HIGH priority Whisper can starve the UI thread
-                // causing the app to appear frozen during transcription
-                try
-                {
-                    process.PriorityClass = ProcessPriorityClass.Normal;
-                }
-                catch { }
-
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                (process, var outputBuilder, var errorBuilder) = ExecuteWhisperProcess(whisperExePath, arguments);
 
                 // Fixed timeout - fail fast instead of complex calculation
                 int timeoutSeconds = 60; // 60 seconds max
@@ -476,138 +343,11 @@ namespace VoiceLite.Services
 
                 if (!exited)
                 {
-                    // Kill the entire process tree to ensure cleanup of any child processes
-                    // Without entireProcessTree=true, orphaned whisper.exe processes can remain
-                    try
-                    {
-                        process.Kill(entireProcessTree: true);
-                        ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
-
-                        // CRIT-005 FIX: Non-blocking process termination with hard timeout
-                        // Use Task.Run to prevent UI thread hang if process is in unkillable state
-                        var waitTask = Task.Run(() =>
-                        {
-                            try
-                            {
-                                // CRIT-006 FIX: Add timeout to WaitForExit to prevent infinite hang
-                                // Previously called without timeout, could hang forever if process in zombie state
-                                return process.WaitForExit(5000); // Wait up to 5 seconds
-                            }
-                            catch
-                            {
-                                return false;
-                            }
-                        });
-
-                        // Hard timeout: 6 seconds max (5s wait + 1s margin)
-                        if (!waitTask.Wait(PROCESS_KILL_HARD_TIMEOUT_MS) || !waitTask.Result)
-                        {
-                            ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
-
-                            // Last resort: Fire-and-forget taskkill (don't wait)
-                            _ = Task.Run(() =>
-                            {
-                                try
-                                {
-                                    var taskkill = Process.Start(new ProcessStartInfo
-                                    {
-                                        FileName = "taskkill",
-                                        Arguments = $"/F /T /PID {process.Id}",
-                                        CreateNoWindow = true,
-                                        UseShellExecute = false
-                                    });
-                                    // Don't wait - fire and forget
-                                    taskkill?.Dispose();
-                                }
-                                catch (Exception taskkillEx)
-                                {
-                                    ErrorLogger.LogError("taskkill also failed", taskkillEx);
-                                }
-                            });
-                        }
-
-                    }
-                    catch (Exception killEx)
-                    {
-                        ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
-                        // Try basic kill as fallback (best effort, don't wait)
-                        try { process.Kill(); } catch { }
-                    }
-
-                    // Check if this is a first-run issue
-                    if (!isWarmedUp)
-                    {
-                        throw new TimeoutException(
-                            "First transcription timed out (this is normal on slow systems).\n\n" +
-                            "Loading the AI model for the first time can take 30-120 seconds on:\n" +
-                            "• Systems with 4GB RAM or less\n" +
-                            "• Computers with antivirus actively scanning\n" +
-                            "• Older CPUs or HDDs (vs SSDs)\n\n" +
-                            "What to try:\n" +
-                            "1. Wait a moment and try again (second attempt is usually faster)\n" +
-                            "2. Run 'Fix Antivirus Issues' from your desktop to add VoiceLite exclusions\n" +
-                            "3. Close other applications to free up RAM\n" +
-                            "4. Consider using the Tiny model in Settings (smaller, loads faster)");
-                    }
-                    else
-                    {
-                        throw new TimeoutException($"Transcription timed out after {timeoutSeconds} seconds. Please try speaking less or using a smaller model.");
-                    }
+                    HandleWhisperTimeout(process, timeoutSeconds);
                 }
 
-                // CRITICAL: Log at WARNING level so it shows in Release builds
-                ErrorLogger.LogWarning($"Whisper process exited with code: {process.ExitCode}");
-
-                if (process.ExitCode != 0)
-                {
-                    var error = errorBuilder.ToString();
-                    ErrorLogger.LogWarning($"Whisper process failed with exit code: {process.ExitCode}");
-                    if (!string.IsNullOrEmpty(error) && error.Length < 500)
-                    {
-                        // Log truncated error to avoid excessive log sizes
-                        ErrorLogger.LogWarning($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
-                    }
-                    throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
-                }
-
-                // Get raw Whisper output
-                var rawResult = outputBuilder.ToString().Trim();
-
-                // Apply text post-processing (punctuation and capitalization)
-                // IMPORTANT: Only apply if user has it enabled in settings
-                var result = rawResult;
-                if (!string.IsNullOrWhiteSpace(rawResult))
-                {
-                    try
-                    {
-                        // Apply punctuation and capitalization post-processing
-                        // Default: both enabled for better transcription quality
-                        result = TextPostProcessor.Process(rawResult,
-                            enablePunctuation: true,
-                            enableCapitalization: true);
-
-                        if (result != rawResult)
-                        {
-                            ErrorLogger.LogDebug($"Text post-processing applied: '{rawResult}' -> '{result}'");
-                        }
-                    }
-                    catch (Exception postProcessEx)
-                    {
-                        // Fallback to raw output if post-processing fails
-                        ErrorLogger.LogWarning($"Text post-processing failed, using raw output: {postProcessEx.Message}");
-                        result = rawResult;
-                    }
-                }
-
-                var totalTime = DateTime.Now - startTime;
-                ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {result.Length} chars");
-                ErrorLogger.LogWarning($"Transcription result: '{result.Substring(0, Math.Min(result.Length, 200))}'");
-
-                // PERFORMANCE: Removed redundant post-transcription warmup
-                // Background warmup only provides benefit on cold start. After first transcription,
-                // OS disk caches are already warm. This was wasting 500-2000ms CPU per transcription.
-
-                return result;
+                // Process output, apply post-processing, and return result
+                return ProcessWhisperOutput(process, outputBuilder, errorBuilder, startTime);
             }
             catch (Exception ex)
             {
@@ -686,6 +426,321 @@ namespace VoiceLite.Services
                 }
                 catch { /* Ignore if already disposed */ }
             }
+        }
+
+        /// <summary>
+        /// Processes Whisper output: validates exit code, applies text post-processing, logs results.
+        /// Returns final transcription text.
+        /// </summary>
+        private string ProcessWhisperOutput(Process process, StringBuilder outputBuilder, StringBuilder errorBuilder, DateTime startTime)
+        {
+            // CRITICAL: Log at WARNING level so it shows in Release builds
+            ErrorLogger.LogWarning($"Whisper process exited with code: {process.ExitCode}");
+
+            if (process.ExitCode != 0)
+            {
+                var error = errorBuilder.ToString();
+                ErrorLogger.LogWarning($"Whisper process failed with exit code: {process.ExitCode}");
+                if (!string.IsNullOrEmpty(error) && error.Length < 500)
+                {
+                    // Log truncated error to avoid excessive log sizes
+                    ErrorLogger.LogWarning($"Whisper error: {error.Substring(0, Math.Min(error.Length, 500))}");
+                }
+                throw new ExternalException($"Whisper process failed with exit code {process.ExitCode}", process.ExitCode);
+            }
+
+            // Get raw Whisper output
+            var rawResult = outputBuilder.ToString().Trim();
+
+            // Apply text post-processing (punctuation and capitalization)
+            // IMPORTANT: Only apply if user has it enabled in settings
+            var result = rawResult;
+            if (!string.IsNullOrWhiteSpace(rawResult))
+            {
+                try
+                {
+                    // Apply punctuation and capitalization post-processing
+                    // Default: both enabled for better transcription quality
+                    result = TextPostProcessor.Process(rawResult,
+                        enablePunctuation: true,
+                        enableCapitalization: true);
+
+                    if (result != rawResult)
+                    {
+                        ErrorLogger.LogDebug($"Text post-processing applied: '{rawResult}' -> '{result}'");
+                    }
+                }
+                catch (Exception postProcessEx)
+                {
+                    // Fallback to raw output if post-processing fails
+                    ErrorLogger.LogWarning($"Text post-processing failed, using raw output: {postProcessEx.Message}");
+                    result = rawResult;
+                }
+            }
+
+            var totalTime = DateTime.Now - startTime;
+            ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {result.Length} chars");
+            ErrorLogger.LogWarning($"Transcription result: '{result.Substring(0, Math.Min(result.Length, 200))}'");
+
+            // PERFORMANCE: Removed redundant post-transcription warmup
+            // Background warmup only provides benefit on cold start. After first transcription,
+            // OS disk caches are already warm. This was wasting 500-2000ms CPU per transcription.
+
+            return result;
+        }
+
+        /// <summary>
+        /// Handles Whisper process timeout: kills process tree, waits with hard timeout, throws TimeoutException.
+        /// </summary>
+        private void HandleWhisperTimeout(Process process, int timeoutSeconds)
+        {
+            // Kill the entire process tree to ensure cleanup of any child processes
+            // Without entireProcessTree=true, orphaned whisper.exe processes can remain
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                ErrorLogger.LogMessage($"Transcription timed out after {timeoutSeconds}s - killed process tree");
+
+                // CRIT-005 FIX: Non-blocking process termination with hard timeout
+                // Use Task.Run to prevent UI thread hang if process is in unkillable state
+                var waitTask = Task.Run(() =>
+                {
+                    try
+                    {
+                        // CRIT-006 FIX: Add timeout to WaitForExit to prevent infinite hang
+                        // Previously called without timeout, could hang forever if process in zombie state
+                        return process.WaitForExit(5000); // Wait up to 5 seconds
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                // Hard timeout: 6 seconds max (5s wait + 1s margin)
+                if (!waitTask.Wait(PROCESS_KILL_HARD_TIMEOUT_MS) || !waitTask.Result)
+                {
+                    ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
+
+                    // Last resort: Fire-and-forget taskkill (don't wait)
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            var taskkill = Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "taskkill",
+                                Arguments = $"/F /T /PID {process.Id}",
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            });
+                            // Don't wait - fire and forget
+                            taskkill?.Dispose();
+                        }
+                        catch (Exception taskkillEx)
+                        {
+                            ErrorLogger.LogError("taskkill also failed", taskkillEx);
+                        }
+                    });
+                }
+
+            }
+            catch (Exception killEx)
+            {
+                ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
+                // Try basic kill as fallback (best effort, don't wait)
+                try { process.Kill(); } catch { }
+            }
+
+            // Check if this is a first-run issue
+            if (!isWarmedUp)
+            {
+                throw new TimeoutException(
+                    "First transcription timed out (this is normal on slow systems).\n\n" +
+                    "Loading the AI model for the first time can take 30-120 seconds on:\n" +
+                    "• Systems with 4GB RAM or less\n" +
+                    "• Computers with antivirus actively scanning\n" +
+                    "• Older CPUs or HDDs (vs SSDs)\n\n" +
+                    "What to try:\n" +
+                    "1. Wait a moment and try again (second attempt is usually faster)\n" +
+                    "2. Run 'Fix Antivirus Issues' from your desktop to add VoiceLite exclusions\n" +
+                    "3. Close other applications to free up RAM\n" +
+                    "4. Consider using the Tiny model in Settings (smaller, loads faster)");
+            }
+            else
+            {
+                throw new TimeoutException($"Transcription timed out after {timeoutSeconds} seconds. Please try speaking less or using a smaller model.");
+            }
+        }
+
+        /// <summary>
+        /// Creates, configures, and starts Whisper process with output/error capture.
+        /// Returns tuple of (process, outputBuilder, errorBuilder).
+        /// </summary>
+        private (Process process, StringBuilder outputBuilder, StringBuilder errorBuilder) ExecuteWhisperProcess(string whisperExePath, string arguments)
+        {
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = whisperExePath,
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            var process = new Process { StartInfo = processStartInfo };
+            var outputBuilder = new StringBuilder(4096); // PERFORMANCE: Pre-size for typical Whisper output (1-3KB)
+            var errorBuilder = new StringBuilder(512);   // PERFORMANCE: Pre-size for error messages
+
+            process.OutputDataReceived += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    outputBuilder.AppendLine(e.Data);
+                }
+            };
+
+            process.ErrorDataReceived += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    errorBuilder.AppendLine(e.Data);
+                }
+            };
+
+            process.Start();
+
+            // PERFORMANCE FIX: Use Normal priority instead of High to prevent UI thread starvation
+            // On systems with limited cores (2-4), HIGH priority Whisper can starve the UI thread
+            // causing the app to appear frozen during transcription
+            try
+            {
+                process.PriorityClass = ProcessPriorityClass.Normal;
+            }
+            catch { }
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            return (process, outputBuilder, errorBuilder);
+        }
+
+        /// <summary>
+        /// Builds Whisper command-line arguments with preset configuration, VAD support, and optimizations.
+        /// </summary>
+        private string BuildWhisperArguments(string audioFilePath, string effectiveModelPath, out int threadCount)
+        {
+            // Build arguments using user-selected transcription preset
+            // v1.2.0: Preset-driven configuration (Speed/Balanced/Accuracy)
+            // - Speed: beam_size=1, aggressive optimizations (current v1.0.87 performance)
+            // - Balanced: beam_size=3, moderate optimizations (recommended default)
+            // - Accuracy: beam_size=5, minimal optimizations (best quality)
+            // PERFORMANCE FIX: Use 4 threads instead of ProcessorCount/2 to avoid thread contention
+            int optimalThreads = 4; // Fixed optimal thread count
+            threadCount = optimalThreads;
+            var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
+
+            var arguments = $"-m \"{effectiveModelPath}\" " +
+                          $"-f \"{audioFilePath}\" " +
+                          $"--threads {optimalThreads} " +
+                          $"--no-timestamps --language {settings.Language} " +
+                          $"--beam-size {presetConfig.BeamSize} " +
+                          $"--best-of {presetConfig.BestOf} " +
+                          $"--entropy-thold {presetConfig.EntropyThreshold:F1} ";
+
+            // DRAGON-LEVEL OPTIMIZATION: Temperature fallback (critical for accuracy)
+            // Dragon retries failed decoding with different parameters - we do the same
+            // Temperature fallback is "the main thing that helps with resolving repetitions and other failure cases"
+            // Add optional flags based on preset
+            if (!presetConfig.UseFallback)
+            {
+                arguments += "--no-fallback ";
+            }
+            else
+            {
+                // Use Whisper default temperature fallback: [0.0, 0.4, 0.8]
+                // This allows retries with increasing randomness if initial decode fails
+                arguments += "--temperature 0.0 --temperature-inc 0.4 ";
+            }
+
+            arguments += $"--max-context {presetConfig.MaxContext} ";
+
+            if (presetConfig.UseFlashAttention)
+                arguments += "--flash-attn ";
+
+            // DRAGON-LEVEL OPTIMIZATION: Initial prompt (vocabulary/context adaptation)
+            // Dragon uses custom vocabularies to improve accuracy on technical terms
+            // Whisper's initial prompt serves the same purpose - guides recognition context
+            // This helps with: proper nouns, technical jargon, programming terms, brand names
+            var initialPrompt = "Transcribe the following dictation with proper capitalization and punctuation. " +
+                               "Common terms: VoiceLite, GitHub, JavaScript, TypeScript, Python, C#, .NET, React, " +
+                               "Node.js, API, JSON, SQL, database, function, variable, component, repository.";
+            arguments += $"--prompt \"{initialPrompt}\" ";
+
+            // VAD (Voice Activity Detection) support (v1.2.0)
+            // CRITICAL: High-quality VAD implementation using Silero VAD v5.1.2
+            // Benefits: Filters out silence/noise, improves speed and accuracy, reduces hallucinations
+            if (settings.EnableVAD)
+            {
+                var vadModelPath = ResolveVADModelPath();
+                if (!string.IsNullOrEmpty(vadModelPath) && File.Exists(vadModelPath))
+                {
+                    // Validate VAD model file integrity
+                    var vadFileInfo = new FileInfo(vadModelPath);
+                    if (vadFileInfo.Length < 100000) // Silero VAD should be ~865KB
+                    {
+                        ErrorLogger.LogWarning($"VAD model file appears corrupted (size: {vadFileInfo.Length} bytes). Expected ~865KB. Disabling VAD.");
+                    }
+                    else
+                    {
+                        // Clamp threshold to safe range (0.3-0.8 validated by Silero VAD best practices)
+                        var safeThreshold = Math.Clamp(settings.VADThreshold, 0.3, 0.8);
+
+                        // TUNED VAD parameters based on Windows Voice Access behavior and Silero best practices
+                        // Key insight: We want to KEEP speech, not aggressively filter it
+                        arguments += $"--vad --vad-model \"{vadModelPath}\" " +
+                                   $"--vad-threshold {safeThreshold:F2} " +
+                                   "--vad-min-speech-duration-ms 80 " +     // 80ms: Catches short words/syllables (was 250ms - TOO HIGH!)
+                                   "--vad-min-silence-duration-ms 500 " +   // 500ms: Only split on clear pauses, not mid-phrase (was 100ms - too aggressive)
+                                   "--vad-speech-pad-ms 200";               // 200ms: Generous padding to avoid clipping word edges (was 30ms - too small)
+
+                        ErrorLogger.LogMessage($"VAD enabled with threshold {safeThreshold:F2}, model: {Path.GetFileName(vadModelPath)}");
+                    }
+                }
+                else
+                {
+                    ErrorLogger.LogWarning($"VAD enabled but model not found. Transcription will continue without VAD. " +
+                                         $"Expected location: {vadModelPath ?? "unknown"}");
+                }
+            }
+
+            return arguments;
+        }
+
+        /// <summary>
+        /// Validates audio file exists and has content. Throws on disposed service or missing file.
+        /// Returns false if file is too small (likely empty).
+        /// </summary>
+        private bool ValidateAudioFile(string audioFilePath)
+        {
+            if (isDisposed)
+                throw new ObjectDisposedException(nameof(PersistentWhisperService));
+
+            if (!File.Exists(audioFilePath))
+                throw new FileNotFoundException($"Audio file not found: {audioFilePath}");
+
+            // Check if file has actual audio data (not just headers)
+            var fileInfo = new FileInfo(audioFilePath);
+            if (fileInfo.Length < 100)
+            {
+                ErrorLogger.LogMessage($"TranscribeAsync: Skipping empty audio file - {audioFilePath} ({fileInfo.Length} bytes)");
+                return false;
+            }
+
+            return true;
         }
 
         private void CleanupProcess()
