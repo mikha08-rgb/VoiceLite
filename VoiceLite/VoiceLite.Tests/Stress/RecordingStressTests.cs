@@ -145,7 +145,7 @@ namespace VoiceLite.Tests.Stress
         }
 
         [Fact(Skip = "Stress test - run manually with: dotnet test --filter Category=Stress")]
-        public async Task StressTest_StartStopWithoutRecording_NoLeaks()
+        public void StressTest_StartStopWithoutRecording_NoLeaks()
         {
             // Arrange - Test edge case: start immediately followed by stop (no recording time)
             const int cycles = 100;

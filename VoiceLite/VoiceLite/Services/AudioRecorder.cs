@@ -138,7 +138,8 @@ namespace VoiceLite.Services
                     if (waveIn.WaveFormat != null) // Check if device is initialized
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(NAUDIO_BUFFER_FLUSH_DELAY_MS);
+                        // NAudio hardware buffer flush - use Task.Delay for non-blocking wait
+                        Task.Delay(NAUDIO_BUFFER_FLUSH_DELAY_MS).Wait();
                     }
                 }
                 catch (Exception ex)
@@ -531,7 +532,8 @@ namespace VoiceLite.Services
                     try
                     {
                         waveIn.StopRecording();
-                        Thread.Sleep(STOP_COMPLETION_DELAY_MS);
+                        // Brief pause for NAudio to complete stop operation
+                        Task.Delay(STOP_COMPLETION_DELAY_MS).Wait();
 
                         // Detach handlers before disposal
                         if (eventHandlersAttached)
@@ -720,8 +722,8 @@ namespace VoiceLite.Services
                     waveIn?.StopRecording();
                 }
 
-                // Minimal delay for cleanup
-                Thread.Sleep(10);
+                // Minimal delay for cleanup - allow NAudio to finalize state
+                Task.Delay(10).Wait();
 
                 // Dispose wave file
                 waveFile?.Dispose();

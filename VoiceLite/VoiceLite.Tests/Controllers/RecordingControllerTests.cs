@@ -143,10 +143,10 @@ namespace VoiceLite.Tests.Controllers
         }
 
         [Fact]
-        public void Cancel_ShouldStopRecordingAndTranscription()
+        public async Task Cancel_ShouldStopRecordingAndTranscription()
         {
             // Arrange
-            _controller.StartRecordingAsync().Wait();
+            await _controller.StartRecordingAsync();
 
             // Act
             _controller.Cancel();

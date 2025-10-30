@@ -153,7 +153,7 @@ namespace VoiceLite.Tests.ViewModels
         }
 
         [Fact]
-        public void ProFeatureService_ShouldReflectProStatus()
+        public async Task ProFeatureService_ShouldReflectProStatus()
         {
             // Arrange & Act - Free user
             _mockProFeatureService.Setup(x => x.IsProUser).Returns(false);
@@ -167,7 +167,7 @@ namespace VoiceLite.Tests.ViewModels
             var proViewModel = CreateViewModel();
 
             // Wait for initialization
-            Task.Delay(100).Wait();
+            await Task.Delay(100);
 
             // Assert - ProFeatureService reflects pro status
             _mockProFeatureService.Object.IsProUser.Should().BeTrue();
@@ -243,7 +243,7 @@ namespace VoiceLite.Tests.ViewModels
         }
 
         [Fact(Skip = "Requires Dispatcher which is not available in test context")]
-        public void OnHistoryItemAdded_ShouldAddToTranscriptionHistory()
+        public async Task OnHistoryItemAdded_ShouldAddToTranscriptionHistory()
         {
             // Arrange
             var item = new TranscriptionItem
@@ -257,7 +257,7 @@ namespace VoiceLite.Tests.ViewModels
             _mockHistoryService.Raise(x => x.ItemAdded += null, _mockHistoryService.Object, item);
 
             // Need to wait for dispatcher
-            Task.Delay(100).Wait();
+            await Task.Delay(100);
 
             // Assert
             // Note: Dispatcher.Invoke requires proper STA thread setup

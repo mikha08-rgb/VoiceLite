@@ -33,6 +33,27 @@ namespace VoiceLite.Services
         private static bool _integrityWarningLogged = false;
         private volatile bool isProcessing = false;
 
+        // Timeout constants for process lifecycle management
+        /// <summary>
+        /// Maximum time to wait for process disposal (2 seconds).
+        /// Prevents indefinite hangs when disposing whisper.exe process.
+        /// </summary>
+        private const int PROCESS_DISPOSAL_TIMEOUT_MS = 2000;
+
+        /// <summary>
+        /// Hard timeout for killing unkillable processes (6 seconds).
+        /// Last resort timeout when process refuses to terminate after Kill().
+        /// Includes 5s wait + 1s margin before forcing taskkill.
+        /// </summary>
+        private const int PROCESS_KILL_HARD_TIMEOUT_MS = 6000;
+
+        /// <summary>
+        /// Maximum time to wait for disposal completion (5 seconds).
+        /// Non-blocking wait for background tasks to complete during service disposal.
+        /// Prevents UI thread hangs during application shutdown.
+        /// </summary>
+        private const int DISPOSAL_COMPLETION_TIMEOUT_SECONDS = 5;
+
         // Interface implementation properties and events
         public bool IsProcessing => isProcessing;
 #pragma warning disable CS0067 // Event is never used - kept for interface compatibility
@@ -581,7 +602,7 @@ namespace VoiceLite.Services
                         });
 
                         // Hard timeout: 6 seconds max (5s wait + 1s margin)
-                        if (!waitTask.Wait(6000) || !waitTask.Result)
+                        if (!waitTask.Wait(PROCESS_KILL_HARD_TIMEOUT_MS) || !waitTask.Result)
                         {
                             ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
 
@@ -719,7 +740,7 @@ namespace VoiceLite.Services
                         });
 
                         // Wait up to 2 seconds for disposal
-                        if (!disposeTask.Wait(2000))
+                        if (!disposeTask.Wait(PROCESS_DISPOSAL_TIMEOUT_MS))
                         {
                             ErrorLogger.LogWarning("Process disposal timed out after 2 seconds - potential zombie process");
                             // Process becomes zombie but app continues - better than hanging forever
@@ -874,7 +895,7 @@ namespace VoiceLite.Services
             // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
             // Old approach: Thread.Sleep(200) blocks UI thread
             // New approach: Efficient signaling with max 5-second timeout
-            disposalComplete.Wait(TimeSpan.FromSeconds(5));
+            disposalComplete.Wait(TimeSpan.FromSeconds(DISPOSAL_COMPLETION_TIMEOUT_SECONDS));
 
             CleanupProcess();
 
