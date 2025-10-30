@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LicenseType } from '@prisma/client';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { upsertLicenseFromStripe, recordLicenseEvent } from '@/lib/licensing';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  // Authenticate admin request
+  if (!isAdminAuthenticated(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { email, paymentIntentId, customerId } = body;

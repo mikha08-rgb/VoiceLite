@@ -116,20 +116,49 @@ export async function recordLicenseActivation({
   machineLabel?: string;
   machineHash?: string;
 }) {
-  return prisma.licenseActivation.upsert({
+  // Check if this is an existing activation (re-validation)
+  const existing = await prisma.licenseActivation.findUnique({
     where: {
       licenseId_machineId: {
         licenseId,
         machineId,
       },
     },
-    update: {
-      machineLabel,
-      machineHash,
-      lastValidatedAt: new Date(),
+  });
+
+  if (existing) {
+    // Update existing activation
+    return prisma.licenseActivation.update({
+      where: {
+        licenseId_machineId: {
+          licenseId,
+          machineId,
+        },
+      },
+      data: {
+        machineLabel,
+        machineHash,
+        lastValidatedAt: new Date(),
+        status: LicenseActivationStatus.ACTIVE,
+      },
+    });
+  }
+
+  // New activation - check 3-device limit
+  const activeCount = await prisma.licenseActivation.count({
+    where: {
+      licenseId,
       status: LicenseActivationStatus.ACTIVE,
     },
-    create: {
+  });
+
+  if (activeCount >= 3) {
+    throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
+  }
+
+  // Create new activation
+  return prisma.licenseActivation.create({
+    data: {
       licenseId,
       machineId,
       machineLabel,

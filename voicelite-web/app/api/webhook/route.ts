@@ -48,11 +48,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Idempotency check with atomic create to prevent race conditions
+  // Idempotency check with transaction to prevent race conditions
   // Use unique constraint on eventId to ensure only one webhook processes this event
+  let isNewEvent = false;
   try {
-    await prisma.webhookEvent.create({
-      data: { eventId: event.id },
+    await prisma.$transaction(async (tx) => {
+      // Try to claim this event atomically
+      await tx.webhookEvent.create({
+        data: { eventId: event.id },
+      });
+      isNewEvent = true;
     });
   } catch (error: any) {
     // P2002 = Unique constraint violation = event already processed
@@ -62,6 +67,11 @@ export async function POST(request: NextRequest) {
     }
     // Other errors should be thrown
     throw error;
+  }
+
+  // Double-check that we claimed the event
+  if (!isNewEvent) {
+    return NextResponse.json({ received: true, cached: true });
   }
 
   try {

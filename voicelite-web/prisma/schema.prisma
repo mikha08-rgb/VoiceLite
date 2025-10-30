@@ -63,6 +63,7 @@ model LicenseActivation {
   @@unique([licenseId, machineId])
   @@index([licenseId])
   @@index([status]) // For activation counting queries
+  @@index([licenseId, status]) // Composite index for efficient activation count queries (WHERE licenseId = X AND status = 'ACTIVE')
   @@index([machineHash]) // For duplicate machine detection
 }
 

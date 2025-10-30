@@ -100,7 +100,10 @@ namespace VoiceLite.Services
 
                 var request = new
                 {
-                    licenseKey = licenseKey.Trim()
+                    licenseKey = licenseKey.Trim(),
+                    machineId = HardwareIdService.GetMachineId(),
+                    machineLabel = HardwareIdService.GetMachineLabel(),
+                    machineHash = HardwareIdService.GetMachineHash()
                 };
 
                 var json = JsonSerializer.Serialize(request);
@@ -133,6 +136,22 @@ namespace VoiceLite.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    // 403 = Activation limit reached
+                    if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    {
+                        var errorBody = await response.Content.ReadAsStringAsync();
+                        var errorResult = JsonSerializer.Deserialize<ValidationResponse>(errorBody, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                        return new LicenseValidationResult
+                        {
+                            IsValid = false,
+                            ErrorMessage = errorResult?.Error ?? "Maximum device activations reached (3 devices). Please deactivate a device to continue."
+                        };
+                    }
+
                     return new LicenseValidationResult
                     {
                         IsValid = false,
@@ -159,14 +178,21 @@ namespace VoiceLite.Services
                 {
                     IsValid = result.Valid,
                     Tier = result.Tier ?? "free",
-                    ErrorMessage = result.Valid ? null : "Invalid or expired license key"
+                    ErrorMessage = result.Valid ? null : (result.Error ?? "Invalid or expired license key")
                 };
+
+                // Update activation counts from response
+                if (result.Valid && result.License != null)
+                {
+                    _activationCount = result.License.ActivationsUsed;
+                    _maxActivations = result.License.MaxActivations;
+                }
 
                 // PHASE 3 - DAY 1: Cache successful validation result (forever - lifetime licenses)
                 if (result.Valid)
                 {
                     _cachedValidationResult = validationResult;
-                    ErrorLogger.LogMessage($"License validation succeeded - cached permanently (lifetime license)");
+                    ErrorLogger.LogMessage($"License validation succeeded - cached permanently (lifetime license). Activations: {_activationCount}/{_maxActivations}");
                 }
 
                 return validationResult;
@@ -274,6 +300,16 @@ namespace VoiceLite.Services
         {
             public bool Valid { get; set; }
             public string? Tier { get; set; }
+            public string? Error { get; set; }
+            public LicenseInfo? License { get; set; }
+        }
+
+        private class LicenseInfo
+        {
+            public string? Type { get; set; }
+            public DateTime? ExpiresAt { get; set; }
+            public int ActivationsUsed { get; set; }
+            public int MaxActivations { get; set; }
         }
     }
 

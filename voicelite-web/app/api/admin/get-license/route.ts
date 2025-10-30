@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 // Temporary admin endpoint to get license by email
 export async function POST(request: NextRequest) {
+  // Authenticate admin request
+  if (!isAdminAuthenticated(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { email, sendEmail } = await request.json();
 

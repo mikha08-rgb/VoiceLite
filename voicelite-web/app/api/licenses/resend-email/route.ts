@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { prisma } from '@/lib/prisma';
 import { recordLicenseEvent } from '@/lib/licensing';
+import { emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit';
 
 import { LicenseStatus } from '@prisma/client';
 /**
@@ -14,6 +15,31 @@ import { LicenseStatus } from '@prisma/client';
  * Body: { email: string } or { licenseKey: string }
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting by IP to prevent enumeration attacks
+  const ip = request.headers.get('x-forwarded-for')?.split(',').pop()?.trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown';
+
+  // Check rate limit
+  if (emailResendRateLimit) {
+    const { success } = await emailResendRateLimit.limit(ip);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+  } else {
+    // Fallback to in-memory rate limiter
+    const allowed = await fallbackEmailResendLimit.check(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+  }
+
   try {
     const body = await request.json();
     const { email, licenseKey } = body;
@@ -35,21 +61,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Use generic message to prevent email enumeration
     if (!license) {
       return NextResponse.json(
-        { error: 'License not found' },
-        { status: 404 }
+        {
+          success: true,
+          message: 'If this license exists, an email will be sent shortly.'
+        },
+        { status: 200 }
       );
     }
 
-    // Check if license is active
+    // Check if license is active (but still return generic message)
     if (license.status !== LicenseStatus.ACTIVE) {
       return NextResponse.json(
         {
-          error: `Cannot resend email for ${license.status} license`,
-          status: license.status
+          success: true,
+          message: 'If this license exists, an email will be sent shortly.'
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 

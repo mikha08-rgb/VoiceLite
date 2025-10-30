@@ -73,6 +73,19 @@ export const profileRateLimit = redis
   : null;
 
 /**
+ * Email resend rate limiter: 3 requests per hour per IP
+ * Used for /api/licenses/resend-email to prevent enumeration and spam
+ */
+export const emailResendRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(3, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:email-resend',
+    })
+  : null;
+
+/**
  * Helper to check rate limit and return appropriate response
  * @param identifier - User identifier (email, userId, etc.)
  * @param limiter - Rate limiter instance
@@ -152,6 +165,7 @@ class InMemoryRateLimiter {
 export const fallbackEmailLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
 export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
+export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
 
 // Cleanup fallback limiters every 10 minutes
 if (!isConfigured) {
@@ -159,5 +173,6 @@ if (!isConfigured) {
     fallbackEmailLimit.cleanup();
     fallbackOtpLimit.cleanup();
     fallbackLicenseLimit.cleanup();
+    fallbackEmailResendLimit.cleanup();
   }, 10 * 60 * 1000);
 }

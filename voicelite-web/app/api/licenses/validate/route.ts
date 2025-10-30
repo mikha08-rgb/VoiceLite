@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/ratelimit';
+import { recordLicenseActivation } from '@/lib/licensing';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
 const bodySchema = z.object({
   licenseKey: z.string().min(10),
+  machineId: z.string().min(10).max(100).optional(), // Required for device tracking
+  machineLabel: z.string().max(255).optional(), // e.g., "John's Desktop"
+  machineHash: z.string().max(64).optional(), // SHA-256 of hardware IDs
 });
 
 // Rate limiter: 5 validation attempts per hour per IP
@@ -47,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { licenseKey } = bodySchema.parse(body);
+    const { licenseKey, machineId, machineLabel, machineHash } = bodySchema.parse(body);
 
     // Look up license in database
     const license = await prisma.license.findUnique({
@@ -57,6 +61,9 @@ export async function POST(request: NextRequest) {
         status: true,
         type: true,
         expiresAt: true,
+        activations: {
+          where: { status: 'ACTIVE' },
+        },
       },
     });
 
@@ -68,6 +75,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // If machineId provided, record activation (enforces 3-device limit)
+    if (machineId) {
+      try {
+        await recordLicenseActivation({
+          licenseId: license.id,
+          machineId,
+          machineLabel,
+          machineHash,
+        });
+      } catch (error: any) {
+        // Check if it's the activation limit error
+        if (error.message && error.message.startsWith('ACTIVATION_LIMIT_REACHED')) {
+          return NextResponse.json({
+            valid: false,
+            tier: 'free',
+            error: 'Maximum 3 device activations reached. Deactivate a device in your account to continue.',
+            activationsUsed: 3,
+            maxActivations: 3,
+          }, { status: 403 });
+        }
+        throw error; // Re-throw other errors
+      }
+    }
+
     // License is valid!
     return NextResponse.json({
       valid: true,
@@ -75,6 +106,8 @@ export async function POST(request: NextRequest) {
       license: {
         type: license.type,
         expiresAt: license.expiresAt,
+        activationsUsed: license.activations.length,
+        maxActivations: 3,
       },
     });
   } catch (error) {
