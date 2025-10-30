@@ -198,9 +198,10 @@ namespace VoiceLite.Services
                 if ((style & ES_PASSWORD) == ES_PASSWORD)
                     return true;
             }
-            catch
+            catch (Exception ex)
             {
                 // If detection fails, err on the side of caution
+                ErrorLogger.LogDebug($"Secure field detection failed: {ex.Message}");
                 return false;
             }
 
@@ -351,15 +352,9 @@ namespace VoiceLite.Services
                         break;
                     }
                 }
-                catch (Exception
-#if DEBUG
-                ex
-#endif
-                )
+                catch (Exception ex)
                 {
-#if DEBUG
-                    ErrorLogger.LogMessage($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
-#endif
+                    ErrorLogger.LogWarning($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
                     if (attempt < 1)
                         Thread.Sleep(CLIPBOARD_RETRY_DELAY_MS);
                 }
@@ -426,22 +421,14 @@ namespace VoiceLite.Services
 #endif
                                         break;
                                     }
-                                    catch (Exception
-#if DEBUG
-                                    ex
-#endif
-                                    )
+                                    catch (Exception ex)
                                     {
-#if DEBUG
-                                        ErrorLogger.LogMessage($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
-#endif
+                                        ErrorLogger.LogWarning($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
                                         if (attempt < 1)
                                             await Task.Delay(CLIPBOARD_SETTLE_DELAY_MS);
                                         else
                                         {
-#if DEBUG
-                                            ErrorLogger.LogMessage("WARNING: Failed to restore original clipboard content after 2 attempts");
-#endif
+                                            ErrorLogger.LogWarning("Failed to restore original clipboard content after 2 attempts");
                                         }
                                     }
                                 }

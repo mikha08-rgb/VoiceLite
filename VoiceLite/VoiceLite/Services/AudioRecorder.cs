@@ -144,7 +144,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogMessage($"DisposeWaveInCompletely: Error stopping recording - {ex.Message}");
+                    ErrorLogger.LogError("DisposeWaveInCompletely: Error stopping recording", ex);
                 }
 
                 // CRITICAL: Dispose the device completely to clear all internal NAudio buffers
@@ -155,7 +155,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogMessage($"DisposeWaveInCompletely: Error disposing waveIn - {ex.Message}");
+                    ErrorLogger.LogError("DisposeWaveInCompletely: Error disposing waveIn", ex);
                 }
 
                 waveIn = null;
@@ -172,7 +172,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogMessage($"DisposeWaveInCompletely: Error disposing wave file - {ex.Message}");
+                    ErrorLogger.LogError("DisposeWaveInCompletely: Error disposing wave file", ex);
                 }
                 waveFile = null;
             }
@@ -202,7 +202,7 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogMessage($"CleanupRecordingState: Error during cleanup - {ex.Message}");
+                ErrorLogger.LogError("CleanupRecordingState: Error during cleanup", ex);
             }
         }
 
@@ -512,13 +512,13 @@ namespace VoiceLite.Services
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogMessage($"StopRecording: Error disposing wave file - {ex.Message}");
+                        ErrorLogger.LogError("StopRecording: Error disposing wave file", ex);
 
                         // CRITICAL: Ensure cleanup even on error
                         waveFile = null;
                         if (audioMemoryStream != null)
                         {
-                            try { audioMemoryStream.Dispose(); } catch (Exception streamEx) { ErrorLogger.LogWarning($"Failed to dispose memory stream in error handler: {streamEx.Message}"); }
+                            try { audioMemoryStream.Dispose(); } catch (Exception streamEx) { ErrorLogger.LogError("Failed to dispose memory stream in error handler", streamEx); }
                             audioMemoryStream = null;
                         }
                     }
@@ -550,7 +550,7 @@ namespace VoiceLite.Services
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogMessage($"StopRecording: Error disposing waveIn - {ex.Message}");
+                        ErrorLogger.LogError("StopRecording: Error disposing waveIn", ex);
                         // Force cleanup even if there's an error
                         waveIn = null;
                         eventHandlersAttached = false;
@@ -572,7 +572,7 @@ namespace VoiceLite.Services
                     else
                     {
                         ErrorLogger.LogMessage($"StopRecording: Skipping empty recording - {audioFileToNotify} (size: {fileInfo.Length} bytes)");
-                        try { File.Delete(audioFileToNotify); } catch (Exception delEx) { ErrorLogger.LogWarning($"Failed to delete empty audio file: {delEx.Message}"); }
+                        try { File.Delete(audioFileToNotify); } catch (Exception delEx) { ErrorLogger.LogError("Failed to delete empty audio file", delEx); }
                     }
                 }
 

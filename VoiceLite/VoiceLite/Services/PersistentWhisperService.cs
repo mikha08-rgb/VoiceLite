@@ -226,7 +226,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogMessage($"Failed to set Whisper warmup process priority: {ex.Message}");
+                    ErrorLogger.LogWarning($"Failed to set Whisper warmup process priority: {ex.Message}");
                 }
 
                 await process.WaitForExitAsync();
@@ -473,7 +473,7 @@ namespace VoiceLite.Services
                 catch (Exception postProcessEx)
                 {
                     // Fallback to raw output if post-processing fails
-                    ErrorLogger.LogWarning($"Text post-processing failed, using raw output: {postProcessEx.Message}");
+                    ErrorLogger.LogError("Text post-processing failed, using raw output", postProcessEx);
                     result = rawResult;
                 }
             }
@@ -620,7 +620,10 @@ namespace VoiceLite.Services
             {
                 process.PriorityClass = ProcessPriorityClass.Normal;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to set Whisper process priority: {ex.Message}");
+            }
 
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -824,8 +827,9 @@ namespace VoiceLite.Services
                     return string.IsNullOrWhiteSpace(output) ? "Unknown" : output.Trim();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                ErrorLogger.LogWarning($"Failed to get Whisper version: {ex.Message}");
                 return "Unknown";
             }
         }
