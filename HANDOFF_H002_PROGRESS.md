@@ -2,8 +2,8 @@
 
 **Date**: 2025-10-31
 **Branch**: test-reliability-improvements
-**Context**: 62% (123k/200k tokens used)
-**Status**: Phases 1-2 complete, ready for phases 3-5
+**Context**: 69% (138k/200k tokens used)
+**Status**: Phases 1-3 complete, ready for phases 4-5
 
 ---
 
@@ -12,8 +12,9 @@
 ```bash
 git status
 # Branch: test-reliability-improvements
-# 10 commits ahead of origin
+# 12 commits ahead of origin
 # Last commits:
+#   a22aabf - H-002 Phase 3: StatusViewModel
 #   049200e - H-002 Phase 2: HistoryViewModel
 #   9073c28 - H-002 Phase 1: RecordingViewModel
 #   4352933 - H-002 analysis document
@@ -27,6 +28,7 @@ dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 ls VoiceLite/VoiceLite/Presentation/ViewModels/
 # RecordingViewModel.cs (200 lines)
 # HistoryViewModel.cs (250 lines)
+# StatusViewModel.cs (112 lines)
 ```
 
 ---
@@ -51,13 +53,15 @@ ls VoiceLite/VoiceLite/Presentation/ViewModels/
 - Wired into MainWindow
 - All tests passing
 
-### ⏸️ Remaining Phases
+**Phase 3: StatusViewModel (commit a22aabf)**
+- Extracted status display logic
+- Properties: StatusText, StatusTextColor, StatusIndicatorFill, StatusIndicatorOpacity
+- Methods: UpdateStatus(text, color), SetReady(), SetRecording(), SetProcessing(), SetError()
+- Wired into MainWindow with PropertyChanged handler for UI sync (temporary until phase 4)
+- All UpdateStatus calls delegate to ViewModel
+- All tests passing
 
-**Phase 3: StatusViewModel (~1h, ~15k tokens)**
-- Extract status text/color management
-- Properties: StatusText, StatusTextColor, StatusIndicatorColor
-- Methods: UpdateStatus(text, color)
-- Simple extraction, minimal risk
+### ⏸️ Remaining Phases
 
 **Phase 4: Slim MainWindow + XAML Bindings (~4h, complex)**
 - Update MainWindow.xaml to bind to ViewModels
@@ -79,18 +83,21 @@ ls VoiceLite/VoiceLite/Presentation/ViewModels/
 ### Files Modified
 
 **VoiceLite/VoiceLite/MainWindow.xaml.cs:**
-- Added recordingViewModel and historyViewModel fields
-- Wired 8 event handlers total:
+- Added recordingViewModel, historyViewModel, and statusViewModel fields
+- Wired 8 event handlers from ViewModels:
   - OnRecordingStartRequested, OnRecordingStopRequested
   - OnClearHistoryRequested, OnClearAllHistoryRequested
   - OnCopyToClipboardRequested, OnDeleteItemRequested
   - OnReInjectRequested, OnSearchTextChanged
+- Added PropertyChanged handler for statusViewModel → UI sync (temporary)
 - Synced ViewModel state in StartRecording/StopRecording
+- UpdateStatus method delegates to statusViewModel.UpdateStatus
 - **Still 2657 lines** (reduction happens in phase 4)
 
 **New Files Created:**
 - `VoiceLite/VoiceLite/Presentation/ViewModels/RecordingViewModel.cs` (200 lines)
 - `VoiceLite/VoiceLite/Presentation/ViewModels/HistoryViewModel.cs` (250 lines)
+- `VoiceLite/VoiceLite/Presentation/ViewModels/StatusViewModel.cs` (112 lines)
 
 ### Tests Status
 - ✅ 311/311 passing (0 failures, 42 skipped)
@@ -408,19 +415,13 @@ MainWindow ← event → ViewModel
 
 ## Success Criteria
 
-### Phases 1-2 (✅ COMPLETE)
+### Phases 1-3 (✅ COMPLETE)
 - [x] RecordingViewModel created and wired
 - [x] HistoryViewModel created and wired
+- [x] StatusViewModel created and wired
 - [x] All 311 tests passing
 - [x] 0 build warnings/errors
 - [x] Commits created with clear messages
-
-### Phase 3 (⏸️ NEXT)
-- [ ] StatusViewModel created
-- [ ] Integrated into MainWindow
-- [ ] All UpdateStatus calls use ViewModel
-- [ ] Tests passing
-- [ ] Commit created
 
 ### Phase 4 (⏸️ PENDING)
 - [ ] XAML bindings updated
@@ -443,9 +444,10 @@ MainWindow ← event → ViewModel
 **Branch Status:**
 ```bash
 # Current branch
-test-reliability-improvements (10 commits ahead)
+test-reliability-improvements (12 commits ahead)
 
 # Recent commits
+a22aabf refactor: extract StatusViewModel (H-002 Phase 3)
 049200e refactor: extract HistoryViewModel (H-002 Phase 2)
 9073c28 refactor: extract RecordingViewModel (H-002 Phase 1)
 4352933 docs: H-002 MVVM extraction analysis
@@ -456,19 +458,20 @@ test-reliability-improvements (10 commits ahead)
 - ✅ M-007: Error handling standardization
 - ✅ H-002 Phase 1: RecordingViewModel
 - ✅ H-002 Phase 2: HistoryViewModel
+- ✅ H-002 Phase 3: StatusViewModel
 
 **Ready for:**
-- Phase 3: StatusViewModel (~1h)
-- Phase 4: XAML bindings (~4h, complex)
-- Phase 5: Testing (~2h)
+- Phase 4: XAML bindings (~4h, complex, HIGH RISK)
+- Phase 5: Testing & polish (~2h)
 
 **Files to Review:**
-- `RecordingViewModel.cs` - reference for pattern
-- `HistoryViewModel.cs` - reference for pattern
-- `MainWindow.xaml.cs` - see event handler wiring
-- `MainWindow.xaml` - will need updates in phase 4
+- `RecordingViewModel.cs` - reference for pattern (200 lines)
+- `HistoryViewModel.cs` - reference for pattern (250 lines)
+- `StatusViewModel.cs` - reference for pattern (112 lines)
+- `MainWindow.xaml.cs` - see event handler wiring + PropertyChanged sync
+- `MainWindow.xaml` - will need updates in phase 4 (XAML bindings)
 
-**Total Effort Remaining:** ~7 hours (phases 3-5)
+**Total Effort Remaining:** ~6 hours (phases 4-5)
 
 ---
 
@@ -477,23 +480,25 @@ test-reliability-improvements (10 commits ahead)
 ```
 Continue H-002 MVVM extraction.
 
-Progress: 2/5 phases complete
-- Phase 1 ✅ RecordingViewModel
-- Phase 2 ✅ HistoryViewModel
-- Phase 3 ⏸️ StatusViewModel (~1h, low risk)
-- Phase 4 ⏸️ XAML bindings (~4h, medium-high risk)
-- Phase 5 ⏸️ Testing (~2h)
+Progress: 3/5 phases complete ✅
+- Phase 1 ✅ RecordingViewModel (committed a22aabf)
+- Phase 2 ✅ HistoryViewModel (committed 049200e)
+- Phase 3 ✅ StatusViewModel (committed a22aabf)
+- Phase 4 ⏸️ XAML bindings (~4h, HIGH RISK)
+- Phase 5 ⏸️ Testing & polish (~2h)
 
-Context: 62% used (76k remaining - enough for phase 3, marginal for phase 4-5)
+Context: 69% used (62k remaining - tight for phases 4-5)
+
+All 3 ViewModels extracted. MainWindow wired with event handlers.
+Next: complex XAML binding work (update .xaml, remove duplicate handlers, test thoroughly).
 
 Recommendation:
-1. Complete phase 3 now (StatusViewModel) - quick win, low risk
-2. Create final handoff before phase 4 (complex XAML changes need fresh context)
+Start fresh session for phases 4-5 (complex XAML changes need full context).
 
 Options:
-A) Continue with phase 3 (StatusViewModel)
-B) Stop here, comprehensive handoff created
-C) Go all the way (phases 3-5) - risky with limited context
+A) Continue with phase 4 now (XAML bindings) - risky with 62k tokens
+B) Stop here, create handoff, resume phases 4-5 in fresh session ⭐ RECOMMENDED
+C) Skip to testing tasks if XAML can wait
 
 Your choice?
 ```
@@ -502,4 +507,4 @@ Your choice?
 
 **End of Handoff Document**
 
-Phases 1-2 complete, tested, committed! Ready for phases 3-5! 🚀
+Phases 1-3 complete, tested, committed! All 3 ViewModels extracted. Ready for phases 4-5! 🚀
