@@ -36,6 +36,7 @@ namespace VoiceLite
 
         // ViewModels
         private RecordingViewModel? recordingViewModel;
+        private HistoryViewModel? historyViewModel;
 
         // Recording state (keeping for compatibility during transition)
         private DateTime recordingStartTime;
@@ -91,6 +92,14 @@ namespace VoiceLite
             recordingViewModel = new RecordingViewModel();
             recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
             recordingViewModel.RecordingStopRequested += OnRecordingStopRequested;
+
+            historyViewModel = new HistoryViewModel();
+            historyViewModel.ClearHistoryRequested += OnClearHistoryRequested;
+            historyViewModel.ClearAllHistoryRequested += OnClearAllHistoryRequested;
+            historyViewModel.CopyToClipboardRequested += OnCopyToClipboardRequested;
+            historyViewModel.DeleteItemRequested += OnDeleteItemRequested;
+            historyViewModel.ReInjectRequested += OnReInjectRequested;
+            historyViewModel.SearchTextChanged += OnSearchTextChanged;
 
             // Start with Ready state - initialization happens in background
             StatusText.Text = "Ready";
@@ -886,6 +895,103 @@ namespace VoiceLite
         private void OnRecordingStopRequested(object? sender, EventArgs e)
         {
             StopRecording();
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to clear history
+        /// </summary>
+        private void OnClearHistoryRequested(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove all transcriptions from history.\n\nContinue?",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                historyService?.ClearHistory();
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to clear all history (including pinned)
+        /// </summary>
+        private void OnClearAllHistoryRequested(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove ALL transcriptions from history including pinned items.\n\nThis action cannot be undone.\n\nContinue?",
+                "Clear All History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                historyService?.ClearHistory();
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to copy item to clipboard
+        /// </summary>
+        private void OnCopyToClipboardRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(item.Text);
+                UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Copy to clipboard", ex);
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to delete item
+        /// </summary>
+        private void OnDeleteItemRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            historyService?.RemoveFromHistory(item.Id);
+            _ = UpdateHistoryUI();
+            SaveSettings();
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to re-inject item
+        /// </summary>
+        private void OnReInjectRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            try
+            {
+                // Use OriginalText if available (before shortcuts), otherwise use Text
+                var textToProcess = item.OriginalText ?? item.Text;
+                var processedText = customShortcutService?.ProcessShortcuts(textToProcess) ?? textToProcess;
+                textInjector?.InjectText(processedText);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Re-inject", ex);
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel search text changes
+        /// </summary>
+        private void OnSearchTextChanged(object? sender, string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                _ = UpdateHistoryUI();
+            }
+            else
+            {
+                _ = FilterHistoryBySearch(searchText);
+            }
         }
 
         private void OnHotkeyPressed(object? sender, EventArgs e)
