@@ -15,6 +15,7 @@ using VoiceLite.Models;
 using VoiceLite.Services;
 using VoiceLite.Utilities;
 using VoiceLite.Helpers;
+using VoiceLite.Presentation.ViewModels;
 using System.Text.Json;
 
 namespace VoiceLite
@@ -33,7 +34,10 @@ namespace VoiceLite
         private CustomShortcutService? customShortcutService;
         // SoundService removed per user request - no audio feedback
 
-        // Recording state
+        // ViewModels
+        private RecordingViewModel? recordingViewModel;
+
+        // Recording state (keeping for compatibility during transition)
         private DateTime recordingStartTime;
         private bool isRecording = false;
         private bool isTranscribing = false;
@@ -82,6 +86,11 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
+
+            // Initialize ViewModels
+            recordingViewModel = new RecordingViewModel();
+            recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
+            recordingViewModel.RecordingStopRequested += OnRecordingStopRequested;
 
             // Start with Ready state - initialization happens in background
             StatusText.Text = "Ready";
@@ -760,6 +769,14 @@ namespace VoiceLite
                 recordingStartTime = DateTime.Now;
                 isRecording = true;
 
+                // Sync ViewModel state
+                if (recordingViewModel != null)
+                {
+                    recordingViewModel.IsRecording = true;
+                    recordingViewModel.CanRecord = false;
+                    recordingViewModel.StartRecordingTimer();
+                }
+
                 // IMMEDIATE FEEDBACK: Update UI before starting recorder for instant response
                 UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
                 UpdateUIForCurrentMode();
@@ -786,6 +803,11 @@ namespace VoiceLite
                     {
                         ErrorLogger.LogWarning("StartRecording: Recording failed to start, rolling back state");
                         isRecording = false;
+                        if (recordingViewModel != null)
+                        {
+                            recordingViewModel.ResetRecording();
+                            recordingViewModel.CanRecord = true;
+                        }
                         UpdateStatus("Failed to start recording", Brushes.Red);
                     }
                 }
@@ -793,6 +815,11 @@ namespace VoiceLite
                 {
                     ErrorLogger.LogError("StartRecording", ex);
                     isRecording = false;
+                    if (recordingViewModel != null)
+                    {
+                        recordingViewModel.ResetRecording();
+                        recordingViewModel.CanRecord = true;
+                    }
                     UpdateStatus("Failed to start recording", Brushes.Red);
                 }
             }
@@ -812,6 +839,14 @@ namespace VoiceLite
             recordingElapsedTimer = null;
 
             isRecording = false;
+
+            // Sync ViewModel state
+            if (recordingViewModel != null)
+            {
+                recordingViewModel.StopRecordingTimer();
+                recordingViewModel.IsRecording = false;
+                recordingViewModel.CanRecord = !isTranscribing; // Can record again if not transcribing
+            }
 
             try
             {
@@ -835,6 +870,22 @@ namespace VoiceLite
                 ErrorLogger.LogError("StopRecording", ex);
                 UpdateStatus("Failed to stop recording", Brushes.Red);
             }
+        }
+
+        /// <summary>
+        /// Handle RecordingViewModel request to start recording
+        /// </summary>
+        private void OnRecordingStartRequested(object? sender, EventArgs e)
+        {
+            StartRecording();
+        }
+
+        /// <summary>
+        /// Handle RecordingViewModel request to stop recording
+        /// </summary>
+        private void OnRecordingStopRequested(object? sender, EventArgs e)
+        {
+            StopRecording();
         }
 
         private void OnHotkeyPressed(object? sender, EventArgs e)
