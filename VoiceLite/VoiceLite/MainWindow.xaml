@@ -14,8 +14,7 @@
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
-        DataContext="{Binding RelativeSource={RelativeSource Self}}">
+        SnapsToDevicePixels="True">
 
     <!-- Value Converters -->
     <Window.Resources>
@@ -77,83 +76,15 @@
                     <RowDefinition Height="*"/>    <!-- Scrollable list -->
                 </Grid.RowDefinitions>
 
-                <!-- Hidden search box (accessible via Ctrl+F) -->
-                <Grid x:Name="SearchBoxRow" Grid.Row="0" Visibility="{Binding HistoryViewModel.IsSearchVisible, Converter={StaticResource BoolToVisibilityConverter}}" Margin="12,8,12,8">
-                    <Border Background="White"
-                            BorderBrush="#E0E0E0"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Padding="8,4">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Search icon -->
-                            <TextBlock Grid.Column="0"
-                                      Text="🔍"
-                                      FontSize="12"
-                                      Foreground="#95A5A6"
-                                      Margin="0,0,6,0"
-                                      VerticalAlignment="Center"/>
-
-                            <!-- Search textbox -->
-                            <TextBox x:Name="HistorySearchBox"
-                                    Grid.Column="1"
-                                    BorderThickness="0"
-                                    Background="Transparent"
-                                    FontSize="12"
-                                    VerticalAlignment="Center"
-                                    Text="{Binding HistoryViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                    KeyDown="HistorySearchBox_KeyDown">
-                                <TextBox.Style>
-                                    <Style TargetType="TextBox">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="TextBox">
-                                                    <Grid>
-                                                        <TextBlock Text="Search transcriptions... (Ctrl+F)"
-                                                                  FontSize="12"
-                                                                  Foreground="#95A5A6"
-                                                                  VerticalAlignment="Center"
-                                                                  Visibility="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"/>
-                                                        <ScrollViewer x:Name="PART_ContentHost"/>
-                                                    </Grid>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </TextBox.Style>
-                            </TextBox>
-
-                            <!-- Clear search button -->
-                            <Button x:Name="ClearSearchButton"
-                                   Grid.Column="2"
-                                   Content="✕"
-                                   Width="20"
-                                   Height="20"
-                                   Background="Transparent"
-                                   BorderThickness="0"
-                                   Foreground="#95A5A6"
-                                   FontSize="14"
-                                   Cursor="Hand"
-                                   Command="{Binding HistoryViewModel.ClearSearchCommand}"
-                                   Visibility="{Binding HistoryViewModel.HasSearchText, Converter={StaticResource BoolToVisibilityConverter}}"
-                                   ToolTip="Clear search (Esc)"/>
-                        </Grid>
-                    </Border>
-                </Grid>
+                <!-- Search removed - feature not needed -->
 
                 <!-- Hidden elements for reference in code -->
                 <TextBlock x:Name="HistoryCountText" Visibility="Collapsed" Text="0 items"/>
-                <Button x:Name="ToggleSearchButton" Visibility="Collapsed" Command="{Binding HistoryViewModel.ToggleSearchCommand}"/>
                 <Button x:Name="HistoryMenuButton" Visibility="Collapsed" Click="HistoryMenuButton_Click">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="HistoryActionsMenu">
-                            <MenuItem Header="Clear" Command="{Binding HistoryViewModel.ClearHistoryCommand}"/>
-                            <MenuItem Header="Clear All" Command="{Binding HistoryViewModel.ClearAllHistoryCommand}"/>
+                            <MenuItem Header="Clear" Click="ClearHistory_Click"/>
+                            <MenuItem Header="Clear All" Click="ClearAllHistory_Click"/>
                             <Separator/>
                             <MenuItem Header="Export..." Click="ExportHistory_Click"/>
                         </ContextMenu>

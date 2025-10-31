@@ -105,12 +105,13 @@ namespace VoiceLite
             historyViewModel.CopyToClipboardRequested += OnCopyToClipboardRequested;
             historyViewModel.DeleteItemRequested += OnDeleteItemRequested;
             historyViewModel.ReInjectRequested += OnReInjectRequested;
-            historyViewModel.SearchTextChanged += OnSearchTextChanged;
+            // SearchTextChanged removed - search feature not needed
 
             statusViewModel = new StatusViewModel();
             statusViewModel.SetReady(); // Start with Ready state
 
-            // PHASE 4: Removed temporary PropertyChanged handler - XAML now binds directly via DataContext
+            // Set DataContext AFTER ViewModels initialized
+            this.DataContext = this;
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
@@ -974,20 +975,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Handle HistoryViewModel search text changes
-        /// </summary>
-        private void OnSearchTextChanged(object? sender, string searchText)
-        {
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                _ = UpdateHistoryUI();
-            }
-            else
-            {
-                _ = FilterHistoryBySearch(searchText);
-            }
-        }
+        // REMOVED: OnSearchTextChanged - search feature not needed
 
         private void OnHotkeyPressed(object? sender, EventArgs e)
         {
@@ -1853,14 +1841,7 @@ namespace VoiceLite
                 return;
             }
 
-            // Handle Esc key to close search box (if open)
-            if (e.Key == Key.Escape && SearchBoxRow.Visibility == Visibility.Visible)
-            {
-                SearchBoxRow.Visibility = Visibility.Collapsed;
-                HistorySearchBox.Text = "";
-                e.Handled = true;
-                return;
-            }
+            // Esc to close search removed - search feature not needed
 
             // Handle Esc key to cancel recording
             if (e.Key == Key.Escape && isRecording)
@@ -2543,18 +2524,7 @@ namespace VoiceLite
 
         // REMOVED: HistorySearchBox_TextChanged - now handled by ViewModel binding
 
-        /// <summary>
-        /// Handles keyboard shortcuts in search box.
-        /// </summary>
-        private void HistorySearchBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Escape)
-            {
-                // Clear search on Escape
-                HistorySearchBox.Text = "";
-                e.Handled = true;
-            }
-        }
+        // REMOVED: HistorySearchBox_KeyDown - search feature not needed
 
         // REMOVED: ToggleSearchButton_Click - now handled by ViewModel command
 
