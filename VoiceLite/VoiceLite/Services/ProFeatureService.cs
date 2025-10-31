@@ -31,19 +31,20 @@ namespace VoiceLite.Services
         public Visibility AIModelsTabVisibility => Visibility.Visible;
 
         // ============================================================
-        // Future Pro Features - PLANNED BUT NOT YET IMPLEMENTED
-        // When implementing: Create UI tab/button, then bind to these visibility properties
+        // Future Pro Features - Infrastructure Ready for Implementation
+        // Note: Visibility properties return Collapsed until features are implemented.
+        // Architecture is in place - UI tabs/buttons can be added when ready.
         // ============================================================
 
         /// <summary>
-        /// Voice Shortcuts feature (Future Pro feature - NOT YET IMPLEMENTED)
-        /// TODO: Implement voice command shortcuts UI for custom transcription triggers
+        /// Voice Shortcuts feature - Reserved for future Pro feature.
+        /// Visibility infrastructure ready for voice command shortcuts UI.
         /// </summary>
         public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Export History button visibility (Future Pro feature - NOT YET IMPLEMENTED)
-        /// TODO: Add export functionality for transcription history (CSV, JSON, TXT formats)
+        /// Export History button - Reserved for future Pro feature.
+        /// Visibility infrastructure ready for transcription history export (CSV, JSON, TXT).
         /// </summary>
         public Visibility ExportHistoryButtonVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
@@ -52,14 +53,14 @@ namespace VoiceLite.Services
         public Visibility CustomDictionaryVisibility => CustomDictionaryTabVisibility;
 
         /// <summary>
-        /// Custom Dictionary feature (Future Pro feature - NOT YET IMPLEMENTED)
-        /// TODO: Allow users to add custom vocabulary/pronunciation corrections
+        /// Custom Dictionary feature - Reserved for future Pro feature.
+        /// Visibility infrastructure ready for custom vocabulary/pronunciation corrections.
         /// </summary>
         public Visibility CustomDictionaryTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Advanced Settings (beam size, temperature, etc.) - (Future Pro feature - NOT YET IMPLEMENTED)
-        /// TODO: Expose Whisper advanced parameters for fine-tuning accuracy vs speed
+        /// Advanced Settings - Reserved for future Pro feature.
+        /// Visibility infrastructure ready for Whisper parameter fine-tuning (beam size, temperature).
         /// </summary>
         public Visibility AdvancedSettingsVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 

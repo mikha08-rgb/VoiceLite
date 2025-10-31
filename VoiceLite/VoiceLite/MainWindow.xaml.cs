@@ -15,6 +15,7 @@ using VoiceLite.Models;
 using VoiceLite.Services;
 using VoiceLite.Utilities;
 using VoiceLite.Helpers;
+using VoiceLite.Presentation.ViewModels;
 using System.Text.Json;
 
 namespace VoiceLite
@@ -33,7 +34,17 @@ namespace VoiceLite
         private CustomShortcutService? customShortcutService;
         // SoundService removed per user request - no audio feedback
 
-        // Recording state
+        // ViewModels
+        private RecordingViewModel? recordingViewModel;
+        private HistoryViewModel? historyViewModel;
+        private StatusViewModel? statusViewModel;
+
+        // Expose ViewModels for XAML data binding
+        public RecordingViewModel RecordingViewModel => recordingViewModel!;
+        public HistoryViewModel HistoryViewModel => historyViewModel!;
+        public StatusViewModel StatusViewModel => statusViewModel!;
+
+        // Recording state (keeping for compatibility during transition)
         private DateTime recordingStartTime;
         private bool isRecording = false;
         private bool isTranscribing = false;
@@ -83,9 +94,23 @@ namespace VoiceLite
             InitializeComponent();
             LoadSettings();
 
-            // Start with Ready state - initialization happens in background
-            StatusText.Text = "Ready";
-            StatusText.Foreground = Brushes.Green;
+            // Initialize ViewModels
+            recordingViewModel = new RecordingViewModel();
+            recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
+            recordingViewModel.RecordingStopRequested += OnRecordingStopRequested;
+
+            historyViewModel = new HistoryViewModel();
+            historyViewModel.ClearHistoryRequested += OnClearHistoryRequested;
+            historyViewModel.ClearAllHistoryRequested += OnClearAllHistoryRequested;
+            historyViewModel.CopyToClipboardRequested += OnCopyToClipboardRequested;
+            historyViewModel.DeleteItemRequested += OnDeleteItemRequested;
+            historyViewModel.ReInjectRequested += OnReInjectRequested;
+            historyViewModel.SearchTextChanged += OnSearchTextChanged;
+
+            statusViewModel = new StatusViewModel();
+            statusViewModel.SetReady(); // Start with Ready state
+
+            // PHASE 4: Removed temporary PropertyChanged handler - XAML now binds directly via DataContext
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
@@ -414,7 +439,7 @@ namespace VoiceLite
         {
             try
             {
-                await Dispatcher.InvokeAsync(() => StatusText.Text = "Initializing services...");
+                await Dispatcher.InvokeAsync(() => statusViewModel?.UpdateStatus("Initializing services...", Brushes.Orange));
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
@@ -428,8 +453,7 @@ namespace VoiceLite
                     {
                         MessageBox.Show("No microphone detected!\n\nPlease connect a microphone and restart the application.",
                             "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        StatusText.Text = "No microphone detected";
-                        StatusText.Foreground = Brushes.Red;
+                        statusViewModel?.UpdateStatus("No microphone detected", Brushes.Red);
                     });
                 }
 
@@ -528,8 +552,7 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("MainWindow_Loaded initialization failed", ex);
-                StatusText.Text = "Initialization failed - Click for help";
-                StatusText.Foreground = Brushes.Red;
+                statusViewModel?.UpdateStatus("Initialization failed - Click for help", Brushes.Red);
 
                 var errorMessage = $"Failed to initialize VoiceLite:\n\n{ex.Message}\n\n";
 
@@ -695,19 +718,9 @@ namespace VoiceLite
 
         private void UpdateStatus(string status, Brush color)
         {
-            // CRITICAL FIX: Protect all UI element accesses with null checks
-            if (StatusText is not null)
-            {
-                StatusText.Text = status;
-                StatusText.Foreground = color;
-            }
-
-            // Update the status indicator ellipse color
-            if (StatusIndicator is not null)
-            {
-                StatusIndicator.Fill = color;
-                StatusIndicator.Opacity = 1.0;
-            }
+            // Delegate to StatusViewModel (phase 3 refactor)
+            // UI elements will be updated via PropertyChanged handler
+            statusViewModel?.UpdateStatus(status, color);
         }
 
         // CRITICAL FIX: Helper method to safely update TranscriptionText with null protection
@@ -760,6 +773,14 @@ namespace VoiceLite
                 recordingStartTime = DateTime.Now;
                 isRecording = true;
 
+                // Sync ViewModel state
+                if (recordingViewModel != null)
+                {
+                    recordingViewModel.IsRecording = true;
+                    recordingViewModel.CanRecord = false;
+                    recordingViewModel.StartRecordingTimer();
+                }
+
                 // IMMEDIATE FEEDBACK: Update UI before starting recorder for instant response
                 UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
                 UpdateUIForCurrentMode();
@@ -786,6 +807,11 @@ namespace VoiceLite
                     {
                         ErrorLogger.LogWarning("StartRecording: Recording failed to start, rolling back state");
                         isRecording = false;
+                        if (recordingViewModel != null)
+                        {
+                            recordingViewModel.ResetRecording();
+                            recordingViewModel.CanRecord = true;
+                        }
                         UpdateStatus("Failed to start recording", Brushes.Red);
                     }
                 }
@@ -793,6 +819,11 @@ namespace VoiceLite
                 {
                     ErrorLogger.LogError("StartRecording", ex);
                     isRecording = false;
+                    if (recordingViewModel != null)
+                    {
+                        recordingViewModel.ResetRecording();
+                        recordingViewModel.CanRecord = true;
+                    }
                     UpdateStatus("Failed to start recording", Brushes.Red);
                 }
             }
@@ -812,6 +843,14 @@ namespace VoiceLite
             recordingElapsedTimer = null;
 
             isRecording = false;
+
+            // Sync ViewModel state
+            if (recordingViewModel != null)
+            {
+                recordingViewModel.StopRecordingTimer();
+                recordingViewModel.IsRecording = false;
+                recordingViewModel.CanRecord = !isTranscribing; // Can record again if not transcribing
+            }
 
             try
             {
@@ -834,6 +873,119 @@ namespace VoiceLite
             {
                 ErrorLogger.LogError("StopRecording", ex);
                 UpdateStatus("Failed to stop recording", Brushes.Red);
+            }
+        }
+
+        /// <summary>
+        /// Handle RecordingViewModel request to start recording
+        /// </summary>
+        private void OnRecordingStartRequested(object? sender, EventArgs e)
+        {
+            StartRecording();
+        }
+
+        /// <summary>
+        /// Handle RecordingViewModel request to stop recording
+        /// </summary>
+        private void OnRecordingStopRequested(object? sender, EventArgs e)
+        {
+            StopRecording();
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to clear history
+        /// </summary>
+        private void OnClearHistoryRequested(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove all transcriptions from history.\n\nContinue?",
+                "Clear History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                historyService?.ClearHistory();
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to clear all history (including pinned)
+        /// </summary>
+        private void OnClearAllHistoryRequested(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "This will remove ALL transcriptions from history including pinned items.\n\nThis action cannot be undone.\n\nContinue?",
+                "Clear All History",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                historyService?.ClearHistory();
+                _ = UpdateHistoryUI();
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to copy item to clipboard
+        /// </summary>
+        private void OnCopyToClipboardRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(item.Text);
+                UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Copy to clipboard", ex);
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to delete item
+        /// </summary>
+        private void OnDeleteItemRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            historyService?.RemoveFromHistory(item.Id);
+            _ = UpdateHistoryUI();
+            SaveSettings();
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel request to re-inject item
+        /// </summary>
+        private void OnReInjectRequested(object? sender, TranscriptionHistoryItem item)
+        {
+            try
+            {
+                // Use OriginalText if available (before shortcuts), otherwise use Text
+                var textToProcess = item.OriginalText ?? item.Text;
+                var processedText = customShortcutService?.ProcessShortcuts(textToProcess) ?? textToProcess;
+                textInjector?.InjectText(processedText);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Re-inject", ex);
+            }
+        }
+
+        /// <summary>
+        /// Handle HistoryViewModel search text changes
+        /// </summary>
+        private void OnSearchTextChanged(object? sender, string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                _ = UpdateHistoryUI();
+            }
+            else
+            {
+                _ = FilterHistoryBySearch(searchText);
             }
         }
 
@@ -1672,7 +1824,7 @@ namespace VoiceLite
             // Handle Ctrl+F - Toggle search box
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                ToggleSearchButton_Click(this, new RoutedEventArgs());
+                historyViewModel?.ToggleSearchCommand.Execute(null);
                 e.Handled = true;
                 return;
             }
@@ -2389,28 +2541,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Handles search text changes for filtering history.
-        /// </summary>
-        private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            var searchText = HistorySearchBox.Text?.ToLower() ?? "";
-
-            // Show/hide clear button
-            ClearSearchButton.Visibility = string.IsNullOrEmpty(searchText) ? Visibility.Collapsed : Visibility.Visible;
-
-            // Filter history items
-            if (string.IsNullOrEmpty(searchText))
-            {
-                // Show all items
-                _ = UpdateHistoryUI();
-            }
-            else
-            {
-                // Show only matching items
-                _ = FilterHistoryBySearch(searchText);
-            }
-        }
+        // REMOVED: HistorySearchBox_TextChanged - now handled by ViewModel binding
 
         /// <summary>
         /// Handles keyboard shortcuts in search box.
@@ -2425,22 +2556,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Toggles search box visibility.
-        /// </summary>
-        private void ToggleSearchButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (SearchBoxRow.Visibility == Visibility.Collapsed)
-            {
-                SearchBoxRow.Visibility = Visibility.Visible;
-                HistorySearchBox.Focus();
-            }
-            else
-            {
-                SearchBoxRow.Visibility = Visibility.Collapsed;
-                HistorySearchBox.Text = ""; // Clear search when hiding
-            }
-        }
+        // REMOVED: ToggleSearchButton_Click - now handled by ViewModel command
 
         /// <summary>
         /// Opens history actions menu.
@@ -2454,14 +2570,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Clears the search box.
-        /// </summary>
-        private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
-        {
-            HistorySearchBox.Text = "";
-            HistorySearchBox.Focus();
-        }
+        // REMOVED: ClearSearchButton_Click - now handled by ViewModel command
 
         /// <summary>
         /// Filters history items by search text.
@@ -2600,10 +2709,8 @@ namespace VoiceLite
                         activeStatusTimers.Remove(existingTimer);
                     }
 
-                    // Update status message
-                    StatusText.Text = message;
-                    if (textColor != null)
-                        StatusText.Foreground = textColor;
+                    // Update status message via ViewModel
+                    statusViewModel?.UpdateStatus(message, textColor ?? Brushes.Gray);
 
                     // Create new timer
                     var timer = new System.Windows.Threading.DispatcherTimer

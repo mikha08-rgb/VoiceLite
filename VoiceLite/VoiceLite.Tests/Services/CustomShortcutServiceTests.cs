@@ -351,7 +351,7 @@ John Doe";
         }
 
         [Fact]
-        public void ProcessShortcuts_ThreadSafe_NoExceptionWhenCalledConcurrently()
+        public async Task ProcessShortcuts_ThreadSafe_NoExceptionWhenCalledConcurrently()
         {
             // Arrange
             _settings.CustomShortcuts.Add(new CustomShortcut
@@ -383,7 +383,7 @@ John Doe";
                 }));
             }
 
-            System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
+            await System.Threading.Tasks.Task.WhenAll(tasks);
 
             // Assert - No exceptions should be thrown
             exceptions.Should().BeEmpty();

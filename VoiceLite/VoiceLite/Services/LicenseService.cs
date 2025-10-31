@@ -214,7 +214,7 @@ namespace VoiceLite.Services
                     ErrorMessage = "Connection error. Please check your internet connection."
                 };
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException ex)
             {
                 // Try to use cached result on timeout
                 if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
@@ -223,6 +223,7 @@ namespace VoiceLite.Services
                     return _cachedValidationResult;
                 }
 
+                ErrorLogger.LogWarning($"License validation request timed out: {ex.Message}");
                 return new LicenseValidationResult
                 {
                     IsValid = false,

@@ -38,9 +38,12 @@ const licenseValidationRateLimit = redis
 export async function POST(request: NextRequest) {
   try {
     // Rate limit by IP to prevent brute-forcing license keys
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
-      || request.headers.get('x-real-ip')
-      || 'unknown';
+    // Only trust x-forwarded-for when behind Vercel proxy (prevents IP spoofing)
+    const ip = process.env.VERCEL
+      ? (request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+         || request.headers.get('x-real-ip')
+         || 'unknown')
+      : 'unknown'; // Fallback for local dev
 
     const rateLimit = await checkRateLimit(ip, licenseValidationRateLimit);
     if (!rateLimit.allowed) {
