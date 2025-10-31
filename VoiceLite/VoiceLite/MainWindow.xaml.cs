@@ -37,6 +37,7 @@ namespace VoiceLite
         // ViewModels
         private RecordingViewModel? recordingViewModel;
         private HistoryViewModel? historyViewModel;
+        private StatusViewModel? statusViewModel;
 
         // Recording state (keeping for compatibility during transition)
         private DateTime recordingStartTime;
@@ -101,9 +102,21 @@ namespace VoiceLite
             historyViewModel.ReInjectRequested += OnReInjectRequested;
             historyViewModel.SearchTextChanged += OnSearchTextChanged;
 
-            // Start with Ready state - initialization happens in background
-            StatusText.Text = "Ready";
-            StatusText.Foreground = Brushes.Green;
+            statusViewModel = new StatusViewModel();
+            statusViewModel.SetReady(); // Start with Ready state
+
+            // Sync ViewModel to UI elements (will be removed in phase 4 when XAML binds directly)
+            statusViewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(StatusViewModel.StatusText) && StatusText != null)
+                    StatusText.Text = statusViewModel.StatusText;
+                if (e.PropertyName == nameof(StatusViewModel.StatusTextColor) && StatusText != null)
+                    StatusText.Foreground = statusViewModel.StatusTextColor;
+                if (e.PropertyName == nameof(StatusViewModel.StatusIndicatorFill) && StatusIndicator != null)
+                    StatusIndicator.Fill = statusViewModel.StatusIndicatorFill;
+                if (e.PropertyName == nameof(StatusViewModel.StatusIndicatorOpacity) && StatusIndicator != null)
+                    StatusIndicator.Opacity = statusViewModel.StatusIndicatorOpacity;
+            };
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
@@ -432,7 +445,7 @@ namespace VoiceLite
         {
             try
             {
-                await Dispatcher.InvokeAsync(() => StatusText.Text = "Initializing services...");
+                await Dispatcher.InvokeAsync(() => statusViewModel?.UpdateStatus("Initializing services...", Brushes.Orange));
 
                 // Initialize core services
                 textInjector = new TextInjector(settings);
@@ -446,8 +459,7 @@ namespace VoiceLite
                     {
                         MessageBox.Show("No microphone detected!\n\nPlease connect a microphone and restart the application.",
                             "No Microphone", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        StatusText.Text = "No microphone detected";
-                        StatusText.Foreground = Brushes.Red;
+                        statusViewModel?.UpdateStatus("No microphone detected", Brushes.Red);
                     });
                 }
 
@@ -546,8 +558,7 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("MainWindow_Loaded initialization failed", ex);
-                StatusText.Text = "Initialization failed - Click for help";
-                StatusText.Foreground = Brushes.Red;
+                statusViewModel?.UpdateStatus("Initialization failed - Click for help", Brushes.Red);
 
                 var errorMessage = $"Failed to initialize VoiceLite:\n\n{ex.Message}\n\n";
 
@@ -713,19 +724,9 @@ namespace VoiceLite
 
         private void UpdateStatus(string status, Brush color)
         {
-            // CRITICAL FIX: Protect all UI element accesses with null checks
-            if (StatusText is not null)
-            {
-                StatusText.Text = status;
-                StatusText.Foreground = color;
-            }
-
-            // Update the status indicator ellipse color
-            if (StatusIndicator is not null)
-            {
-                StatusIndicator.Fill = color;
-                StatusIndicator.Opacity = 1.0;
-            }
+            // Delegate to StatusViewModel (phase 3 refactor)
+            // UI elements will be updated via PropertyChanged handler
+            statusViewModel?.UpdateStatus(status, color);
         }
 
         // CRITICAL FIX: Helper method to safely update TranscriptionText with null protection
@@ -2757,10 +2758,8 @@ namespace VoiceLite
                         activeStatusTimers.Remove(existingTimer);
                     }
 
-                    // Update status message
-                    StatusText.Text = message;
-                    if (textColor != null)
-                        StatusText.Foreground = textColor;
+                    // Update status message via ViewModel
+                    statusViewModel?.UpdateStatus(message, textColor ?? Brushes.Gray);
 
                     // Create new timer
                     var timer = new System.Windows.Threading.DispatcherTimer
