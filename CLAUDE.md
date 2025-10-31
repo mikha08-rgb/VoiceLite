@@ -152,6 +152,13 @@ whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
 - v1.0.87: Added flash attention + Q8_0 tiny model - Additional 7-12% faster
 - v1.0.88: Q8_0 quantization for all Pro models - 67-73% faster overall, 45% smaller
 
+**Recent Architecture Improvements**:
+- **H-002 MVVM Extraction (v1.2.x)**: Completed incremental MVVM extraction from MainWindow (2657 lines):
+  - Phase 1-3: Extracted RecordingViewModel, HistoryViewModel, StatusViewModel (~560 lines)
+  - Phase 4-5: XAML data bindings, removed duplicate handlers, PropertyChanged syncing
+  - Result: Cleaner separation of concerns, testable ViewModels, maintainable UI logic
+  - All 311 tests passing, 0 regressions
+
 **Recent Critical Fixes**:
 - **v1.0.96**: CRITICAL model file not in git - `ggml-tiny.bin` (42MB) was ignored by `.gitignore`, causing GitHub Actions builds to fail (100% failure rate on fresh installs). Fixed by force-adding model to git with `git add -f`. v1.0.95 was broken for all fresh installations.
 - **v1.0.95**: PARTIAL FIX - Fixed installer path but model still missing (only fixed local builds, not GitHub Actions)

@@ -14,7 +14,8 @@
         TextOptions.TextRenderingMode="ClearType"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        DataContext="{Binding RelativeSource={RelativeSource Self}}">
 
     <!-- Value Converters -->
     <Window.Resources>
@@ -46,10 +47,10 @@
                           FontSize="13"
                           Foreground="#7A7A7A"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="#C8E6C9" Margin="0,0,5,0"/>
-                <TextBlock x:Name="StatusText" Text="Ready"
-                          Foreground="#7A7A7A" FontWeight="Normal" FontSize="12"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" DataContext="{Binding StatusViewModel}">
+                <Ellipse x:Name="StatusIndicator" Width="8" Height="8" Fill="{Binding StatusIndicatorFill}" Opacity="{Binding StatusIndicatorOpacity}" Margin="0,0,5,0"/>
+                <TextBlock x:Name="StatusText" Text="{Binding StatusText}"
+                          Foreground="{Binding StatusTextColor}" FontWeight="Normal" FontSize="12"/>
             </StackPanel>
         </Grid>
 
@@ -77,7 +78,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Hidden search box (accessible via Ctrl+F) -->
-                <Grid x:Name="SearchBoxRow" Grid.Row="0" Visibility="Collapsed" Margin="12,8,12,8">
+                <Grid x:Name="SearchBoxRow" Grid.Row="0" Visibility="{Binding HistoryViewModel.IsSearchVisible, Converter={StaticResource BoolToVisibilityConverter}}" Margin="12,8,12,8">
                     <Border Background="White"
                             BorderBrush="#E0E0E0"
                             BorderThickness="1"
@@ -105,7 +106,7 @@
                                     Background="Transparent"
                                     FontSize="12"
                                     VerticalAlignment="Center"
-                                    TextChanged="HistorySearchBox_TextChanged"
+                                    Text="{Binding HistoryViewModel.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                     KeyDown="HistorySearchBox_KeyDown">
                                 <TextBox.Style>
                                     <Style TargetType="TextBox">
@@ -138,8 +139,8 @@
                                    Foreground="#95A5A6"
                                    FontSize="14"
                                    Cursor="Hand"
-                                   Click="ClearSearchButton_Click"
-                                   Visibility="Collapsed"
+                                   Command="{Binding HistoryViewModel.ClearSearchCommand}"
+                                   Visibility="{Binding HistoryViewModel.HasSearchText, Converter={StaticResource BoolToVisibilityConverter}}"
                                    ToolTip="Clear search (Esc)"/>
                         </Grid>
                     </Border>
@@ -147,12 +148,12 @@
 
                 <!-- Hidden elements for reference in code -->
                 <TextBlock x:Name="HistoryCountText" Visibility="Collapsed" Text="0 items"/>
-                <Button x:Name="ToggleSearchButton" Visibility="Collapsed" Click="ToggleSearchButton_Click"/>
+                <Button x:Name="ToggleSearchButton" Visibility="Collapsed" Command="{Binding HistoryViewModel.ToggleSearchCommand}"/>
                 <Button x:Name="HistoryMenuButton" Visibility="Collapsed" Click="HistoryMenuButton_Click">
                     <Button.ContextMenu>
                         <ContextMenu x:Name="HistoryActionsMenu">
-                            <MenuItem Header="Clear" Click="ClearHistory_Click"/>
-                            <MenuItem Header="Clear All" Click="ClearAllHistory_Click"/>
+                            <MenuItem Header="Clear" Command="{Binding HistoryViewModel.ClearHistoryCommand}"/>
+                            <MenuItem Header="Clear All" Command="{Binding HistoryViewModel.ClearAllHistoryCommand}"/>
                             <Separator/>
                             <MenuItem Header="Export..." Click="ExportHistory_Click"/>
                         </ContextMenu>

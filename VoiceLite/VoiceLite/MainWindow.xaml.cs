@@ -39,6 +39,11 @@ namespace VoiceLite
         private HistoryViewModel? historyViewModel;
         private StatusViewModel? statusViewModel;
 
+        // Expose ViewModels for XAML data binding
+        public RecordingViewModel RecordingViewModel => recordingViewModel!;
+        public HistoryViewModel HistoryViewModel => historyViewModel!;
+        public StatusViewModel StatusViewModel => statusViewModel!;
+
         // Recording state (keeping for compatibility during transition)
         private DateTime recordingStartTime;
         private bool isRecording = false;
@@ -105,18 +110,7 @@ namespace VoiceLite
             statusViewModel = new StatusViewModel();
             statusViewModel.SetReady(); // Start with Ready state
 
-            // Sync ViewModel to UI elements (will be removed in phase 4 when XAML binds directly)
-            statusViewModel.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(StatusViewModel.StatusText) && StatusText != null)
-                    StatusText.Text = statusViewModel.StatusText;
-                if (e.PropertyName == nameof(StatusViewModel.StatusTextColor) && StatusText != null)
-                    StatusText.Foreground = statusViewModel.StatusTextColor;
-                if (e.PropertyName == nameof(StatusViewModel.StatusIndicatorFill) && StatusIndicator != null)
-                    StatusIndicator.Fill = statusViewModel.StatusIndicatorFill;
-                if (e.PropertyName == nameof(StatusViewModel.StatusIndicatorOpacity) && StatusIndicator != null)
-                    StatusIndicator.Opacity = statusViewModel.StatusIndicatorOpacity;
-            };
+            // PHASE 4: Removed temporary PropertyChanged handler - XAML now binds directly via DataContext
 
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
@@ -1830,7 +1824,7 @@ namespace VoiceLite
             // Handle Ctrl+F - Toggle search box
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                ToggleSearchButton_Click(this, new RoutedEventArgs());
+                historyViewModel?.ToggleSearchCommand.Execute(null);
                 e.Handled = true;
                 return;
             }
@@ -2547,28 +2541,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Handles search text changes for filtering history.
-        /// </summary>
-        private void HistorySearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            var searchText = HistorySearchBox.Text?.ToLower() ?? "";
-
-            // Show/hide clear button
-            ClearSearchButton.Visibility = string.IsNullOrEmpty(searchText) ? Visibility.Collapsed : Visibility.Visible;
-
-            // Filter history items
-            if (string.IsNullOrEmpty(searchText))
-            {
-                // Show all items
-                _ = UpdateHistoryUI();
-            }
-            else
-            {
-                // Show only matching items
-                _ = FilterHistoryBySearch(searchText);
-            }
-        }
+        // REMOVED: HistorySearchBox_TextChanged - now handled by ViewModel binding
 
         /// <summary>
         /// Handles keyboard shortcuts in search box.
@@ -2583,22 +2556,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Toggles search box visibility.
-        /// </summary>
-        private void ToggleSearchButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (SearchBoxRow.Visibility == Visibility.Collapsed)
-            {
-                SearchBoxRow.Visibility = Visibility.Visible;
-                HistorySearchBox.Focus();
-            }
-            else
-            {
-                SearchBoxRow.Visibility = Visibility.Collapsed;
-                HistorySearchBox.Text = ""; // Clear search when hiding
-            }
-        }
+        // REMOVED: ToggleSearchButton_Click - now handled by ViewModel command
 
         /// <summary>
         /// Opens history actions menu.
@@ -2612,14 +2570,7 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Clears the search box.
-        /// </summary>
-        private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
-        {
-            HistorySearchBox.Text = "";
-            HistorySearchBox.Focus();
-        }
+        // REMOVED: ClearSearchButton_Click - now handled by ViewModel command
 
         /// <summary>
         /// Filters history items by search text.
