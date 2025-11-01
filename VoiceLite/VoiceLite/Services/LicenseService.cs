@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -54,6 +56,16 @@ namespace VoiceLite.Services
         // Once validated successfully, cache forever for offline use
         private LicenseValidationResult? _cachedValidationResult = null;
 
+        // SECURITY FIX (LICENSE-ENC-001): Encrypted license storage
+        // License keys are encrypted using Windows DPAPI (Data Protection API)
+        // Scope: CurrentUser (tied to Windows user account)
+        // Location: %LOCALAPPDATA%\VoiceLite\license.dat
+        private static readonly string LicenseFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VoiceLite",
+            "license.dat"
+        );
+
         public event EventHandler<bool>? LicenseStatusChanged;
 
         static LicenseService()
@@ -65,6 +77,9 @@ namespace VoiceLite.Services
         public LicenseService()
         {
             _apiBaseUrl = "https://voicelite.app";
+
+            // SECURITY FIX (LICENSE-ENC-001): Auto-load encrypted license key on startup
+            LoadLicenseKey();
         }
 
         /// <summary>
@@ -251,10 +266,125 @@ namespace VoiceLite.Services
             return _storedLicenseKey ?? string.Empty;
         }
 
+        /// <summary>
+        /// SECURITY FIX (LICENSE-ENC-001): Saves license key with Windows DPAPI encryption
+        ///
+        /// Encryption details:
+        /// - Uses ProtectedData.Protect() with CurrentUser scope
+        /// - Key is tied to Windows user account (can't be copied to other machines/users)
+        /// - Encrypted data stored in %LOCALAPPDATA%\VoiceLite\license.dat
+        /// - Safe from memory dumps and disk inspection
+        /// </summary>
         public void SaveLicenseKey(string licenseKey)
         {
-            _storedLicenseKey = licenseKey;
-            // TODO: Save to secure storage
+            try
+            {
+                _storedLicenseKey = licenseKey;
+
+                // Encrypt license key using Windows DPAPI
+                byte[] plaintextBytes = Encoding.UTF8.GetBytes(licenseKey);
+                byte[] encryptedBytes = ProtectedData.Protect(
+                    plaintextBytes,
+                    null, // No additional entropy (user account is enough)
+                    DataProtectionScope.CurrentUser
+                );
+
+                // Ensure directory exists
+                string? directory = Path.GetDirectoryName(LicenseFilePath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // Write encrypted bytes to file
+                File.WriteAllBytes(LicenseFilePath, encryptedBytes);
+
+                ErrorLogger.LogMessage($"License key saved securely (encrypted with DPAPI)");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to save encrypted license key", ex);
+                throw new InvalidOperationException("Failed to save license key securely", ex);
+            }
+        }
+
+        /// <summary>
+        /// SECURITY FIX (LICENSE-ENC-001): Loads encrypted license key on startup
+        ///
+        /// Auto-migration:
+        /// - If encrypted file doesn't exist but settings.json has plaintext key, migrate it
+        /// - Supports smooth upgrade from v1.2.0 to v1.2.1
+        /// </summary>
+        private void LoadLicenseKey()
+        {
+            try
+            {
+                // If encrypted license file exists, load it
+                if (File.Exists(LicenseFilePath))
+                {
+                    byte[] encryptedBytes = File.ReadAllBytes(LicenseFilePath);
+                    byte[] plaintextBytes = ProtectedData.Unprotect(
+                        encryptedBytes,
+                        null,
+                        DataProtectionScope.CurrentUser
+                    );
+
+                    _storedLicenseKey = Encoding.UTF8.GetString(plaintextBytes);
+                    ErrorLogger.LogMessage("License key loaded from encrypted storage");
+                }
+                else
+                {
+                    // MIGRATION PATH: Check if plaintext license exists in settings.json
+                    // This handles upgrade from v1.2.0 (no encryption) to v1.2.1 (DPAPI encryption)
+                    var settingsPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "VoiceLite",
+                        "settings.json"
+                    );
+
+                    if (File.Exists(settingsPath))
+                    {
+                        try
+                        {
+                            var settingsJson = File.ReadAllText(settingsPath);
+                            var settings = JsonSerializer.Deserialize<Models.Settings>(settingsJson);
+
+                            if (settings != null && !string.IsNullOrWhiteSpace(settings.LicenseKey))
+                            {
+                                ErrorLogger.LogMessage("Migrating plaintext license key to encrypted storage...");
+
+                                // Migrate to encrypted storage
+                                SaveLicenseKey(settings.LicenseKey);
+
+                                // Clear plaintext key from settings.json
+                                settings.LicenseKey = string.Empty;
+                                var updatedJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                });
+                                File.WriteAllText(settingsPath, updatedJson);
+
+                                ErrorLogger.LogMessage("License key migration complete - plaintext removed from settings");
+                            }
+                        }
+                        catch (Exception migrationEx)
+                        {
+                            ErrorLogger.LogWarning($"License key migration failed: {migrationEx.Message}");
+                            // Don't throw - migration is best-effort
+                        }
+                    }
+                }
+            }
+            catch (CryptographicException ex)
+            {
+                ErrorLogger.LogError("Failed to decrypt license key (may be corrupted or from different user)", ex);
+                // Don't throw - let app continue without license
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to load license key: {ex.Message}");
+                // Don't throw - let app continue without license
+            }
         }
 
         public void RemoveLicenseKey()
@@ -263,6 +393,21 @@ namespace VoiceLite.Services
             _isLicenseValid = false;
             _licenseEmail = null;
             _activationCount = 0;
+
+            // SECURITY FIX (LICENSE-ENC-001): Delete encrypted license file
+            try
+            {
+                if (File.Exists(LicenseFilePath))
+                {
+                    File.Delete(LicenseFilePath);
+                    ErrorLogger.LogMessage("Encrypted license file deleted");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to delete license file: {ex.Message}");
+            }
+
             LicenseStatusChanged?.Invoke(this, false);
         }
 

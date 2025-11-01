@@ -32,6 +32,7 @@ namespace VoiceLite
         private SystemTrayManager? systemTrayManager;
         private TranscriptionHistoryService? historyService;
         private CustomShortcutService? customShortcutService;
+        private ProFeatureService? proFeatureService;
         // SoundService removed per user request - no audio feedback
 
         // ViewModels
@@ -464,8 +465,13 @@ namespace VoiceLite
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
                 }
 
+                // Initialize Pro feature service (for license validation)
+                // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
+                proFeatureService = new ProFeatureService(settings);
+
                 // Initialize Whisper service using process mode
-                whisperService = new PersistentWhisperService(settings);
+                // SECURITY FIX (MODEL-GATE-001): Pass proFeatureService to enable license validation
+                whisperService = new PersistentWhisperService(settings, null, proFeatureService);
 
                 // Initialize services
                 historyService = new TranscriptionHistoryService(settings);
@@ -1741,8 +1747,14 @@ namespace VoiceLite
                 // Model switching is handled by the service itself in most cases
                 if (whisperService == null)
                 {
+                    // SECURITY FIX (MODEL-GATE-001): Ensure proFeatureService exists before creating whisperService
+                    if (proFeatureService == null)
+                    {
+                        proFeatureService = new ProFeatureService(settings);
+                    }
+
                     ErrorLogger.LogMessage($"Creating initial Whisper service with model: {settings.WhisperModel}");
-                    whisperService = new PersistentWhisperService(settings);
+                    whisperService = new PersistentWhisperService(settings, null, proFeatureService);
                 }
                 else
                 {

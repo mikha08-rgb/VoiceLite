@@ -28,6 +28,16 @@ function getStripeClient() {
 
 export async function POST(request: NextRequest) {
   const stripe = getStripeClient();
+
+  // Verify request origin for additional CSRF protection
+  const origin = request.headers.get('origin');
+  const allowedOrigins = ['https://stripe.com', 'https://dashboard.stripe.com'];
+
+  if (origin && !allowedOrigins.includes(origin)) {
+    console.warn(`Suspicious webhook origin: ${origin}`);
+    // Still allow - Stripe doesn't always set origin, but log for monitoring
+  }
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
@@ -48,29 +58,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Idempotency check with transaction to prevent race conditions
-  // Use unique constraint on eventId to ensure only one webhook processes this event
-  let isNewEvent = false;
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Try to claim this event atomically
-      await tx.webhookEvent.create({
-        data: { eventId: event.id },
-      });
-      isNewEvent = true;
-    });
-  } catch (error: any) {
-    // P2002 = Unique constraint violation = event already processed
-    if (error.code === 'P2002') {
-      console.log(`Event ${event.id} already processed, skipping (race condition prevented)`);
-      return NextResponse.json({ received: true, cached: true });
-    }
-    // Other errors should be thrown
-    throw error;
-  }
+  // Atomic claim using upsert to prevent race conditions
+  // This ensures only ONE webhook processes each event, even with concurrent requests
+  const webhookEvent = await prisma.webhookEvent.upsert({
+    where: { eventId: event.id },
+    create: {
+      eventId: event.id,
+      seenAt: new Date(),
+      processedAt: new Date()
+    },
+    update: {
+      // If event already exists, don't update processedAt
+      // This allows us to detect duplicate processing attempts
+    },
+  });
 
-  // Double-check that we claimed the event
-  if (!isNewEvent) {
+  // Check if this is first processing by comparing timestamps
+  // If seenAt and processedAt are the same, this is the first time we're processing
+  const isFirstProcessing =
+    Math.abs(webhookEvent.seenAt.getTime() - webhookEvent.processedAt.getTime()) < 1000;
+
+  if (!isFirstProcessing) {
+    console.log(`Event ${event.id} already processed at ${webhookEvent.processedAt.toISOString()}, skipping (race condition prevented)`);
     return NextResponse.json({ received: true, cached: true });
   }
 

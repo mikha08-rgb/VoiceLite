@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
@@ -9,21 +10,24 @@ namespace VoiceLite.Services
     /// <summary>
     /// Service for resolving Whisper model and executable paths.
     /// Extracted from PersistentWhisperService for better separation of concerns.
+    /// SECURITY FIX (MODEL-GATE-001): Added Pro license validation to prevent freemium bypass
     /// </summary>
     public class ModelResolverService : IModelResolverService
     {
         private readonly string _baseDir;
+        private readonly IProFeatureService? _proFeatureService;
         private static bool _integrityWarningLogged = false;
 
         // Expected SHA256 hash of the official whisper.exe binary (whisper.cpp v1.7.6)
         private const string EXPECTED_WHISPER_HASH = "B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF";
 
-        public ModelResolverService(string baseDirectory)
+        public ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService = null)
         {
             if (string.IsNullOrWhiteSpace(baseDirectory))
                 throw new ArgumentNullException(nameof(baseDirectory));
 
             _baseDir = baseDirectory;
+            _proFeatureService = proFeatureService;
         }
 
         /// <summary>
@@ -97,10 +101,25 @@ namespace VoiceLite.Services
         /// <summary>
         /// Resolves the full path to the specified Whisper model file.
         /// Searches in: baseDir/whisper/, baseDir/, %LocalAppData%/VoiceLite/whisper/
+        /// SECURITY FIX (MODEL-GATE-001): Validates Pro license before returning Pro models
         /// </summary>
         public string ResolveModelPath(string modelName)
         {
             var modelFile = NormalizeModelName(modelName);
+
+            // SECURITY FIX (MODEL-GATE-001): Validate Pro license before resolving Pro models
+            // This prevents freemium bypass where users manually download Pro models
+            if (_proFeatureService != null && !_proFeatureService.CanUseModel(modelFile))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Model '{GetModelDisplayName(modelFile)}' requires Pro license.\n\n" +
+                    _proFeatureService.GetUpgradeMessage("Advanced AI Models") + "\n\n" +
+                    "Free tier includes Swift model (ggml-base.bin) which provides excellent accuracy for most users.\n" +
+                    "Upgrade to Pro to unlock:\n" +
+                    "- Pro model (90-93% accuracy)\n" +
+                    "- Elite model (95-97% accuracy)\n" +
+                    "- Ultra model (97-99% Dragon-level quality)");
+            }
 
             // Check bundled models in Program Files (read-only)
             var modelPath = Path.Combine(_baseDir, "whisper", modelFile);
@@ -128,6 +147,22 @@ namespace VoiceLite.Services
                 $"Expected locations:\n" +
                 $"- Bundled: {Path.Combine(_baseDir, "whisper", modelFile)}\n" +
                 $"- Downloaded: {localDataPath}");
+        }
+
+        /// <summary>
+        /// Gets user-friendly display name for model file
+        /// </summary>
+        private string GetModelDisplayName(string modelFile)
+        {
+            return modelFile.ToLower() switch
+            {
+                "ggml-tiny.bin" => "Lite",
+                "ggml-base.bin" => "Swift",
+                "ggml-small.bin" => "Pro",
+                "ggml-medium.bin" => "Elite",
+                "ggml-large-v3.bin" => "Ultra",
+                _ => modelFile
+            };
         }
 
         /// <summary>

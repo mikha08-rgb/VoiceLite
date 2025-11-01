@@ -39,6 +39,22 @@ namespace VoiceLite.Core.Interfaces.Features
         bool IsModelAvailable(string modelName);
 
         /// <summary>
+        /// Checks if user can use a specific Whisper model by filename.
+        /// SECURITY FIX (MODEL-GATE-001): Added for Pro model access control
+        /// </summary>
+        /// <param name="modelFileName">Model file name (e.g., "ggml-small.bin")</param>
+        /// <returns>True if user can use this model</returns>
+        bool CanUseModel(string modelFileName);
+
+        /// <summary>
+        /// Gets user-friendly upgrade message for a specific feature.
+        /// SECURITY FIX (MODEL-GATE-001): Added for consistent messaging
+        /// </summary>
+        /// <param name="featureName">Name of the Pro feature</param>
+        /// <returns>User-friendly upgrade message</returns>
+        string GetUpgradeMessage(string featureName);
+
+        /// <summary>
         /// Gets the list of available models based on license status
         /// </summary>
         string[] GetAvailableModels();

@@ -82,8 +82,9 @@ model LicenseEvent {
 
 // Webhook event deduplication for Stripe webhooks
 model WebhookEvent {
-  eventId String   @id
-  seenAt  DateTime @default(now())
+  eventId     String   @id
+  seenAt      DateTime @default(now())
+  processedAt DateTime @default(now()) // Track when event was actually processed (vs first seen)
 
   @@index([seenAt])
 }

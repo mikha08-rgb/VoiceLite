@@ -86,6 +86,39 @@ export const emailResendRateLimit = redis
   : null;
 
 /**
+ * License validation multi-layer rate limiting (prevents brute force attacks)
+ * Layer 1: IP-based (3/hour per IP)
+ * Layer 2: License key-based (10/hour per key)
+ * Layer 3: Global (1000/hour across all requests)
+ */
+export const licenseValidationIpRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(3, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:license-validation:ip',
+    })
+  : null;
+
+export const licenseValidationKeyRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:license-validation:key',
+    })
+  : null;
+
+export const licenseValidationGlobalRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(1000, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:license-validation:global',
+    })
+  : null;
+
+/**
  * Helper to check rate limit and return appropriate response
  * @param identifier - User identifier (email, userId, etc.)
  * @param limiter - Rate limiter instance

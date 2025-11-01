@@ -4,11 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
 using VoiceLite.Models;
+using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
@@ -64,13 +66,14 @@ namespace VoiceLite.Services
         public event EventHandler<int>? ProgressChanged;
 #pragma warning restore CS0067
 
-        public PersistentWhisperService(Settings settings, IModelResolverService? modelResolver = null)
+        public PersistentWhisperService(Settings settings, IModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
             // Create ModelResolverService if not injected (backward compatibility)
-            this.modelResolver = modelResolver ?? new ModelResolverService(baseDir);
+            // SECURITY FIX (MODEL-GATE-001): Pass ProFeatureService to enable license validation
+            this.modelResolver = modelResolver ?? new ModelResolverService(baseDir, proFeatureService);
 
             // Cache paths at initialization
             cachedWhisperExePath = this.modelResolver.ResolveWhisperExePath();
@@ -380,8 +383,55 @@ namespace VoiceLite.Services
                         // Wait up to 2 seconds for disposal
                         if (!disposeTask.Wait(PROCESS_DISPOSAL_TIMEOUT_MS))
                         {
-                            ErrorLogger.LogWarning("Process disposal timed out after 2 seconds - potential zombie process");
-                            // Process becomes zombie but app continues - better than hanging forever
+                            ErrorLogger.LogError("Process disposal timed out - force killing whisper.exe",
+                                new TimeoutException());
+
+                            // SECURITY FIX (ZOMBIE-KILL-001): Force-kill zombie process with taskkill
+                            try
+                            {
+                                var processId = process.Id;
+                                ErrorLogger.LogMessage($"Force-killing whisper.exe PID {processId} with taskkill...");
+
+                                // Use taskkill /F /T to force-kill process tree
+                                var taskkillProcess = new Process
+                                {
+                                    StartInfo = new ProcessStartInfo
+                                    {
+                                        FileName = "taskkill",
+                                        Arguments = $"/F /T /PID {processId}",
+                                        CreateNoWindow = true,
+                                        UseShellExecute = false,
+                                        RedirectStandardOutput = true,
+                                        RedirectStandardError = true
+                                    }
+                                };
+
+                                taskkillProcess.Start();
+                                taskkillProcess.WaitForExit(1000); // Wait 1 second for taskkill
+
+                                // Verify process terminated
+                                try
+                                {
+                                    if (!process.HasExited)
+                                    {
+                                        ErrorLogger.LogError("Failed to kill zombie whisper.exe after taskkill",
+                                            new InvalidOperationException($"PID {processId} still running"));
+                                    }
+                                    else
+                                    {
+                                        ErrorLogger.LogMessage($"Successfully force-killed zombie PID {processId}");
+                                    }
+                                }
+                                catch (InvalidOperationException)
+                                {
+                                    // Process.HasExited throws if process already disposed - that's fine
+                                    ErrorLogger.LogMessage("Zombie process already disposed after taskkill");
+                                }
+                            }
+                            catch (Exception killEx)
+                            {
+                                ErrorLogger.LogError("Failed to force-kill zombie process with taskkill", killEx);
+                            }
                         }
                         else if (!disposeTask.Result)
                         {
@@ -633,6 +683,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Builds Whisper command-line arguments with preset configuration, VAD support, and optimizations.
+        /// SECURITY FIX (CMD-SANITIZE-001): Sanitizes all file paths and user-controllable inputs
         /// </summary>
         private string BuildWhisperArguments(string audioFilePath, string effectiveModelPath, out int threadCount)
         {
@@ -646,10 +697,17 @@ namespace VoiceLite.Services
             threadCount = optimalThreads;
             var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
 
+            // SECURITY FIX (CMD-SANITIZE-001): Sanitize file paths to prevent injection
+            audioFilePath = SanitizeFilePath(audioFilePath, "audio file");
+            effectiveModelPath = SanitizeFilePath(effectiveModelPath, "model file");
+
+            // SECURITY FIX (CMD-SANITIZE-001): Validate language code format
+            var safeLanguage = SanitizeLanguageCode(settings.Language);
+
             var arguments = $"-m \"{effectiveModelPath}\" " +
                           $"-f \"{audioFilePath}\" " +
                           $"--threads {optimalThreads} " +
-                          $"--no-timestamps --language {settings.Language} " +
+                          $"--no-timestamps --language {safeLanguage} " +
                           $"--beam-size {presetConfig.BeamSize} " +
                           $"--best-of {presetConfig.BestOf} " +
                           $"--entropy-thold {presetConfig.EntropyThreshold:F1} ";
@@ -681,7 +739,10 @@ namespace VoiceLite.Services
             var initialPrompt = "Transcribe the following dictation with proper capitalization and punctuation. " +
                                "Common terms: VoiceLite, GitHub, JavaScript, TypeScript, Python, C#, .NET, React, " +
                                "Node.js, API, JSON, SQL, database, function, variable, component, repository.";
-            arguments += $"--prompt \"{initialPrompt}\" ";
+
+            // SECURITY FIX (CMD-SANITIZE-001): Escape quotes in prompt to prevent command injection
+            var safePrompt = initialPrompt.Replace("\"", "\\\"");
+            arguments += $"--prompt \"{safePrompt}\" ";
 
             // VAD (Voice Activity Detection) support (v1.2.0)
             // CRITICAL: High-quality VAD implementation using Silero VAD v5.1.2
@@ -691,6 +752,9 @@ namespace VoiceLite.Services
                 var vadModelPath = ResolveVADModelPath();
                 if (!string.IsNullOrEmpty(vadModelPath) && File.Exists(vadModelPath))
                 {
+                    // SECURITY FIX (CMD-SANITIZE-001): Sanitize VAD model path
+                    vadModelPath = SanitizeFilePath(vadModelPath, "VAD model");
+
                     // Validate VAD model file integrity
                     var vadFileInfo = new FileInfo(vadModelPath);
                     if (vadFileInfo.Length < 100000) // Silero VAD should be ~865KB
@@ -721,6 +785,70 @@ namespace VoiceLite.Services
             }
 
             return arguments;
+        }
+
+        /// <summary>
+        /// SECURITY FIX (CMD-SANITIZE-001): Sanitizes file paths to prevent command injection and directory traversal
+        /// </summary>
+        private string SanitizeFilePath(string filePath, string fileType)
+        {
+            try
+            {
+                // Normalize path to absolute path (prevents relative path attacks)
+                var normalizedPath = Path.GetFullPath(filePath);
+
+                // Validate path is within expected directories
+                var allowedDirs = new[] {
+                    baseDir, // Application directory
+                    Path.GetTempPath(), // Temp directory for audio files
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceLite")
+                };
+
+                bool isAllowed = allowedDirs.Any(dir =>
+                    normalizedPath.StartsWith(Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase));
+
+                if (!isAllowed)
+                {
+                    throw new SecurityException(
+                        $"{fileType} path is outside allowed directories: {normalizedPath}");
+                }
+
+                // Additional validation: ensure no shell metacharacters in filename
+                var fileName = Path.GetFileName(normalizedPath);
+                if (fileName.IndexOfAny(new[] { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' }) != -1)
+                {
+                    throw new SecurityException(
+                        $"{fileType} filename contains invalid characters: {fileName}");
+                }
+
+                return normalizedPath;
+            }
+            catch (Exception ex) when (ex is not SecurityException)
+            {
+                throw new SecurityException($"Failed to sanitize {fileType} path", ex);
+            }
+        }
+
+        /// <summary>
+        /// SECURITY FIX (CMD-SANITIZE-001): Validates language code format (ISO 639-1)
+        /// </summary>
+        private string SanitizeLanguageCode(string languageCode)
+        {
+            // Allow only 2-letter ISO 639-1 codes (lowercase letters only)
+            if (string.IsNullOrWhiteSpace(languageCode))
+                return "en"; // Default to English
+
+            // Normalize to lowercase
+            var normalized = languageCode.Trim().ToLower();
+
+            // Validate format: 2 lowercase letters only (ISO 639-1)
+            if (normalized.Length != 2 || !normalized.All(char.IsLower))
+            {
+                ErrorLogger.LogWarning($"Invalid language code '{languageCode}', defaulting to 'en'");
+                return "en";
+            }
+
+            return normalized;
         }
 
         /// <summary>
