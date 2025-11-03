@@ -127,18 +127,20 @@ namespace VoiceLite.Controls
 
             foreach (var model in models)
             {
-                // Free users: Only see Base model
-                // Pro users: See all models
+                // Free users: See Base (bundled) + Tiny (downloadable)
+                // Pro users: See all models (Base + Tiny + Small + Medium + Large)
                 if (isProUser)
                 {
                     model.IsVisible = true;
                     model.IsLocked = false;
+                    model.IsProUser = true;
                 }
                 else
                 {
-                    // Free users only see Base model
-                    model.IsVisible = model.FileName == "ggml-base.bin";
+                    // Free users see Base (bundled default) + Tiny (downloadable for slow PCs)
+                    model.IsVisible = model.FileName == "ggml-base.bin" || model.FileName == "ggml-tiny.bin";
                     model.IsLocked = false;
+                    model.IsProUser = false;
                 }
             }
         }
@@ -210,6 +212,18 @@ namespace VoiceLite.Controls
         {
             try
             {
+                // SECURITY: Verify Pro license for Pro-only models (backend enforcement)
+                if (model.IsProOnly && !model.IsProUser)
+                {
+                    MessageBox.Show(
+                        "This model requires a Pro license. Please activate your license in the License tab.",
+                        "Pro License Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning
+                    );
+                    return;
+                }
+
                 model.IsDownloading = true;
                 model.DownloadProgress = 0;
 
@@ -265,6 +279,7 @@ namespace VoiceLite.Controls
         private int downloadProgress;
         private bool isVisible = true;
         private bool isLocked = false;
+        private bool isProUser = false;
 
         public string FileName { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
@@ -272,6 +287,18 @@ namespace VoiceLite.Controls
         public int FileSizeMB { get; set; }
         public string? DownloadUrl { get; set; }
         public bool IsProOnly { get; set; } = false;
+
+        public bool IsProUser
+        {
+            get => isProUser;
+            set
+            {
+                isProUser = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ActionButtonVisibility));
+                OnPropertyChanged(nameof(ProRequiredMessageVisibility));
+            }
+        }
 
         public bool IsVisible
         {
@@ -334,7 +361,17 @@ namespace VoiceLite.Controls
             }
         }
 
-        public Visibility ActionButtonVisibility => (DownloadUrl != null && !IsInstalled) ? Visibility.Visible : Visibility.Collapsed;
+        // Download button: Show only if (1) has download URL, (2) not installed, (3) user has permission (free tier can't download Pro models)
+        public Visibility ActionButtonVisibility =>
+            (DownloadUrl != null && !IsInstalled && (!IsProOnly || IsProUser))
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        // Pro required message: Show if (1) Pro-only model, (2) user is NOT Pro, (3) model is visible (not collapsed)
+        public Visibility ProRequiredMessageVisibility =>
+            (IsProOnly && !IsProUser && IsVisible)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public bool ActionButtonEnabled => !IsDownloading;
         public Visibility DownloadProgressVisibility => IsDownloading ? Visibility.Visible : Visibility.Collapsed;

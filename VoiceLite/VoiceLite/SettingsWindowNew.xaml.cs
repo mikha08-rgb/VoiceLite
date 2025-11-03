@@ -88,11 +88,9 @@ namespace VoiceLite
                 // Pro Features - Control visibility of AI Models tab
                 UpdateProFeatureVisibility();
 
-                // Initialize Model Download Control (Pro users only)
-                if (proFeatureService?.IsProUser == true)
-                {
-                    ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
-                }
+                // Initialize Model Download Control (applies Pro gating for both free and Pro users)
+                // CRITICAL FIX: Must initialize for ALL users to apply visibility gating
+                ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
 
                 // Load Custom Shortcuts
                 LoadShortcuts();

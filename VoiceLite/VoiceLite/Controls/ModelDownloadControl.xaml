@@ -68,6 +68,13 @@
                                            Foreground="Gray"
                                            Margin="0,2,0,0"
                                            TextWrapping="Wrap"/>
+                                <TextBlock Text="🔒 Requires Pro License - Activate in License tab"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="#DC2626"
+                                           Margin="0,5,0,0"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding ProRequiredMessageVisibility}"/>
                             </StackPanel>
 
                             <!-- Download/Status Button -->
