@@ -155,6 +155,18 @@ jobs:
           echo "  - $($_.Name) ($sizeInMB MB)"
         }
 
+    - name: Download VC++ Redistributable
+      shell: pwsh
+      run: |
+        $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        $vcRedistPath = "VoiceLite/Installer/vc_redist.x64.exe"
+
+        echo "Downloading VC++ Redistributable..."
+        Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistPath
+
+        $sizeInMB = [math]::Round((Get-Item $vcRedistPath).Length / 1MB, 2)
+        echo "Downloaded VC++ Redistributable ($sizeInMB MB)"
+
     - name: Download Inno Setup
       shell: pwsh
       run: |
@@ -249,8 +261,10 @@ jobs:
           ---
 
           ### Download
-          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~100 MB)
-            - Includes Tiny model (42MB Q8_0 quantized) for fastest installation
+          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~190 MB)
+            - Includes Base model (78MB Q8_0 quantized) bundled
+            - VC++ Runtime bundled (25MB, auto-installs silently)
+            - .NET 8 bundled (self-contained, no separate install needed)
             - Download additional models from Settings after installation
             - Works completely offline after setup
 
@@ -258,19 +272,17 @@ jobs:
           1. **Verify SHA256 hash** (see above) ⚠️
           2. Download the installer
           3. Right-click installer → Properties → **Unblock** (if shown)
-          4. Run the installer - you'll see a popup listing required dependencies
-          5. If you don't have the dependencies, install them first:
-             - Microsoft Visual C++ Runtime 2015-2022 (x64)
-             - .NET 8.0 Desktop Runtime (x64)
-          6. Accept EULA and complete installation
-          7. Launch VoiceLite from Start Menu or Desktop shortcut
+          4. Run the installer - dependencies auto-install silently
+          5. Accept EULA and complete installation
+          6. Launch VoiceLite - ready to use immediately!
+
+          **No manual downloads or restarts required** ✨
 
           ### System Requirements
           - Windows 10/11 (64-bit)
-          - Visual C++ Runtime 2015-2022 (x64) - [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-          - .NET 8.0 Desktop Runtime (x64) - [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
-          - ~200 MB free disk space (Tiny model only)
+          - ~200 MB free disk space
           - Microphone (built-in or USB)
+          - **All dependencies bundled** - VC++ Runtime and .NET 8 install automatically
 
           ### SHA256 Hashes
           ${{ steps.generate-hashes.outputs.HASHES }}
@@ -279,10 +291,9 @@ jobs:
           If installation fails, see [TROUBLESHOOTING.md](https://github.com/${{ github.repository }}/blob/master/TROUBLESHOOTING.md)
 
           **Common issues**:
-          - **VCRUNTIME140.dll missing**: Install [VC++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) then run installer again
-          - **App won't launch**: Install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) then restart
           - **Antivirus blocking**: Add VoiceLite.exe and whisper.exe to antivirus exclusions
           - **Model corruption**: Verify SHA256 hash, re-download if mismatch
+          - **VC++ install fails**: Installer auto-installs VC++ Runtime - if it fails, manually download from [Microsoft](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 
           ### What's New
           See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for full release notes.
