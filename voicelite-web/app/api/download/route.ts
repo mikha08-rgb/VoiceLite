@@ -6,7 +6,7 @@ const MAX_VERSION_LENGTH = 20;
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const version = searchParams.get('version') || '1.2.0.3';
+  const version = searchParams.get('version') || '1.2.0.4';
 
   // Validate version format to prevent path traversal
   if (!VERSION_REGEX.test(version)) {
