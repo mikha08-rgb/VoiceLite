@@ -17,6 +17,10 @@ namespace VoiceLite.Services
     {
         public bool AutoPaste { get; set; } = true;
 
+        // Target window handle for paste operations
+        // Captured when InjectText is called to ensure paste goes to correct window
+        private IntPtr _targetWindowHandle = IntPtr.Zero;
+
         // Text length thresholds for injection mode selection
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
         private const int LONG_TEXT_THRESHOLD = 100; // Text longer than this is considered "long"
@@ -48,8 +52,13 @@ namespace VoiceLite.Services
                 return;
             }
 
+            // CRITICAL FIX: Capture foreground window IMMEDIATELY when InjectText is called
+            // This is the window where the user expects text to be pasted
+            // For long transcriptions, user may switch focus during processing - we restore it later
+            _targetWindowHandle = GetForegroundWindow();
+
 #if DEBUG
-            ErrorLogger.LogMessage($"InjectText called with {text.Length} characters, AutoPaste: {AutoPaste}");
+            ErrorLogger.LogMessage($"InjectText called with {text.Length} characters, AutoPaste: {AutoPaste}, Target window: {_targetWindowHandle}");
 #endif
 
             try
@@ -489,7 +498,7 @@ namespace VoiceLite.Services
             }
         }
 
-        private static void SetClipboardText(string text)
+        private void SetClipboardText(string text)
         {
             const int maxAttempts = 5;
 
@@ -519,13 +528,22 @@ namespace VoiceLite.Services
             throw new InvalidOperationException("Unable to access clipboard.");
         }
 
-        private static void SimulateCtrlV()
+        private void SimulateCtrlV()
         {
             try
             {
 #if DEBUG
-                ErrorLogger.LogMessage("Simulating Ctrl+V");
+                ErrorLogger.LogMessage($"Simulating Ctrl+V to window handle: {_targetWindowHandle}");
 #endif
+
+                // CRITICAL FIX: Restore focus to target window before sending keystrokes
+                // For long transcriptions (>5s), user may have clicked VoiceLite window to check progress
+                // This ensures Ctrl+V goes to the ORIGINAL target app, not VoiceLite
+                if (_targetWindowHandle != IntPtr.Zero)
+                {
+                    SetForegroundWindow(_targetWindowHandle);
+                    Thread.Sleep(50); // Allow window activation to complete
+                }
 
                 // RELIABILITY FIX: Increased timing for better cross-application compatibility
                 // Previous 1ms delays were too aggressive, causing paste failures in some apps
@@ -631,6 +649,10 @@ namespace VoiceLite.Services
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);

@@ -1,11 +1,11 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.2.0.3: Critical fix - Pro license bypass in AI Models tab
+; v1.2.0.4: Hotfix - Focus preservation for long transcriptions
 ; Just copy files, inform user of dependencies, and launch
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.2.0.3
+AppVersion=1.2.0.4
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +13,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.2.0.3
+OutputBaseFilename=VoiceLite-Setup-1.2.0.4
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
