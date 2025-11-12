@@ -121,3 +121,42 @@ enum ActivityType {
   LICENSE_RENEWED
   FEEDBACK_SUBMITTED
 }
+
+// Feedback submission enums
+enum FeedbackType {
+  BUG
+  FEATURE_REQUEST
+  GENERAL
+  QUESTION
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum FeedbackPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Feedback - optional, for user feedback collection
+model Feedback {
+  id        String           @id @default(cuid())
+  email     String?
+  type      FeedbackType     @default(GENERAL)
+  subject   String
+  message   String
+  metadata  String?          // JSON - browser, OS, version, etc.
+  status    FeedbackStatus   @default(OPEN)
+  priority  FeedbackPriority @default(MEDIUM)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
