@@ -9,21 +9,22 @@ datasource db {
 }
 
 model License {
-  id                    String         @id @default(cuid())
+  id                    String              @id @default(cuid())
   userId                String
-  licenseKey            String         @unique
+  licenseKey            String              @unique
   type                  LicenseType
-  status                LicenseStatus  @default(ACTIVE)
+  status                LicenseStatus       @default(ACTIVE)
   stripeCustomerId      String?
-  stripeSubscriptionId  String?        @unique
-  stripePaymentIntentId String?        @unique
+  stripeSubscriptionId  String?             @unique
+  stripePaymentIntentId String?             @unique
   activatedAt           DateTime?
   expiresAt             DateTime?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @default(now()) @updatedAt
-  email                 String         @default("")
-  User                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @default(now()) @updatedAt
+  email                 String              @default("")
+  User                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   events                LicenseEvent[]
+  activations           LicenseActivation[]
 
   @@index([email])
   @@index([stripeCustomerId])
@@ -36,6 +37,7 @@ model License {
 model LicenseActivation {
   id              String    @id @default(cuid())
   licenseId       String
+  license         License   @relation(fields: [licenseId], references: [id], onDelete: Cascade)
   device_id       String
   metadata        String?
   activatedAt     DateTime  @default(now())
