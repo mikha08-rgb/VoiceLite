@@ -21,7 +21,7 @@ export interface LicenseEmailResult {
 }
 
 export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'BasmentHustleLLC@gmail.com';
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'VoiceLite <BasmentHustleLLC@gmail.com>';
 
   const html = `
 <!DOCTYPE html>
@@ -132,7 +132,7 @@ Need help? Just reply to this email.
     console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
     const resend = getResendClient();
     const result = await resend.emails.send({
-      from: `VoiceLite <${fromEmail}>`,
+      from: fromEmail,
       to: email,
       subject: 'Your VoiceLite Pro License Key',
       html,

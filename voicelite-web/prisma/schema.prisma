@@ -1,14 +1,101 @@
-// Prisma schema for VoiceLite licensing (simplified - removed auth, analytics, unused models)
-// Datasource uses Supabase Postgres via pooled connection string.
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
+model License {
+  id                    String         @id @default(cuid())
+  userId                String
+  licenseKey            String         @unique
+  type                  LicenseType
+  status                LicenseStatus  @default(ACTIVE)
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?        @unique
+  stripePaymentIntentId String?        @unique
+  activatedAt           DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @default(now()) @updatedAt
+  email                 String         @default("")
+  User                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events                LicenseEvent[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
+  @@index([userId])
+  @@index([userId, status], map: "License_user_status_idx")
+  @@index([status], map: "idx_license_status")
+  @@index([userId], map: "idx_license_userid")
+}
+
+model LicenseActivation {
+  id              String    @id @default(cuid())
+  licenseId       String
+  device_id       String
+  metadata        String?
+  activatedAt     DateTime  @default(now())
+  lastValidatedAt DateTime?
+  status          String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now())
+
+  @@unique([licenseId, device_id], map: "LicenseActivation_licenseId_machineId_key")
+  @@index([licenseId])
+  @@index([licenseId, status])
+  @@index([device_id], map: "LicenseActivation_machineId_idx")
+  @@index([licenseId], map: "idx_activation_licenseid")
+}
+
+model LicenseEvent {
+  id        String   @id @default(cuid())
+  licenseId String
+  type      String
+  metadata  String?
+  createdAt DateTime @default(now())
+  license   License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId])
+  @@index([createdAt])
+  @@index([licenseId, createdAt(sort: Desc)])
+  @@index([licenseId], map: "idx_licenseevent_licenseid")
+  @@index([licenseId, type], map: "idx_licenseevent_licenseid_type")
+  @@index([type], map: "idx_licenseevent_type")
+}
+
+model WebhookEvent {
+  eventId String   @id
+  seenAt  DateTime @default(now())
+
+  @@index([seenAt])
+}
+
+model User {
+  id           String         @id
+  email        String         @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now())
+  License      License[]
+  UserActivity UserActivity[]
+}
+
+model UserActivity {
+  id           String       @id
+  userId       String?
+  activityType ActivityType
+  metadata     String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime     @default(now())
+  User         User?        @relation(fields: [userId], references: [id])
+
+  @@index([activityType])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 enum LicenseType {
@@ -22,108 +109,15 @@ enum LicenseStatus {
   EXPIRED
 }
 
-enum LicenseActivationStatus {
-  ACTIVE
-  BLOCKED
-}
-
-// Core licensing model - stores license keys from Stripe purchases
-model License {
-  id                    String    @id @default(cuid())
-  email                 String    // Customer email (no auth/user table needed)
-  licenseKey            String    @unique
-  type                  LicenseType
-  status                LicenseStatus @default(ACTIVE)
-  stripeCustomerId      String?
-  stripeSubscriptionId  String?   @unique
-  stripePaymentIntentId String?   @unique
-  activatedAt           DateTime?
-  expiresAt             DateTime?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
-  activations           LicenseActivation[]
-  events                LicenseEvent[]
-
-  @@index([email])
-  @@index([stripeCustomerId])
-}
-
-// License activations - tracks 3-device limit per license
-model LicenseActivation {
-  id              String                  @id @default(cuid())
-  licenseId       String
-  license         License                 @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  machineId       String
-  machineLabel    String?
-  machineHash     String?
-  activatedAt     DateTime                @default(now())
-  lastValidatedAt DateTime?
-  status          LicenseActivationStatus @default(ACTIVE)
-
-  @@unique([licenseId, machineId])
-  @@index([licenseId])
-  @@index([status]) // For activation counting queries
-  @@index([licenseId, status]) // Composite index for efficient activation count queries (WHERE licenseId = X AND status = 'ACTIVE')
-  @@index([machineHash]) // For duplicate machine detection
-}
-
-// License event audit trail
-model LicenseEvent {
-  id        String   @id @default(cuid())
-  licenseId String
-  license   License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  type      String   // "issued" | "renewed" | "revoked" | "activated" | "deactivated"
-  metadata  String?  // JSON
-  createdAt DateTime @default(now())
-
-  @@index([licenseId])
-  @@index([createdAt])
-}
-
-// Webhook event deduplication for Stripe webhooks
-model WebhookEvent {
-  eventId     String   @id
-  seenAt      DateTime @default(now())
-  processedAt DateTime @default(now()) // Track when event was actually processed (vs first seen)
-
-  @@index([seenAt])
-}
-
-// Feedback submission enums
-enum FeedbackType {
-  BUG
-  FEATURE_REQUEST
-  GENERAL
-  QUESTION
-}
-
-enum FeedbackStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum FeedbackPriority {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-// Feedback - optional, for user feedback collection
-model Feedback {
-  id        String           @id @default(cuid())
-  email     String?
-  type      FeedbackType     @default(GENERAL)
-  subject   String
-  message   String
-  metadata  String?          // JSON - browser, OS, version, etc.
-  status    FeedbackStatus   @default(OPEN)
-  priority  FeedbackPriority @default(MEDIUM)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  @@index([status])
-  @@index([createdAt])
+enum ActivityType {
+  USER_REGISTERED
+  USER_LOGIN
+  USER_LOGOUT
+  CHECKOUT_STARTED
+  CHECKOUT_COMPLETED
+  LICENSE_ISSUED
+  LICENSE_ACTIVATED
+  LICENSE_DEACTIVATED
+  LICENSE_RENEWED
+  FEEDBACK_SUBMITTED
 }
