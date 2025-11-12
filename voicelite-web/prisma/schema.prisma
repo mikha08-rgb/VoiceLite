@@ -70,8 +70,9 @@ model LicenseEvent {
 }
 
 model WebhookEvent {
-  eventId String   @id
-  seenAt  DateTime @default(now())
+  eventId     String   @id
+  seenAt      DateTime @default(now())
+  processedAt DateTime @default(now())
 
   @@index([seenAt])
 }
