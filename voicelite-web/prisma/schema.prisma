@@ -35,16 +35,16 @@ model License {
 }
 
 model LicenseActivation {
-  id              String    @id @default(cuid())
+  id              String                   @id @default(cuid())
   licenseId       String
-  license         License   @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  license         License                  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
   device_id       String
   metadata        String?
-  activatedAt     DateTime  @default(now())
+  activatedAt     DateTime                 @default(now())
   lastValidatedAt DateTime?
-  status          String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now())
+  status          LicenseActivationStatus  @default(ACTIVE)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @default(now())
 
   @@unique([licenseId, device_id], map: "LicenseActivation_licenseId_machineId_key")
   @@index([licenseId])
@@ -110,6 +110,11 @@ enum LicenseStatus {
   ACTIVE
   CANCELED
   EXPIRED
+}
+
+enum LicenseActivationStatus {
+  ACTIVE
+  BLOCKED
 }
 
 enum ActivityType {
