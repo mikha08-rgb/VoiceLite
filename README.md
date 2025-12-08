@@ -1,5 +1,8 @@
 # 🎙️ VoiceLite - Instant Voice Typing for Windows
 
+[![Run in Smithery](https://smithery.ai/badge/skills/mikha08-rgb)](https://smithery.ai/skills?ns=mikha08-rgb&utm_source=github&utm_medium=badge)
+
+
 <div align="center">
 
   **Try Free • Upgrade to Pro ($20) • 100% Offline • Privacy-First**
