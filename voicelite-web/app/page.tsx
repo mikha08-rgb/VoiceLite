@@ -3,6 +3,110 @@
 import { useState } from 'react';
 import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
+import Script from 'next/script';
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "VoiceLite",
+  "description": "Windows speech-to-text app. 100% offline voice recognition with OpenAI Whisper AI. Fast, accurate, privacy-focused.",
+  "operatingSystem": "Windows 10, Windows 11",
+  "applicationCategory": "ProductivityApplication",
+  "applicationSubCategory": "Speech-to-Text Software",
+  "downloadUrl": "https://voicelite.app/api/download",
+  "softwareVersion": "1.2.0",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "VoiceLite Free",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    {
+      "@type": "Offer",
+      "name": "VoiceLite Pro",
+      "price": "20",
+      "priceCurrency": "USD"
+    }
+  ],
+  "softwareRequirements": "Windows 10 or later, 4GB RAM minimum",
+  "featureList": [
+    "100% offline speech-to-text",
+    "OpenAI Whisper AI models",
+    "Global hotkey works in any app",
+    "Sub-200ms latency",
+    "99 languages supported",
+    "Privacy-focused - voice never leaves device"
+  ],
+  "author": {
+    "@type": "Organization",
+    "name": "VoiceLite"
+  },
+  "datePublished": "2024-01-01"
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does VoiceLite require an internet connection?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. VoiceLite runs 100% offline on your PC. Your voice never leaves your computer - no internet required for transcription."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which Windows apps does VoiceLite work with?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All of them! VS Code, Chrome, Discord, Slack, terminals, Word, and any Windows app with a text field. The global hotkey works system-wide."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How accurate is VoiceLite with technical terms?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "VoiceLite recognizes technical terms like useState, npm, git, Docker with 90-93% accuracy (Pro model). It handles code, jargon, and specialized vocabulary."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use VoiceLite for coding?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! VoiceLite works great for dictating code. It recognizes function names, variable names, and technical syntax. Many developers use it daily."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What languages does VoiceLite support?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "VoiceLite supports 99 languages including English, Spanish, French, German, Chinese, Japanese, and many more. All work 100% offline."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Will VoiceLite slow down my computer?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. VoiceLite uses less than 100MB RAM when idle and less than 300MB when transcribing. It only uses CPU/GPU when you hold the hotkey. Minimal performance impact."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is VoiceLite's refund policy?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "30-day money-back guarantee on all purchases. If VoiceLite doesn't work for you, email support for a full refund - no questions asked."
+      }
+    }
+  ]
+};
 
 export default function HomePage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -35,6 +139,17 @@ export default function HomePage() {
   };
 
   return (
+    <>
+      <Script
+        id="json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <Script
+        id="faq-json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
     <main className="min-h-screen bg-white dark:bg-stone-950">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-stone-200 bg-white/95 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-950/95">
@@ -375,7 +490,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="/api/download?version=1.2.0.4"
+                href="/api/download?version=1.2.0.6"
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -552,7 +667,7 @@ export default function HomePage() {
                   Pricing
                 </a>
                 <a
-                  href="/api/download?version=1.2.0.4"
+                  href="/api/download?version=1.2.0.6"
                   className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
                 >
                   Download
@@ -599,5 +714,6 @@ export default function HomePage() {
         </div>
       </footer>
     </main>
+    </>
   );
 }
