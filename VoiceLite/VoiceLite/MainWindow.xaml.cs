@@ -1955,16 +1955,40 @@ namespace VoiceLite
 
                 if (!File.Exists(modelPath) && !File.Exists(localDataPath))
                 {
-                    // Show clear error message - no fallback
-                    MessageBox.Show(
-                        $"Model file '{modelFile}' is missing.\n\n" +
-                        "Please reinstall VoiceLite or download the model from Settings → AI Models.\n\n" +
-                        $"Expected locations:\n" +
-                        $"- Bundled: {modelPath}\n" +
-                        $"- Downloaded: {localDataPath}",
-                        "Model File Missing",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    // Check if base model exists as fallback
+                    var baseModelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
+                    var baseLocalPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "VoiceLite", "whisper", "ggml-base.bin");
+
+                    if (File.Exists(baseModelPath) || File.Exists(baseLocalPath))
+                    {
+                        // CRITICAL FIX: Fallback to base model so app is usable
+                        ErrorLogger.LogWarning($"Model '{modelFile}' missing - falling back to ggml-base.bin");
+                        settings.WhisperModel = "ggml-base.bin";
+                        _ = SaveSettingsInternalAsync();
+
+                        MessageBox.Show(
+                            $"Model file '{modelFile}' is missing.\n\n" +
+                            "VoiceLite has switched to the bundled Swift (Base) model.\n\n" +
+                            "To download other models, go to Settings → AI Models.",
+                            "Model File Missing - Using Swift",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+                    else
+                    {
+                        // No models available at all - show error
+                        MessageBox.Show(
+                            $"Model file '{modelFile}' is missing.\n\n" +
+                            "Please reinstall VoiceLite or download the model from Settings → AI Models.\n\n" +
+                            $"Expected locations:\n" +
+                            $"- Bundled: {modelPath}\n" +
+                            $"- Downloaded: {localDataPath}",
+                            "Model File Missing",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
                 }
             }
             catch (Exception ex)

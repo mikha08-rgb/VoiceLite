@@ -92,7 +92,7 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public void WhisperService_DisposeCleansUpProcessPool()
         {
-            var settings = new Settings { WhisperModel = "small" };
+            var settings = new Settings { WhisperModel = "base" };
 
             // Only run if whisper.exe exists
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
@@ -222,7 +222,7 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task FileHandles_ReleasedAfterTranscription()
         {
-            var settings = new Settings { WhisperModel = "small" };
+            var settings = new Settings { WhisperModel = "base" };
 
             var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
             if (!File.Exists(whisperPath))
