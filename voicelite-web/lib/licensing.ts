@@ -155,26 +155,31 @@ export async function recordLicenseActivation({
     });
   }
 
-  // New activation - check 3-device limit
-  const activeCount = await prisma.licenseActivation.count({
-    where: {
-      licenseId,
-      status: LicenseActivationStatus.ACTIVE,
-    },
-  });
+  // MED-13 FIX: Use transaction for count+create to prevent race condition
+  // Without transaction, two simultaneous requests could both see count=2 and both create,
+  // resulting in 4 activations (exceeding 3-device limit)
+  return prisma.$transaction(async (tx) => {
+    // New activation - check 3-device limit (inside transaction)
+    const activeCount = await tx.licenseActivation.count({
+      where: {
+        licenseId,
+        status: LicenseActivationStatus.ACTIVE,
+      },
+    });
 
-  if (activeCount >= 3) {
-    throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
-  }
+    if (activeCount >= 3) {
+      throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
+    }
 
-  // Create new activation
-  return prisma.licenseActivation.create({
-    data: {
-      licenseId,
-      machineId,
-      machineLabel,
-      machineHash,
-    },
+    // Create new activation (inside same transaction)
+    return tx.licenseActivation.create({
+      data: {
+        licenseId,
+        machineId,
+        machineLabel,
+        machineHash,
+      },
+    });
   });
 }
 

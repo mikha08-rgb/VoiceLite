@@ -57,6 +57,8 @@ namespace VoiceLite
         private bool isInitializing = true;
         // TIER 1.4: Replaced lock with SemaphoreSlim for async compatibility
         private readonly SemaphoreSlim saveSettingsSemaphore = new SemaphoreSlim(1, 1);
+        // MED-11 FIX: CancellationToken for settings save operations (cancelled on disposal)
+        private readonly CancellationTokenSource settingsSaveCts = new CancellationTokenSource();
         private DateTime lastClickTime = DateTime.MinValue;
         private DateTime lastHotkeyPressTime = DateTime.MinValue;
 
@@ -264,8 +266,26 @@ namespace VoiceLite
                     }
                     else
                     {
-                        ErrorLogger.LogMessage("Settings validation failed - using defaults WITHOUT cleanup");
+                        ErrorLogger.LogMessage("Settings validation failed - attempting history recovery");
+
+                        // CRIT-6 FIX: Preserve transcription history before resetting
+                        // Prevents permanent data loss when settings file is corrupted
+                        var preservedHistory = new List<TranscriptionHistoryItem>();
+                        try
+                        {
+                            if (loadedSettings?.TranscriptionHistory != null)
+                            {
+                                preservedHistory = loadedSettings.TranscriptionHistory.ToList();
+                                ErrorLogger.LogMessage($"Preserved {preservedHistory.Count} history items from corrupted settings");
+                            }
+                        }
+                        catch (Exception historyEx)
+                        {
+                            ErrorLogger.LogWarning($"Failed to preserve history: {historyEx.Message}");
+                        }
+
                         settings = new Settings();
+                        settings.TranscriptionHistory = preservedHistory;
                     }
                 }
                 else
@@ -356,7 +376,8 @@ namespace VoiceLite
             });
 
             // TIER 1.4: Use SemaphoreSlim instead of lock for async compatibility
-            await saveSettingsSemaphore.WaitAsync();
+            // MED-11 FIX: Use cancellation token to allow graceful shutdown
+            await saveSettingsSemaphore.WaitAsync(settingsSaveCts.Token);
             try
             {
                 try
@@ -2053,6 +2074,10 @@ namespace VoiceLite
                 hotkeyManager = null;
 
                 // SoundService removed per user request - no disposal needed
+
+                // MED-11 FIX: Cancel pending settings save operations before disposing
+                try { settingsSaveCts?.Cancel(); } catch { }
+                try { settingsSaveCts?.Dispose(); } catch { }
 
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
                 try { saveSettingsSemaphore?.Dispose(); } catch { }

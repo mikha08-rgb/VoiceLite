@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  // CRIT-2 FIX: Require admin authentication
+  if (!isAdminAuthenticated(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     console.log('🔧 Checking database schema...');
 
@@ -62,7 +68,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: false,
       error: error.message,
-      details: error.stack,
+      // HIGH-1 FIX: Only expose stack trace in development (prevents info leak in production)
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     }, { status: 500 });
   }
 }

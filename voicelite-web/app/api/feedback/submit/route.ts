@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ipAddress } from '@vercel/edge';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
-import { headers } from 'next/headers';
 
 // Lazy initialization of rate limiter to allow builds without env vars
-function getRateLimiter() {
+function getRateLimiter(): Ratelimit | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
-    throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be configured');
+    return null;
   }
 
   return new Ratelimit({
@@ -37,22 +37,28 @@ const feedbackSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // Rate limiting: 5 feedback submissions per hour per IP
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    // Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
+    const ip = ipAddress(req) || 'unknown';
 
     const ratelimit = getRateLimiter();
-    const { success, limit, remaining, reset } = await ratelimit.limit(`feedback:${ip}`);
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': limit.toString(),
-            'X-RateLimit-Remaining': remaining.toString(),
-            'X-RateLimit-Reset': reset.toString(),
-          },
-        }
-      );
+    if (ratelimit) {
+      const { success, limit, remaining, reset } = await ratelimit.limit(`feedback:${ip}`);
+      if (!success) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded. Please try again later.' },
+          {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': reset.toString(),
+            },
+          }
+        );
+      }
+    } else {
+      // Development/fallback: log warning but allow request
+      console.warn('Rate limiter not configured, allowing feedback request');
     }
 
     // Parse and validate request body

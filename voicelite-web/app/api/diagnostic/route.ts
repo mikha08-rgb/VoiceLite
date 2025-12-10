@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
+import { isAdminAuthenticated } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  // CRIT-1 FIX: Require admin authentication
+  if (!isAdminAuthenticated(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const results: any = {
     timestamp: new Date().toISOString(),
     checks: {},
@@ -37,22 +42,31 @@ export async function GET(request: NextRequest) {
   // Check 3: Test email sending (optional, only if ?testEmail=true)
   const testEmail = request.nextUrl.searchParams.get('testEmail');
   if (testEmail === 'true') {
-    try {
-      const emailResult = await sendLicenseEmail({
-        email: 'mikhail.lev08@gmail.com',
-        licenseKey: 'DIAGNOSTIC-TEST-KEY',
-      });
+    // HIGH-4 FIX: Use env variable instead of hardcoded email
+    const diagnosticEmail = process.env.DIAGNOSTIC_TEST_EMAIL || process.env.RESEND_FROM_EMAIL;
+    if (!diagnosticEmail) {
+      results.checks.email = {
+        status: '❌ Skipped',
+        error: 'DIAGNOSTIC_TEST_EMAIL or RESEND_FROM_EMAIL not configured',
+      };
+    } else {
+      try {
+        const emailResult = await sendLicenseEmail({
+          email: diagnosticEmail,
+          licenseKey: 'DIAGNOSTIC-TEST-KEY',
+        });
 
-      results.checks.email = {
-        status: emailResult.success ? '✅ Success' : '❌ Failed',
-        messageId: emailResult.messageId,
-        error: emailResult.error,
-      };
-    } catch (error: any) {
-      results.checks.email = {
-        status: '❌ Failed',
-        error: error.message,
-      };
+        results.checks.email = {
+          status: emailResult.success ? '✅ Success' : '❌ Failed',
+          messageId: emailResult.messageId,
+          error: emailResult.error,
+        };
+      } catch (error: any) {
+        results.checks.email = {
+          status: '❌ Failed',
+          error: error.message,
+        };
+      }
     }
   }
 

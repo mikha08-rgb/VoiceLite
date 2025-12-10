@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ipAddress } from '@vercel/edge';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { prisma } from '@/lib/prisma';
 import { recordLicenseEvent } from '@/lib/licensing';
@@ -16,9 +17,8 @@ import { LicenseStatus } from '@prisma/client';
  */
 export async function POST(request: NextRequest) {
   // Rate limiting by IP to prevent enumeration attacks
-  const ip = request.headers.get('x-forwarded-for')?.split(',').pop()?.trim()
-    || request.headers.get('x-real-ip')
-    || 'unknown';
+  // Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
+  const ip = ipAddress(request) || 'unknown';
 
   // Check rate limit
   if (emailResendRateLimit) {
@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
         createdAt: 'desc', // Get most recent if multiple exist
       },
     });
+
+    // Add small random delay to prevent timing attacks (50-150ms)
+    await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
 
     // Use generic message to prevent email enumeration
     if (!license) {
@@ -114,23 +117,17 @@ export async function POST(request: NextRequest) {
         email: license.email,
       });
 
+      // Don't expose detailed error in production
       return NextResponse.json(
-        {
-          error: 'Failed to send email',
-          details: emailResult.error instanceof Error
-            ? emailResult.error.message
-            : 'Unknown error'
-        },
+        { error: 'Failed to send email. Please try again later.' },
         { status: 500 }
       );
     }
   } catch (error) {
     console.error('Error in resend-email endpoint:', error);
+    // Don't expose error details in production
     return NextResponse.json(
-      {
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Internal server error. Please try again later.' },
       { status: 500 }
     );
   }

@@ -1,239 +1,124 @@
-# CLAUDE.md
+# VoiceLite
 
-VoiceLite: Windows speech-to-text app using OpenAI Whisper AI. **Philosophy**: Core-only workflow with Pro licensing for advanced models. Recording → Whisper → text injection.
+Windows speech-to-text app. Desktop (.NET 8 WPF) + Web backend (Next.js 15). Recording → Whisper.cpp → text injection.
 
-## Quick Commands
+## Quick Start
 
-### Build & Run
 ```bash
-# Build and run
+# Build & run desktop
 dotnet build VoiceLite/VoiceLite.sln
 dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj
 
-# Release build
-dotnet build VoiceLite/VoiceLite.sln -c Release
+# Release build + installer
 dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
-```
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup.iss
 
-### Testing
-```bash
-# Run all tests (~200 tests)
+# Tests (~311 tests, must all pass before commit)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
-# With coverage (target: ≥75% overall, ≥80% Services/)
-dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj --collect:"XPlat Code Coverage"
+# Web backend
+cd voicelite-web && npm run dev
 ```
 
-### Installer (Inno Setup)
-```bash
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup.iss
-```
+## Architecture Decisions
 
-### Web App (voicelite-web/)
-```bash
-cd voicelite-web
-npm install
-npm run dev                # Development server
-npm run build              # Production build
-npm run db:migrate         # Database migrations
-npm run db:studio          # Prisma Studio GUI
-vercel deploy --prod       # Deploy to production
-```
+**Why subprocess for Whisper**: whisper.cpp as Process, not library binding. Easier to kill zombie processes, debug crashes, update whisper version independently.
 
-### Release (Automated via GitHub Actions)
-```bash
-# Tag and push - workflow auto-builds installer
-git tag v1.0.XX
-git push --tags
-# Workflow updates versions, builds, creates GitHub release (~5-7 min)
-```
+**Why no DI container**: Manual service wiring in MainWindow. Small app, MVVM extraction in progress. ViewModels own events, MainWindow wires handlers.
 
-## Project Architecture
+**Why static HttpClient in LicenseService**: Single API endpoint (voicelite.app). Prevents socket exhaustion. Intentionally NOT disposed.
 
-**Target**: .NET 8.0 Windows | **Distribution**: Free tier + Pro upgrade ($20 one-time)
+**Why DPAPI for license storage**: Windows-native encryption, tied to user account. `%LOCALAPPDATA%\VoiceLite\license.dat`. Auto-migrates from plaintext settings.json.
 
-### Core Components (9 Services - v1.0.79)
+**Why Q8_0 quantization**: 45% smaller models, 30-40% faster inference, 99.98% identical accuracy. large-v3 still F16 (no upstream Q8).
 
-**Active Services**:
-- `AudioRecorder`: NAudio recording (16kHz mono WAV, no preprocessing)
-- `PersistentWhisperService`: Whisper.cpp subprocess (greedy decoding: beam_size=1)
-- `TextInjector`: Text injection via InputSimulator (SmartAuto/Type/Paste modes)
-- `HotkeyManager`: Global hotkeys via Win32 API
-- `SystemTrayManager`: Tray icon + context menu
-- `TranscriptionHistoryService`: History with pinning
-- `ErrorLogger`: Centralized error logging
-- `LicenseService`: Pro license validation via web API
-- `ProFeatureService`: Centralized Pro feature gating (AI Models tab, future features)
+## Critical Paths
 
-**Note**: Services like `MemoryMonitor`, `StartupDiagnostics`, `DependencyChecker`, `ZombieProcessCleanupService` exist only in `voicelite-web-preview/` branch (v1.0.70), not in main production app.
+**Recording flow**: `MainWindow` → `AudioRecorder.StartRecording()` → 16kHz mono WAV → `PersistentWhisperService.TranscribeAsync()` → `TextInjector.InjectText()`
 
-### Whisper Models (in `whisper/` directory)
+**License validation**: Desktop calls `/api/licenses/validate` → Prisma lookup → device activation (3-device limit) → DPAPI-cached locally
 
-**Most models Q8_0 quantized (v1.0.88+)** for 45% size reduction & 30-40% speed boost with identical accuracy. Large-v3 uses F16 (Q8_0 unavailable upstream).
+## Gotchas & Past Failures
 
-**Free Tier:**
-- `ggml-base.bin` (78MB Q8_0): **Swift** - Bundled with installer (default), 85-90% accuracy, ~1.5s processing ⭐ DEFAULT
-- `ggml-tiny.bin` (42MB Q8_0): **Lite** - Downloadable for very slow PCs, 80-85% accuracy, <0.8s processing
+- **Model files in .gitignore**: v1.0.96 broke because `ggml-tiny.bin` was gitignored. Use `git add -f` for model files.
+- **Release logging disabled**: v1.0.94 had silent failures because `#if DEBUG` wrapped logging. Use `ErrorLogger.LogWarning()` for release-visible logs.
+- **Process disposal timeout**: Whisper processes can zombie. `PersistentWhisperService` has 2-second disposal timeout + taskkill fallback.
+- **Semaphore tracking**: `TranscribeAsync()` tracks `semaphoreAcquired` bool to prevent `SemaphoreFullException` on cancellation.
+- **TextInjector window capture**: Captures foreground window at start of transcription, not at injection time. Long transcriptions may redirect to wrong window.
 
-**Pro Tier ($20 one-time - downloadable in-app):**
-- `ggml-small.bin` (253MB Q8_0): **Pro** ⭐ - 90-93% accuracy, ~3s processing (recommended)
-- `ggml-medium.bin` (823MB Q8_0): **Elite** - 95-97% accuracy, ~12s processing
-- `ggml-large-v3.bin` (3.1GB F16): **Ultra** - 97-99% accuracy, ~15s processing (Dragon-level quality)
+## Patterns to Follow
 
-**Quantization Details (v1.0.88)**:
-- Method: Q8_0 (8-bit integer quantization)
-- Accuracy: 99.98% identical to F16 (research-proven, arXiv 2503.09905)
-- Benefits: Smaller downloads, faster inference, lower memory usage
-- F16 backups: Available as `*-f16.backup` for rollback if needed
-
-**Whisper Command** (v1.0.87+):
-```bash
-whisper.exe -m [model] -f [audio.wav] --no-timestamps --language en \
-  --beam-size 1 --best-of 1 --entropy-thold 3.0 --no-fallback \
-  --max-context 64 --flash-attn  # Optimized for speed (67-73% faster than v1.0.84)
-```
-
-### File Locations
-
-- **Settings**: `%LOCALAPPDATA%\VoiceLite\settings.json` (Local, NOT synced)
-- **Logs**: `%LOCALAPPDATA%\VoiceLite\logs\voicelite.log` (10MB rotation)
-- **Dependencies**: Visual C++ Runtime 2015-2022 x64 (bundled in installer)
-
-### Key Dependencies
-
-```xml
-<PackageReference Include="NAudio" Version="2.2.1" />
-<PackageReference Include="H.InputSimulator" Version="1.2.1" />
-<PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
-<PackageReference Include="System.Text.Json" Version="9.0.9" />
-<PackageReference Include="System.Management" Version="8.0.0" />
-```
-
-## Code Guidelines
-
-### Critical Implementation Rules
-
-1. **Audio Format**: 16kHz, 16-bit mono WAV (no preprocessing for reliability)
-2. **Thread Safety**: Use `lock` for recording state, `Dispatcher.Invoke()` for UI updates
-3. **Process Management**: One whisper.exe per transcription, manual cleanup via Process.Kill()
-4. **Memory**: Always dispose IDisposable, check disposal tests
-5. **Error Handling**: Centralized via ErrorLogger, graceful fallbacks
-6. **Text Injection**: SmartAuto mode (clipboard for >100 chars, typing for short)
-
-### Testing Standards
-
-- **Coverage**: ≥75% overall, ≥80% Services/
-- **Frameworks**: xUnit, Moq, FluentAssertions
-- **Run before commit**: `dotnet test` (all tests must pass)
-- **Disposal tests**: Critical for memory leak prevention
-
-### WPF Patterns
-
-- **XAML**: Use `ModernStyles.xaml` for consistency
-- **Converters**: `RelativeTimeConverter` ("5 mins ago"), `TruncateTextConverter`
-- **UI Updates**: Always use `Dispatcher.Invoke()` from non-UI threads
-- **Resources**: Icons in root
-
-## Known Issues
-
-1. **VCRUNTIME140_1.dll**: Installer bundles VC++ Runtime (auto-installs)
-2. **Antivirus**: Text injection may trigger false positives (global hotkeys)
-3. **License Validation**: Requires internet connection for initial Pro activation (cached after first validation)
-
-## Version Context
-
-**Current Desktop**: v1.2.0.5 (Production-ready with text injection improvements and audio preprocessing)
-**Current Web**: v0.1.0 (Next.js 15 + React 19 + Prisma)
-**Philosophy**: Core-only workflow with Pro feature gating for advanced models
-
-**Performance Journey** (v1.0.85-88):
-- v1.0.85: Command-line optimizations (entropy-thold, no-fallback, optimal threads) - 40% faster
-- v1.0.86: Upgraded whisper.cpp v1.6.0 → v1.7.6 - Additional 20-40% faster
-- v1.0.87: Added flash attention + Q8_0 tiny model - Additional 7-12% faster
-- v1.0.88: Q8_0 quantization for all Pro models - 67-73% faster overall, 45% smaller
-
-**Recent Architecture Improvements**:
-- **H-002 MVVM Extraction (v1.2.x)**: Completed incremental MVVM extraction from MainWindow (2657 lines):
-  - Phase 1-3: Extracted RecordingViewModel, HistoryViewModel, StatusViewModel (~560 lines)
-  - Phase 4-5: XAML data bindings, removed duplicate handlers, PropertyChanged syncing
-  - Result: Cleaner separation of concerns, testable ViewModels, maintainable UI logic
-  - All 311 tests passing, 0 regressions
-
-**Recent Critical Fixes**:
-- **v1.0.96**: CRITICAL model file not in git - `ggml-tiny.bin` (42MB) was ignored by `.gitignore`, causing GitHub Actions builds to fail (100% failure rate on fresh installs). Fixed by force-adding model to git with `git add -f`. v1.0.95 was broken for all fresh installations.
-- **v1.0.95**: PARTIAL FIX - Fixed installer path but model still missing (only fixed local builds, not GitHub Actions)
-- **v1.0.94**: Critical logging bug - Release builds had logging suppressed, preventing diagnostics
-- **v1.0.77-79**: Security fixes - Closed freemium bypass vulnerabilities, Pro feature gating
-
-## Web Backend (voicelite-web)
-
-**Tech Stack**: Next.js 15.5.4, React 19.2.0, Prisma 6.1.0, PostgreSQL (Supabase), Stripe 18.5.0
-**Purpose**: License validation, Stripe payments, model downloads, feedback collection
-
-**API Endpoints**:
-- `POST /api/licenses/validate` - License key validation (rate limited: 5/hour/IP)
-- `POST /api/checkout` - Stripe checkout session creation
-- `POST /api/feedback/submit` - User feedback (rate limited via Upstash Redis)
-- `POST /api/download` - Model/app download tracking
-- `POST /api/webhook` - Stripe webhook handler for payment events
-- `GET /api/docs` - API documentation
-
-**Database Models** (Prisma):
-- `License` - Core licensing with Stripe integration (email-based, no user accounts)
-- `LicenseActivation` - Device activation tracking (3-device limit per license)
-- `LicenseEvent` - Audit trail for license operations
-- `WebhookEvent` - Stripe webhook event deduplication
-- `Feedback` - User feedback with priority/status tracking
-
-## Performance Targets
-
-- Transcription latency: <200ms after speech stops
-- Idle RAM: <100MB | Active RAM: <300MB
-- Idle CPU: <5%
-- Accuracy: 95%+ on technical terms (git, npm, useState)
-
-## Distribution
-
-**Installer**: `VoiceLite-Setup-{VERSION}.exe` (~100-150MB, includes Tiny model only)
-**Release Process**: GitHub Actions auto-builds on git tag push
-**Channels**: GitHub Releases (primary), Google Drive (mirror)
-
-**Pro License**: $20 one-time payment via Stripe → Email with UUID license key → Activate in Settings → Unlock AI Models tab for in-app model downloads
-
-## Pro Features System
-
-**Architecture**: Centralized feature gating via `ProFeatureService.cs` + `LicenseService.cs`
-
-**License Validation Flow**:
-1. User purchases via Stripe → Backend creates License record
-2. User enters license key in Settings → Desktop calls `/api/licenses/validate`
-3. LicenseService caches validation result (HTTPClient to voicelite.app)
-4. ProFeatureService exposes `IsProUser` property based on cached status
-
-**Free Tier**:
-- Tiny model (ggml-tiny.bin) only
-- Basic transcription
-- Settings: General + License tabs only
-
-**Pro Tier** ($20 one-time):
-- All 5 AI models (Small included in source, Base/Medium/Large downloadable via AI Models tab)
-- Settings: General + **AI Models** + License tabs
-- 3 device activations per license
-- Future Pro features: Voice Shortcuts, Export History, Custom Dictionary, etc.
-
-**Adding New Pro Features** (3-step pattern):
+**Error logging**:
 ```csharp
-// 1. In ProFeatureService.cs: Add visibility property
-public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
-
-// 2. In SettingsWindowNew.xaml: Add gated tab
-<TabItem Header="Voice Shortcuts" Name="VoiceShortcutsTab">...</TabItem>
-
-// 3. In SettingsWindowNew.xaml.cs: Bind visibility
-VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
+ErrorLogger.LogMessage("info");      // Debug only
+ErrorLogger.LogWarning("visible");   // Shows in Release builds
+ErrorLogger.LogError("context", ex); // Always shows
 ```
 
----
+**Process cleanup**: Always `process.Kill(entireProcessTree: true)` for whisper.exe. Child processes can orphan.
 
-**For detailed changelogs, architecture history, and migration notes**: See git history and inline code comments. This file focuses on **actionable development commands and critical context**.
+**Disposal**: Every service implements `IDisposable`. Tests validate disposal (`*DisposalTests.cs`).
 
+**Settings path**: `%LOCALAPPDATA%\VoiceLite\` - NOT Roaming (privacy fix, no cloud sync).
+
+**ViewModel events**: ViewModels expose `*Requested` events. MainWindow subscribes, calls services:
+```csharp
+recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
+```
+
+## File Locations
+
+| Path | Purpose |
+|------|---------|
+| `VoiceLite/VoiceLite/Services/` | Core services (AudioRecorder, PersistentWhisperService, TextInjector, etc.) |
+| `VoiceLite/VoiceLite/Core/Interfaces/` | Service interfaces (IWhisperService, IAudioRecorder, etc.) |
+| `VoiceLite/VoiceLite/Presentation/ViewModels/` | MVVM ViewModels (in-progress extraction) |
+| `VoiceLite/VoiceLite/Models/` | Settings, WhisperModelInfo, TranscriptionPreset |
+| `VoiceLite/whisper/` | whisper.exe + models (ggml-base.bin bundled) |
+| `voicelite-web/app/api/` | Next.js API routes (licenses, checkout, feedback) |
+| `voicelite-web/prisma/schema.prisma` | Database schema |
+
+## Web Backend
+
+**Stack**: Next.js 15.5, React 19, Prisma 6, Supabase PostgreSQL, Stripe
+
+**Key endpoints**:
+- `POST /api/licenses/validate` - License validation (rate limited: 5/hour/IP)
+- `POST /api/checkout` - Stripe checkout session
+- `POST /api/webhook` - Stripe webhook handler
+
+**Database models**: License, LicenseActivation (3-device limit), LicenseEvent (audit), WebhookEvent (idempotency)
+
+## Release Process
+
+```bash
+# Auto-releases via GitHub Actions on tag push
+git tag v1.2.0.X
+git push --tags
+# Workflow: validate versions → build → create installer → GitHub release
+```
+
+**Version sync required**: `VoiceLite.csproj`, `VoiceLiteSetup.iss` must match tag. Workflow validates.
+
+**GitHub Actions**: Claude respects this CLAUDE.md in CI workflows. Applies testing standards and code patterns automatically.
+
+## Pro Feature Gating
+
+```csharp
+// ProFeatureService.cs controls visibility
+public Visibility AiModelsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
+
+// In XAML: bind tab visibility to service property
+```
+
+Free tier: Base model only. Pro ($20): All 5 models + AI Models settings tab.
+
+## Testing
+
+- Coverage target: ≥75% overall, ≥80% Services/
+- Disposal tests are critical (memory leak prevention)
+- Run `dotnet test` before every commit
+
+## Version
+
+Check `git tag` for current version. Desktop version in `VoiceLite/VoiceLite/VoiceLite.csproj`.

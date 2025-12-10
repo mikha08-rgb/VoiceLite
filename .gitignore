@@ -108,3 +108,6 @@ verify-*.ps1
 *_REPORT.md
 CLEANUP_*.md
 coverage/
+
+# Security audit documents (keep local only)
+SECURITY-AUDIT-*.md

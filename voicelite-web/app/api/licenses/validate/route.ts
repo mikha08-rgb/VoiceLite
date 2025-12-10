@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ipAddress } from '@vercel/edge';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit,
   licenseValidationIpRateLimit,
@@ -9,14 +10,17 @@ import { checkRateLimit,
 import { recordLicenseActivation } from '@/lib/licensing';
 
 const bodySchema = z.object({
-  // UUID format for license keys (strict validation prevents SQL injection)
+  // Accept both formats:
+  // - New: VL-XXXXXX-XXXXXX-XXXXXX (nanoid, may include A-Z0-9_-)
+  // - Legacy: UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
   licenseKey: z.string()
-    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    .regex(/^(VL-[A-Za-z0-9_-]{6}-[A-Za-z0-9_-]{6}-[A-Za-z0-9_-]{6}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
       "Invalid license key format"),
 
-  // Alphanumeric + hyphens/underscores only (prevents injection)
+  // Base64 encoded machine ID (SHA256 hash, truncated to 32 chars)
+  // Allows standard Base64 chars: A-Za-z0-9+/=
   machineId: z.string()
-    .regex(/^[a-zA-Z0-9\-_]{10,100}$/,
+    .regex(/^[a-zA-Z0-9+/=\-_]{10,100}$/,
       "Invalid machine ID format")
     .optional(),
 
@@ -26,9 +30,9 @@ const bodySchema = z.object({
     .transform(s => s.replace(/<[^>]*>/g, '')) // Strip all HTML tags
     .optional(),
 
-  // Hex string only for SHA256 hash (64 hex characters)
+  // Base64 encoded SHA256 hash (exactly 43-44 chars for proper SHA256)
   machineHash: z.string()
-    .regex(/^[a-f0-9]{64}$/i,
+    .regex(/^[a-zA-Z0-9+/=]{43,44}$/,
       "Invalid machine hash format")
     .optional(),
 });
@@ -39,13 +43,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { licenseKey, machineId, machineLabel, machineHash } = bodySchema.parse(body);
 
-    // Multi-layer rate limiting to prevent brute force attacks
-    // Only trust x-forwarded-for when behind Vercel proxy (prevents IP spoofing)
-    const ip = process.env.VERCEL
-      ? (request.headers.get('x-forwarded-for')?.split(',')[0].trim()
-         || request.headers.get('x-real-ip')
-         || 'unknown')
-      : 'unknown';
+    // HIGH-1 FIX: Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
+    const ip = ipAddress(request) || 'unknown';
 
     // Check all three rate limiters (IP, license key, global)
     const ipRateLimit = await checkRateLimit(ip, licenseValidationIpRateLimit);
@@ -56,7 +55,8 @@ export async function POST(request: NextRequest) {
       const reason = !ipRateLimit.allowed ? 'IP limit exceeded' :
                      !keyRateLimit.allowed ? 'License key limit exceeded' :
                      'Global rate limit exceeded';
-      console.warn(`Rate limit exceeded: ${reason} (IP: ${ip}, Key: ${licenseKey.substring(0, 8)}...)`);
+      // HIGH-2 FIX: Don't log key prefix (reduces brute-force keyspace)
+      console.warn(`Rate limit exceeded: ${reason} (IP: ${ip}, Key: <redacted>)`);
 
       return NextResponse.json(
         { error: 'Too many validation attempts. Please try again later.' },

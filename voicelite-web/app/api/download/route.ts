@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
     return new Response('Download not found', { status: 404 });
   }
 
+  // Size limit check: max 200MB to prevent abuse
+  const MAX_SIZE_BYTES = 200 * 1024 * 1024; // 200MB
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > MAX_SIZE_BYTES) {
+    return new Response('File too large', { status: 413 });
+  }
+
   // Stream the file with download headers (prevents redirect to GitHub)
   return new Response(response.body, {
     status: 200,

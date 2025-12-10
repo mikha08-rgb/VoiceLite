@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using System;
 using System.IO;
+using System.Security;
 using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Services;
 using Xunit;
@@ -159,7 +160,8 @@ namespace VoiceLite.Tests.Services
             // Arrange
             var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
             File.WriteAllText(whisperExePath, "dummy exe"); // Create dummy file
-            var service = new ModelResolverService(_testBaseDir);
+            // Use internal constructor to skip integrity validation for path resolution test
+            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
 
             // Act
             var result = service.ResolveWhisperExePath();
@@ -175,7 +177,8 @@ namespace VoiceLite.Tests.Services
             // Arrange
             var whisperExePath = Path.Combine(_testBaseDir, "whisper.exe");
             File.WriteAllText(whisperExePath, "dummy exe");
-            var service = new ModelResolverService(_testBaseDir);
+            // Use internal constructor to skip integrity validation for path resolution test
+            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
 
             // Act
             var result = service.ResolveWhisperExePath();
@@ -193,7 +196,8 @@ namespace VoiceLite.Tests.Services
             File.WriteAllText(subdirExePath, "subdir exe");
             File.WriteAllText(baseDirExePath, "base exe");
 
-            var service = new ModelResolverService(_testBaseDir);
+            // Use internal constructor to skip integrity validation for path resolution test
+            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
 
             // Act
             var result = service.ResolveWhisperExePath();
@@ -515,32 +519,45 @@ namespace VoiceLite.Tests.Services
         #region Whisper.exe Integrity Validation Tests
 
         [Fact]
-        public void ValidateWhisperExecutable_ValidFile_ReturnsTrue()
+        public void ValidateWhisperExecutable_InvalidHash_ThrowsSecurityException()
         {
             // Arrange
             var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
-            File.WriteAllText(whisperExePath, "test exe");
+            File.WriteAllText(whisperExePath, "test exe with wrong hash");
 
             var service = new ModelResolverService(_testBaseDir);
+
+            // Act & Assert - Fail closed on hash mismatch (security-critical)
+            Action act = () => service.ValidateWhisperExecutable(whisperExePath);
+            act.Should().Throw<SecurityException>()
+                .WithMessage("*integrity verification failed*");
+        }
+
+        [Fact]
+        public void ValidateWhisperExecutable_FileNotFound_ThrowsSecurityException()
+        {
+            // Arrange
+            var service = new ModelResolverService(_testBaseDir);
+
+            // Act & Assert - Fail closed on file errors (security-critical)
+            Action act = () => service.ValidateWhisperExecutable("C:\\nonexistent\\whisper.exe");
+            act.Should().Throw<SecurityException>()
+                .WithMessage("*integrity check failed*");
+        }
+
+        [Fact]
+        public void ValidateWhisperExecutable_SkipValidation_ReturnsTrue()
+        {
+            // Arrange - Use internal constructor to skip validation
+            var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
+            File.WriteAllText(whisperExePath, "dummy content");
+            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
 
             // Act
             var result = service.ValidateWhisperExecutable(whisperExePath);
 
-            // Assert
-            result.Should().BeTrue("Validation should fail-open (warn but allow)");
-        }
-
-        [Fact]
-        public void ValidateWhisperExecutable_FailsOpen_OnValidationError()
-        {
-            // Arrange
-            var service = new ModelResolverService(_testBaseDir);
-
-            // Act - Validate non-existent file
-            var result = service.ValidateWhisperExecutable("C:\\nonexistent\\whisper.exe");
-
-            // Assert
-            result.Should().BeTrue("Should fail-open on errors to avoid breaking updates");
+            // Assert - Validation bypassed for testing
+            result.Should().BeTrue();
         }
 
         #endregion

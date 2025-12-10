@@ -62,3 +62,6 @@ jobs:
 
     - name: Lint code
       run: npm run lint --if-present || echo "No lint script found, skipping..."
+
+    - name: Security audit
+      run: npm audit --audit-level=high || echo "Audit found high severity vulnerabilities - review required"

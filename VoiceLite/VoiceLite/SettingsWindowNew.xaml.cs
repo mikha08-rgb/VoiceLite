@@ -337,7 +337,9 @@ namespace VoiceLite
             // Transcription Preset
             if (TranscriptionPresetComboBox.SelectedItem is ComboBoxItem selectedPreset)
             {
-                if (Enum.TryParse<TranscriptionPreset>(selectedPreset.Tag?.ToString(), out var preset))
+                // MED-6 FIX: Validate parsed enum is actually defined (TryParse accepts undefined int values)
+                if (Enum.TryParse<TranscriptionPreset>(selectedPreset.Tag?.ToString(), out var preset) &&
+                    Enum.IsDefined(typeof(TranscriptionPreset), preset))
                 {
                     settings.TranscriptionPreset = preset;
                 }
@@ -470,7 +472,9 @@ namespace VoiceLite
         {
             if (TranscriptionPresetComboBox.SelectedItem is ComboBoxItem selectedItem)
             {
-                if (Enum.TryParse<TranscriptionPreset>(selectedItem.Tag?.ToString(), out var preset))
+                // MED-6 FIX: Validate parsed enum is actually defined
+                if (Enum.TryParse<TranscriptionPreset>(selectedItem.Tag?.ToString(), out var preset) &&
+                    Enum.IsDefined(typeof(TranscriptionPreset), preset))
                 {
                     UpdatePresetDescription(preset);
                 }

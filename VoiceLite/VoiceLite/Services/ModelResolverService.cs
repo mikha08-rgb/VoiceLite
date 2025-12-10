@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security;
 using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Core.Interfaces.Services;
 
@@ -16,18 +17,28 @@ namespace VoiceLite.Services
     {
         private readonly string _baseDir;
         private readonly IProFeatureService? _proFeatureService;
+        private readonly bool _skipIntegrityValidation;
         private static bool _integrityWarningLogged = false;
 
         // Expected SHA256 hash of the official whisper.exe binary (whisper.cpp v1.7.6)
         private const string EXPECTED_WHISPER_HASH = "B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF";
 
         public ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService = null)
+            : this(baseDirectory, proFeatureService, skipIntegrityValidation: false)
+        {
+        }
+
+        /// <summary>
+        /// Internal constructor for testing - allows bypassing integrity validation
+        /// </summary>
+        internal ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService, bool skipIntegrityValidation)
         {
             if (string.IsNullOrWhiteSpace(baseDirectory))
                 throw new ArgumentNullException(nameof(baseDirectory));
 
             _baseDir = baseDirectory;
             _proFeatureService = proFeatureService;
+            _skipIntegrityValidation = skipIntegrityValidation;
         }
 
         /// <summary>
@@ -66,6 +77,12 @@ namespace VoiceLite.Services
         /// </summary>
         public bool ValidateWhisperExecutable(string whisperExePath)
         {
+            // Skip validation if bypass flag set (testing only)
+            if (_skipIntegrityValidation)
+            {
+                return true;
+            }
+
             try
             {
                 using var sha256 = System.Security.Cryptography.SHA256.Create();
@@ -73,15 +90,12 @@ namespace VoiceLite.Services
                 var hash = sha256.ComputeHash(stream);
                 var hashString = BitConverter.ToString(hash).Replace("-", "");
 
+                // HIGH-4 FIX: Fail CLOSED on hash mismatch (security-critical)
                 if (!hashString.Equals(EXPECTED_WHISPER_HASH, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Integrity check failed - log warning only once per session
-                    if (!_integrityWarningLogged)
-                    {
-                        ErrorLogger.LogMessage("WARNING: Whisper.exe integrity check failed. Using anyway (fail-open mode).");
-                        _integrityWarningLogged = true;
-                    }
-                    return true; // Warn but allow execution
+                    var hashMismatchEx = new SecurityException("Whisper executable integrity verification failed. Please reinstall VoiceLite.");
+                    ErrorLogger.LogError("Whisper.exe integrity check FAILED - refusing to execute", hashMismatchEx);
+                    throw hashMismatchEx;
                 }
 
                 // Only log success on first check
@@ -91,10 +105,15 @@ namespace VoiceLite.Services
                 }
                 return true;
             }
+            catch (SecurityException)
+            {
+                throw; // Re-throw security exceptions (hash mismatch)
+            }
             catch (Exception ex)
             {
+                // HIGH-4 FIX: Fail CLOSED on validation error (security-critical)
                 ErrorLogger.LogError("Failed to validate whisper.exe integrity", ex);
-                return true; // Fail open - allow execution on validation error
+                throw new SecurityException("Whisper executable integrity check failed. Please reinstall VoiceLite.", ex);
             }
         }
 

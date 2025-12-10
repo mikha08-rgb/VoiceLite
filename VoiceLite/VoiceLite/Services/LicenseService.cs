@@ -36,7 +36,7 @@ namespace VoiceLite.Services
         /// </summary>
         private static readonly HttpClient _httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(10),
+            Timeout = TimeSpan.FromSeconds(30), // Increased for Vercel cold start + DB query
             DefaultRequestHeaders =
             {
                 { "User-Agent", "VoiceLite-Desktop/1.0" }
@@ -60,6 +60,10 @@ namespace VoiceLite.Services
         // License keys are encrypted using Windows DPAPI (Data Protection API)
         // Scope: CurrentUser (tied to Windows user account)
         // Location: %LOCALAPPDATA%\VoiceLite\license.dat
+
+        // HIGH-5 FIX: Add entropy for stronger DPAPI encryption
+        private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("VoiceLite-License-v1");
+
         private static readonly string LicenseFilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite",
@@ -281,11 +285,11 @@ namespace VoiceLite.Services
             {
                 _storedLicenseKey = licenseKey;
 
-                // Encrypt license key using Windows DPAPI
+                // HIGH-5 FIX: Encrypt license key using Windows DPAPI with entropy
                 byte[] plaintextBytes = Encoding.UTF8.GetBytes(licenseKey);
                 byte[] encryptedBytes = ProtectedData.Protect(
                     plaintextBytes,
-                    null, // No additional entropy (user account is enough)
+                    DpapiEntropy,  // Additional entropy for stronger encryption
                     DataProtectionScope.CurrentUser
                 );
 
@@ -323,11 +327,32 @@ namespace VoiceLite.Services
                 if (File.Exists(LicenseFilePath))
                 {
                     byte[] encryptedBytes = File.ReadAllBytes(LicenseFilePath);
-                    byte[] plaintextBytes = ProtectedData.Unprotect(
-                        encryptedBytes,
-                        null,
-                        DataProtectionScope.CurrentUser
-                    );
+                    byte[] plaintextBytes;
+
+                    // HIGH-5 FIX: Try new entropy first, fall back to old (null) for migration
+                    try
+                    {
+                        plaintextBytes = ProtectedData.Unprotect(
+                            encryptedBytes,
+                            DpapiEntropy,
+                            DataProtectionScope.CurrentUser
+                        );
+                    }
+                    catch (CryptographicException)
+                    {
+                        // Old license file without entropy - migrate it
+                        ErrorLogger.LogMessage("Migrating license from old encryption format...");
+                        plaintextBytes = ProtectedData.Unprotect(
+                            encryptedBytes,
+                            null,  // Old format had no entropy
+                            DataProtectionScope.CurrentUser
+                        );
+                        // Re-save with new entropy
+                        _storedLicenseKey = Encoding.UTF8.GetString(plaintextBytes);
+                        SaveLicenseKey(_storedLicenseKey);
+                        ErrorLogger.LogMessage("License migrated to new encryption format");
+                        return;
+                    }
 
                     _storedLicenseKey = Encoding.UTF8.GetString(plaintextBytes);
                     ErrorLogger.LogMessage("License key loaded from encrypted storage");

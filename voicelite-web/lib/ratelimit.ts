@@ -133,9 +133,20 @@ export async function checkRateLimit(
   remaining: number;
   reset: Date;
 }> {
-  // If rate limiting not configured, allow all requests
+  // If rate limiting not configured, behavior depends on environment
   if (!limiter) {
-    console.warn('Rate limiting not configured (missing Upstash credentials)');
+    if (process.env.VERCEL) {
+      // Production: fail closed - missing Upstash is a deployment error
+      console.error('Rate limiting not configured in production - blocking request');
+      return {
+        allowed: false,
+        limit: 0,
+        remaining: 0,
+        reset: new Date(Date.now() + 60000),
+      };
+    }
+    // Development: allow through with warning
+    console.warn('Rate limiting not configured (missing Upstash credentials) - allowing in dev');
     return {
       allowed: true,
       limit: 999,
@@ -144,14 +155,26 @@ export async function checkRateLimit(
     };
   }
 
-  const { success, limit, remaining, reset } = await limiter.limit(identifier);
+  try {
+    const { success, limit, remaining, reset } = await limiter.limit(identifier);
 
-  return {
-    allowed: success,
-    limit,
-    remaining,
-    reset: new Date(reset),
-  };
+    return {
+      allowed: success,
+      limit,
+      remaining,
+      reset: new Date(reset),
+    };
+  } catch (error) {
+    // Graceful degradation: if Redis is unreachable, allow request through
+    // This prevents rate limiting infrastructure failures from blocking all users
+    console.error('Rate limiting failed (Redis unreachable), allowing request:', error);
+    return {
+      allowed: true,
+      limit: 999,
+      remaining: 999,
+      reset: new Date(Date.now() + 3600000),
+    };
+  }
 }
 
 /**

@@ -91,6 +91,27 @@ const envSchema = z.object({
     )
     .optional(),
 
+  ADMIN_SECRET_TOKEN: z
+    .string()
+    .min(20, 'ADMIN_SECRET_TOKEN must be at least 20 characters')
+    .refine(
+      (val) => !val.includes('placeholder') && !val.includes('PLACEHOLDER'),
+      'ADMIN_SECRET_TOKEN contains a placeholder value'
+    )
+    .optional(),
+
+  // -----------------------------------------------------------------------------
+  // Direct Database URL (for migrations - bypasses connection pooling)
+  // -----------------------------------------------------------------------------
+  DIRECT_DATABASE_URL: z
+    .string()
+    .min(1)
+    .refine(
+      (val) => val.startsWith('postgresql://'),
+      'DIRECT_DATABASE_URL must be a PostgreSQL connection string'
+    )
+    .optional(),
+
   // -----------------------------------------------------------------------------
   // Node Environment
   // -----------------------------------------------------------------------------
@@ -124,6 +145,14 @@ export function validateEnvironment() {
 
     if (!process.env.ADMIN_EMAILS) {
       warnings.push('ADMIN_EMAILS not set - admin dashboard will be inaccessible');
+    }
+
+    if (!process.env.ADMIN_SECRET_TOKEN) {
+      warnings.push('ADMIN_SECRET_TOKEN not set - admin API endpoints unprotected');
+    }
+
+    if (!process.env.DIRECT_DATABASE_URL) {
+      warnings.push('DIRECT_DATABASE_URL not set - database migrations will fail');
     }
 
     if (!process.env.UPSTASH_REDIS_REST_URL) {

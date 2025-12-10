@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: error.message,
-        details: error.stack,
+        // HIGH-8 FIX: Only expose stack traces in development
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
       { status: 500 }
     );

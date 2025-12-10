@@ -10,6 +10,28 @@ import {
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
 
+// MED-5 FIX: Rate limit email sending (1 per 5 minutes per license)
+const EMAIL_RATE_LIMIT_MINUTES = 5;
+
+async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
+  const recentEmail = await prisma.licenseEvent.findFirst({
+    where: {
+      licenseId,
+      type: 'email_sent',
+      createdAt: {
+        gte: new Date(Date.now() - EMAIL_RATE_LIMIT_MINUTES * 60 * 1000),
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (recentEmail) {
+    console.log(`📧 Email rate limited for license ${licenseId} - last sent at ${recentEmail.createdAt.toISOString()}`);
+    return false;
+  }
+  return true;
+}
+
 // Configure route to receive raw body for Stripe signature verification
 export const dynamic = 'force-dynamic';
 
@@ -58,25 +80,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Atomic claim using upsert to prevent race conditions
-  // This ensures only ONE webhook processes each event, even with concurrent requests
+  // HIGH-3 FIX: Atomic claim with null processedAt to prevent race condition
+  // First insert has processedAt=null, subsequent upserts set processedAt
   const webhookEvent = await prisma.webhookEvent.upsert({
     where: { eventId: event.id },
     create: {
       eventId: event.id,
       seenAt: new Date(),
-      processedAt: new Date()
+      // processedAt stays null on first insert
     },
     update: {
-      // If event already exists, don't update processedAt
-      // This allows us to detect duplicate processing attempts
+      processedAt: new Date(),  // Mark as processed on duplicate
     },
   });
 
-  // Check if this is first processing by comparing timestamps
-  // If seenAt and processedAt are the same, this is the first time we're processing
-  const isFirstProcessing =
-    Math.abs(webhookEvent.seenAt.getTime() - webhookEvent.processedAt.getTime()) < 1000;
+  // HIGH-3 FIX: Check if processedAt is null (first processing) vs set (duplicate)
+  const isFirstProcessing = webhookEvent.processedAt === null;
 
   if (!isFirstProcessing) {
     console.log(`Event ${event.id} already processed at ${webhookEvent.processedAt.toISOString()}, skipping (race condition prevented)`);
@@ -147,24 +166,27 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
     console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
 
-    const emailResult = await sendLicenseEmail({
-      email,
-      licenseKey: license.licenseKey,
-    });
+    // MED-5 FIX: Check rate limit before sending
+    if (await canSendLicenseEmail(license.id)) {
+      const emailResult = await sendLicenseEmail({
+        email,
+        licenseKey: license.licenseKey,
+      });
 
-    if (emailResult.success) {
-      console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
-      await recordLicenseEvent(license.id, 'email_sent', {
-        messageId: emailResult.messageId,
-        email: email,
-      });
-    } else {
-      console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
-      await recordLicenseEvent(license.id, 'email_failed', {
-        error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
-        email: email,
-      });
-      // Don't throw - license was created successfully, just log the email failure
+      if (emailResult.success) {
+        console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+        await recordLicenseEvent(license.id, 'email_sent', {
+          messageId: emailResult.messageId,
+          email: email,
+        });
+      } else {
+        console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+        await recordLicenseEvent(license.id, 'email_failed', {
+          error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
+          email: email,
+        });
+        // Don't throw - license was created successfully, just log the email failure
+      }
     }
   } else {
     console.log(`💰 Processing lifetime/one-time payment`);
@@ -198,24 +220,27 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
     console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
 
-    const emailResult = await sendLicenseEmail({
-      email,
-      licenseKey: license.licenseKey,
-    });
+    // MED-5 FIX: Check rate limit before sending
+    if (await canSendLicenseEmail(license.id)) {
+      const emailResult = await sendLicenseEmail({
+        email,
+        licenseKey: license.licenseKey,
+      });
 
-    if (emailResult.success) {
-      console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
-      await recordLicenseEvent(license.id, 'email_sent', {
-        messageId: emailResult.messageId,
-        email: email,
-      });
-    } else {
-      console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
-      await recordLicenseEvent(license.id, 'email_failed', {
-        error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
-        email: email,
-      });
-      // Don't throw - license was created successfully, just log the email failure
+      if (emailResult.success) {
+        console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+        await recordLicenseEvent(license.id, 'email_sent', {
+          messageId: emailResult.messageId,
+          email: email,
+        });
+      } else {
+        console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+        await recordLicenseEvent(license.id, 'email_failed', {
+          error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
+          email: email,
+        });
+        // Don't throw - license was created successfully, just log the email failure
+      }
     }
   }
 }

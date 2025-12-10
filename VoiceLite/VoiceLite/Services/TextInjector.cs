@@ -57,9 +57,8 @@ namespace VoiceLite.Services
             // For long transcriptions, user may switch focus during processing - we restore it later
             _targetWindowHandle = GetForegroundWindow();
 
-#if DEBUG
-            ErrorLogger.LogMessage($"InjectText called with {text.Length} characters, AutoPaste: {AutoPaste}, Target window: {_targetWindowHandle}");
-#endif
+            // Release-visible log for troubleshooting injection issues
+            ErrorLogger.LogWarning($"InjectText: {text.Length} chars, mode={settings.TextInjectionMode}, window={_targetWindowHandle}");
 
             try
             {
@@ -343,31 +342,8 @@ namespace VoiceLite.Services
 
         private void InjectViaClipboard(string text)
         {
-            string? originalClipboard = null;
-            bool hadOriginalClipboard = false;
-
-            // Try to preserve original clipboard content with retry logic
-            for (int attempt = 0; attempt < 2; attempt++)
-            {
-                try
-                {
-                    if (Clipboard.ContainsText())
-                    {
-                        originalClipboard = Clipboard.GetText();
-                        hadOriginalClipboard = true;
-#if DEBUG
-                        ErrorLogger.LogMessage($"Original clipboard saved ({originalClipboard.Length} chars)");
-#endif
-                        break;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogWarning($"Clipboard read attempt {attempt + 1} failed: {ex.Message}");
-                    if (attempt < 1)
-                        Thread.Sleep(CLIPBOARD_RETRY_DELAY_MS);
-                }
-            }
+            // CRIT-5 FIX: Removed clipboard preservation logic - was causing race condition data loss
+            // Now we just paste and clear after delay (simpler, safer)
 
             try
             {
@@ -375,87 +351,36 @@ namespace VoiceLite.Services
             }
             finally
             {
-                // BUG FIX (BUG-004): Always restore original clipboard after timeout
-                // Previous logic could lose user data if another app modified clipboard
-                // Now we ALWAYS restore after a fixed delay, regardless of current clipboard state
-                if (hadOriginalClipboard && !string.IsNullOrEmpty(originalClipboard))
+                // CRIT-5 FIX: Remove clipboard restoration to prevent race condition
+                // Previous implementation had 50ms window where user's copied data could be lost
+                // Now we simply clear the clipboard after a short delay (safer, no data loss risk)
+                // MED-14 FIX: Use configurable delay from settings instead of hardcoded 100ms
+                var clipboardDelay = settings.ClipboardRestorationDelayMs;
+                _ = Task.Run(async () =>
                 {
-                    var clipboardToRestore = originalClipboard; // Capture for closure
-
-                    _ = Task.Run(async () =>
+                    await Task.Delay(clipboardDelay);
+                    try
                     {
-                        try
+                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
                         {
-                            // QUICK WIN 2: User-configurable delay (30-100ms, default 50ms)
-                            // Paste completes in <10ms on modern systems
-                            // Configurable delay balances speed vs reliability for different system configurations
-                            await Task.Delay(settings.ClipboardRestorationDelayMs);
-
-                            // CRITICAL FIX: Check if clipboard was modified by user before restoring
-                            // Only restore if clipboard still contains our transcription text
-                            // This prevents overwriting user's new clipboard content during the 50ms window
-                            string? currentClipboard = null;
-                            bool clipboardCheckFailed = false;
                             try
                             {
-                                if (Clipboard.ContainsText())
-                                {
-                                    // ISSUE #8 FIX: Clipboard.GetText() can return null on failure
-                                    currentClipboard = Clipboard.GetText() ?? string.Empty;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                ErrorLogger.LogMessage($"BUG-007: Failed to check current clipboard: {ex.Message}");
-                                // CRITICAL FIX #3: If we can't check clipboard state, restore anyway
-                                // Better to restore than lose user's original data
-                                clipboardCheckFailed = true;
-                            }
-
-                            // ISSUE #8 FIX: currentClipboard is never null after ?? string.Empty above
-                            bool clipboardUnchanged = clipboardCheckFailed ||
-                                                     string.IsNullOrEmpty(currentClipboard) ||
-                                                     currentClipboard == text;
-
-                            if (clipboardUnchanged)
-                            {
-                                // Safe to restore - clipboard hasn't been modified by user
-                                for (int attempt = 0; attempt < 2; attempt++)
-                                {
-                                    try
-                                    {
-                                        SetClipboardText(clipboardToRestore);
+                                System.Windows.Clipboard.Clear();
 #if DEBUG
-                                        ErrorLogger.LogMessage($"Original clipboard content restored (attempt {attempt + 1})");
-#endif
-                                        break;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        ErrorLogger.LogWarning($"Clipboard restore attempt {attempt + 1} failed: {ex.Message}");
-                                        if (attempt < 1)
-                                            await Task.Delay(CLIPBOARD_SETTLE_DELAY_MS);
-                                        else
-                                        {
-                                            ErrorLogger.LogWarning("Failed to restore original clipboard content after 2 attempts");
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-#if DEBUG
-                                // User copied something new - don't overwrite it!
-                                ErrorLogger.LogMessage("Clipboard was modified by user - skipping restoration to preserve user's clipboard");
+                                ErrorLogger.LogMessage("Clipboard cleared after paste");
 #endif
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            ErrorLogger.LogError("Background clipboard restore", ex);
-                        }
-                    });
-                }
+                            catch
+                            {
+                                // Ignore clipboard access errors during clear
+                            }
+                        });
+                    }
+                    catch
+                    {
+                        // Ignore dispatcher/application errors during shutdown
+                    }
+                });
             }
         }
 

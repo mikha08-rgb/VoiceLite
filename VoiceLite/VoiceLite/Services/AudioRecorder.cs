@@ -35,7 +35,11 @@ namespace VoiceLite.Services
         // All file-mode code paths have been removed - memory buffering is the only implementation
         // This eliminates dead code and makes the codebase clearer
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
-        private volatile int currentSessionId = 0; // CRITICAL FIX #1: Session ID to reject stale callbacks
+        // MED-3 FIX: Session ID for rejecting stale callbacks
+        // Note: int wraps around at int.MaxValue (2^31), which is acceptable since we only need uniqueness
+        // vs previous session, not monotonicity. 2 billion recordings before wrap is practically infinite.
+        // volatile long not allowed in C# (64-bit not atomic on 32-bit systems)
+        private volatile int currentSessionId = 0;
 
         // Audio preprocessing settings (enabled by default for better transcription quality)
         private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
@@ -138,8 +142,9 @@ namespace VoiceLite.Services
                     if (waveIn.WaveFormat != null) // Check if device is initialized
                     {
                         waveIn.StopRecording();
-                        // NAudio hardware buffer flush - use Task.Delay for non-blocking wait
-                        Task.Delay(NAUDIO_BUFFER_FLUSH_DELAY_MS).Wait();
+                        // HIGH-3 FIX: Use Thread.Sleep instead of Task.Delay().Wait() for sync code
+                        // Task.Delay creates unnecessary Task overhead when blocking synchronously
+                        Thread.Sleep(NAUDIO_BUFFER_FLUSH_DELAY_MS);
                     }
                 }
                 catch (Exception ex)
@@ -289,6 +294,9 @@ namespace VoiceLite.Services
                     currentSessionId++;
                     int sessionId = currentSessionId;
 
+                    // Release-visible log for troubleshooting recording issues
+                    ErrorLogger.LogWarning($"StartRecording: session #{sessionId}, device={deviceToUse}");
+
                     waveIn = new WaveInEvent
                     {
                         WaveFormat = new WaveFormat(16000, 16, 1),
@@ -330,15 +338,18 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
+            // CRIT-2 FIX: Capture session ID BEFORE acquiring lock
+            // If another thread starts a new session while we wait for the lock,
+            // we'll detect the mismatch and reject this stale callback
+            int callbackSessionId = currentSessionId;
+
             // BUG FIX (RACE-001): Hold lock for entire method to prevent TOCTOU vulnerabilities
             // Previous code had pre-lock check that created race condition window
             // Now all validation happens atomically inside single lock block
             lock (lockObject)
             {
-                // CRITICAL FIX #1: Capture and validate session ID inside lock
-                int callbackSessionId = currentSessionId;
-
-                // CRITICAL FIX #1: Reject callbacks from old sessions
+                // CRIT-2 FIX: Compare captured session ID against current
+                // If session changed while waiting for lock, this callback is stale
                 if (callbackSessionId != currentSessionId)
                 {
                     ErrorLogger.LogDebug($"OnDataAvailable: Rejected stale callback from session #{callbackSessionId} (current: #{currentSessionId})");
@@ -631,9 +642,12 @@ namespace VoiceLite.Services
             {
                 // BUG FIX (BUG-005): Log warning for memory buffer save failure
                 // This is best-effort operation - audio data will be lost but app continues
-                // Memory leak is acceptable here as it only occurs on disk I/O failure (rare)
                 ErrorLogger.LogError("SaveMemoryBufferToTempFile failed", ex);
                 ErrorLogger.LogMessage($"WARNING: Audio data ({audioData.Length} bytes) will be lost due to disk I/O failure. This is expected behavior for best-effort memory buffer mode.");
+
+                // MED-8 FIX: Clear stale path reference on error
+                // currentAudioFilePath was set before File.WriteAllBytes - clear it since file may not exist
+                currentAudioFilePath = null;
             }
         }
 
@@ -688,6 +702,21 @@ namespace VoiceLite.Services
 
         public void Dispose()
         {
+            // MED-4 FIX: Stop timer BEFORE acquiring lock to prevent callback race condition
+            // Timer callback could be waiting for lock when we try to dispose
+            // Stopping first ensures no new callbacks are queued while we wait
+            if (cleanupTimer != null)
+            {
+                try
+                {
+                    cleanupTimer.Stop(); // Prevents new callbacks from being queued
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Timer already disposed, ignore
+                }
+            }
+
             // CRIT-007 FIX: Hold lock for entire disposal sequence to prevent TOCTOU race condition
             // Previously checked isDisposed, then performed disposal logic outside lock
             // This caused race conditions where multiple threads could enter disposal logic
@@ -700,12 +729,11 @@ namespace VoiceLite.Services
                 // Mark as disposed FIRST while holding lock
                 isDisposed = true;
 
-                // Stop and dispose timer (safe to do under lock, timer won't fire during disposal)
+                // Dispose timer (already stopped above)
                 if (cleanupTimer != null)
                 {
                     try
                     {
-                        cleanupTimer.Stop();
                         cleanupTimer.Dispose();
                     }
                     catch (ObjectDisposedException)

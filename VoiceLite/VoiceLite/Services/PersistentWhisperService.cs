@@ -321,19 +321,8 @@ namespace VoiceLite.Services
                 // Build Whisper command-line arguments
                 var arguments = BuildWhisperArguments(audioFilePath, effectiveModelPath, out int optimalThreads);
 
-                // DIAGNOSTIC: Log exact whisper command with thread count
-                try
-                {
-                    var diagDir = Path.Combine(Path.GetTempPath(), "VoiceLite");
-                    Directory.CreateDirectory(diagDir); // CRITICAL FIX: Create directory if it doesn't exist
-                    File.AppendAllText(Path.Combine(diagDir, "diagnostic.log"),
-                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Thread count: {optimalThreads}, CPU cores: {Environment.ProcessorCount}\n" +
-                        $"Command: {whisperExePath} {arguments}\n\n");
-                }
-                catch
-                {
-                    // Ignore diagnostic logging failures - don't let them break transcription
-                }
+                // Log whisper command (visible in Release builds for troubleshooting)
+                ErrorLogger.LogWarning($"Whisper: threads={optimalThreads}, cores={Environment.ProcessorCount}, model={Path.GetFileName(effectiveModelPath)}");
 
                 // Execute Whisper process and capture output
                 // TIER 1.3: Assign to method-scoped variable for finally block access
@@ -351,6 +340,13 @@ namespace VoiceLite.Services
 
                 // Process output, apply post-processing, and return result
                 return ProcessWhisperOutput(process, outputBuilder, errorBuilder, startTime);
+            }
+            // HIGH-7 FIX: Explicit catch for cancellation - semaphore NOT acquired if WaitAsync was cancelled
+            catch (OperationCanceledException)
+            {
+                // WaitAsync was cancelled before acquiring semaphore
+                // semaphoreAcquired is false, so finally block won't release
+                throw;
             }
             catch (Exception ex)
             {
@@ -465,6 +461,29 @@ namespace VoiceLite.Services
                     {
                         // Should never happen since we track acquisition, but log just in case
                         ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
+                    }
+                }
+
+                // CRIT-4 FIX: Kill our specific whisper process if it's still running
+                // Only kills the process WE spawned, not other whisper.exe instances
+                if (process != null)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            var pid = process.Id;
+                            process.Kill(entireProcessTree: true);
+                            ErrorLogger.LogWarning($"Killed orphaned whisper.exe (PID: {pid})");
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Process already exited - this is fine
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogWarning($"Orphan whisper cleanup failed: {ex.Message}");
                     }
                 }
 
@@ -645,9 +664,14 @@ namespace VoiceLite.Services
             var outputBuilder = new StringBuilder(4096); // PERFORMANCE: Pre-size for typical Whisper output (1-3KB)
             var errorBuilder = new StringBuilder(512);   // PERFORMANCE: Pre-size for error messages
 
+            // MED-10 FIX: Maximum buffer sizes to prevent unbounded memory growth
+            const int MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB max for transcription output (paranoid limit)
+            const int MAX_ERROR_SIZE = 64 * 1024;    // 64KB max for error messages
+
             process.OutputDataReceived += (s, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
+                // MED-10 FIX: Bound output buffer to prevent unbounded growth
+                if (!string.IsNullOrEmpty(e.Data) && outputBuilder.Length < MAX_OUTPUT_SIZE)
                 {
                     outputBuilder.AppendLine(e.Data);
                 }
@@ -655,7 +679,8 @@ namespace VoiceLite.Services
 
             process.ErrorDataReceived += (s, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
+                // MED-10 FIX: Bound error buffer to prevent unbounded growth
+                if (!string.IsNullOrEmpty(e.Data) && errorBuilder.Length < MAX_ERROR_SIZE)
                 {
                     errorBuilder.AppendLine(e.Data);
                 }
@@ -844,7 +869,11 @@ namespace VoiceLite.Services
             // Validate format: 2 lowercase letters only (ISO 639-1)
             if (normalized.Length != 2 || !normalized.All(char.IsLower))
             {
-                ErrorLogger.LogWarning($"Invalid language code '{languageCode}', defaulting to 'en'");
+                // HIGH-5 FIX: Sanitize control characters before logging to prevent log injection
+                // Attackers could inject newlines to create fake log entries
+                string sanitized = new string(languageCode.Where(c => !char.IsControl(c)).ToArray());
+                if (sanitized.Length > 20) sanitized = sanitized.Substring(0, 20) + "...";
+                ErrorLogger.LogWarning($"Invalid language code '{sanitized}', defaulting to 'en'");
                 return "en";
             }
 
@@ -977,10 +1006,19 @@ namespace VoiceLite.Services
             }
             catch { /* Ignore cancellation errors */ }
 
-            // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
-            // Old approach: Thread.Sleep(200) blocks UI thread
-            // New approach: Efficient signaling with max 5-second timeout
-            disposalComplete.Wait(TimeSpan.FromSeconds(DISPOSAL_COMPLETION_TIMEOUT_SECONDS));
+            // MED-15 FIX: Use try-finally to ensure ManualResetEventSlim is always disposed
+            // Previously, if Wait() threw, subsequent disposal code wouldn't run
+            try
+            {
+                // CRITICAL FIX: Non-blocking wait for background tasks using ManualResetEventSlim
+                // Old approach: Thread.Sleep(200) blocks UI thread
+                // New approach: Efficient signaling with max 5-second timeout
+                disposalComplete.Wait(TimeSpan.FromSeconds(DISPOSAL_COMPLETION_TIMEOUT_SECONDS));
+            }
+            catch (ObjectDisposedException)
+            {
+                // ManualResetEventSlim already disposed, continue cleanup
+            }
 
             CleanupProcess();
 
@@ -1014,6 +1052,7 @@ namespace VoiceLite.Services
             }
             catch (ObjectDisposedException) { }
 
+            // MED-15 FIX: Always dispose ManualResetEventSlim in finally-equivalent position
             try
             {
                 disposalComplete.Dispose();
