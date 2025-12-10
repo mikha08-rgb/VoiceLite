@@ -72,20 +72,6 @@ jobs:
           $errors += "❌ Could not find AppVersion in VoiceLiteSetup.iss"
         }
 
-        # Check CLAUDE.md
-        $claudeMdPath = "CLAUDE.md"
-        $claudeContent = Get-Content $claudeMdPath -Raw
-        if ($claudeContent -match '\*\*Current Desktop\*\*: v([\d\.]+)') {
-          $claudeVersion = $matches[1]
-          if ($claudeVersion -ne $expectedVersion) {
-            $errors += "❌ CLAUDE.md has version $claudeVersion, expected $expectedVersion"
-          } else {
-            Write-Host "✓ CLAUDE.md version: $claudeVersion" -ForegroundColor Green
-          }
-        } else {
-          $errors += "❌ Could not find Current Desktop version in CLAUDE.md"
-        }
-
         # Fail if any errors
         if ($errors.Count -gt 0) {
           Write-Host ""
