@@ -670,19 +670,27 @@ namespace VoiceLite.Services
 
             process.OutputDataReceived += (s, e) =>
             {
-                // MED-10 FIX: Bound output buffer to prevent unbounded growth
-                if (!string.IsNullOrEmpty(e.Data) && outputBuilder.Length < MAX_OUTPUT_SIZE)
+                // HIGH-2 FIX: Calculate newLength before appending to prevent exceeding MAX_OUTPUT_SIZE
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    outputBuilder.AppendLine(e.Data);
+                    int newLength = outputBuilder.Length + e.Data.Length + Environment.NewLine.Length;
+                    if (newLength <= MAX_OUTPUT_SIZE)
+                    {
+                        outputBuilder.AppendLine(e.Data);
+                    }
                 }
             };
 
             process.ErrorDataReceived += (s, e) =>
             {
-                // MED-10 FIX: Bound error buffer to prevent unbounded growth
-                if (!string.IsNullOrEmpty(e.Data) && errorBuilder.Length < MAX_ERROR_SIZE)
+                // HIGH-2 FIX: Calculate newLength before appending to prevent exceeding MAX_ERROR_SIZE
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    errorBuilder.AppendLine(e.Data);
+                    int newLength = errorBuilder.Length + e.Data.Length + Environment.NewLine.Length;
+                    if (newLength <= MAX_ERROR_SIZE)
+                    {
+                        errorBuilder.AppendLine(e.Data);
+                    }
                 }
             };
 
@@ -723,8 +731,16 @@ namespace VoiceLite.Services
             var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
 
             // SECURITY FIX (CMD-SANITIZE-001): Sanitize file paths to prevent injection
-            audioFilePath = SanitizeFilePath(audioFilePath, "audio file");
-            effectiveModelPath = SanitizeFilePath(effectiveModelPath, "model file");
+            // CRIT-3 FIX: Wrap in try-catch to handle SecurityException gracefully
+            try
+            {
+                audioFilePath = SanitizeFilePath(audioFilePath, "audio file");
+                effectiveModelPath = SanitizeFilePath(effectiveModelPath, "model file");
+            }
+            catch (SecurityException ex)
+            {
+                throw new InvalidOperationException($"Path validation failed: {ex.Message}", ex);
+            }
 
             // SECURITY FIX (CMD-SANITIZE-001): Validate language code format
             var safeLanguage = SanitizeLanguageCode(settings.Language);

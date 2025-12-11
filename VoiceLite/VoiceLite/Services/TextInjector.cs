@@ -345,43 +345,11 @@ namespace VoiceLite.Services
             // CRIT-5 FIX: Removed clipboard preservation logic - was causing race condition data loss
             // Now we just paste and clear after delay (simpler, safer)
 
-            try
-            {
-                PasteViaClipboard(text);
-            }
-            finally
-            {
-                // CRIT-5 FIX: Remove clipboard restoration to prevent race condition
-                // Previous implementation had 50ms window where user's copied data could be lost
-                // Now we simply clear the clipboard after a short delay (safer, no data loss risk)
-                // MED-14 FIX: Use configurable delay from settings instead of hardcoded 100ms
-                var clipboardDelay = settings.ClipboardRestorationDelayMs;
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(clipboardDelay);
-                    try
-                    {
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                        {
-                            try
-                            {
-                                System.Windows.Clipboard.Clear();
-#if DEBUG
-                                ErrorLogger.LogMessage("Clipboard cleared after paste");
-#endif
-                            }
-                            catch
-                            {
-                                // Ignore clipboard access errors during clear
-                            }
-                        });
-                    }
-                    catch
-                    {
-                        // Ignore dispatcher/application errors during shutdown
-                    }
-                });
-            }
+            // CRIT-5 FIX: Removed clipboard clearing entirely
+            // Data loss risk > cleanup benefit. Transcription text left in clipboard
+            // is actually useful (user might paste again). Previous async clear could
+            // delete user's unrelated clipboard content during the delay window.
+            PasteViaClipboard(text);
         }
 
         private void PasteViaClipboard(string text)

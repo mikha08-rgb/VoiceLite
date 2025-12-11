@@ -310,7 +310,6 @@ namespace VoiceLite.Services
 
             // CRIT-003 FIX: Use ManualResetEventSlim for non-blocking coordination instead of Task.Wait()
             // BUG FIX (BLOCKING-001): Reduced timeout from 5s to 2s for faster shutdown
-            // Task.Wait() blocks calling thread for up to 2 seconds, but should not be called on UI thread
             // ManualResetEventSlim allows efficient signaling without busy-waiting
             if (task != null && !task.IsCompleted)
             {
@@ -321,10 +320,26 @@ namespace VoiceLite.Services
                     // Start async task to signal completion
                     _ = task.ContinueWith(_ => unregisterComplete.Set(), TaskScheduler.Default);
 
-                    // Wait with timeout - should be on background thread (assertion above checks this)
-                    if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
+                    // CRIT-4 FIX: Avoid blocking UI thread
+                    if (dispatcher.CheckAccess())
                     {
-                        ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds - continuing anyway");
+                        // On UI thread - fire-and-forget to avoid freeze
+                        // Don't wait for completion - let cleanup happen asynchronously
+                        _ = Task.Run(() =>
+                        {
+                            if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
+                            {
+                                ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds");
+                            }
+                        });
+                    }
+                    else
+                    {
+                        // Background thread - safe to block directly
+                        if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
+                        {
+                            ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds - continuing anyway");
+                        }
                     }
                 }
                 catch (AggregateException ex) when (ex.InnerException is TaskCanceledException)

@@ -201,10 +201,13 @@ namespace VoiceLite.Services
                 };
 
                 // Update activation counts from response
+                // HIGH-1 FIX: Use default values when JSON doesn't provide them
                 if (result.Valid && result.License != null)
                 {
-                    _activationCount = result.License.ActivationsUsed;
-                    _maxActivations = result.License.MaxActivations;
+                    _activationCount = result.License.ActivationsUsed; // 0 is acceptable default
+                    _maxActivations = result.License.MaxActivations > 0
+                        ? result.License.MaxActivations
+                        : 3; // Default to 3 activations if not provided
                 }
 
                 // PHASE 3 - DAY 1: Cache successful validation result (forever - lifetime licenses)

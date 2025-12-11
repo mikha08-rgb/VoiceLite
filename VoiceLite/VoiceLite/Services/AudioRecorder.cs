@@ -142,9 +142,8 @@ namespace VoiceLite.Services
                     if (waveIn.WaveFormat != null) // Check if device is initialized
                     {
                         waveIn.StopRecording();
-                        // HIGH-3 FIX: Use Thread.Sleep instead of Task.Delay().Wait() for sync code
-                        // Task.Delay creates unnecessary Task overhead when blocking synchronously
-                        Thread.Sleep(NAUDIO_BUFFER_FLUSH_DELAY_MS);
+                        // HIGH-3 FIX: Removed Thread.Sleep - NAudio handles flushing internally
+                        // Sleeping while holding lockObject causes priority inversion and audio dropouts
                     }
                 }
                 catch (Exception ex)
@@ -388,6 +387,11 @@ namespace VoiceLite.Services
                     // Write raw audio data directly (no volume scaling - AGC will handle normalization)
                     // This provides cleaner input for audio preprocessing pipeline
                     localWaveFile.Write(e.Buffer, 0, e.BytesRecorded);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // CRIT-2 FIX: Expected during shutdown - waveFile disposed while callback in flight
+                    // Silently ignore, don't log as error (this is normal behavior)
                 }
                 catch (Exception ex)
                 {
