@@ -133,20 +133,10 @@ export async function checkRateLimit(
   remaining: number;
   reset: Date;
 }> {
-  // If rate limiting not configured, behavior depends on environment
+  // If rate limiting not configured, allow through (fail-open)
+  // This is intentional - Upstash was disabled due to DNS timeout issues
   if (!limiter) {
-    if (process.env.VERCEL) {
-      // Production: fail closed - missing Upstash is a deployment error
-      console.error('Rate limiting not configured in production - blocking request');
-      return {
-        allowed: false,
-        limit: 0,
-        remaining: 0,
-        reset: new Date(Date.now() + 60000),
-      };
-    }
-    // Development: allow through with warning
-    console.warn('Rate limiting not configured (missing Upstash credentials) - allowing in dev');
+    console.warn('Rate limiting not configured (Upstash disabled) - allowing request');
     return {
       allowed: true,
       limit: 999,
