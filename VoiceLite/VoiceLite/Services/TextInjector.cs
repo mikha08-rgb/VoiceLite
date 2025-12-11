@@ -36,6 +36,10 @@ namespace VoiceLite.Services
         private readonly InputSimulator inputSimulator;
         private readonly Settings settings;
 
+        // THREAD-LEAK FIX: Semaphore to prevent multiple concurrent clipboard operations
+        // If timeout occurs, subsequent calls wait rather than spawning unlimited threads
+        private readonly SemaphoreSlim _clipboardSemaphore = new SemaphoreSlim(1, 1);
+
         public TextInjector(Settings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -354,40 +358,74 @@ namespace VoiceLite.Services
 
         private void PasteViaClipboard(string text)
         {
-            Exception? workerException = null;
-
-            Thread thread = new Thread(() =>
+            // THREAD-LEAK FIX: Acquire semaphore to prevent unbounded thread accumulation
+            // If previous operation timed out but thread is still running, we wait here
+            if (!_clipboardSemaphore.Wait(TimeSpan.FromSeconds(5)))
             {
-                try
-                {
-                    SetClipboardText(text);
-
-                    if (AutoPaste)
-                    {
-                        // RELIABILITY FIX: Increased delay from 5ms to 20ms for better compatibility
-                        // Some applications need more time to process clipboard changes
-                        Thread.Sleep(CLIPBOARD_READY_DELAY_MS);
-                        SimulateCtrlV();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    workerException = ex;
-                }
-            });
-
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-
-            if (!thread.Join(TimeSpan.FromSeconds(3)))
-            {
-                ErrorLogger.LogMessage("Clipboard operation thread timed out");
-                throw new InvalidOperationException("Clipboard operation timed out.");
+                ErrorLogger.LogWarning("Clipboard semaphore acquisition timed out - previous operation may be stuck");
+                throw new InvalidOperationException("Clipboard operation busy. Please try again.");
             }
 
-            if (workerException != null)
+            Exception? workerException = null;
+            bool operationCompleted = false;
+
+            try
             {
-                throw new InvalidOperationException("Clipboard operation failed.", workerException);
+                Thread thread = new Thread(() =>
+                {
+                    try
+                    {
+                        SetClipboardText(text);
+
+                        if (AutoPaste)
+                        {
+                            // RELIABILITY FIX: Increased delay from 5ms to 20ms for better compatibility
+                            // Some applications need more time to process clipboard changes
+                            Thread.Sleep(CLIPBOARD_READY_DELAY_MS);
+                            SimulateCtrlV();
+                        }
+                        operationCompleted = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        workerException = ex;
+                    }
+                    finally
+                    {
+                        // THREAD-LEAK FIX: Release semaphore when thread completes (even on timeout path)
+                        // This ensures next operation can proceed
+                        try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { }
+                    }
+                });
+
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.Start();
+
+                if (!thread.Join(TimeSpan.FromSeconds(3)))
+                {
+                    // Thread timed out but is still running - semaphore will be released when it completes
+                    ErrorLogger.LogWarning("Clipboard operation thread timed out - thread will release semaphore when done");
+                    throw new InvalidOperationException("Clipboard operation timed out.");
+                }
+
+                if (workerException != null)
+                {
+                    throw new InvalidOperationException("Clipboard operation failed.", workerException);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Re-throw timeout/failure exceptions - semaphore released by thread
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - release semaphore here since thread may not have started
+                if (!operationCompleted)
+                {
+                    try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { }
+                }
+                throw new InvalidOperationException("Clipboard operation failed unexpectedly.", ex);
             }
         }
 

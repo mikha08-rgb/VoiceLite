@@ -36,10 +36,9 @@ namespace VoiceLite.Services
         // This eliminates dead code and makes the codebase clearer
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
         // MED-3 FIX: Session ID for rejecting stale callbacks
-        // Note: int wraps around at int.MaxValue (2^31), which is acceptable since we only need uniqueness
-        // vs previous session, not monotonicity. 2 billion recordings before wrap is practically infinite.
-        // volatile long not allowed in C# (64-bit not atomic on 32-bit systems)
-        private volatile int currentSessionId = 0;
+        // OVERFLOW FIX: Use Interlocked.Increment for atomic increment with wrap-around safety
+        // int.MaxValue wraps to int.MinValue, which is fine - we only need uniqueness vs previous session
+        private int currentSessionId = 0;
 
         // Audio preprocessing settings (enabled by default for better transcription quality)
         private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
@@ -289,9 +288,9 @@ namespace VoiceLite.Services
                         throw new InvalidOperationException("Previous recording session not fully cleaned up. Cannot start new session.");
                     }
 
-                    // CRITICAL FIX #1: Increment session ID to invalidate any stale callbacks
-                    currentSessionId++;
-                    int sessionId = currentSessionId;
+                    // CRITICAL FIX #1: Atomically increment session ID to invalidate any stale callbacks
+                    // OVERFLOW FIX: Interlocked.Increment handles wrap-around safely (int.MaxValue -> int.MinValue)
+                    int sessionId = Interlocked.Increment(ref currentSessionId);
 
                     // Release-visible log for troubleshooting recording issues
                     ErrorLogger.LogWarning($"StartRecording: session #{sessionId}, device={deviceToUse}");
@@ -337,10 +336,10 @@ namespace VoiceLite.Services
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            // CRIT-2 FIX: Capture session ID BEFORE acquiring lock
+            // CRIT-2 FIX: Capture session ID BEFORE acquiring lock using volatile read
             // If another thread starts a new session while we wait for the lock,
             // we'll detect the mismatch and reject this stale callback
-            int callbackSessionId = currentSessionId;
+            int callbackSessionId = Volatile.Read(ref currentSessionId);
 
             // BUG FIX (RACE-001): Hold lock for entire method to prevent TOCTOU vulnerabilities
             // Previous code had pre-lock check that created race condition window
@@ -395,20 +394,18 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogError("OnDataAvailable: Audio write failed", ex);
-                    // Mic disconnected or error - stop this session gracefully
-                    // NOTE: StopRecording will try to acquire lock, but we already hold it
-                    // This could cause deadlock - need to handle differently
-                    try
+                    // ERROR-HANDLER FIX: Set flag immediately, log after releasing lock
+                    // Logging while holding lock is risky - ErrorLogger might block or throw
+                    isRecording = false;
+
+                    // Queue error logging to happen outside the lock via fire-and-forget
+                    // This prevents potential deadlock if logging blocks
+                    var capturedEx = ex;
+                    _ = Task.Run(() =>
                     {
-                        // Set flag to stop without calling StopRecording (avoid deadlock)
-                        isRecording = false;
+                        ErrorLogger.LogError("OnDataAvailable: Audio write failed", capturedEx);
                         ErrorLogger.LogMessage("OnDataAvailable: Recording stopped due to write error");
-                    }
-                    catch (Exception stopEx)
-                    {
-                        ErrorLogger.LogError("OnDataAvailable: Failed to stop recording after error", stopEx);
-                    }
+                    });
                 }
             }
         }

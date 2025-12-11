@@ -591,20 +591,24 @@ namespace VoiceLite.Services
                 {
                     ErrorLogger.LogError("Whisper process refused to die after Kill()", new TimeoutException());
 
-                    // Last resort: Fire-and-forget taskkill (don't wait)
+                    // Last resort: taskkill with verification
+                    // ZOMBIE FIX: Wait for taskkill completion and verify process died
                     _ = Task.Run(() =>
                     {
                         try
                         {
-                            var taskkill = Process.Start(new ProcessStartInfo
+                            using var taskkill = Process.Start(new ProcessStartInfo
                             {
                                 FileName = "taskkill",
                                 Arguments = $"/F /T /PID {process.Id}",
                                 CreateNoWindow = true,
                                 UseShellExecute = false
                             });
-                            // Don't wait - fire and forget
-                            taskkill?.Dispose();
+                            // ZOMBIE FIX: Wait for taskkill to complete (up to 2s)
+                            if (taskkill != null && !taskkill.WaitForExit(2000))
+                            {
+                                ErrorLogger.LogWarning($"taskkill command timed out for PID {process.Id}");
+                            }
                         }
                         catch (Exception taskkillEx)
                         {
