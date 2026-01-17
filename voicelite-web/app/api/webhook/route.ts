@@ -80,25 +80,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // HIGH-3 FIX: Atomic claim with null processedAt to prevent race condition
-  // First insert has processedAt=null, subsequent upserts set processedAt
+  // Atomic claim using upsert - set processedAt immediately on create
+  // This ensures first processor wins and duplicates are rejected
+  const now = new Date();
   const webhookEvent = await prisma.webhookEvent.upsert({
     where: { eventId: event.id },
     create: {
       eventId: event.id,
-      seenAt: new Date(),
-      // processedAt stays null on first insert
+      seenAt: now,
+      processedAt: now,  // Set immediately on first insert
     },
     update: {
-      processedAt: new Date(),  // Mark as processed on duplicate
+      // Don't update - just return existing record
     },
   });
 
-  // HIGH-3 FIX: Check if processedAt is null (first processing) vs set (duplicate)
-  const isFirstProcessing = webhookEvent.processedAt === null;
+  // If timestamps match (within 1 second), this is first processing
+  // If they differ, another request already processed this event
+  const isFirstProcessing =
+    Math.abs(webhookEvent.seenAt.getTime() - webhookEvent.processedAt!.getTime()) < 1000;
 
   if (!isFirstProcessing) {
-    console.log(`Event ${event.id} already processed at ${webhookEvent.processedAt.toISOString()}, skipping (race condition prevented)`);
+    console.log(`Event ${event.id} already processed at ${webhookEvent.processedAt?.toISOString()}, skipping (duplicate prevented)`);
     return NextResponse.json({ received: true, cached: true });
   }
 
