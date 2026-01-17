@@ -493,7 +493,7 @@ namespace VoiceLite.Services
                 {
                     disposalComplete?.Set();
                 }
-                catch { /* Ignore if already disposed */ }
+                catch (Exception ex) { ErrorLogger.LogDebug($"DisposalComplete.Set failed (expected if disposed): {ex.Message}"); }
             }
         }
 
@@ -622,7 +622,7 @@ namespace VoiceLite.Services
             {
                 ErrorLogger.LogError("Failed to kill whisper.exe process", killEx);
                 // Try basic kill as fallback (best effort, don't wait)
-                try { process.Kill(); } catch { }
+                try { process.Kill(); } catch (Exception fallbackEx) { ErrorLogger.LogDebug($"Fallback process.Kill failed: {fallbackEx.Message}"); }
             }
 
             // Check if this is a first-run issue
@@ -1024,7 +1024,7 @@ namespace VoiceLite.Services
                 warmupCts.Cancel(); // Cancel warmup tasks
                 transcriptionCts.Cancel(); // Cancel semaphore waits to unblock transcriptions
             }
-            catch { /* Ignore cancellation errors */ }
+            catch (Exception ex) { ErrorLogger.LogDebug($"CancellationTokenSource.Cancel failed: {ex.Message}"); }
 
             // MED-15 FIX: Use try-finally to ensure ManualResetEventSlim is always disposed
             // Previously, if Wait() threw, subsequent disposal code wouldn't run

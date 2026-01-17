@@ -535,8 +535,9 @@ namespace VoiceLite.Services
                 // Check if we can get the foreground window
                 return GetForegroundWindow() != IntPtr.Zero;
             }
-            catch
+            catch (Exception ex)
             {
+                ErrorLogger.LogDebug($"CanInject check failed: {ex.Message}");
                 return false;
             }
         }
@@ -555,8 +556,9 @@ namespace VoiceLite.Services
                 var process = Process.GetProcessById((int)processId);
                 return process?.ProcessName ?? "Unknown";
             }
-            catch
+            catch (Exception ex)
             {
+                ErrorLogger.LogDebug($"GetFocusedApplicationName failed: {ex.Message}");
                 return "Unknown";
             }
         }
