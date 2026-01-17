@@ -52,46 +52,50 @@ export async function upsertLicenseFromStripe({
     ? mapStripeSubscriptionStatus(subscriptionStatus ?? 'active')
     : LicenseStatus.ACTIVE;
 
-  // Create or find user for this email (required by schema)
-  const user = await prisma.user.upsert({
-    where: { email: normalizedEmail },
-    create: {
-      id: `user_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      email: normalizedEmail,
-    },
-    update: {},
+  // Use transaction to ensure user and license are created atomically
+  // Prevents orphaned user records if license creation fails
+  return prisma.$transaction(async (tx) => {
+    // Create or find user for this email (required by schema)
+    const user = await tx.user.upsert({
+      where: { email: normalizedEmail },
+      create: {
+        id: `user_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        email: normalizedEmail,
+      },
+      update: {},
+    });
+
+    const where = stripeSubscriptionId
+      ? { stripeSubscriptionId }
+      : { stripePaymentIntentId: stripePaymentIntentId! };
+
+    const license = await tx.license.upsert({
+      where,
+      create: {
+        email: normalizedEmail,
+        licenseKey,
+        type,
+        status,
+        userId: user.id,
+        stripeCustomerId,
+        stripeSubscriptionId: stripeSubscriptionId ?? undefined,
+        stripePaymentIntentId: stripePaymentIntentId ?? undefined,
+        activatedAt: new Date(),
+        expiresAt: periodEndsAt ?? undefined,
+      },
+      update: {
+        email: normalizedEmail,
+        status,
+        stripeCustomerId,
+        stripeSubscriptionId: stripeSubscriptionId ?? undefined,
+        stripePaymentIntentId: stripePaymentIntentId ?? undefined,
+        expiresAt: periodEndsAt ?? undefined,
+        activatedAt: new Date(),
+      },
+    });
+
+    return license;
   });
-
-  const where = stripeSubscriptionId
-    ? { stripeSubscriptionId }
-    : { stripePaymentIntentId: stripePaymentIntentId! };
-
-  const license = await prisma.license.upsert({
-    where,
-    create: {
-      email: normalizedEmail,
-      licenseKey,
-      type,
-      status,
-      userId: user.id,
-      stripeCustomerId,
-      stripeSubscriptionId: stripeSubscriptionId ?? undefined,
-      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
-      activatedAt: new Date(),
-      expiresAt: periodEndsAt ?? undefined,
-    },
-    update: {
-      email: normalizedEmail,
-      status,
-      stripeCustomerId,
-      stripeSubscriptionId: stripeSubscriptionId ?? undefined,
-      stripePaymentIntentId: stripePaymentIntentId ?? undefined,
-      expiresAt: periodEndsAt ?? undefined,
-      activatedAt: new Date(),
-    },
-  });
-
-  return license;
 }
 
 export async function updateLicenseStatusBySubscriptionId(

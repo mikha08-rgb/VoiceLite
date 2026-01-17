@@ -86,6 +86,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Check if license has expired (subscription past due or ended)
+    if (license.expiresAt && license.expiresAt < new Date()) {
+      return NextResponse.json({
+        valid: false,
+        tier: 'free',
+        reason: 'expired',
+      });
+    }
+
     // If machineId provided, record activation (enforces 3-device limit)
     if (machineId) {
       try {

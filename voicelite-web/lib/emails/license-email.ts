@@ -1,12 +1,25 @@
 import { Resend } from 'resend';
 
-// Lazy initialization of Resend client to allow builds without env vars
-function getResendClient() {
+// Singleton Resend client - lazy initialized for serverless compatibility
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  // Return cached client if already initialized
+  if (resendClient) {
+    return resendClient;
+  }
+
   const key = process.env.RESEND_API_KEY;
   if (!key || key === 're_placeholder') {
-    throw new Error('RESEND_API_KEY must be configured');
+    // Log detailed error for debugging in production
+    console.error('RESEND_API_KEY missing or placeholder. Email sending will fail.');
+    throw new Error('RESEND_API_KEY must be configured for email sending');
   }
-  return new Resend(key);
+
+  // Create and cache client
+  resendClient = new Resend(key);
+  console.log('📧 Resend client initialized');
+  return resendClient;
 }
 
 export interface LicenseEmailData {

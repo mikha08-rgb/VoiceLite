@@ -36,7 +36,7 @@ async function verifyEmailFix() {
   try {
     const failedEvents = await prisma.licenseEvent.findMany({
       where: {
-        eventType: {
+        type: {
           in: ['email_failed', 'email_resend_failed']
         }
       },
@@ -99,7 +99,7 @@ async function verifyEmailFix() {
 
     const successfulEvents = await prisma.licenseEvent.findMany({
       where: {
-        eventType: {
+        type: {
           in: ['email_sent', 'email_resent_manual']
         },
         createdAt: {
@@ -118,7 +118,7 @@ async function verifyEmailFix() {
       console.log(`   Found ${successfulEvents.length} successful email(s) in last 24h:\n`);
       successfulEvents.forEach((event, i) => {
         const metadata = event.metadata as any;
-        console.log(`   ${i + 1}. ${event.eventType} at ${event.createdAt.toISOString()}`);
+        console.log(`   ${i + 1}. ${event.type} at ${event.createdAt.toISOString()}`);
         console.log(`      Message ID: ${metadata?.messageId || 'N/A'}`);
         console.log('');
       });

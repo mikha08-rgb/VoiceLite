@@ -13,6 +13,14 @@ import { prisma } from '@/lib/prisma';
 // MED-5 FIX: Rate limit email sending (1 per 5 minutes per license)
 const EMAIL_RATE_LIMIT_MINUTES = 5;
 
+// Custom error class for transient errors that should trigger Stripe retry
+class RetriableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetriableError';
+  }
+}
+
 async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
   const recentEmail = await prisma.licenseEvent.findFirst({
     where: {
@@ -124,8 +132,14 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Webhook processing failure', error);
-    // Return 200 to avoid Stripe retries for permanent failures
-    // The event is already marked as processed
+
+    // Return 500 for transient errors (Stripe will retry)
+    // Return 200 for permanent errors (no point retrying)
+    if (error instanceof RetriableError) {
+      return NextResponse.json({ error: error.message, eventId: event.id }, { status: 500 });
+    }
+
+    // Permanent failure - don't retry
     return NextResponse.json({ error: 'Processing error', eventId: event.id }, { status: 200 });
   }
 
@@ -153,7 +167,16 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     if (!subscriptionId) {
       throw new Error('Missing subscription id for quarterly plan');
     }
-    const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as any;
+
+    // Wrap Stripe API call - network errors should trigger retry
+    let subscription: any;
+    try {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (stripeError) {
+      console.error(`❌ Failed to retrieve subscription ${subscriptionId}:`, stripeError);
+      throw new RetriableError(`Stripe API error: Failed to retrieve subscription ${subscriptionId}`);
+    }
+
     const currentPeriodEnd = subscription.current_period_end
       ? new Date(subscription.current_period_end * 1000)
       : undefined;
@@ -188,8 +211,15 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
         });
-        // Don't throw - license was created successfully, just log the email failure
+        // Throw RetriableError so Stripe will retry - customer MUST get their email
+        throw new RetriableError(`Email sending failed for ${email}`);
       }
+    } else {
+      // Log that email was skipped due to rate limit
+      await recordLicenseEvent(license.id, 'email_skipped_rate_limit', {
+        email: email,
+        reason: 'Rate limit: email already sent within 5 minutes',
+      });
     }
   } else {
     console.log(`💰 Processing lifetime/one-time payment`);
@@ -242,8 +272,15 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
         });
-        // Don't throw - license was created successfully, just log the email failure
+        // Throw RetriableError so Stripe will retry - customer MUST get their email
+        throw new RetriableError(`Email sending failed for ${email}`);
       }
+    } else {
+      // Log that email was skipped due to rate limit
+      await recordLicenseEvent(license.id, 'email_skipped_rate_limit', {
+        email: email,
+        reason: 'Rate limit: email already sent within 5 minutes',
+      });
     }
   }
 }
