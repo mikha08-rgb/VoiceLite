@@ -314,6 +314,27 @@ namespace VoiceLite.Core.Controllers
         }
 
         /// <summary>
+        /// Cancels the currently running transcription, if any
+        /// </summary>
+        public async Task<bool> CancelCurrentTranscriptionAsync()
+        {
+            try
+            {
+                _errorLogger.LogInfo("CancelCurrentTranscriptionAsync: Attempting to cancel transcription");
+                _whisperService.CancelTranscription();
+
+                // Give async TranscribeAsync time to observe cancellation token before shutdown continues
+                await Task.Delay(100);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _errorLogger.LogError(ex, "CancelCurrentTranscriptionAsync failed");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Gets transcription performance statistics
         /// </summary>
         public TranscriptionStatistics GetStatistics()

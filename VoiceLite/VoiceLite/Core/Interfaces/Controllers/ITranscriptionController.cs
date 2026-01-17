@@ -57,6 +57,12 @@ namespace VoiceLite.Core.Interfaces.Controllers
         TranscriptionStatistics GetStatistics();
 
         /// <summary>
+        /// Cancels the currently running transcription, if any
+        /// </summary>
+        /// <returns>True if cancellation was initiated, false if no transcription was running</returns>
+        Task<bool> CancelCurrentTranscriptionAsync();
+
+        /// <summary>
         /// Raised when a batch transcription item completes
         /// </summary>
         event EventHandler<BatchProgressEventArgs> BatchItemCompleted;

@@ -352,8 +352,7 @@ namespace VoiceLite.Presentation.ViewModels
                 // Cancel any ongoing transcription
                 if (IsTranscribing)
                 {
-                    // TODO: Add CancelCurrentTranscriptionAsync to ITranscriptionController
-                    // await _transcriptionController.CancelCurrentTranscriptionAsync();
+                    await _transcriptionController.CancelCurrentTranscriptionAsync();
                 }
 
                 // Save settings

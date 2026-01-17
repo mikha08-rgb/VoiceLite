@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { logger } from '@/lib/logger';
 
 // Lazy initialization of rate limiter to allow builds without env vars
 function getRateLimiter(): Ratelimit | null {
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Development/fallback: log warning but allow request
-      console.warn('Rate limiter not configured, allowing feedback request');
+      logger.warn('Rate limiter not configured, allowing feedback request');
     }
 
     // Parse and validate request body
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('Feedback submission error:', error);
+    logger.error('Feedback submission error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

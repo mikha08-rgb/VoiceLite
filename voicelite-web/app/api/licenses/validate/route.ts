@@ -8,6 +8,7 @@ import { checkRateLimit,
   licenseValidationGlobalRateLimit
 } from '@/lib/ratelimit';
 import { recordLicenseActivation } from '@/lib/licensing';
+import { logger } from '@/lib/logger';
 
 const bodySchema = z.object({
   // Accept both formats:
@@ -55,8 +56,7 @@ export async function POST(request: NextRequest) {
       const reason = !ipRateLimit.allowed ? 'IP limit exceeded' :
                      !keyRateLimit.allowed ? 'License key limit exceeded' :
                      'Global rate limit exceeded';
-      // HIGH-2 FIX: Don't log key prefix (reduces brute-force keyspace)
-      console.warn(`Rate limit exceeded: ${reason} (IP: ${ip}, Key: <redacted>)`);
+      logger.warn('Rate limit exceeded', { reason, ip });
 
       return NextResponse.json(
         { error: 'Too many validation attempts. Please try again later.' },
@@ -132,10 +132,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      logger.warn('License validation: Invalid request format', { issues: error.issues });
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    console.error('License validation failed:', error);
-    return NextResponse.json({ error: 'Unable to validate license' }, { status: 500 });
+    // Differentiate between database errors (retriable) and other errors
+    const isPrismaError = error && typeof error === 'object' && 'code' in error;
+    logger.error('License validation failed', error, { isPrismaError });
+
+    // Return 503 for database errors (retriable), 500 for others
+    const status = isPrismaError ? 503 : 500;
+    return NextResponse.json(
+      { error: 'Unable to validate license. Please try again.' },
+      { status }
+    );
   }
 }

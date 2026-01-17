@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { logger } from '@/lib/logger';
 
 // Lazy initialization of Stripe client
 // During build time, env vars may not be set, so we initialize on first use
@@ -52,15 +53,14 @@ export async function POST(request: NextRequest) {
     if (error && typeof error === 'object' && 'type' in error) {
       const stripeError = error as any;
 
-      console.error('Stripe API error:', {
+      logger.error('Stripe API error', stripeError, {
         type: stripeError.type,
         code: stripeError.code,
-        message: stripeError.message,
       });
 
       switch (stripeError.type) {
         case 'StripeInvalidRequestError':
-          console.error('Stripe configuration error - check price IDs and API keys');
+          logger.error('Stripe configuration error - check price IDs and API keys');
           return NextResponse.json(
             { error: 'Payment system configuration error. Please contact support.' },
             { status: 500 }
@@ -74,14 +74,14 @@ export async function POST(request: NextRequest) {
           );
 
         case 'StripeAuthenticationError':
-          console.error('Stripe authentication failed - check API keys');
+          logger.error('Stripe authentication failed - check API keys');
           return NextResponse.json(
             { error: 'Payment system authentication error. Please contact support.' },
             { status: 500 }
           );
 
         default:
-          console.error('Unknown Stripe error type:', stripeError.type);
+          logger.error('Unknown Stripe error type', stripeError, { type: stripeError.type });
           return NextResponse.json(
             { error: 'An error occurred during checkout. Please try again.' },
             { status: 500 }
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generic error fallback
-    console.error('Unexpected checkout error:', error instanceof Error ? error.message : 'Unknown error');
+    logger.error('Unexpected checkout error', error);
     return NextResponse.json(
       { error: 'Failed to create checkout session. Please try again.' },
       { status: 500 }

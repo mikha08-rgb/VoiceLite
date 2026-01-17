@@ -1,9 +1,12 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Win32;
+using NAudio.Wave;
 using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Core.Interfaces.Services;
 using VoiceLite.Presentation.Commands;
@@ -517,9 +520,85 @@ namespace VoiceLite.Presentation.ViewModels
 
         private async Task ExecuteTestAudio()
         {
-            // TODO: Implement audio test
-            await Task.Delay(1000);
-            MessageBox.Show("Audio test completed successfully!", "Audio Test", MessageBoxButton.OK, MessageBoxImage.Information);
+            try
+            {
+                // Find device index from name
+                int deviceIndex = -1;
+                for (int i = 0; i < WaveInEvent.DeviceCount; i++)
+                {
+                    var caps = WaveInEvent.GetCapabilities(i);
+                    if (caps.ProductName == SelectedAudioDevice)
+                    {
+                        deviceIndex = i;
+                        break;
+                    }
+                }
+
+                if (deviceIndex < 0)
+                {
+                    MessageBox.Show($"Audio device '{SelectedAudioDevice}' not found.", "Audio Test Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Test microphone by recording briefly and measuring level
+                float maxLevel = 0;
+                var tcs = new TaskCompletionSource<bool>();
+
+                var waveIn = new WaveInEvent
+                {
+                    DeviceNumber = deviceIndex,
+                    WaveFormat = new WaveFormat(16000, 16, 1)
+                };
+
+                try
+                {
+                    waveIn.DataAvailable += (s, e) =>
+                    {
+                        // Measure peak level from samples
+                        for (int i = 0; i < e.BytesRecorded; i += 2)
+                        {
+                            short sample = BitConverter.ToInt16(e.Buffer, i);
+                            float level = Math.Abs(sample / 32768f);
+                            if (level > maxLevel) maxLevel = level;
+                        }
+                    };
+
+                    waveIn.RecordingStopped += (s, e) => tcs.TrySetResult(true);
+
+                    waveIn.StartRecording();
+                    await Task.Delay(500); // Record for 500ms
+                    waveIn.StopRecording();
+
+                    // Wait for RecordingStopped with timeout to prevent infinite wait
+                    await Task.WhenAny(tcs.Task, Task.Delay(2000));
+                }
+                finally
+                {
+                    waveIn?.Dispose();
+                }
+
+                // Show result
+                string levelDesc = maxLevel switch
+                {
+                    < 0.01f => "No audio detected - check mic connection",
+                    < 0.1f => "Low level - speak louder or check mic settings",
+                    < 0.5f => "Good level",
+                    _ => "Strong signal"
+                };
+
+                MessageBox.Show(
+                    $"Device: {SelectedAudioDevice}\n" +
+                    $"Peak Level: {maxLevel:P0}\n" +
+                    $"Status: {levelDesc}",
+                    "Audio Test Complete",
+                    MessageBoxButton.OK,
+                    maxLevel < 0.01f ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _errorLogger.LogError(ex, "Audio test failed");
+                MessageBox.Show($"Audio test failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task ExecuteExportSettings()
@@ -610,7 +689,63 @@ namespace VoiceLite.Presentation.ViewModels
 
         private void UpdateStartupRegistration(bool enable)
         {
-            // TODO: Implement Windows startup registration
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
+
+                if (key == null)
+                {
+                    _errorLogger.LogWarning("Could not open registry key for startup registration");
+                    RevertStartupSetting(enable);
+                    MessageBox.Show(
+                        "Unable to modify Windows startup settings. Registry access denied.",
+                        "Startup Configuration Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                const string appName = "VoiceLite";
+                var exePath = Process.GetCurrentProcess().MainModule?.FileName;
+
+                if (string.IsNullOrEmpty(exePath))
+                {
+                    _errorLogger.LogWarning("Could not determine executable path for startup registration");
+                    RevertStartupSetting(enable);
+                    return;
+                }
+
+                if (enable)
+                {
+                    // Add to startup with /startup flag for silent launch
+                    key.SetValue(appName, $"\"{exePath}\" /startup");
+                    _errorLogger.LogInfo("VoiceLite added to Windows startup");
+                }
+                else
+                {
+                    key.DeleteValue(appName, throwOnMissingValue: false);
+                    _errorLogger.LogInfo("VoiceLite removed from Windows startup");
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorLogger.LogError(ex, "Failed to update Windows startup registration");
+                RevertStartupSetting(enable);
+                MessageBox.Show(
+                    $"Failed to update Windows startup: {ex.Message}",
+                    "Startup Configuration Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private void RevertStartupSetting(bool attemptedValue)
+        {
+            // Revert to opposite of what was attempted
+            _startWithWindows = !attemptedValue;
+            _settingsService.StartWithWindows = !attemptedValue;
+            OnPropertyChanged(nameof(StartWithWindows));
         }
 
         private ITextInjector.InjectionMode ConvertToInjectionMode(string mode)

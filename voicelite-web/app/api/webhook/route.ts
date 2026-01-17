@@ -9,6 +9,7 @@ import {
   revokeLicense,
 } from '@/lib/licensing';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 // MED-5 FIX: Rate limit email sending (1 per 5 minutes per license)
 const EMAIL_RATE_LIMIT_MINUTES = 5;
@@ -34,7 +35,7 @@ async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
   });
 
   if (recentEmail) {
-    console.log(`📧 Email rate limited for license ${licenseId} - last sent at ${recentEmail.createdAt.toISOString()}`);
+    logger.info('Email rate limited', { licenseId, lastSent: recentEmail.createdAt.toISOString() });
     return false;
   }
   return true;
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
   const allowedOrigins = ['https://stripe.com', 'https://dashboard.stripe.com'];
 
   if (origin && !allowedOrigins.includes(origin)) {
-    console.warn(`Suspicious webhook origin: ${origin}`);
+    logger.warn('Suspicious webhook origin', { origin });
     // Still allow - Stripe doesn't always set origin, but log for monitoring
   }
 
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (error) {
-    console.error('Webhook signature verification failed:', error);
+    logger.error('Webhook signature verification failed', error);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     Math.abs(webhookEvent.seenAt.getTime() - webhookEvent.processedAt!.getTime()) < 1000;
 
   if (!isFirstProcessing) {
-    console.log(`Event ${event.id} already processed at ${webhookEvent.processedAt?.toISOString()}, skipping (duplicate prevented)`);
+    logger.info('Event already processed, skipping', { eventId: event.id, processedAt: webhookEvent.processedAt?.toISOString() });
     return NextResponse.json({ received: true, cached: true });
   }
 
@@ -128,10 +129,10 @@ export async function POST(request: NextRequest) {
         await handleChargeRefunded(event.data.object as Stripe.Charge);
         break;
       default:
-        console.log(`Unhandled event type ${event.type}`);
+        logger.warn('Unhandled event type', { eventType: event.type });
     }
   } catch (error) {
-    console.error('Webhook processing failure', error);
+    logger.error('Webhook processing failure', error);
 
     // Return 500 for transient errors (Stripe will retry)
     // Return 200 for permanent errors (no point retrying)
@@ -147,20 +148,20 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
-  console.log(`🔔 WEBHOOK RECEIVED: checkout.session.completed - Session ${session.id}`);
+  logger.info('Webhook: checkout.session.completed', { sessionId: session.id });
 
   const email = session.customer_email || session.customer_details?.email;
   const stripeCustomerId = (session.customer as string) ?? '';
 
-  console.log(`📝 Email: ${email}, Customer: ${stripeCustomerId}`);
+  logger.debug('Checkout details', { email, stripeCustomerId });
 
   if (!email || !stripeCustomerId) {
-    console.error('❌ Missing customer email or ID');
+    logger.error('Missing customer email or ID');
     throw new Error('Missing customer email or ID on checkout session');
   }
 
   const plan = session.metadata?.plan ?? (session.mode === 'subscription' ? 'quarterly' : 'lifetime');
-  console.log(`💳 Plan type: ${plan}, Mode: ${session.mode}`);
+  logger.debug('Plan details', { plan, mode: session.mode });
 
   if (plan === 'quarterly') {
     const subscriptionId = session.subscription as string | undefined;
@@ -173,7 +174,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     try {
       subscription = await stripe.subscriptions.retrieve(subscriptionId);
     } catch (stripeError) {
-      console.error(`❌ Failed to retrieve subscription ${subscriptionId}:`, stripeError);
+      logger.error('Failed to retrieve subscription', stripeError, { subscriptionId });
       throw new RetriableError(`Stripe API error: Failed to retrieve subscription ${subscriptionId}`);
     }
 
@@ -193,11 +194,11 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
         periodEndsAt: currentPeriodEnd,
       });
     } catch (dbError) {
-      console.error(`❌ DATABASE ERROR (subscription):`, dbError);
+      logger.error('Database error creating subscription license', dbError, { email });
       throw new RetriableError(`Database error creating subscription license for ${email}`);
     }
 
-    console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
+    logger.info('Sending license email', { email, licenseKey: license.licenseKey });
 
     // MED-5 FIX: Check rate limit before sending
     if (await canSendLicenseEmail(license.id)) {
@@ -207,13 +208,13 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       });
 
       if (emailResult.success) {
-        console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+        logger.info('License email sent', { email, messageId: emailResult.messageId });
         await recordLicenseEvent(license.id, 'email_sent', {
           messageId: emailResult.messageId,
           email: email,
         });
       } else {
-        console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+        logger.error('Failed to send license email', emailResult.error, { email });
         await recordLicenseEvent(license.id, 'email_failed', {
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
@@ -229,19 +230,19 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       });
     }
   } else {
-    console.log(`💰 Processing lifetime/one-time payment`);
+    logger.info('Processing lifetime payment');
     const paymentIntentId = typeof session.payment_intent === 'string'
       ? session.payment_intent
       : session.payment_intent?.id;
 
-    console.log(`💳 Payment Intent ID: ${paymentIntentId}`);
+    logger.debug('Payment intent', { paymentIntentId });
 
     if (!paymentIntentId) {
-      console.error('❌ Missing payment intent for lifetime plan');
+      logger.error('Missing payment intent for lifetime plan');
       throw new Error('Missing payment intent for lifetime plan');
     }
 
-    console.log(`💾 Creating/updating license in database...`);
+    logger.debug('Creating license in database');
 
     let license;
     try {
@@ -251,14 +252,13 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
         stripeCustomerId,
         stripePaymentIntentId: paymentIntentId,
       });
-      console.log(`✅ License created: ${license.licenseKey} (ID: ${license.id})`);
+      logger.info('License created', { licenseKey: license.licenseKey, licenseId: license.id });
     } catch (dbError) {
-      console.error(`❌ DATABASE ERROR (lifetime):`, dbError);
-      console.error(`Error details:`, JSON.stringify(dbError, null, 2));
+      logger.error('Database error creating lifetime license', dbError, { email });
       throw new RetriableError(`Database error creating lifetime license for ${email}`);
     }
 
-    console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
+    logger.info('Sending license email', { email, licenseKey: license.licenseKey });
 
     // MED-5 FIX: Check rate limit before sending
     if (await canSendLicenseEmail(license.id)) {
@@ -268,13 +268,13 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       });
 
       if (emailResult.success) {
-        console.log(`✅ License email sent successfully to ${email} (MessageID: ${emailResult.messageId})`);
+        logger.info('License email sent', { email, messageId: emailResult.messageId });
         await recordLicenseEvent(license.id, 'email_sent', {
           messageId: emailResult.messageId,
           email: email,
         });
       } else {
-        console.error(`❌ Failed to send license email to ${email}:`, emailResult.error);
+        logger.error('Failed to send license email', emailResult.error, { email });
         await recordLicenseEvent(license.id, 'email_failed', {
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
@@ -332,7 +332,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     : charge.payment_intent?.id;
 
   if (!paymentIntentId) {
-    console.warn('Charge refunded but no payment intent ID found');
+    logger.warn('Charge refunded but no payment intent ID found');
     return;
   }
 
@@ -342,6 +342,6 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 
   if (license) {
     await revokeLicense(license.id, 'charge_refunded');
-    console.log(`License ${license.id} revoked due to charge refund`);
+    logger.warn('License revoked due to charge refund', { licenseId: license.id });
   }
 }

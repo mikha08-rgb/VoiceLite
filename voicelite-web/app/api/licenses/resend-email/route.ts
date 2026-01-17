@@ -4,6 +4,7 @@ import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { prisma } from '@/lib/prisma';
 import { recordLicenseEvent } from '@/lib/licensing';
 import { emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit';
+import { logger } from '@/lib/logger';
 
 import { LicenseStatus } from '@prisma/client';
 /**
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send the email
-    console.log(`🔄 Manual resend requested for license ${license.id} (${license.email})`);
+    logger.info('Manual resend requested', { licenseId: license.id, email: license.email });
 
     const emailResult = await sendLicenseEmail({
       email: license.email,
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error('Error in resend-email endpoint:', error);
+    logger.error('Error in resend-email endpoint', error);
     // Don't expose error details in production
     return NextResponse.json(
       { error: 'Internal server error. Please try again later.' },
