@@ -181,14 +181,21 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       ? new Date(subscription.current_period_end * 1000)
       : undefined;
 
-    const license = await upsertLicenseFromStripe({
-      email,
-      type: LicenseType.SUBSCRIPTION,
-      stripeCustomerId,
-      stripeSubscriptionId: subscriptionId,
-      subscriptionStatus: subscription.status,
-      periodEndsAt: currentPeriodEnd,
-    });
+    // Wrap database call - errors should trigger retry
+    let license;
+    try {
+      license = await upsertLicenseFromStripe({
+        email,
+        type: LicenseType.SUBSCRIPTION,
+        stripeCustomerId,
+        stripeSubscriptionId: subscriptionId,
+        subscriptionStatus: subscription.status,
+        periodEndsAt: currentPeriodEnd,
+      });
+    } catch (dbError) {
+      console.error(`❌ DATABASE ERROR (subscription):`, dbError);
+      throw new RetriableError(`Database error creating subscription license for ${email}`);
+    }
 
     console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
 
@@ -246,9 +253,9 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       });
       console.log(`✅ License created: ${license.licenseKey} (ID: ${license.id})`);
     } catch (dbError) {
-      console.error(`❌ DATABASE ERROR:`, dbError);
+      console.error(`❌ DATABASE ERROR (lifetime):`, dbError);
       console.error(`Error details:`, JSON.stringify(dbError, null, 2));
-      throw dbError;
+      throw new RetriableError(`Database error creating lifetime license for ${email}`);
     }
 
     console.log(`📧 Attempting to send license email to ${email} (License: ${license.licenseKey})`);
