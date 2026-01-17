@@ -21,7 +21,7 @@ export interface LicenseEmailResult {
 }
 
 export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'VoiceLite <BasmentHustleLLC@gmail.com>';
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'VoiceLite <basementhustlellc@gmail.com>';
 
   const html = `
 <!DOCTYPE html>

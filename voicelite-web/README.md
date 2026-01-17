@@ -88,6 +88,6 @@ Upgrade to database when you have >100 customers.
 
 ## Support
 
-Email: BasmentHustleLLC@gmail.com
+Email: basementhustlellc@gmail.com
 
 # GA4 Fix 2025-10-25

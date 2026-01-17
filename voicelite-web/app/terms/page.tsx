@@ -84,8 +84,8 @@ export default function TermsOfService() {
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
               <li><strong>30-Day Money-Back Guarantee:</strong> Full refund if requested within 30 days of purchase</li>
               <li>Refund requests must be sent to{' '}
-                <a href="mailto:BasmentHustleLLC@gmail.com" className="text-blue-600 hover:underline">
-                  BasmentHustleLLC@gmail.com
+                <a href="mailto:basementhustlellc@gmail.com" className="text-blue-600 hover:underline">
+                  basementhustlellc@gmail.com
                 </a>
               </li>
               <li>No questions asked - we want you to be 100% satisfied</li>
@@ -226,8 +226,8 @@ export default function TermsOfService() {
             </p>
             <p className="text-gray-700">
               <strong>Email:</strong>{' '}
-              <a href="mailto:BasmentHustleLLC@gmail.com" className="text-blue-600 hover:underline">
-                BasmentHustleLLC@gmail.com
+              <a href="mailto:basementhustlellc@gmail.com" className="text-blue-600 hover:underline">
+                basementhustlellc@gmail.com
               </a>
               <br />
               <strong>Website:</strong>{' '}

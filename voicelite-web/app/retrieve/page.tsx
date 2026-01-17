@@ -129,7 +129,7 @@ export default function RetrieveLicensePage() {
         <div className="mt-8 pt-6 border-t border-stone-200 dark:border-stone-700 text-center">
           <p className="text-sm text-stone-500 dark:text-stone-400">
             Need help?{' '}
-            <a href="mailto:BasmentHustleLLC@gmail.com" className="text-blue-600 dark:text-blue-400 hover:underline">
+            <a href="mailto:basementhustlellc@gmail.com" className="text-blue-600 dark:text-blue-400 hover:underline">
               Contact support
             </a>
           </p>
