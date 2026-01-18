@@ -9,9 +9,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>1.2.0.13</Version>
-    <AssemblyVersion>1.2.0.13</AssemblyVersion>
-    <FileVersion>1.2.0.13</FileVersion>
+    <Version>1.2.0.14</Version>
+    <AssemblyVersion>1.2.0.14</AssemblyVersion>
+    <FileVersion>1.2.0.14</FileVersion>
     <RollForward>LatestMinor</RollForward>
 
     <!-- Rich metadata helps antivirus trust (visible in file properties) -->
