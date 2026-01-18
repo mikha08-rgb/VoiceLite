@@ -2083,6 +2083,24 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated -= OnPollingModeActivated;
                 }
 
+                // MEMORY LEAK FIX: Unsubscribe ViewModel event handlers
+                // ViewModels hold references to MainWindow via event subscriptions
+                // Must unsubscribe to allow MainWindow to be garbage collected
+                if (recordingViewModel != null)
+                {
+                    recordingViewModel.RecordingStartRequested -= OnRecordingStartRequested;
+                    recordingViewModel.RecordingStopRequested -= OnRecordingStopRequested;
+                }
+
+                if (historyViewModel != null)
+                {
+                    historyViewModel.ClearHistoryRequested -= OnClearHistoryRequested;
+                    historyViewModel.ClearAllHistoryRequested -= OnClearAllHistoryRequested;
+                    historyViewModel.CopyToClipboardRequested -= OnCopyToClipboardRequested;
+                    historyViewModel.DeleteItemRequested -= OnDeleteItemRequested;
+                    historyViewModel.ReInjectRequested -= OnReInjectRequested;
+                }
+
 
                 // Dispose child windows (WPF Window resources)
 
@@ -2111,6 +2129,10 @@ namespace VoiceLite
 
                 audioRecorder?.Dispose();
                 audioRecorder = null;
+
+                // Dispose TextInjector to release clipboard semaphore
+                textInjector?.Dispose();
+                textInjector = null;
 
                 // Note: Removed aggressive GC.Collect() - let .NET handle it
             }
@@ -2213,14 +2235,14 @@ namespace VoiceLite
                     System.Windows.Clipboard.SetText(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
+                    lock (timerLock) { activeStatusTimers.Add(timer); } // TIMER RACE FIX: Use lock for thread safety
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
+                        lock (timerLock) { activeStatusTimers.Remove(timer); } // TIMER RACE FIX: Use lock for thread safety
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2301,14 +2323,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
+                    lock (timerLock) { activeStatusTimers.Add(timer); } // TIMER RACE FIX: Use lock for thread safety
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
+                        lock (timerLock) { activeStatusTimers.Remove(timer); } // TIMER RACE FIX: Use lock for thread safety
                     };
                     timer.Tick += handler;
                     timer.Start();

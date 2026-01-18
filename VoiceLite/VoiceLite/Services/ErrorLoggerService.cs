@@ -23,7 +23,9 @@ namespace VoiceLite.Services
 
         public void LogWarning(string message)
         {
-            ErrorLogger.LogMessage($"WARNING: {message}");
+            // Use ErrorLogger.LogWarning directly instead of LogMessage with prefix
+            // LogWarning is visible in Release builds, LogMessage is Debug-only
+            ErrorLogger.LogWarning(message);
         }
 
         public void LogDebug(string message)

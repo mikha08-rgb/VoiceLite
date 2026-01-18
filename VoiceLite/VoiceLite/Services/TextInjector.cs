@@ -12,13 +12,23 @@ using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class TextInjector : ITextInjector
+    public class TextInjector : ITextInjector, IDisposable
     {
-        public bool AutoPaste { get; set; } = true;
+        // Thread-safe AutoPaste property (Issue 3)
+        private volatile bool _autoPaste = true;
+        public bool AutoPaste
+        {
+            get => _autoPaste;
+            set => _autoPaste = value;
+        }
 
         // Target window handle for paste operations
         // Captured when InjectText is called to ensure paste goes to correct window
-        private IntPtr _targetWindowHandle = IntPtr.Zero;
+        // Made volatile for thread-safe access between main thread and worker threads (Issue 2)
+        private volatile IntPtr _targetWindowHandle = IntPtr.Zero;
+
+        // Disposal tracking (Issue 1)
+        private bool _disposed = false;
 
         // Text length thresholds for injection mode selection
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
@@ -103,7 +113,15 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("TextInjector.InjectText", ex);
-                // Fallback to clipboard method if typing fails
+
+                // Issue 7: Don't fall back to paste if user explicitly wants typing only
+                if (settings.TextInjectionMode == TextInjectionMode.AlwaysType)
+                {
+                    ErrorLogger.LogWarning("InjectViaTyping failed and AlwaysType mode set - not falling back to clipboard");
+                    throw new InvalidOperationException($"Text injection via typing failed: {ex.Message}", ex);
+                }
+
+                // Fallback to clipboard method if typing fails (for other modes)
                 try
                 {
 #if DEBUG
@@ -282,6 +300,17 @@ namespace VoiceLite.Services
 
         private void InjectViaTyping(string text)
         {
+            // Issue 6: Restore focus to target window before typing
+            // For long transcriptions, user may have clicked away during processing
+            if (_targetWindowHandle != IntPtr.Zero)
+            {
+                if (!SetForegroundWindow(_targetWindowHandle))
+                {
+                    ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in InjectViaTyping");
+                }
+                Thread.Sleep(50); // Allow window activation to complete
+            }
+
             // Get adaptive delay based on current application
             int delay = GetTypingDelay();
 
@@ -332,7 +361,9 @@ namespace VoiceLite.Services
             }
 
             Exception? workerException = null;
-            bool operationCompleted = false;
+            // Issue 5: Use threadStarted instead of operationCompleted to avoid race condition
+            // threadStarted is only written by the main thread, so no synchronization needed
+            bool threadStarted = false;
 
             try
             {
@@ -349,7 +380,6 @@ namespace VoiceLite.Services
                             Thread.Sleep(CLIPBOARD_READY_DELAY_MS);
                             SimulateCtrlV();
                         }
-                        operationCompleted = true;
                     }
                     catch (Exception ex)
                     {
@@ -365,8 +395,10 @@ namespace VoiceLite.Services
 
                 thread.SetApartmentState(ApartmentState.STA);
                 thread.Start();
+                threadStarted = true; // Issue 5: Set AFTER Start() succeeds - thread will handle semaphore release
 
-                if (!thread.Join(TimeSpan.FromSeconds(3)))
+                // Issue 4: Align timeout with semaphore timeout (5s) to prevent false timeout errors
+                if (!thread.Join(TimeSpan.FromSeconds(5)))
                 {
                     // Thread timed out but is still running - semaphore will be released when it completes
                     ErrorLogger.LogWarning("Clipboard operation thread timed out - thread will release semaphore when done");
@@ -385,8 +417,9 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
-                // Unexpected error - release semaphore here since thread may not have started
-                if (!operationCompleted)
+                // Issue 5: Only release semaphore if thread never started
+                // Once thread.Start() succeeds, thread's finally block handles semaphore release
+                if (!threadStarted)
                 {
                     try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { }
                 }
@@ -437,7 +470,10 @@ namespace VoiceLite.Services
                 // This ensures Ctrl+V goes to the ORIGINAL target app, not VoiceLite
                 if (_targetWindowHandle != IntPtr.Zero)
                 {
-                    SetForegroundWindow(_targetWindowHandle);
+                    if (!SetForegroundWindow(_targetWindowHandle))
+                    {
+                        ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in SimulateCtrlV");
+                    }
                     Thread.Sleep(50); // Allow window activation to complete
                 }
 
@@ -518,8 +554,17 @@ namespace VoiceLite.Services
                 uint processId;
                 GetWindowThreadProcessId(hwnd, out processId);
 
-                var process = Process.GetProcessById((int)processId);
-                return process?.ProcessName ?? "Unknown";
+                try
+                {
+                    var process = Process.GetProcessById((int)processId);
+                    return process?.ProcessName ?? "Unknown";
+                }
+                catch (ArgumentException)
+                {
+                    // Issue 8: Process exited between GetWindowThreadProcessId and GetProcessById
+                    ErrorLogger.LogDebug($"Process {processId} exited before name could be retrieved");
+                    return "Unknown";
+                }
             }
             catch (Exception ex)
             {
@@ -528,10 +573,18 @@ namespace VoiceLite.Services
             }
         }
 
+        /// <summary>
+        /// Sets the typing delay between keystrokes.
+        /// Issue 9: This is intentionally a no-op because adaptive per-application
+        /// delays are used instead (see GetTypingDelayForApplication). The delay
+        /// is automatically optimized based on the target application for best
+        /// balance between speed and reliability.
+        /// </summary>
+        /// <param name="millisecondsDelay">Ignored - adaptive delays are used instead</param>
         public void SetTypingDelay(int millisecondsDelay)
         {
-            // Would need to refactor TYPING_DELAY_MS to be non-const
-            // For now, this is a no-op as the delay is constant
+            // Intentional no-op: Adaptive per-application delays are used instead
+            // See GetTypingDelayForApplication() for the actual delay logic
         }
 
         // Virtual key codes
@@ -554,5 +607,47 @@ namespace VoiceLite.Services
 
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        /// <summary>
+        /// Disposes the TextInjector and releases the clipboard semaphore.
+        /// Issue 1: Prevents SemaphoreSlim leak on app exit.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Implements the standard Dispose pattern.
+        /// </summary>
+        /// <param name="disposing">True if called from Dispose(), false if called from finalizer.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            if (disposing)
+            {
+                // Dispose managed resources
+                try
+                {
+                    _clipboardSemaphore?.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Already disposed, ignore
+                }
+            }
+            // No unmanaged resources to release
+        }
+
+        /// <summary>
+        /// Finalizer to catch cases where Dispose() was never called.
+        /// </summary>
+        ~TextInjector()
+        {
+            Dispose(false);
+        }
     }
 }

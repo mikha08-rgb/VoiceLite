@@ -14,6 +14,10 @@ import { logger } from '@/lib/logger';
 // MED-5 FIX: Rate limit email sending (1 per 5 minutes per license)
 const EMAIL_RATE_LIMIT_MINUTES = 5;
 
+// CRITICAL-2 FIX: Email format validation regex
+// Validates email format before processing to prevent data integrity issues
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 // Custom error class for transient errors that should trigger Stripe retry
 class RetriableError extends Error {
   constructor(message: string) {
@@ -165,6 +169,13 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   if (!email || !stripeCustomerId) {
     logger.error('Missing customer email or ID');
     throw new Error('Missing customer email or ID on checkout session');
+  }
+
+  // CRITICAL-2 FIX: Validate email format before processing
+  // Prevents data integrity issues from malformed emails
+  if (!EMAIL_REGEX.test(email)) {
+    logger.error('Invalid email format from Stripe', { email: email.substring(0, 50) });
+    throw new Error('Invalid email format on checkout session');
   }
 
   const plan = session.metadata?.plan ?? (session.mode === 'subscription' ? 'quarterly' : 'lifetime');

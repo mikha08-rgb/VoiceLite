@@ -11,6 +11,15 @@ namespace VoiceLite.Services
     /// </summary>
     public class TextPostProcessor
     {
+        // Pre-compiled regex patterns for performance (compiled once, reused many times)
+        private static readonly Regex ConjunctionCommaRegex = new Regex(
+            @"(\w+\s+\w+)\s+(and|but|or)\s+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex NonWordCharRegex = new Regex(
+            @"[^\w]",
+            RegexOptions.Compiled);
+
         // Common sentence-ending phrases that should get periods
         private static readonly HashSet<string> SentenceEnders = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -136,8 +145,8 @@ namespace VoiceLite.Services
             // Add commas before coordinating conjunctions in longer sentences
             if (text.Length > 30) // Only for longer sentences
             {
-                // Pattern: " and " preceded by at least 2 words
-                text = Regex.Replace(text, @"(\w+\s+\w+)\s+(and|but|or)\s+", "$1, $2 ", RegexOptions.IgnoreCase);
+                // Pattern: " and " preceded by at least 2 words - uses pre-compiled regex
+                text = ConjunctionCommaRegex.Replace(text, "$1, $2 ");
             }
 
             return text;
@@ -158,7 +167,7 @@ namespace VoiceLite.Services
             for (int i = 0; i < words.Length; i++)
             {
                 string word = words[i];
-                string cleanWord = Regex.Replace(word, @"[^\w]", ""); // Remove punctuation for checking
+                string cleanWord = NonWordCharRegex.Replace(word, ""); // Remove punctuation for checking (pre-compiled)
 
                 if (i == 0)
                 {

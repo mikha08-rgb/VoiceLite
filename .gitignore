@@ -17,6 +17,7 @@ backup*/
 # Temporary files
 temp/
 *.wav
+nul
 
 # Visual Studio
 .vs/

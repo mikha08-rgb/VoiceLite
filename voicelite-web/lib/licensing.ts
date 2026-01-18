@@ -65,6 +65,31 @@ export async function upsertLicenseFromStripe({
       update: {},
     });
 
+    // CRITICAL-1 FIX: Check for existing ACTIVE license for this email
+    // Prevents duplicate license creation if customer pays twice accidentally
+    // (different payment intents would otherwise create separate licenses)
+    const existingActiveLicense = await tx.license.findFirst({
+      where: {
+        email: normalizedEmail,
+        status: LicenseStatus.ACTIVE,
+      },
+    });
+
+    if (existingActiveLicense) {
+      // Return existing active license instead of creating duplicate
+      // Update Stripe IDs to link new payment to existing license
+      return tx.license.update({
+        where: { id: existingActiveLicense.id },
+        data: {
+          stripeCustomerId,
+          stripeSubscriptionId: stripeSubscriptionId ?? existingActiveLicense.stripeSubscriptionId,
+          stripePaymentIntentId: stripePaymentIntentId ?? existingActiveLicense.stripePaymentIntentId,
+          expiresAt: periodEndsAt ?? existingActiveLicense.expiresAt,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     const where = stripeSubscriptionId
       ? { stripeSubscriptionId }
       : { stripePaymentIntentId: stripePaymentIntentId! };

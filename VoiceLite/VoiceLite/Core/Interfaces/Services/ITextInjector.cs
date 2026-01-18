@@ -1,11 +1,13 @@
+using System;
 using System.Threading.Tasks;
 
 namespace VoiceLite.Core.Interfaces.Services
 {
     /// <summary>
-    /// Interface for text injection into applications
+    /// Interface for text injection into applications.
+    /// Implements IDisposable to ensure clipboard semaphore is properly released on app exit.
     /// </summary>
-    public interface ITextInjector
+    public interface ITextInjector : IDisposable
     {
         /// <summary>
         /// Text injection modes

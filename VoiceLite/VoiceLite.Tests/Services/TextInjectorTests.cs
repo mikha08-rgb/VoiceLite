@@ -745,5 +745,140 @@ namespace VoiceLite.Tests.Services
         // ✅ Unknown apps: Should use 1ms delay (default)
 
         #endregion
+
+        #region Disposal Tests (Issue 1 - Production Readiness)
+
+        [Fact]
+        public void Dispose_ReleasesSemaphore_DoesNotThrow()
+        {
+            // Arrange
+            var settings = new Settings();
+            var injector = new TextInjector(settings);
+
+            // Act
+            Action act = () => injector.Dispose();
+
+            // Assert - Should not throw
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void Dispose_CalledTwice_DoesNotThrow()
+        {
+            // Arrange
+            var settings = new Settings();
+            var injector = new TextInjector(settings);
+
+            // Act - Call dispose twice
+            Action act = () =>
+            {
+                injector.Dispose();
+                injector.Dispose();
+            };
+
+            // Assert - Should be idempotent
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void Dispose_AfterInjectText_DoesNotThrow()
+        {
+            // Arrange
+            _settings.TextInjectionMode = TextInjectionMode.AlwaysType;
+            var injector = new TextInjector(_settings);
+
+            // Act - Use the injector, then dispose
+            injector.InjectText("a");
+            Action act = () => injector.Dispose();
+
+            // Assert
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void TextInjector_ImplementsIDisposable()
+        {
+            // Arrange & Assert
+            typeof(TextInjector).Should().Implement<IDisposable>();
+        }
+
+        #endregion
+
+        #region Error Handling Tests (Issues 7 & 8)
+
+        [Fact]
+        public void GetFocusedApplicationName_ReturnsValidString()
+        {
+            // Arrange
+            var injector = new TextInjector(_settings);
+
+            // Act
+            var appName = injector.GetFocusedApplicationName();
+
+            // Assert - Should return either a valid process name or "Unknown"
+            appName.Should().NotBeNull();
+            appName.Should().NotBeEmpty();
+        }
+
+        [Fact]
+        public void GetFocusedApplicationName_DoesNotThrow()
+        {
+            // Arrange
+            var injector = new TextInjector(_settings);
+
+            // Act
+            Action act = () => injector.GetFocusedApplicationName();
+
+            // Assert - Should handle any window/process state gracefully
+            act.Should().NotThrow();
+        }
+
+        #endregion
+
+        #region Typing Delay Tests (Issue 9)
+
+        [Fact]
+        public void GetTypingDelayForApplication_ReturnsPositiveValue()
+        {
+            // Arrange
+            var injector = new TextInjector(_settings);
+
+            // Act
+            var delay = InvokeGetTypingDelayForApplication(injector);
+
+            // Assert - Delay should be between 1-5ms based on implementation
+            delay.Should().BeGreaterThanOrEqualTo(1);
+            delay.Should().BeLessThanOrEqualTo(5);
+        }
+
+        [Fact]
+        public void GetTypingDelay_ReturnsValueFromGetTypingDelayForApplication()
+        {
+            // Arrange
+            var injector = new TextInjector(_settings);
+
+            // Act
+            var delay = InvokeGetTypingDelay(injector);
+            var delayForApp = InvokeGetTypingDelayForApplication(injector);
+
+            // Assert - GetTypingDelay should delegate to GetTypingDelayForApplication
+            delay.Should().Be(delayForApp);
+        }
+
+        private int InvokeGetTypingDelayForApplication(TextInjector injector)
+        {
+            var method = typeof(TextInjector).GetMethod("GetTypingDelayForApplication",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return (int)method!.Invoke(injector, Array.Empty<object>())!;
+        }
+
+        private int InvokeGetTypingDelay(TextInjector injector)
+        {
+            var method = typeof(TextInjector).GetMethod("GetTypingDelay",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return (int)method!.Invoke(injector, Array.Empty<object>())!;
+        }
+
+        #endregion
     }
 }

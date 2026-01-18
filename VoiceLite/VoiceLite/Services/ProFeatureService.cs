@@ -11,6 +11,7 @@ namespace VoiceLite.Services
     public class ProFeatureService : IProFeatureService
     {
         private readonly Settings _settings;
+        private readonly object _refreshLock = new object();
 
         public ProFeatureService(Settings settings)
         {
@@ -142,12 +143,16 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Refreshes the Pro status from the license service
+        /// Refreshes the Pro status from the license service.
+        /// Thread-safe: uses lock to prevent concurrent reload operations.
         /// </summary>
         public void RefreshProStatus()
         {
-            // Force settings reload to get latest license status
-            _settings.Reload();
+            lock (_refreshLock)
+            {
+                // Force settings reload to get latest license status
+                _settings.Reload();
+            }
         }
 
         /// <summary>

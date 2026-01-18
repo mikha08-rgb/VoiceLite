@@ -58,7 +58,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Removes items beyond the MaxHistoryItems limit.
-        /// P1 OPTIMIZATION: Added early exit to avoid unnecessary allocations (10-20ms savings)
+        /// P1 OPTIMIZATION: O(n log n) instead of O(n²) - uses RemoveAll with HashSet lookup
         /// </summary>
         private void CleanupOldItems()
         {
@@ -66,22 +66,22 @@ namespace VoiceLite.Services
             if (settings.TranscriptionHistory.Count <= settings.MaxHistoryItems)
                 return; // No cleanup needed
 
-            // Only allocate and sort if we actually need to remove items
-            var itemsToRemove = settings.TranscriptionHistory
+            int itemsToRemoveCount = settings.TranscriptionHistory.Count - settings.MaxHistoryItems;
+
+            // O(n log n): Sort to find oldest items
+            var itemIdsToRemove = settings.TranscriptionHistory
                 .OrderBy(x => x.Timestamp) // Oldest first
-                .Take(settings.TranscriptionHistory.Count - settings.MaxHistoryItems)
-                .ToList();
+                .Take(itemsToRemoveCount)
+                .Select(x => x.Id)
+                .ToHashSet(); // O(1) lookup
 
-            foreach (var item in itemsToRemove)
-            {
-                settings.TranscriptionHistory.Remove(item);
-#if DEBUG
-                ErrorLogger.LogMessage($"Removed old history item: '{item.PreviewText}' (ID: {item.Id})");
-#endif
-            }
+            // O(n): RemoveAll is more efficient than individual Remove() calls
+            // Remove() is O(n) per call, making the old approach O(n²)
+            // RemoveAll with HashSet lookup is O(n) total
+            int removedCount = settings.TranscriptionHistory.RemoveAll(item => itemIdsToRemove.Contains(item.Id));
 
 #if DEBUG
-            ErrorLogger.LogMessage($"Cleaned up {itemsToRemove.Count} old history items");
+            ErrorLogger.LogMessage($"Cleaned up {removedCount} old history items");
 #endif
         }
 
