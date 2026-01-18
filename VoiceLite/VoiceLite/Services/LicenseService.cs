@@ -405,9 +405,11 @@ namespace VoiceLite.Services
         }
 
 
+        // THREAD-SAFETY FIX (P1): Synchronize property read to prevent torn reads
+        // Consistent with other getters (GetLicenseEmail, GetActivationCount, etc.)
         public string GetStoredLicenseKey()
         {
-            return _storedLicenseKey ?? string.Empty;
+            lock (_cacheLock) { return _storedLicenseKey ?? string.Empty; }
         }
 
         /// <summary>
@@ -424,24 +426,33 @@ namespace VoiceLite.Services
         /// </summary>
         public void SaveLicenseKey(string licenseKey)
         {
-            // Call overload with current email (if any)
-            SaveLicenseKey(licenseKey, _licenseEmail);
+            // THREAD-SAFETY FIX (P1): Read _licenseEmail under lock to prevent race with ValidateLicenseAsync
+            string? currentEmail;
+            lock (_cacheLock) { currentEmail = _licenseEmail; }
+            SaveLicenseKey(licenseKey, currentEmail);
         }
 
         /// <summary>
         /// CRITICAL-3 FIX: Overload that saves license key with email for tamper detection.
         /// Format: "key|email" - email is optional for backward compatibility.
+        /// THREAD-SAFETY FIX (P1): Field updates synchronized to prevent race with ValidateLicenseAsync.
         /// </summary>
         public void SaveLicenseKey(string licenseKey, string? email)
         {
             try
             {
-                _storedLicenseKey = licenseKey;
-                if (!string.IsNullOrEmpty(email))
+                // THREAD-SAFETY FIX (P1): Synchronize field updates to prevent race with
+                // ValidateLicenseAsync, RemoveLicenseKey, and GetStoredLicenseKey
+                lock (_cacheLock)
                 {
-                    _licenseEmail = email;
+                    _storedLicenseKey = licenseKey;
+                    if (!string.IsNullOrEmpty(email))
+                    {
+                        _licenseEmail = email;
+                    }
                 }
 
+                // File I/O OUTSIDE lock (non-blocking, as done in RemoveLicenseKey)
                 // CRITICAL-3 FIX: Store key|email for tamper detection
                 string dataToStore = string.IsNullOrEmpty(email)
                     ? licenseKey

@@ -571,7 +571,13 @@ namespace VoiceLite.Services
                         InjectViaClipboard(text, capturedHandle);
                         break;
                     case ITextInjector.InjectionMode.SmartAuto:
-                        InjectText(text); // Uses existing smart logic (captures its own handle)
+                        // THREAD-SAFETY FIX (P3): Use captured handle instead of calling InjectText()
+                        // InjectText() would recapture the foreground window on the worker thread,
+                        // potentially getting the wrong window during rapid window switching
+                        if (ShouldUseTyping(text))
+                            InjectViaTyping(text, capturedHandle);
+                        else
+                            InjectViaClipboard(text, capturedHandle);
                         break;
                 }
             });

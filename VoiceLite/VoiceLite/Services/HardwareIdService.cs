@@ -292,6 +292,11 @@ namespace VoiceLite.Services
                 {
                     // Previous holder crashed - we now own the mutex, proceed normally
                     ErrorLogger.LogWarning("Acquired abandoned machine ID mutex - previous process may have crashed");
+                    // THREAD-SAFETY FIX (P2): Removed explicit ReleaseMutex() calls
+                    // The using block handles mutex cleanup - explicit release causes double-release
+                    // which throws ApplicationException ("Object synchronization method was called
+                    // from an unsynchronized block of code")
+
                     // Re-check file inside mutex (recursive call would deadlock, so inline the check)
                     if (File.Exists(FallbackIdFilePath))
                     {
@@ -302,16 +307,14 @@ namespace VoiceLite.Services
                             var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
                             if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
                             {
-                                mutex.ReleaseMutex();
-                                return savedId;
+                                return savedId; // using block handles mutex release
                             }
                         }
                         catch { /* Fall through to generate new */ }
                     }
                     var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
                     SaveEncryptedMachineId(newId);
-                    mutex.ReleaseMutex();
-                    return newId;
+                    return newId; // using block handles mutex release
                 }
                 catch (Exception ex)
                 {
