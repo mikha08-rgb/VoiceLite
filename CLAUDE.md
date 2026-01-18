@@ -13,7 +13,7 @@ dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj
 dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup.iss
 
-# Tests (~311 tests, must all pass before commit)
+# Tests (~412 tests, must all pass before commit)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
 # Web backend
@@ -99,8 +99,6 @@ git push --tags
 ```
 
 **Version sync required**: `VoiceLite.csproj`, `VoiceLiteSetup.iss` must match tag. Workflow validates.
-
-**GitHub Actions**: Claude respects this CLAUDE.md in CI workflows. Applies testing standards and code patterns automatically.
 
 ## Pro Feature Gating
 
