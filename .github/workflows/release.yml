@@ -58,10 +58,10 @@ jobs:
           $errors += "❌ Could not find version in VoiceLite.csproj"
         }
 
-        # Check VoiceLiteSetup.iss
+        # Check VoiceLiteSetup.iss (uses preprocessor directive #define MyAppVersion)
         $issPath = "VoiceLite/Installer/VoiceLiteSetup.iss"
         $issContent = Get-Content $issPath -Raw
-        if ($issContent -match 'AppVersion=([\d\.]+)') {
+        if ($issContent -match '#define MyAppVersion "([\d\.]+)"') {
           $issVersion = $matches[1]
           if ($issVersion -ne $expectedVersion) {
             $errors += "❌ VoiceLiteSetup.iss has version $issVersion, expected $expectedVersion"
@@ -69,7 +69,7 @@ jobs:
             Write-Host "✓ VoiceLiteSetup.iss version: $issVersion" -ForegroundColor Green
           }
         } else {
-          $errors += "❌ Could not find AppVersion in VoiceLiteSetup.iss"
+          $errors += "❌ Could not find #define MyAppVersion in VoiceLiteSetup.iss"
         }
 
         # Fail if any errors

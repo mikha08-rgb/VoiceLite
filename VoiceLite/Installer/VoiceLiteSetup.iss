@@ -2,10 +2,12 @@
 ; v1.2.0.5: Bundled VC++ redistributable - auto-installs silently
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
+#define MyAppVersion "1.2.0.11"
+
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
 AppName=VoiceLite
-AppVersion=1.2.0.10
+AppVersion={#MyAppVersion}
 AppPublisher=VoiceLite
 AppPublisherURL=https://voicelite.app
 AppSupportURL=https://voicelite.app
@@ -13,7 +15,7 @@ AppUpdatesURL=https://voicelite.app
 DefaultDirName={autopf}\VoiceLite
 DisableProgramGroupPage=yes
 OutputDir=..\..\
-OutputBaseFilename=VoiceLite-Setup-1.2.0.8
+OutputBaseFilename=VoiceLite-Setup-{#MyAppVersion}
 SetupIconFile=..\VoiceLite\VoiceLite.ico
 Compression=lzma
 SolidCompression=yes
