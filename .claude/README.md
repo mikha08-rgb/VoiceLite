@@ -7,7 +7,7 @@ This directory contains Claude Code configuration for the VoiceLite project.
 ```
 .claude/
 ├── knowledge/           # Domain expertise files
-│   ├── whisper-expertise.md  # Whisper AI model selection, parameters, troubleshooting
+│   ├── troubleshooting.md    # Whisper AI troubleshooting and common issues
 │   └── wpf-patterns.md       # WPF/XAML best practices (thread safety, MVVM, disposal)
 ├── mcp.json            # MCP server configuration (Supabase + GitHub) - GITIGNORED
 ├── mcp.json.example    # Example MCP configuration (safe to commit)
@@ -17,11 +17,10 @@ This directory contains Claude Code configuration for the VoiceLite project.
 
 ## Knowledge Files
 
-### whisper-expertise.md
-- Whisper model selection guide (Tiny/Small/Base/Medium/Large)
-- Command parameters and greedy decoding settings
+### troubleshooting.md
+- Common Whisper transcription issues and solutions
 - Audio format requirements (16kHz, 16-bit mono WAV)
-- Performance optimization and troubleshooting
+- Performance optimization tips
 
 ### wpf-patterns.md
 - WPF thread safety with Dispatcher

@@ -1,6 +1,6 @@
 # VoiceLite Architecture Guide
 
-**Version**: v1.0.96 (Post-Phase 1-4 Refactoring)
+**Version**: v1.2.0.11
 **Last Updated**: Phase 4D Day 1
 **Status**: Production-ready MVVM architecture with DI
 
@@ -573,7 +573,7 @@ VoiceLite.Tests/
     └── RetryPolicyTests.cs              # 7 tests
 ```
 
-**Total**: ~150 tests (Phase 1-3)
+**Total**: ~412 tests
 
 ### Running Tests
 
@@ -631,7 +631,7 @@ dotnet test --filter "Category=Stress"
    - 99.98% identical accuracy to F16
    - Result: 67-73% faster overall vs v1.0.84
 
-**See**: [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md:1) for detailed analysis
+See CLAUDE.md for performance optimization details (Q8_0 quantization, whisper.cpp flags).
 
 ---
 
@@ -769,8 +769,6 @@ Assert.NotNull(recorder); // Fails if not registered
 
 ## Security Considerations
 
-**See**: [SECURITY_AUDIT.md](SECURITY_AUDIT.md:1) and [LICENSE_SECURITY_VERIFICATION.md](LICENSE_SECURITY_VERIFICATION.md:1)
-
 **Key Points**:
 - HTTPS enforced for all API calls
 - No secrets in code
@@ -812,11 +810,8 @@ Assert.NotNull(recorder); // Fails if not registered
 
 ## Further Reading
 
-- [CLAUDE.md](CLAUDE.md:1) - Project context & commands
-- [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md:1) - Performance analysis
-- [SECURITY_AUDIT.md](SECURITY_AUDIT.md:1) - Security audit report
-- [LICENSE_SECURITY_VERIFICATION.md](LICENSE_SECURITY_VERIFICATION.md:1) - License system verification
-- [SOLIDIFY_CODEBASE_PLAN.md](SOLIDIFY_CODEBASE_PLAN.md:1) - Original refactoring plan
+- [CLAUDE.md](CLAUDE.md) - Project context & commands
+- [SECURITY.md](SECURITY.md) - Security policy & vulnerability reporting
 
 ---
 

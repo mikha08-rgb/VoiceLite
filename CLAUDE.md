@@ -24,7 +24,7 @@ cd voicelite-web && npm run dev
 
 **Why subprocess for Whisper**: whisper.cpp as Process, not library binding. Easier to kill zombie processes, debug crashes, update whisper version independently.
 
-**Why no DI container**: Manual service wiring in MainWindow. Small app, MVVM extraction in progress. ViewModels own events, MainWindow wires handlers.
+**Why DI container**: Uses Microsoft.Extensions.DependencyInjection. Services registered in `ServiceConfiguration.cs`, wired via `AddVoiceLiteServices()` in App.xaml.cs. ViewModels own events, MainWindow wires handlers.
 
 **Why static HttpClient in LicenseService**: Single API endpoint (voicelite.app). Prevents socket exhaustion. Intentionally NOT disposed.
 
