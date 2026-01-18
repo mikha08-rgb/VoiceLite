@@ -4,6 +4,32 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0.14] - 2026-01-18
+
+### Fixed
+- **LicenseService**: All shared field reads now synchronized with `_cacheLock`
+- **HardwareIdService**: Fixed double-release bug in AbandonedMutexException handler
+- **TextInjector**: Fixed race condition where concurrent InjectText() calls could target wrong window
+
+## [1.2.0.13] - 2026-01-18
+
+### Fixed
+- **LicenseService**: SaveLicenseKey() and RemoveLicenseKey() field updates moved inside lock
+- **HardwareIdService**: Added named mutex for cross-process file synchronization
+- **HardwareIdService**: Cached timeout fallback ID to prevent device limit exhaustion
+- **TextInjector**: Removed shared `_targetWindowHandle` field — now captured locally per call
+- **TextInjector**: Made `_disposed` volatile for cross-thread visibility
+
+## [1.2.0.12] - 2026-01-18
+
+### Security
+- Thread safety audit of LicenseService, HardwareIdService, and TextInjector
+- File I/O operations moved outside locks to prevent blocking
+
+### Fixed
+- Race conditions in license validation caching
+- Potential torn reads on shared state fields
+
 ## [1.2.0.11] - 2026-01-18
 
 ### Fixed
