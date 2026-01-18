@@ -3,6 +3,7 @@ using System.IO;
 using System.Management;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 
 namespace VoiceLite.Services
 {
@@ -18,6 +19,10 @@ namespace VoiceLite.Services
             "VoiceLite",
             "machine_id.dat"
         );
+
+        // HIGH-4 FIX: Entropy for DPAPI encryption of machine_id.dat
+        // Prevents users from copying machine_id.dat to other machines to bypass device limit
+        private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("VoiceLite-MachineId-v1");
         /// <summary>
         /// Gets a unique machine identifier based on hardware.
         /// Format: Base64-encoded SHA256 hash of CPU ID + Motherboard Serial (truncated to 32 chars)
@@ -194,7 +199,8 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// HIGH-6 FIX: Gets or creates a persistent fallback machine ID
-        /// Stores a random GUID in %LOCALAPPDATA%\VoiceLite\machine_id.dat
+        /// HIGH-4 FIX: Now encrypted with DPAPI to prevent copying to other machines
+        /// Stores a random GUID in %LOCALAPPDATA%\VoiceLite\machine_id.dat (encrypted)
         /// This prevents users on VMs/headless systems from bypassing the 3-device limit
         /// </summary>
         private static string GetOrCreatePersistentFallbackId()
@@ -204,24 +210,40 @@ namespace VoiceLite.Services
                 // Check if we have a saved fallback ID
                 if (File.Exists(FallbackIdFilePath))
                 {
-                    var savedId = File.ReadAllText(FallbackIdFilePath).Trim();
-                    if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
+                    var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+
+                    // HIGH-4 FIX: Try to decrypt with DPAPI first (new format)
+                    try
                     {
-                        return savedId;
+                        var decryptedBytes = ProtectedData.Unprotect(
+                            fileBytes,
+                            DpapiEntropy,
+                            DataProtectionScope.CurrentUser
+                        );
+                        var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
+                        if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
+                        {
+                            return savedId;
+                        }
+                    }
+                    catch (CryptographicException)
+                    {
+                        // Migration: Try reading as plaintext (old format)
+                        var savedId = Encoding.UTF8.GetString(fileBytes).Trim();
+                        if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32 &&
+                            savedId.All(c => char.IsLetterOrDigit(c)))
+                        {
+                            // Migrate to encrypted format
+                            ErrorLogger.LogMessage("Migrating machine ID to encrypted format...");
+                            SaveEncryptedMachineId(savedId);
+                            return savedId;
+                        }
                     }
                 }
 
-                // Generate and save a new persistent ID
+                // Generate and save a new persistent ID (encrypted)
                 var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
-
-                // Ensure directory exists
-                var directory = Path.GetDirectoryName(FallbackIdFilePath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(FallbackIdFilePath, newId);
+                SaveEncryptedMachineId(newId);
                 ErrorLogger.LogWarning($"Created persistent fallback machine ID (hardware detection failed)");
 
                 return newId;
@@ -232,6 +254,28 @@ namespace VoiceLite.Services
                 // Absolute last resort - still generate random but log warning
                 return Guid.NewGuid().ToString("N").Substring(0, 32);
             }
+        }
+
+        /// <summary>
+        /// HIGH-4 FIX: Saves machine ID with DPAPI encryption
+        /// </summary>
+        private static void SaveEncryptedMachineId(string machineId)
+        {
+            var plaintextBytes = Encoding.UTF8.GetBytes(machineId);
+            var encryptedBytes = ProtectedData.Protect(
+                plaintextBytes,
+                DpapiEntropy,
+                DataProtectionScope.CurrentUser
+            );
+
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(FallbackIdFilePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllBytes(FallbackIdFilePath, encryptedBytes);
         }
     }
 }

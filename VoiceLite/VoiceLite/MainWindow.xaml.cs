@@ -1943,6 +1943,18 @@ namespace VoiceLite
                     settings.LicenseKey = string.Empty;
                     _ = SaveSettingsInternalAsync();
                 }
+                // HIGH-3 FIX: Verify settings.json license key matches DPAPI-encrypted storage
+                // Prevents bypass where attacker edits settings.json with fake license key
+                else if (settings.IsProLicense && !string.IsNullOrWhiteSpace(settings.LicenseKey))
+                {
+                    if (!LicenseService.VerifyLicenseKeyMatchesStorage(settings.LicenseKey))
+                    {
+                        ErrorLogger.LogWarning("SECURITY: License key in settings.json doesn't match DPAPI storage - possible tampering, resetting to free");
+                        settings.IsProLicense = false;
+                        settings.LicenseKey = string.Empty;
+                        _ = SaveSettingsInternalAsync();
+                    }
+                }
 
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
                 // Also check LocalAppData for downloaded models

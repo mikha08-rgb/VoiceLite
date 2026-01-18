@@ -53,11 +53,12 @@ namespace VoiceLite.Services
         private int _maxActivations = 3;
 
         // HIGH-9 FIX: Changed from lifetime cache to 30-day cache
+        // MED-5 FIX: Reduced from 30 days to 14 days for faster revocation detection
         // Revoked/expired licenses should stop working after cache expires
-        // 30 days provides good offline UX while still allowing revocation to take effect
+        // 14 days provides good offline UX while allowing faster revocation enforcement
         private LicenseValidationResult? _cachedValidationResult = null;
         private DateTime? _cacheTimestamp = null;
-        private static readonly TimeSpan CacheExpiration = TimeSpan.FromDays(30);
+        private static readonly TimeSpan CacheExpiration = TimeSpan.FromDays(14);
 
         // THREAD-SAFETY FIX: Lock for cache access to prevent race conditions
         // Multiple concurrent ValidateLicenseAsync calls could corrupt cache without synchronization
@@ -101,6 +102,53 @@ namespace VoiceLite.Services
         );
 
         public event EventHandler<bool>? LicenseStatusChanged;
+
+        /// <summary>
+        /// HIGH-3 FIX: Static method to verify a license key matches DPAPI-encrypted storage.
+        /// Used for tamper detection when settings.json's LicenseKey might have been manually edited.
+        /// Returns true if the key matches the encrypted storage, or false if no match/no storage.
+        /// </summary>
+        public static bool VerifyLicenseKeyMatchesStorage(string licenseKey)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(licenseKey))
+                    return false;
+
+                if (!File.Exists(LicenseFilePath))
+                    return false;
+
+                byte[] encryptedBytes = File.ReadAllBytes(LicenseFilePath);
+                byte[] plaintextBytes;
+
+                // Try new entropy format first
+                try
+                {
+                    plaintextBytes = ProtectedData.Unprotect(
+                        encryptedBytes,
+                        DpapiEntropy,
+                        DataProtectionScope.CurrentUser
+                    );
+                }
+                catch (CryptographicException)
+                {
+                    // Try old format (no entropy)
+                    plaintextBytes = ProtectedData.Unprotect(
+                        encryptedBytes,
+                        null,
+                        DataProtectionScope.CurrentUser
+                    );
+                }
+
+                var storedKey = Encoding.UTF8.GetString(plaintextBytes);
+                return string.Equals(storedKey.Trim(), licenseKey.Trim(), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"HIGH-3 FIX: Failed to verify license key against DPAPI storage: {ex.Message}");
+                return false;
+            }
+        }
 
         static LicenseService()
         {
@@ -260,7 +308,7 @@ namespace VoiceLite.Services
                     // CRITICAL-2 FIX: Raise LicenseStatusChanged event on successful validation
                     LicenseStatusChanged?.Invoke(this, true);
 
-                    ErrorLogger.LogMessage($"License validation succeeded - cached for 30 days. Activations: {_activationCount}/{_maxActivations}");
+                    ErrorLogger.LogMessage($"License validation succeeded - cached for 14 days. Activations: {_activationCount}/{_maxActivations}");
                 }
 
                 return validationResult;
