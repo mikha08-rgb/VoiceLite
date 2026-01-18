@@ -163,6 +163,9 @@ namespace VoiceLite
             // Update description
             UpdatePresetDescription(settings.TranscriptionPreset);
 
+            // Load Language selection
+            LoadLanguages();
+
             // Load VAD settings (with null checks for safety)
             if (EnableVADCheckBox != null)
                 EnableVADCheckBox.IsChecked = settings.EnableVAD;
@@ -175,6 +178,53 @@ namespace VoiceLite
 
             if (VADSettingsPanel != null)
                 VADSettingsPanel.IsEnabled = settings.EnableVAD;
+        }
+
+        private void LoadLanguages()
+        {
+            if (LanguageComboBox == null) return;
+
+            var languages = LanguageInfo.GetSupportedLanguages();
+            LanguageComboBox.ItemsSource = languages;
+
+            // Select current language from settings
+            var currentLanguage = languages.FirstOrDefault(l => l.Code == settings.Language)
+                                ?? languages.FirstOrDefault(l => l.Code == "en");
+
+            LanguageComboBox.SelectedItem = currentLanguage;
+
+            // Update warnings based on current selection
+            UpdateLanguageWarnings(settings.Language);
+        }
+
+        private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (LanguageComboBox?.SelectedItem is LanguageInfo selectedLanguage)
+            {
+                settings.Language = selectedLanguage.Code;
+                UpdateLanguageWarnings(selectedLanguage.Code);
+            }
+        }
+
+        private void UpdateLanguageWarnings(string languageCode)
+        {
+            // Show auto-detect latency warning
+            if (LanguageDescriptionText != null)
+            {
+                LanguageDescriptionText.Visibility = languageCode == "auto"
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            // Show base model warning for non-English languages
+            if (BaseModelWarningText != null)
+            {
+                bool isBaseModel = settings.WhisperModel == "ggml-base.bin";
+                bool isNonEnglish = languageCode != "en" && languageCode != "auto";
+                BaseModelWarningText.Visibility = (isBaseModel && isNonEnglish)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
         }
 
         private void UpdatePresetDescription(TranscriptionPreset preset)

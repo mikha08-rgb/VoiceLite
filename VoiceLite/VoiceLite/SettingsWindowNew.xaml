@@ -114,6 +114,29 @@
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,10"/>
 
+                                <!-- Language Selection -->
+                                <TextBlock Text="Transcription Language:" Margin="0,10,0,5"/>
+                                <ComboBox Name="LanguageComboBox"
+                                          Margin="0,0,0,5"
+                                          MaxWidth="400"
+                                          HorizontalAlignment="Left"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Code"
+                                          SelectionChanged="LanguageComboBox_SelectionChanged"/>
+                                <TextBlock Name="LanguageDescriptionText"
+                                           Text="Auto-detect adds ~0.5s latency per transcription"
+                                           FontSize="11"
+                                           Foreground="Gray"
+                                           Visibility="Collapsed"
+                                           Margin="0,0,0,5"/>
+                                <TextBlock Name="BaseModelWarningText"
+                                           Text="⚠️ Base model is optimized for English. For best results with other languages, upgrade to a larger model in AI Models tab."
+                                           FontSize="11"
+                                           Foreground="#B45309"
+                                           TextWrapping="Wrap"
+                                           Visibility="Collapsed"
+                                           Margin="0,0,0,10"/>
+
                                 <!-- VAD Settings -->
                                 <CheckBox Name="EnableVADCheckBox"
                                           Content="Enable Voice Activity Detection (VAD)"

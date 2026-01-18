@@ -875,16 +875,20 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// SECURITY FIX (CMD-SANITIZE-001): Validates language code format (ISO 639-1)
+        /// SECURITY FIX (CMD-SANITIZE-001): Validates language code format (ISO 639-1 or "auto")
         /// </summary>
         private string SanitizeLanguageCode(string languageCode)
         {
-            // Allow only 2-letter ISO 639-1 codes (lowercase letters only)
+            // Allow only 2-letter ISO 639-1 codes (lowercase letters only) or "auto"
             if (string.IsNullOrWhiteSpace(languageCode))
                 return "en"; // Default to English
 
             // Normalize to lowercase
             var normalized = languageCode.Trim().ToLower();
+
+            // Special case: "auto" for language auto-detection
+            if (normalized == "auto")
+                return "auto";
 
             // Validate format: 2 lowercase letters only (ISO 639-1)
             if (normalized.Length != 2 || !normalized.All(char.IsLower))

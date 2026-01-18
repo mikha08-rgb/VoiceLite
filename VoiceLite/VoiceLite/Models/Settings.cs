@@ -256,9 +256,9 @@ namespace VoiceLite.Models
             if (settings == null)
                 return new Settings();
 
-            // Validate language code (top 30 most popular languages supported by Whisper)
+            // Validate language code (top 30 most popular languages supported by Whisper + auto-detect)
             var validLanguages = new HashSet<string> {
-                "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
+                "auto", "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
                 "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi",
                 "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no"
             };
