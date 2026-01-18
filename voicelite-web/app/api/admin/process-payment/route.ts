@@ -84,10 +84,14 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('❌ Manual license creation failed:', error);
+    // HIGH-11 FIX: Sanitize error message to prevent leaking Prisma constraint details
+    const sanitizedError = process.env.NODE_ENV === 'development'
+      ? error.message
+      : 'License creation failed. Please try again or contact support.';
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: sanitizedError,
         // HIGH-8 FIX: Only expose stack traces in development
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },

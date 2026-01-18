@@ -72,9 +72,14 @@ namespace VoiceLite.Services
 
         private void CleanupStaleAudioFiles()
         {
-            // DISPOSAL SAFETY: Early exit if disposed
-            if (isDisposed)
-                return;
+            // CRIT-2 FIX: Acquire lock before checking isDisposed to prevent TOCTOU race condition
+            // Timer callback could proceed past the check while main thread disposes
+            lock (lockObject)
+            {
+                // DISPOSAL SAFETY: Early exit if disposed
+                if (isDisposed)
+                    return;
+            }
 
             try
             {
@@ -544,8 +549,9 @@ namespace VoiceLite.Services
                     try
                     {
                         waveIn.StopRecording();
-                        // Brief pause for NAudio to complete stop operation
-                        Task.Delay(STOP_COMPLETION_DELAY_MS).Wait();
+                        // HIGH-6 FIX: Use Thread.Sleep instead of Task.Delay().Wait() for synchronous blocking
+                        // This is intentional blocking for NAudio to complete stop operation
+                        Thread.Sleep(STOP_COMPLETION_DELAY_MS);
 
                         // Detach handlers before disposal
                         if (eventHandlersAttached)

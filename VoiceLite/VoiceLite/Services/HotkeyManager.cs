@@ -33,6 +33,7 @@ namespace VoiceLite.Services
         private bool isRegistered = false;
         private CancellationTokenSource? keyMonitorCts;
         private Task? keyMonitorTask; // DISPOSAL SAFETY: Track polling task to wait for completion
+        private Task? cleanupWaitTask; // HIGH-7 FIX: Track background cleanup task for proper disposal
         private readonly ManualResetEventSlim unregisterComplete = new ManualResetEventSlim(false); // CRIT-003 FIX: Non-blocking coordination for unregister
 
         private Key currentKey = Key.LeftAlt;
@@ -323,13 +324,20 @@ namespace VoiceLite.Services
                     // CRIT-4 FIX: Avoid blocking UI thread
                     if (dispatcher.CheckAccess())
                     {
-                        // On UI thread - fire-and-forget to avoid freeze
-                        // Don't wait for completion - let cleanup happen asynchronously
-                        _ = Task.Run(() =>
+                        // HIGH-7 FIX: Track cleanup task so Dispose() can wait for it
+                        // On UI thread - track task instead of fire-and-forget
+                        cleanupWaitTask = Task.Run(() =>
                         {
-                            if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
+                            try
                             {
-                                ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds");
+                                if (!unregisterComplete.Wait(TimeSpan.FromSeconds(2)))
+                                {
+                                    ErrorLogger.LogWarning("HotkeyManager: Key monitor task did not complete within 2 seconds");
+                                }
+                            }
+                            catch (ObjectDisposedException)
+                            {
+                                // Expected if disposed while waiting
                             }
                         });
                     }
@@ -568,6 +576,20 @@ namespace VoiceLite.Services
             HotkeyReleased = null;
 
             StopKeyMonitor();
+
+            // HIGH-7 FIX: Wait for background cleanup task to complete before disposing unregisterComplete
+            if (cleanupWaitTask != null && !cleanupWaitTask.IsCompleted)
+            {
+                try
+                {
+                    // Wait briefly for cleanup task - don't block indefinitely
+                    cleanupWaitTask.Wait(TimeSpan.FromSeconds(1));
+                }
+                catch (Exception ex) when (ex is AggregateException || ex is TaskCanceledException)
+                {
+                    // Expected during disposal
+                }
+            }
 
             if (isRegistered && windowHandle != IntPtr.Zero)
             {

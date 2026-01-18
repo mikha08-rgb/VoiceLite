@@ -53,6 +53,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // HIGH-10 FIX: Add small random delay to prevent timing attacks (50-150ms)
+    // This ensures response time is consistent regardless of whether license exists
+    await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+
     // Always return same response to prevent email enumeration
     const successMessage = 'If a license exists for this email, you will receive it shortly. Please check your spam folder.';
 

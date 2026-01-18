@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Check 4: Recent licenses
+  // CRIT-5 FIX: Filter sensitive fields (licenseKey, full email) from diagnostic response
   try {
     const recentLicenses = await prisma.license.findMany({
       take: 5,
@@ -78,17 +79,25 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         email: true,
-        licenseKey: true,
         type: true,
         status: true,
         createdAt: true,
       },
     });
 
+    // CRIT-5 FIX: Mask email addresses (show only domain) and remove license keys
+    const maskedLicenses = recentLicenses.map((license) => ({
+      id: license.id,
+      email: license.email ? `***@${license.email.split('@')[1] || 'unknown'}` : 'unknown',
+      type: license.type,
+      status: license.status,
+      createdAt: license.createdAt,
+    }));
+
     results.checks.recentLicenses = {
       status: '✅ Retrieved',
       count: recentLicenses.length,
-      licenses: recentLicenses,
+      licenses: maskedLicenses,
     };
   } catch (error: any) {
     results.checks.recentLicenses = {

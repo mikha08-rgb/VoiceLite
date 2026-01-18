@@ -404,7 +404,10 @@ namespace VoiceLite.Services
                         // The volatile keyword ensures we see the latest value across threads
                         if (!_disposed)
                         {
-                            try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { } catch (ObjectDisposedException) { }
+                            // HIGH-8 FIX: Log SemaphoreFullException as it indicates a synchronization bug (double-release)
+                            try { _clipboardSemaphore.Release(); }
+                            catch (SemaphoreFullException ex) { ErrorLogger.LogError("TextInjector: SemaphoreFullException - double release detected (sync bug)", ex); }
+                            catch (ObjectDisposedException) { }
                         }
                     }
                 });
@@ -438,7 +441,10 @@ namespace VoiceLite.Services
                 // CRITICAL-2 FIX: Also check _disposed to avoid ObjectDisposedException
                 if (!threadStarted && !_disposed)
                 {
-                    try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { } catch (ObjectDisposedException) { }
+                    // HIGH-8 FIX: Log SemaphoreFullException as it indicates a synchronization bug (double-release)
+                    try { _clipboardSemaphore.Release(); }
+                    catch (SemaphoreFullException semEx) { ErrorLogger.LogError("TextInjector: SemaphoreFullException in catch - double release detected (sync bug)", semEx); }
+                    catch (ObjectDisposedException) { }
                 }
                 throw new InvalidOperationException("Clipboard operation failed unexpectedly.", ex);
             }

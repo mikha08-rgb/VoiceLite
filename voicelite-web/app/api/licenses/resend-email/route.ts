@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ipAddress } from '@vercel/edge';
+import { z } from 'zod';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { prisma } from '@/lib/prisma';
 import { recordLicenseEvent } from '@/lib/licensing';
@@ -7,6 +8,14 @@ import { emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit'
 import { logger } from '@/lib/logger';
 
 import { LicenseStatus } from '@prisma/client';
+
+// HIGH-12 FIX: Add Zod schema validation for request body
+const bodySchema = z.object({
+  email: z.string().email('Invalid email address').optional(),
+  licenseKey: z.string().min(10, 'Invalid license key format').max(100, 'License key too long').optional(),
+}).refine(data => data.email || data.licenseKey, {
+  message: 'Either email or licenseKey is required',
+});
 /**
  * Manual License Email Resend API
  *
@@ -43,14 +52,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, licenseKey } = body;
-
-    if (!email && !licenseKey) {
+    // HIGH-12 FIX: Validate with Zod schema
+    const parseResult = bodySchema.safeParse(body);
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: 'Either email or licenseKey is required' },
+        { error: parseResult.error.errors[0]?.message || 'Invalid request' },
         { status: 400 }
       );
     }
+    const { email, licenseKey } = parseResult.data;
 
     // Find the license by email or license key
     const license = await prisma.license.findFirst({

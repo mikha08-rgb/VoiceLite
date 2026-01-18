@@ -1601,7 +1601,7 @@ namespace VoiceLite
                                     }
                                 });
                             }
-                            catch { }
+                            catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: Status reset after transcription failed: {ex.Message}"); }
                         });
                     }
                     else
@@ -1648,7 +1648,7 @@ namespace VoiceLite
                                 }
                             });
                         }
-                        catch { }
+                        catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: Status reset after error failed: {ex.Message}"); }
                     });
                 });
             }
@@ -1690,7 +1690,7 @@ namespace VoiceLite
                         UpdateTranscriptionText("Critical error", Brushes.Red);
                     });
                 }
-                catch { /* Swallow UI update errors during catastrophic failure */ }
+                catch (Exception uiEx) { ErrorLogger.LogWarning($"CRIT-3 FIX: UI update during catastrophic failure failed: {uiEx.Message}"); }
             }
         }
 
@@ -2054,7 +2054,7 @@ namespace VoiceLite
             if (settingsSaveTimer != null)
             {
                 settingsSaveTimer.Stop();
-                try { (settingsSaveTimer as IDisposable)?.Dispose(); } catch { }
+                try { (settingsSaveTimer as IDisposable)?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: settingsSaveTimer disposal failed: {ex.Message}"); }
                 settingsSaveTimer = null;
             }
 
@@ -2062,7 +2062,7 @@ namespace VoiceLite
             if (recordingElapsedTimer != null)
             {
                 recordingElapsedTimer.Stop();
-                try { (recordingElapsedTimer as IDisposable)?.Dispose(); } catch { }
+                try { (recordingElapsedTimer as IDisposable)?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: recordingElapsedTimer disposal failed: {ex.Message}"); }
                 recordingElapsedTimer = null;
             }
 
@@ -2116,7 +2116,7 @@ namespace VoiceLite
 
                 // Dispose child windows (WPF Window resources)
 
-                try { currentSettingsWindow?.Close(); } catch { }
+                try { currentSettingsWindow?.Close(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: Settings window close failed: {ex.Message}"); }
                 currentSettingsWindow = null;
 
 
@@ -2130,11 +2130,11 @@ namespace VoiceLite
                 // SoundService removed per user request - no disposal needed
 
                 // MED-11 FIX: Cancel pending settings save operations before disposing
-                try { settingsSaveCts?.Cancel(); } catch { }
-                try { settingsSaveCts?.Dispose(); } catch { }
+                try { settingsSaveCts?.Cancel(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: settingsSaveCts cancel failed: {ex.Message}"); }
+                try { settingsSaveCts?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: settingsSaveCts disposal failed: {ex.Message}"); }
 
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
-                try { saveSettingsSemaphore?.Dispose(); } catch { }
+                try { saveSettingsSemaphore?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: saveSettingsSemaphore disposal failed: {ex.Message}"); }
 
                 whisperService?.Dispose();
                 whisperService = null;
@@ -2435,14 +2435,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
+                    lock (timerLock) { activeStatusTimers.Add(timer); } // HIGH-13 FIX: Use lock for thread safety
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
+                        lock (timerLock) { activeStatusTimers.Remove(timer); } // HIGH-13 FIX: Use lock for thread safety
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2510,14 +2510,14 @@ namespace VoiceLite
 
                     // Revert to "Ready" after 1.5 seconds
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    activeStatusTimers.Add(timer); // CRITICAL FIX: Track timer for disposal
+                    lock (timerLock) { activeStatusTimers.Add(timer); } // HIGH-13 FIX: Use lock for thread safety
                     EventHandler? handler = null;
                     handler = (ts, te) =>
                     {
                         UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
                         timer.Stop();
                         if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        activeStatusTimers.Remove(timer); // CRITICAL FIX: Remove from tracking list
+                        lock (timerLock) { activeStatusTimers.Remove(timer); } // HIGH-13 FIX: Use lock for thread safety
                     };
                     timer.Tick += handler;
                     timer.Start();
@@ -2824,7 +2824,7 @@ namespace VoiceLite
                     // DispatcherTimer doesn't, but this is defensive for future changes
                     if (timer is IDisposable disposable)
                     {
-                        try { disposable.Dispose(); } catch { /* Ignore disposal errors */ }
+                        try { disposable.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: Timer disposal failed: {ex.Message}"); }
                     }
                 }
                 activeStatusTimers.Clear();

@@ -446,7 +446,16 @@ namespace VoiceLite
 
             try
             {
-                var result = await licenseService!.ValidateLicenseAsync(key);
+                // CRIT-4 FIX: Proper null check instead of null-forgiving operator
+                if (licenseService == null)
+                {
+                    LicenseStatusText.Text = "✗ License service not initialized";
+                    LicenseStatusText.Foreground = System.Windows.Media.Brushes.Red;
+                    ActivateLicenseButton.IsEnabled = true;
+                    ActivateLicenseButton.Content = "Activate License";
+                    return;
+                }
+                var result = await licenseService.ValidateLicenseAsync(key);
 
                 if (result.IsValid && result.Tier == "pro")
                 {
@@ -467,8 +476,8 @@ namespace VoiceLite
                     // Show Pro features (AI Models tab)
                     UpdateProFeatureVisibility();
 
-                    // Initialize Model Download Control
-                    ModelDownloadControl.Initialize(settings, () => saveSettingsCallback?.Invoke());
+                    // CRIT-4 FIX: Initialize Model Download Control with null check (consistent with line 93)
+                    ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
 
                     // Show success message
                     MessageBox.Show(
@@ -701,6 +710,22 @@ namespace VoiceLite
             {
                 EditShortcutButton_Click(sender, e);
             }
+        }
+
+        // HIGH-9 & HIGH-14 FIX: Cleanup event handlers and dispose resources on window close
+        protected override void OnClosed(EventArgs e)
+        {
+            // HIGH-9 FIX: Unsubscribe event handler to prevent memory leak
+            if (ShortcutsListView != null)
+            {
+                ShortcutsListView.SelectionChanged -= ShortcutsListView_SelectionChanged;
+            }
+
+            // HIGH-14 FIX: Dispose licenseService to release HTTP clients and other resources
+            licenseService?.Dispose();
+            licenseService = null;
+
+            base.OnClosed(e);
         }
     }
 }
