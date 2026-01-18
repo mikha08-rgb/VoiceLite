@@ -248,7 +248,8 @@ export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 100
 // CRITICAL-3 FIX: Add fallback limiters for license validation (stricter limits when Redis unavailable)
 export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour per IP
 export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour per key
-export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(500, 60 * 60 * 1000); // 500/hour global (stricter)
+// HIGH-8 FIX: Reduced from 500/hour to 100/hour to prevent brute force during Redis outages
+export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour global (strict)
 export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 // Cleanup fallback limiters every 10 minutes

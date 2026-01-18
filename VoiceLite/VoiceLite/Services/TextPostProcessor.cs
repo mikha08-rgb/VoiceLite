@@ -8,10 +8,19 @@ namespace VoiceLite.Services
     /// <summary>
     /// Post-processes transcription text to add punctuation and proper capitalization.
     /// Uses rule-based approach optimized for English speech patterns.
+    ///
+    /// Thread Safety: This class is thread-safe. All methods are static and operate
+    /// on immutable input data. The pre-compiled Regex instances are thread-safe
+    /// by design when used with instance methods like Replace() - they do not store
+    /// any mutable per-call state. See: https://docs.microsoft.com/en-us/dotnet/standard/base-types/thread-safety-in-regular-expressions
     /// </summary>
     public class TextPostProcessor
     {
         // Pre-compiled regex patterns for performance (compiled once, reused many times)
+        // MINOR-11 FIX: These are thread-safe for concurrent use because:
+        // 1. Regex instances are immutable after construction
+        // 2. Instance methods (Replace, Match, etc.) don't modify internal state
+        // 3. The Compiled flag only affects performance, not thread safety
         private static readonly Regex ConjunctionCommaRegex = new Regex(
             @"(\w+\s+\w+)\s+(and|but|or)\s+",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);

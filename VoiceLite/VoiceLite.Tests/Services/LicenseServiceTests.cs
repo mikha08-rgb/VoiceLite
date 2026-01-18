@@ -609,5 +609,173 @@ namespace VoiceLite.Tests.Services
         }
 
         #endregion
+
+        #region Tamper Detection Tests (HIGH-9 FIX)
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithNullKey_ReturnsFalse()
+        {
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(null!);
+
+            // Assert
+            result.Should().BeFalse("null key should not match any storage");
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithEmptyKey_ReturnsFalse()
+        {
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(string.Empty);
+
+            // Assert
+            result.Should().BeFalse("empty key should not match any storage");
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithWhitespaceKey_ReturnsFalse()
+        {
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage("   ");
+
+            // Assert
+            result.Should().BeFalse("whitespace-only key should not match any storage");
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WhenNoStorageFile_ReturnsFalse()
+        {
+            // Arrange - use a random key that doesn't exist in storage
+            var randomKey = $"NONEXISTENT-{Guid.NewGuid()}";
+
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(randomKey);
+
+            // Assert
+            result.Should().BeFalse("should return false when storage file doesn't exist");
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_AfterSave_ReturnsTrue()
+        {
+            // Arrange
+            var testKey = $"TEST-KEY-{Guid.NewGuid()}";
+            _licenseService.SaveLicenseKey(testKey);
+
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(testKey);
+
+            // Assert
+            result.Should().BeTrue("saved key should be verified successfully");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithDifferentKey_ReturnsFalse()
+        {
+            // Arrange
+            var originalKey = $"ORIGINAL-KEY-{Guid.NewGuid()}";
+            var tamperedKey = $"TAMPERED-KEY-{Guid.NewGuid()}";
+            _licenseService.SaveLicenseKey(originalKey);
+
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(tamperedKey);
+
+            // Assert
+            result.Should().BeFalse("tampered key should not match storage");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithCaseDifference_ReturnsTrue()
+        {
+            // Arrange
+            var testKey = $"Test-Key-{Guid.NewGuid()}";
+            _licenseService.SaveLicenseKey(testKey);
+
+            // Act - verify with different case
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(testKey.ToUpper());
+
+            // Assert
+            result.Should().BeTrue("key comparison should be case-insensitive");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithKeyAndEmail_VerifiesBoth()
+        {
+            // Arrange
+            var testKey = $"TEST-KEY-{Guid.NewGuid()}";
+            var testEmail = "test@example.com";
+            _licenseService.SaveLicenseKey(testKey, testEmail);
+
+            // Act - verify with correct email
+            var resultCorrect = LicenseService.VerifyLicenseKeyMatchesStorage(testKey, testEmail);
+
+            // Assert
+            resultCorrect.Should().BeTrue("key and email should both match");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_WithWrongEmail_ReturnsFalse()
+        {
+            // Arrange
+            var testKey = $"TEST-KEY-{Guid.NewGuid()}";
+            var correctEmail = "correct@example.com";
+            var wrongEmail = "wrong@example.com";
+            _licenseService.SaveLicenseKey(testKey, correctEmail);
+
+            // Act - verify with wrong email (simulates tampering)
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(testKey, wrongEmail);
+
+            // Assert
+            result.Should().BeFalse("mismatched email should indicate tampering");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_KeyOnly_NullEmailIgnored()
+        {
+            // Arrange - save key without email (legacy format)
+            var testKey = $"TEST-KEY-{Guid.NewGuid()}";
+            _licenseService.SaveLicenseKey(testKey, null);
+
+            // Act - verify without providing email
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(testKey, null);
+
+            // Assert
+            result.Should().BeTrue("key-only verification should work without email");
+
+            // Cleanup
+            _licenseService.RemoveLicenseKey();
+        }
+
+        [Fact]
+        public void VerifyLicenseKeyMatchesStorage_AfterRemove_ReturnsFalse()
+        {
+            // Arrange
+            var testKey = $"TEST-KEY-{Guid.NewGuid()}";
+            _licenseService.SaveLicenseKey(testKey);
+            _licenseService.RemoveLicenseKey();
+
+            // Act
+            var result = LicenseService.VerifyLicenseKeyMatchesStorage(testKey);
+
+            // Assert
+            result.Should().BeFalse("removed key should not be verifiable");
+        }
+
+        #endregion
     }
 }

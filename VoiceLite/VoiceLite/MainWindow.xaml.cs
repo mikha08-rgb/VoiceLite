@@ -2809,6 +2809,9 @@ namespace VoiceLite
 
         /// <summary>
         /// Cleans up all active status timers
+        /// HIGH-6 FIX: Added IDisposable check for proper resource cleanup.
+        /// Note: WPF DispatcherTimer doesn't implement IDisposable, but this is
+        /// defensive coding for future-proofing if timer type changes.
         /// </summary>
         private void CleanupAllTimers()
         {
@@ -2817,6 +2820,12 @@ namespace VoiceLite
                 foreach (var timer in activeStatusTimers.ToList())
                 {
                     timer.Stop();
+                    // HIGH-6 FIX: Dispose if timer implements IDisposable
+                    // DispatcherTimer doesn't, but this is defensive for future changes
+                    if (timer is IDisposable disposable)
+                    {
+                        try { disposable.Dispose(); } catch { /* Ignore disposal errors */ }
+                    }
                 }
                 activeStatusTimers.Clear();
             }

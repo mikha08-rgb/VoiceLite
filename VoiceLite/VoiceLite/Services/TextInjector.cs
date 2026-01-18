@@ -28,7 +28,9 @@ namespace VoiceLite.Services
         private volatile IntPtr _targetWindowHandle = IntPtr.Zero;
 
         // Disposal tracking (Issue 1)
-        private bool _disposed = false;
+        // CRITICAL-2 FIX: Made volatile to ensure visibility across threads
+        // Without volatile, worker thread may not see disposal and could call Release() on disposed semaphore
+        private volatile bool _disposed = false;
 
         // Text length thresholds for injection mode selection
         private const int SHORT_TEXT_THRESHOLD = 50; // Use typing for text shorter than this
@@ -122,6 +124,9 @@ namespace VoiceLite.Services
                 }
 
                 // Fallback to clipboard method if typing fails (for other modes)
+                // HIGH-5 FIX: Re-capture foreground window before fallback paste
+                // User may have switched windows during the failed typing attempt
+                _targetWindowHandle = GetForegroundWindow();
                 try
                 {
 #if DEBUG
@@ -302,13 +307,19 @@ namespace VoiceLite.Services
         {
             // Issue 6: Restore focus to target window before typing
             // For long transcriptions, user may have clicked away during processing
-            if (_targetWindowHandle != IntPtr.Zero)
+            // HIGH-4 FIX: Validate window handle is still valid before use
+            if (_targetWindowHandle != IntPtr.Zero && IsWindow(_targetWindowHandle))
             {
                 if (!SetForegroundWindow(_targetWindowHandle))
                 {
                     ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in InjectViaTyping");
                 }
                 Thread.Sleep(50); // Allow window activation to complete
+            }
+            else if (_targetWindowHandle != IntPtr.Zero)
+            {
+                // Window was closed - log warning but continue (will type to current foreground window)
+                ErrorLogger.LogWarning($"Target window {_targetWindowHandle} no longer valid in InjectViaTyping, using current foreground window");
             }
 
             // Get adaptive delay based on current application
@@ -389,7 +400,12 @@ namespace VoiceLite.Services
                     {
                         // THREAD-LEAK FIX: Release semaphore when thread completes (even on timeout path)
                         // This ensures next operation can proceed
-                        try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { }
+                        // CRITICAL-2 FIX: Check _disposed before releasing to avoid ObjectDisposedException
+                        // The volatile keyword ensures we see the latest value across threads
+                        if (!_disposed)
+                        {
+                            try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { } catch (ObjectDisposedException) { }
+                        }
                     }
                 });
 
@@ -419,9 +435,10 @@ namespace VoiceLite.Services
             {
                 // Issue 5: Only release semaphore if thread never started
                 // Once thread.Start() succeeds, thread's finally block handles semaphore release
-                if (!threadStarted)
+                // CRITICAL-2 FIX: Also check _disposed to avoid ObjectDisposedException
+                if (!threadStarted && !_disposed)
                 {
-                    try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { }
+                    try { _clipboardSemaphore.Release(); } catch (SemaphoreFullException) { } catch (ObjectDisposedException) { }
                 }
                 throw new InvalidOperationException("Clipboard operation failed unexpectedly.", ex);
             }
@@ -468,13 +485,19 @@ namespace VoiceLite.Services
                 // CRITICAL FIX: Restore focus to target window before sending keystrokes
                 // For long transcriptions (>5s), user may have clicked VoiceLite window to check progress
                 // This ensures Ctrl+V goes to the ORIGINAL target app, not VoiceLite
-                if (_targetWindowHandle != IntPtr.Zero)
+                // HIGH-4 FIX: Validate window handle is still valid before use
+                if (_targetWindowHandle != IntPtr.Zero && IsWindow(_targetWindowHandle))
                 {
                     if (!SetForegroundWindow(_targetWindowHandle))
                     {
                         ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in SimulateCtrlV");
                     }
                     Thread.Sleep(50); // Allow window activation to complete
+                }
+                else if (_targetWindowHandle != IntPtr.Zero)
+                {
+                    // Window was closed - log warning but continue (will paste to current foreground window)
+                    ErrorLogger.LogWarning($"Target window {_targetWindowHandle} no longer valid in SimulateCtrlV, using current foreground window");
                 }
 
                 // RELIABILITY FIX: Increased timing for better cross-application compatibility
@@ -607,6 +630,12 @@ namespace VoiceLite.Services
 
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        // HIGH-4 FIX: Add IsWindow() to validate window handles before use
+        // Window may have been closed between capture and injection
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindow(IntPtr hWnd);
 
         /// <summary>
         /// Disposes the TextInjector and releases the clipboard semaphore.

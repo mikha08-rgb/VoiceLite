@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Windows;
 using VoiceLite.Models;
 using VoiceLite.Core.Interfaces.Features;
@@ -7,11 +9,16 @@ namespace VoiceLite.Services
     /// <summary>
     /// Centralized service for managing Pro feature access and visibility.
     /// Adding new Pro features: Just add one property here + bind in XAML.
+    ///
+    /// Thread Safety: Uses ReaderWriterLockSlim to allow concurrent reads while
+    /// ensuring exclusive access during RefreshProStatus(). All property reads
+    /// acquire read locks to prevent stale data during settings reload.
     /// </summary>
-    public class ProFeatureService : IProFeatureService
+    public class ProFeatureService : IProFeatureService, IDisposable
     {
         private readonly Settings _settings;
-        private readonly object _refreshLock = new object();
+        private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
+        private bool _disposed;
 
         public ProFeatureService(Settings settings)
         {
@@ -19,9 +26,24 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Core license check - true if user has activated Pro license
+        /// Core license check - true if user has activated Pro license.
+        /// Thread-safe: acquires read lock to prevent reading stale data during refresh.
         /// </summary>
-        public bool IsProUser => _settings.IsProLicense;
+        public bool IsProUser
+        {
+            get
+            {
+                _rwLock.EnterReadLock();
+                try
+                {
+                    return _settings.IsProLicense;
+                }
+                finally
+                {
+                    _rwLock.ExitReadLock();
+                }
+            }
+        }
 
         /// <summary>
         /// Controls visibility of AI Models tab in Settings.
@@ -144,14 +166,20 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Refreshes the Pro status from the license service.
-        /// Thread-safe: uses lock to prevent concurrent reload operations.
+        /// Thread-safe: uses write lock to ensure exclusive access during reload,
+        /// preventing any property reads from seeing stale data.
         /// </summary>
         public void RefreshProStatus()
         {
-            lock (_refreshLock)
+            _rwLock.EnterWriteLock();
+            try
             {
                 // Force settings reload to get latest license status
                 _settings.Reload();
+            }
+            finally
+            {
+                _rwLock.ExitWriteLock();
             }
         }
 
@@ -171,6 +199,30 @@ namespace VoiceLite.Services
                 "Upgrade to Pro",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        /// <summary>
+        /// Disposes the ReaderWriterLockSlim to prevent resource leaks.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            if (disposing)
+            {
+                _rwLock?.Dispose();
+            }
         }
 
         #endregion

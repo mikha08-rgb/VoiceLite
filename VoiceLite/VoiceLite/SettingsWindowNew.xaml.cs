@@ -217,9 +217,11 @@ namespace VoiceLite
             }
 
             // Show base model warning for non-English languages
+            // HIGH-7 FIX: Add null check for WhisperModel to prevent NullReferenceException
             if (BaseModelWarningText != null)
             {
-                bool isSmallModel = settings.WhisperModel == "ggml-base.bin" || settings.WhisperModel == "ggml-tiny.bin";
+                bool isSmallModel = settings.WhisperModel?.Equals("ggml-base.bin", StringComparison.OrdinalIgnoreCase) == true ||
+                                   settings.WhisperModel?.Equals("ggml-tiny.bin", StringComparison.OrdinalIgnoreCase) == true;
                 bool isNonEnglish = languageCode != "en" && languageCode != "auto";
                 BaseModelWarningText.Visibility = (isSmallModel && isNonEnglish)
                     ? Visibility.Visible

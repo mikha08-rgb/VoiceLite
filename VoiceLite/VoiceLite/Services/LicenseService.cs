@@ -107,8 +107,11 @@ namespace VoiceLite.Services
         /// HIGH-3 FIX: Static method to verify a license key matches DPAPI-encrypted storage.
         /// Used for tamper detection when settings.json's LicenseKey might have been manually edited.
         /// Returns true if the key matches the encrypted storage, or false if no match/no storage.
+        ///
+        /// CRITICAL-3 FIX: Now also verifies email when available. Storage format is "key|email".
+        /// Attacker cannot steal key alone and bypass detection - email must also match.
         /// </summary>
-        public static bool VerifyLicenseKeyMatchesStorage(string licenseKey)
+        public static bool VerifyLicenseKeyMatchesStorage(string licenseKey, string? email = null)
         {
             try
             {
@@ -140,12 +143,42 @@ namespace VoiceLite.Services
                     );
                 }
 
-                var storedKey = Encoding.UTF8.GetString(plaintextBytes);
-                return string.Equals(storedKey.Trim(), licenseKey.Trim(), StringComparison.OrdinalIgnoreCase);
+                var storedData = Encoding.UTF8.GetString(plaintextBytes);
+
+                // CRITICAL-3 FIX: Parse key|email format (backward compatible with key-only format)
+                string storedKey;
+                string? storedEmail = null;
+                var parts = storedData.Split('|');
+                if (parts.Length >= 2)
+                {
+                    storedKey = parts[0];
+                    storedEmail = parts[1];
+                }
+                else
+                {
+                    storedKey = storedData;
+                }
+
+                // Verify key matches
+                if (!string.Equals(storedKey.Trim(), licenseKey.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                // CRITICAL-3 FIX: If email provided and stored, verify it matches
+                // This prevents key theft without also knowing the email
+                if (!string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(storedEmail))
+                {
+                    if (!string.Equals(storedEmail.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        ErrorLogger.LogWarning("CRITICAL-3 FIX: License key matches but email mismatch detected - possible tampering");
+                        return false;
+                    }
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"HIGH-3 FIX: Failed to verify license key against DPAPI storage: {ex.Message}");
+                ErrorLogger.LogWarning($"CRITICAL-3 FIX: Failed to verify license key against DPAPI storage: {ex.Message}");
                 return false;
             }
         }
@@ -192,7 +225,8 @@ namespace VoiceLite.Services
                 var cached = TryGetCachedResult(licenseKey);
                 if (cached != null)
                 {
-                    ErrorLogger.LogMessage("Using cached license validation result (lifetime cache)");
+                    // MINOR-10 FIX: Updated comment - cache is 14-day expiration, not lifetime
+                ErrorLogger.LogMessage("Using cached license validation result (14-day cache)");
                     return cached;
                 }
 
@@ -377,15 +411,37 @@ namespace VoiceLite.Services
         /// - Key is tied to Windows user account (can't be copied to other machines/users)
         /// - Encrypted data stored in %LOCALAPPDATA%\VoiceLite\license.dat
         /// - Safe from memory dumps and disk inspection
+        ///
+        /// CRITICAL-3 FIX: Now stores email alongside key in format "key|email"
+        /// This enables email verification in tamper detection.
         /// </summary>
         public void SaveLicenseKey(string licenseKey)
+        {
+            // Call overload with current email (if any)
+            SaveLicenseKey(licenseKey, _licenseEmail);
+        }
+
+        /// <summary>
+        /// CRITICAL-3 FIX: Overload that saves license key with email for tamper detection.
+        /// Format: "key|email" - email is optional for backward compatibility.
+        /// </summary>
+        public void SaveLicenseKey(string licenseKey, string? email)
         {
             try
             {
                 _storedLicenseKey = licenseKey;
+                if (!string.IsNullOrEmpty(email))
+                {
+                    _licenseEmail = email;
+                }
+
+                // CRITICAL-3 FIX: Store key|email for tamper detection
+                string dataToStore = string.IsNullOrEmpty(email)
+                    ? licenseKey
+                    : $"{licenseKey}|{email}";
 
                 // HIGH-5 FIX: Encrypt license key using Windows DPAPI with entropy
-                byte[] plaintextBytes = Encoding.UTF8.GetBytes(licenseKey);
+                byte[] plaintextBytes = Encoding.UTF8.GetBytes(dataToStore);
                 byte[] encryptedBytes = ProtectedData.Protect(
                     plaintextBytes,
                     DpapiEntropy,  // Additional entropy for stronger encryption
@@ -402,7 +458,7 @@ namespace VoiceLite.Services
                 // Write encrypted bytes to file
                 File.WriteAllBytes(LicenseFilePath, encryptedBytes);
 
-                ErrorLogger.LogMessage($"License key saved securely (encrypted with DPAPI)");
+                ErrorLogger.LogMessage($"License key saved securely (encrypted with DPAPI, email={!string.IsNullOrEmpty(email)})");
             }
             catch (Exception ex)
             {
@@ -417,6 +473,8 @@ namespace VoiceLite.Services
         /// Auto-migration:
         /// - If encrypted file doesn't exist but settings.json has plaintext key, migrate it
         /// - Supports smooth upgrade from v1.2.0 to v1.2.1
+        ///
+        /// CRITICAL-3 FIX: Now parses key|email format for tamper detection.
         /// </summary>
         private void LoadLicenseKey()
         {
@@ -453,8 +511,20 @@ namespace VoiceLite.Services
                         return;
                     }
 
-                    _storedLicenseKey = Encoding.UTF8.GetString(plaintextBytes);
-                    ErrorLogger.LogMessage("License key loaded from encrypted storage");
+                    // CRITICAL-3 FIX: Parse key|email format (backward compatible with key-only format)
+                    var storedData = Encoding.UTF8.GetString(plaintextBytes);
+                    var parts = storedData.Split('|');
+                    if (parts.Length >= 2)
+                    {
+                        _storedLicenseKey = parts[0];
+                        _licenseEmail = parts[1];
+                        ErrorLogger.LogMessage("License key and email loaded from encrypted storage");
+                    }
+                    else
+                    {
+                        _storedLicenseKey = storedData;
+                        ErrorLogger.LogMessage("License key loaded from encrypted storage (no email)");
+                    }
                 }
                 else
                 {
