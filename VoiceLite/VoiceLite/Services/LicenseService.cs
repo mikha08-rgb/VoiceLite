@@ -313,24 +313,26 @@ namespace VoiceLite.Services
                     ErrorMessage = result.Valid ? null : (result.Error ?? "Invalid or expired license key")
                 };
 
-                // Update activation counts and email from response
-                // HIGH-1 FIX: Use default values when JSON doesn't provide them
-                // HIGH-7 FIX: Extract email from response
-                if (result.Valid && result.License != null)
-                {
-                    _activationCount = result.License.ActivationsUsed; // 0 is acceptable default
-                    _maxActivations = result.License.MaxActivations > 0
-                        ? result.License.MaxActivations
-                        : 3; // Default to 3 activations if not provided
-                    _licenseEmail = result.License.Email; // HIGH-7 FIX: Store license email
-                }
-
                 // HIGH-9 FIX: Cache successful validation result with 30-day expiration
-                // THREAD-SAFETY FIX: Write cache under lock
+                // THREAD-SAFETY FIX: Write cache and ALL state fields under lock
+                // MED-2 FIX: Extended lock coverage to include _activationCount, _maxActivations, _licenseEmail
+                // Previously these were updated outside the lock, causing race conditions
                 if (result.Valid)
                 {
                     lock (_cacheLock)
                     {
+                        // Update activation counts and email from response (now inside lock)
+                        // HIGH-1 FIX: Use default values when JSON doesn't provide them
+                        // HIGH-7 FIX: Extract email from response
+                        if (result.License != null)
+                        {
+                            _activationCount = result.License.ActivationsUsed; // 0 is acceptable default
+                            _maxActivations = result.License.MaxActivations > 0
+                                ? result.License.MaxActivations
+                                : 3; // Default to 3 activations if not provided
+                            _licenseEmail = result.License.Email; // HIGH-7 FIX: Store license email
+                        }
+
                         _cachedValidationResult = validationResult;
                         _cacheTimestamp = DateTime.UtcNow; // HIGH-9 FIX: Track cache timestamp for expiration
                         // CRITICAL-2 FIX: Set _isLicenseValid to true on successful validation

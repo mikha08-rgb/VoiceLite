@@ -270,36 +270,67 @@ namespace VoiceLite.Services
                 "settings.json");
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Synchronize multi-field operations via Settings.SyncRoot
+        /// </summary>
         public async Task LoadSettingsAsync()
         {
             await Task.Run(() =>
             {
                 var loaded = Settings.Load();
-                CopySettings(loaded, _settings);
+                lock (_settings.SyncRoot)
+                {
+                    CopySettingsLocked(loaded, _settings);
+                }
             });
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Synchronize save operation via Settings.SyncRoot
+        /// </summary>
         public async Task SaveSettingsAsync()
         {
-            await Task.Run(() => _settings.Save());
+            await Task.Run(() =>
+            {
+                lock (_settings.SyncRoot)
+                {
+                    _settings.Save();
+                }
+            });
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Synchronize multi-field operations via Settings.SyncRoot
+        /// </summary>
         public void ResetToDefaults()
         {
             var defaults = new Settings();
-            CopySettings(defaults, _settings);
-            _settings.Save();
+            lock (_settings.SyncRoot)
+            {
+                CopySettingsLocked(defaults, _settings);
+                _settings.Save();
+            }
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Synchronize serialization via Settings.SyncRoot
+        /// </summary>
         public async Task ExportSettingsAsync(string filePath)
         {
-            var json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions
+            string json;
+            lock (_settings.SyncRoot)
             {
-                WriteIndented = true
-            });
+                json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+            }
             await File.WriteAllTextAsync(filePath, json);
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Synchronize multi-field operations via Settings.SyncRoot
+        /// </summary>
         public async Task ImportSettingsAsync(string filePath)
         {
             var json = await File.ReadAllTextAsync(filePath);
@@ -307,12 +338,18 @@ namespace VoiceLite.Services
 
             if (imported != null)
             {
-                CopySettings(imported, _settings);
-                _settings.Save();
+                lock (_settings.SyncRoot)
+                {
+                    CopySettingsLocked(imported, _settings);
+                    _settings.Save();
+                }
             }
         }
 
-        private void CopySettings(Settings source, Settings target)
+        /// <summary>
+        /// THREAD-SAFETY: Caller must hold settings.SyncRoot lock
+        /// </summary>
+        private void CopySettingsLocked(Settings source, Settings target)
         {
             // Copy all properties from source to target
             target.SelectedModel = source.SelectedModel;

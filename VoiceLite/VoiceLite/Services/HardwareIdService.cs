@@ -4,6 +4,7 @@ using System.Management;
 using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
+using System.Threading;
 
 namespace VoiceLite.Services
 {
@@ -23,6 +24,10 @@ namespace VoiceLite.Services
         // HIGH-4 FIX: Entropy for DPAPI encryption of machine_id.dat
         // Prevents users from copying machine_id.dat to other machines to bypass device limit
         private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("VoiceLite-MachineId-v1");
+
+        // THREAD-SAFETY FIX (MED-3): Named mutex for atomic file I/O in GetOrCreatePersistentFallbackId
+        // Prevents race condition where two threads see file missing, both generate GUID, both write
+        private static readonly string MutexName = "Global\\VoiceLite_MachineId_Mutex";
         /// <summary>
         /// Gets a unique machine identifier based on hardware.
         /// Format: Base64-encoded SHA256 hash of CPU ID + Motherboard Serial (truncated to 32 chars)
@@ -200,59 +205,105 @@ namespace VoiceLite.Services
         /// <summary>
         /// HIGH-6 FIX: Gets or creates a persistent fallback machine ID
         /// HIGH-4 FIX: Now encrypted with DPAPI to prevent copying to other machines
+        /// THREAD-SAFETY FIX (MED-3): Uses named mutex for atomic check-and-create
         /// Stores a random GUID in %LOCALAPPDATA%\VoiceLite\machine_id.dat (encrypted)
         /// This prevents users on VMs/headless systems from bypassing the 3-device limit
         /// </summary>
         private static string GetOrCreatePersistentFallbackId()
         {
-            try
+            // THREAD-SAFETY FIX (MED-3): Use named mutex for atomic file check-and-create
+            // Prevents race condition where two threads see file missing, both generate GUID, both write
+            bool createdNew;
+            using (var mutex = new Mutex(false, MutexName, out createdNew))
             {
-                // Check if we have a saved fallback ID
-                if (File.Exists(FallbackIdFilePath))
+                try
                 {
-                    var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+                    // Wait up to 5 seconds to acquire mutex
+                    if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
+                    {
+                        ErrorLogger.LogWarning("Timeout acquiring machine ID mutex - using random ID");
+                        return Guid.NewGuid().ToString("N").Substring(0, 32);
+                    }
 
-                    // HIGH-4 FIX: Try to decrypt with DPAPI first (new format)
                     try
                     {
-                        var decryptedBytes = ProtectedData.Unprotect(
-                            fileBytes,
-                            DpapiEntropy,
-                            DataProtectionScope.CurrentUser
-                        );
-                        var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
-                        if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
+                        // Check if we have a saved fallback ID (now inside mutex)
+                        if (File.Exists(FallbackIdFilePath))
                         {
-                            return savedId;
+                            var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+
+                            // HIGH-4 FIX: Try to decrypt with DPAPI first (new format)
+                            try
+                            {
+                                var decryptedBytes = ProtectedData.Unprotect(
+                                    fileBytes,
+                                    DpapiEntropy,
+                                    DataProtectionScope.CurrentUser
+                                );
+                                var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
+                                if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
+                                {
+                                    return savedId;
+                                }
+                            }
+                            catch (CryptographicException)
+                            {
+                                // Migration: Try reading as plaintext (old format)
+                                var savedId = Encoding.UTF8.GetString(fileBytes).Trim();
+                                if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32 &&
+                                    savedId.All(c => char.IsLetterOrDigit(c)))
+                                {
+                                    // Migrate to encrypted format
+                                    ErrorLogger.LogMessage("Migrating machine ID to encrypted format...");
+                                    SaveEncryptedMachineId(savedId);
+                                    return savedId;
+                                }
+                            }
                         }
+
+                        // Generate and save a new persistent ID (encrypted)
+                        var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
+                        SaveEncryptedMachineId(newId);
+                        ErrorLogger.LogWarning($"Created persistent fallback machine ID (hardware detection failed)");
+
+                        return newId;
                     }
-                    catch (CryptographicException)
+                    finally
                     {
-                        // Migration: Try reading as plaintext (old format)
-                        var savedId = Encoding.UTF8.GetString(fileBytes).Trim();
-                        if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32 &&
-                            savedId.All(c => char.IsLetterOrDigit(c)))
-                        {
-                            // Migrate to encrypted format
-                            ErrorLogger.LogMessage("Migrating machine ID to encrypted format...");
-                            SaveEncryptedMachineId(savedId);
-                            return savedId;
-                        }
+                        mutex.ReleaseMutex();
                     }
                 }
-
-                // Generate and save a new persistent ID (encrypted)
-                var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
-                SaveEncryptedMachineId(newId);
-                ErrorLogger.LogWarning($"Created persistent fallback machine ID (hardware detection failed)");
-
-                return newId;
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Failed to persist fallback machine ID: {ex.Message}");
-                // Absolute last resort - still generate random but log warning
-                return Guid.NewGuid().ToString("N").Substring(0, 32);
+                catch (AbandonedMutexException)
+                {
+                    // Previous holder crashed - we now own the mutex, proceed normally
+                    ErrorLogger.LogWarning("Acquired abandoned machine ID mutex - previous process may have crashed");
+                    // Re-check file inside mutex (recursive call would deadlock, so inline the check)
+                    if (File.Exists(FallbackIdFilePath))
+                    {
+                        try
+                        {
+                            var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+                            var decryptedBytes = ProtectedData.Unprotect(fileBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
+                            var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
+                            if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
+                            {
+                                mutex.ReleaseMutex();
+                                return savedId;
+                            }
+                        }
+                        catch { /* Fall through to generate new */ }
+                    }
+                    var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
+                    SaveEncryptedMachineId(newId);
+                    mutex.ReleaseMutex();
+                    return newId;
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogWarning($"Failed to persist fallback machine ID: {ex.Message}");
+                    // Absolute last resort - still generate random but log warning
+                    return Guid.NewGuid().ToString("N").Substring(0, 32);
+                }
             }
         }
 

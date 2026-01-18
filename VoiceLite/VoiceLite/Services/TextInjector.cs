@@ -27,6 +27,10 @@ namespace VoiceLite.Services
         // Made volatile for thread-safe access between main thread and worker threads (Issue 2)
         private volatile IntPtr _targetWindowHandle = IntPtr.Zero;
 
+        // THREAD-SAFETY FIX (MED-5): Lock for synchronizing window handle updates
+        // Prevents race condition where concurrent InjectText calls overwrite each other's target window
+        private readonly object _windowHandleLock = new object();
+
         // Disposal tracking (Issue 1)
         // CRITICAL-2 FIX: Made volatile to ensure visibility across threads
         // Without volatile, worker thread may not see disposal and could call Release() on disposed semaphore
@@ -70,10 +74,16 @@ namespace VoiceLite.Services
             // CRITICAL FIX: Capture foreground window IMMEDIATELY when InjectText is called
             // This is the window where the user expects text to be pasted
             // For long transcriptions, user may switch focus during processing - we restore it later
-            _targetWindowHandle = GetForegroundWindow();
+            // THREAD-SAFETY FIX (MED-5): Synchronize window handle update to prevent race conditions
+            IntPtr capturedHandle;
+            lock (_windowHandleLock)
+            {
+                _targetWindowHandle = GetForegroundWindow();
+                capturedHandle = _targetWindowHandle;
+            }
 
             // Release-visible log for troubleshooting injection issues
-            ErrorLogger.LogWarning($"InjectText: {text.Length} chars, mode={settings.TextInjectionMode}, window={_targetWindowHandle}");
+            ErrorLogger.LogWarning($"InjectText: {text.Length} chars, mode={settings.TextInjectionMode}, window={capturedHandle}");
 
             try
             {
@@ -126,7 +136,11 @@ namespace VoiceLite.Services
                 // Fallback to clipboard method if typing fails (for other modes)
                 // HIGH-5 FIX: Re-capture foreground window before fallback paste
                 // User may have switched windows during the failed typing attempt
-                _targetWindowHandle = GetForegroundWindow();
+                // THREAD-SAFETY FIX (MED-5): Synchronize window handle update
+                lock (_windowHandleLock)
+                {
+                    _targetWindowHandle = GetForegroundWindow();
+                }
                 try
                 {
 #if DEBUG
@@ -308,18 +322,25 @@ namespace VoiceLite.Services
             // Issue 6: Restore focus to target window before typing
             // For long transcriptions, user may have clicked away during processing
             // HIGH-4 FIX: Validate window handle is still valid before use
-            if (_targetWindowHandle != IntPtr.Zero && IsWindow(_targetWindowHandle))
+            // THREAD-SAFETY FIX (MED-5): Read window handle under lock
+            IntPtr targetHandle;
+            lock (_windowHandleLock)
             {
-                if (!SetForegroundWindow(_targetWindowHandle))
+                targetHandle = _targetWindowHandle;
+            }
+
+            if (targetHandle != IntPtr.Zero && IsWindow(targetHandle))
+            {
+                if (!SetForegroundWindow(targetHandle))
                 {
-                    ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in InjectViaTyping");
+                    ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {targetHandle} in InjectViaTyping");
                 }
                 Thread.Sleep(50); // Allow window activation to complete
             }
-            else if (_targetWindowHandle != IntPtr.Zero)
+            else if (targetHandle != IntPtr.Zero)
             {
                 // Window was closed - log warning but continue (will type to current foreground window)
-                ErrorLogger.LogWarning($"Target window {_targetWindowHandle} no longer valid in InjectViaTyping, using current foreground window");
+                ErrorLogger.LogWarning($"Target window {targetHandle} no longer valid in InjectViaTyping, using current foreground window");
             }
 
             // Get adaptive delay based on current application
@@ -484,26 +505,33 @@ namespace VoiceLite.Services
         {
             try
             {
+                // THREAD-SAFETY FIX (MED-5): Read window handle under lock
+                IntPtr targetHandle;
+                lock (_windowHandleLock)
+                {
+                    targetHandle = _targetWindowHandle;
+                }
+
 #if DEBUG
-                ErrorLogger.LogMessage($"Simulating Ctrl+V to window handle: {_targetWindowHandle}");
+                ErrorLogger.LogMessage($"Simulating Ctrl+V to window handle: {targetHandle}");
 #endif
 
                 // CRITICAL FIX: Restore focus to target window before sending keystrokes
                 // For long transcriptions (>5s), user may have clicked VoiceLite window to check progress
                 // This ensures Ctrl+V goes to the ORIGINAL target app, not VoiceLite
                 // HIGH-4 FIX: Validate window handle is still valid before use
-                if (_targetWindowHandle != IntPtr.Zero && IsWindow(_targetWindowHandle))
+                if (targetHandle != IntPtr.Zero && IsWindow(targetHandle))
                 {
-                    if (!SetForegroundWindow(_targetWindowHandle))
+                    if (!SetForegroundWindow(targetHandle))
                     {
-                        ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {_targetWindowHandle} in SimulateCtrlV");
+                        ErrorLogger.LogWarning($"SetForegroundWindow failed for handle {targetHandle} in SimulateCtrlV");
                     }
                     Thread.Sleep(50); // Allow window activation to complete
                 }
-                else if (_targetWindowHandle != IntPtr.Zero)
+                else if (targetHandle != IntPtr.Zero)
                 {
                     // Window was closed - log warning but continue (will paste to current foreground window)
-                    ErrorLogger.LogWarning($"Target window {_targetWindowHandle} no longer valid in SimulateCtrlV, using current foreground window");
+                    ErrorLogger.LogWarning($"Target window {targetHandle} no longer valid in SimulateCtrlV, using current foreground window");
                 }
 
                 // RELIABILITY FIX: Increased timing for better cross-application compatibility

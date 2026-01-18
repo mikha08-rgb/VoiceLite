@@ -29,6 +29,7 @@ namespace VoiceLite.Services
         /// <summary>
         /// Adds a new transcription to the history.
         /// Inserts at the beginning (newest first) and removes old unpinned items beyond the limit.
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
         /// </summary>
         public void AddToHistory(TranscriptionHistoryItem item)
         {
@@ -48,19 +49,25 @@ namespace VoiceLite.Services
                 item.Text = item.Text.Substring(0, MAX_TEXT_LENGTH) + "... (truncated)";
             }
 
-            // Insert at the beginning (newest first)
-            settings.TranscriptionHistory.Insert(0, item);
-            ErrorLogger.LogMessage($"Added history item: '{item.PreviewText}' (ID: {item.Id})");
+            // THREAD-SAFETY FIX: Synchronize list operations to prevent corruption
+            // UI thread reads while transcription thread writes without this lock
+            lock (settings.SyncRoot)
+            {
+                // Insert at the beginning (newest first)
+                settings.TranscriptionHistory.Insert(0, item);
+                ErrorLogger.LogMessage($"Added history item: '{item.PreviewText}' (ID: {item.Id})");
 
-            // Clean up old items beyond the max limit (but keep pinned items)
-            CleanupOldItems();
+                // Clean up old items beyond the max limit (but keep pinned items)
+                CleanupOldItemsLocked();
+            }
         }
 
         /// <summary>
         /// Removes items beyond the MaxHistoryItems limit.
         /// P1 OPTIMIZATION: O(n log n) instead of O(n²) - uses RemoveAll with HashSet lookup
+        /// THREAD-SAFETY: Caller must hold settings.SyncRoot lock
         /// </summary>
-        private void CleanupOldItems()
+        private void CleanupOldItemsLocked()
         {
             // P1 OPTIMIZATION: Early exit if no cleanup needed
             if (settings.TranscriptionHistory.Count <= settings.MaxHistoryItems)
@@ -87,15 +94,19 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Removes a specific item from the history by ID.
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
         /// </summary>
         public bool RemoveFromHistory(string id)
         {
-            var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == id);
-            if (item != null)
+            lock (settings.SyncRoot)
             {
-                settings.TranscriptionHistory.Remove(item);
-                ErrorLogger.LogMessage($"Manually removed history item: '{item.PreviewText}' (ID: {id})");
-                return true;
+                var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == id);
+                if (item != null)
+                {
+                    settings.TranscriptionHistory.Remove(item);
+                    ErrorLogger.LogMessage($"Manually removed history item: '{item.PreviewText}' (ID: {id})");
+                    return true;
+                }
             }
 
             ErrorLogger.LogMessage($"History item not found for removal: ID {id}");
@@ -104,31 +115,40 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Clears all items from the history.
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
         /// </summary>
         public void ClearHistory()
         {
-            int count = settings.TranscriptionHistory.Count;
-            settings.TranscriptionHistory.Clear();
+            int count;
+            lock (settings.SyncRoot)
+            {
+                count = settings.TranscriptionHistory.Count;
+                settings.TranscriptionHistory.Clear();
+            }
             ErrorLogger.LogMessage($"Cleared {count} history items");
         }
 
 
         /// <summary>
         /// Gets history statistics for display.
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
         /// </summary>
         public HistoryStatistics GetStatistics()
         {
-            return new HistoryStatistics
+            lock (settings.SyncRoot)
             {
-                TotalItems = settings.TranscriptionHistory.Count,
-                TotalWords = settings.TranscriptionHistory.Sum(x => x.WordCount),
-                AverageDuration = settings.TranscriptionHistory.Any()
-                    ? settings.TranscriptionHistory.Average(x => x.DurationSeconds)
-                    : 0,
-                OldestTimestamp = settings.TranscriptionHistory.Any()
-                    ? settings.TranscriptionHistory.Min(x => x.Timestamp)
-                    : DateTime.Now
-            };
+                return new HistoryStatistics
+                {
+                    TotalItems = settings.TranscriptionHistory.Count,
+                    TotalWords = settings.TranscriptionHistory.Sum(x => x.WordCount),
+                    AverageDuration = settings.TranscriptionHistory.Any()
+                        ? settings.TranscriptionHistory.Average(x => x.DurationSeconds)
+                        : 0,
+                    OldestTimestamp = settings.TranscriptionHistory.Any()
+                        ? settings.TranscriptionHistory.Min(x => x.Timestamp)
+                        : DateTime.Now
+                };
+            }
         }
 
         #region ITranscriptionHistoryService Implementation
@@ -160,18 +180,25 @@ namespace VoiceLite.Services
 
         public void AddItem(TranscriptionItem item) => AddTranscription(item);
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: Returns a snapshot copy to prevent enumeration during modification
+        /// </summary>
         public IEnumerable<TranscriptionItem> GetHistory()
         {
             // Convert TranscriptionHistoryItem to TranscriptionItem
-            return settings.TranscriptionHistory.Select(h => new TranscriptionItem
+            // THREAD-SAFETY FIX: Take snapshot under lock, ToList() forces immediate evaluation
+            lock (settings.SyncRoot)
             {
-                Id = h.Id,
-                Text = h.Text,
-                Timestamp = h.Timestamp,
-                ProcessingTime = h.DurationSeconds,
-                ModelUsed = h.ModelUsed,
-                IsPinned = h.IsPinned
-            });
+                return settings.TranscriptionHistory.Select(h => new TranscriptionItem
+                {
+                    Id = h.Id,
+                    Text = h.Text,
+                    Timestamp = h.Timestamp,
+                    ProcessingTime = h.DurationSeconds,
+                    ModelUsed = h.ModelUsed,
+                    IsPinned = h.IsPinned
+                }).ToList();
+            }
         }
 
         public IEnumerable<TranscriptionItem> GetHistoryRange(DateTime from, DateTime to)
@@ -187,13 +214,19 @@ namespace VoiceLite.Services
             return GetHistory().Where(h => h.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase));
         }
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
+        /// </summary>
         public void ClearHistory(bool preservePinned)
         {
             if (preservePinned)
             {
-                var pinned = settings.TranscriptionHistory.Where(h => h.IsPinned).ToList();
-                settings.TranscriptionHistory.Clear();
-                settings.TranscriptionHistory.AddRange(pinned);
+                lock (settings.SyncRoot)
+                {
+                    var pinned = settings.TranscriptionHistory.Where(h => h.IsPinned).ToList();
+                    settings.TranscriptionHistory.Clear();
+                    settings.TranscriptionHistory.AddRange(pinned);
+                }
             }
             else
             {
@@ -207,13 +240,19 @@ namespace VoiceLite.Services
 
         public void TogglePin(Guid itemId) => TogglePin(itemId.ToString());
 
+        /// <summary>
+        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
+        /// </summary>
         public void TogglePin(string itemId)
         {
-            var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == itemId);
-            if (item != null)
+            lock (settings.SyncRoot)
             {
-                item.IsPinned = !item.IsPinned;
-                settings.Save();
+                var item = settings.TranscriptionHistory.FirstOrDefault(x => x.Id == itemId);
+                if (item != null)
+                {
+                    item.IsPinned = !item.IsPinned;
+                    settings.Save();
+                }
             }
         }
 
