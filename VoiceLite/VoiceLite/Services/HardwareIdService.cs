@@ -28,6 +28,12 @@ namespace VoiceLite.Services
         // THREAD-SAFETY FIX (MED-3): Named mutex for atomic file I/O in GetOrCreatePersistentFallbackId
         // Prevents race condition where two threads see file missing, both generate GUID, both write
         private static readonly string MutexName = "Global\\VoiceLite_MachineId_Mutex";
+
+        // THREAD-SAFETY FIX (P3): Static cache for mutex timeout fallback ID
+        // Without this cache, each timeout would generate a different GUID, potentially exhausting
+        // the 3-device activation limit with repeated failed mutex acquisitions
+        private static string? _cachedTimeoutFallbackId = null;
+        private static readonly object _timeoutCacheLock = new object();
         /// <summary>
         /// Gets a unique machine identifier based on hardware.
         /// Format: Base64-encoded SHA256 hash of CPU ID + Motherboard Serial (truncated to 32 chars)
@@ -221,8 +227,17 @@ namespace VoiceLite.Services
                     // Wait up to 5 seconds to acquire mutex
                     if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
                     {
-                        ErrorLogger.LogWarning("Timeout acquiring machine ID mutex - using random ID");
-                        return Guid.NewGuid().ToString("N").Substring(0, 32);
+                        // THREAD-SAFETY FIX (P3): Use cached fallback ID on timeout to prevent
+                        // generating different GUIDs on each call, which would exhaust device limit
+                        lock (_timeoutCacheLock)
+                        {
+                            if (_cachedTimeoutFallbackId == null)
+                            {
+                                _cachedTimeoutFallbackId = Guid.NewGuid().ToString("N").Substring(0, 32);
+                            }
+                            ErrorLogger.LogWarning("Timeout acquiring machine ID mutex - using cached fallback ID");
+                            return _cachedTimeoutFallbackId;
+                        }
                     }
 
                     try

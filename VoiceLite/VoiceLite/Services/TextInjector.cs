@@ -22,14 +22,14 @@ namespace VoiceLite.Services
             set => _autoPaste = value;
         }
 
-        // Target window handle for paste operations
-        // Captured when InjectText is called to ensure paste goes to correct window
-        // Made volatile for thread-safe access between main thread and worker threads (Issue 2)
-        private volatile IntPtr _targetWindowHandle = IntPtr.Zero;
-
-        // THREAD-SAFETY FIX (MED-5): Lock for synchronizing window handle updates
-        // Prevents race condition where concurrent InjectText calls overwrite each other's target window
-        private readonly object _windowHandleLock = new object();
+        // THREAD-SAFETY FIX (P2): Removed _targetWindowHandle instance field
+        // Previously, concurrent InjectText() calls could overwrite each other's target window
+        // Now the captured handle is passed directly via method parameters/closures
+        // This prevents Race Scenario:
+        //   1. Recording A completes → InjectText(A) captures Window A
+        //   2. Recording B completes immediately → InjectText(B) overwrites with Window B
+        //   3. InjectText(A)'s worker reads instance field = Window B (WRONG!)
+        // Fix: Each call captures its own handle locally and passes it through the call chain
 
         // Disposal tracking (Issue 1)
         // CRITICAL-2 FIX: Made volatile to ensure visibility across threads
@@ -74,13 +74,9 @@ namespace VoiceLite.Services
             // CRITICAL FIX: Capture foreground window IMMEDIATELY when InjectText is called
             // This is the window where the user expects text to be pasted
             // For long transcriptions, user may switch focus during processing - we restore it later
-            // THREAD-SAFETY FIX (MED-5): Synchronize window handle update to prevent race conditions
-            IntPtr capturedHandle;
-            lock (_windowHandleLock)
-            {
-                _targetWindowHandle = GetForegroundWindow();
-                capturedHandle = _targetWindowHandle;
-            }
+            // THREAD-SAFETY FIX (P2): Capture to local variable only - no instance field storage
+            // This prevents concurrent InjectText() calls from interfering with each other
+            IntPtr capturedHandle = GetForegroundWindow();
 
             // Release-visible log for troubleshooting injection issues
             ErrorLogger.LogWarning($"InjectText: {text.Length} chars, mode={settings.TextInjectionMode}, window={capturedHandle}");
@@ -88,9 +84,10 @@ namespace VoiceLite.Services
             try
             {
                 // Respect explicit user preferences - skip UI Automation for these modes
+                // THREAD-SAFETY FIX (P2): Pass captured handle to all injection methods
                 if (settings.TextInjectionMode == TextInjectionMode.AlwaysType)
                 {
-                    InjectViaTyping(text);
+                    InjectViaTyping(text, capturedHandle);
 #if DEBUG
                     ErrorLogger.LogMessage($"Text injected via typing (AlwaysType mode, {text.Length} chars)");
 #endif
@@ -99,7 +96,7 @@ namespace VoiceLite.Services
 
                 if (settings.TextInjectionMode == TextInjectionMode.AlwaysPaste)
                 {
-                    InjectViaClipboard(text);
+                    InjectViaClipboard(text, capturedHandle);
 #if DEBUG
                     ErrorLogger.LogMessage($"Text injected via clipboard (AlwaysPaste mode, {text.Length} chars)");
 #endif
@@ -109,14 +106,14 @@ namespace VoiceLite.Services
                 // Use smart logic for SmartAuto/PreferType/PreferPaste modes
                 if (ShouldUseTyping(text))
                 {
-                    InjectViaTyping(text);
+                    InjectViaTyping(text, capturedHandle);
 #if DEBUG
                     ErrorLogger.LogMessage($"Text injected via typing ({text.Length} chars)");
 #endif
                 }
                 else
                 {
-                    InjectViaClipboard(text);
+                    InjectViaClipboard(text, capturedHandle);
 #if DEBUG
                     ErrorLogger.LogMessage($"Text injected via clipboard ({text.Length} chars)");
 #endif
@@ -136,17 +133,14 @@ namespace VoiceLite.Services
                 // Fallback to clipboard method if typing fails (for other modes)
                 // HIGH-5 FIX: Re-capture foreground window before fallback paste
                 // User may have switched windows during the failed typing attempt
-                // THREAD-SAFETY FIX (MED-5): Synchronize window handle update
-                lock (_windowHandleLock)
-                {
-                    _targetWindowHandle = GetForegroundWindow();
-                }
+                // THREAD-SAFETY FIX (P2): Capture to local variable, pass to method
+                IntPtr fallbackHandle = GetForegroundWindow();
                 try
                 {
 #if DEBUG
                     ErrorLogger.LogMessage("Falling back to clipboard injection");
 #endif
-                    PasteViaClipboard(text);
+                    PasteViaClipboard(text, fallbackHandle);
                 }
                 catch
                 {
@@ -317,18 +311,12 @@ namespace VoiceLite.Services
             return GetTypingDelayForApplication();
         }
 
-        private void InjectViaTyping(string text)
+        // THREAD-SAFETY FIX (P2): Accept target handle as parameter instead of reading from instance field
+        private void InjectViaTyping(string text, IntPtr targetHandle)
         {
             // Issue 6: Restore focus to target window before typing
             // For long transcriptions, user may have clicked away during processing
             // HIGH-4 FIX: Validate window handle is still valid before use
-            // THREAD-SAFETY FIX (MED-5): Read window handle under lock
-            IntPtr targetHandle;
-            lock (_windowHandleLock)
-            {
-                targetHandle = _targetWindowHandle;
-            }
-
             if (targetHandle != IntPtr.Zero && IsWindow(targetHandle))
             {
                 if (!SetForegroundWindow(targetHandle))
@@ -370,7 +358,8 @@ namespace VoiceLite.Services
             }
         }
 
-        private void InjectViaClipboard(string text)
+        // THREAD-SAFETY FIX (P2): Accept target handle as parameter instead of reading from instance field
+        private void InjectViaClipboard(string text, IntPtr targetHandle)
         {
             // CRIT-5 FIX: Removed clipboard preservation logic - was causing race condition data loss
             // Now we just paste and clear after delay (simpler, safer)
@@ -379,10 +368,12 @@ namespace VoiceLite.Services
             // Data loss risk > cleanup benefit. Transcription text left in clipboard
             // is actually useful (user might paste again). Previous async clear could
             // delete user's unrelated clipboard content during the delay window.
-            PasteViaClipboard(text);
+            PasteViaClipboard(text, targetHandle);
         }
 
-        private void PasteViaClipboard(string text)
+        // THREAD-SAFETY FIX (P2): Accept target handle as parameter instead of reading from instance field
+        // The handle is captured by the lambda closure for the worker thread to use
+        private void PasteViaClipboard(string text, IntPtr targetHandle)
         {
             // THREAD-LEAK FIX: Acquire semaphore to prevent unbounded thread accumulation
             // If previous operation timed out but thread is still running, we wait here
@@ -399,6 +390,8 @@ namespace VoiceLite.Services
 
             try
             {
+                // THREAD-SAFETY FIX (P2): targetHandle is captured by closure, so worker thread
+                // uses the handle captured at InjectText() call time, not a shared instance field
                 Thread thread = new Thread(() =>
                 {
                     try
@@ -410,7 +403,7 @@ namespace VoiceLite.Services
                             // RELIABILITY FIX: Increased delay from 5ms to 20ms for better compatibility
                             // Some applications need more time to process clipboard changes
                             Thread.Sleep(CLIPBOARD_READY_DELAY_MS);
-                            SimulateCtrlV();
+                            SimulateCtrlV(targetHandle);
                         }
                     }
                     catch (Exception ex)
@@ -501,17 +494,11 @@ namespace VoiceLite.Services
             throw new InvalidOperationException("Unable to access clipboard.");
         }
 
-        private void SimulateCtrlV()
+        // THREAD-SAFETY FIX (P2): Accept target handle as parameter instead of reading from instance field
+        private void SimulateCtrlV(IntPtr targetHandle)
         {
             try
             {
-                // THREAD-SAFETY FIX (MED-5): Read window handle under lock
-                IntPtr targetHandle;
-                lock (_windowHandleLock)
-                {
-                    targetHandle = _targetWindowHandle;
-                }
-
 #if DEBUG
                 ErrorLogger.LogMessage($"Simulating Ctrl+V to window handle: {targetHandle}");
 #endif
@@ -567,20 +554,24 @@ namespace VoiceLite.Services
         }
 
         // Interface implementation methods
+        // THREAD-SAFETY FIX (P2): Capture foreground window BEFORE Task.Run to get correct window
         public async Task InjectTextAsync(string text, ITextInjector.InjectionMode mode)
         {
+            // Capture foreground window on calling thread (UI thread)
+            IntPtr capturedHandle = GetForegroundWindow();
+
             await Task.Run(() =>
             {
                 switch (mode)
                 {
                     case ITextInjector.InjectionMode.Type:
-                        InjectViaTyping(text);
+                        InjectViaTyping(text, capturedHandle);
                         break;
                     case ITextInjector.InjectionMode.Paste:
-                        InjectViaClipboard(text);
+                        InjectViaClipboard(text, capturedHandle);
                         break;
                     case ITextInjector.InjectionMode.SmartAuto:
-                        InjectText(text); // Uses existing smart logic
+                        InjectText(text); // Uses existing smart logic (captures its own handle)
                         break;
                 }
             });

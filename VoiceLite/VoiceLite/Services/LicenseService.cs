@@ -397,7 +397,12 @@ namespace VoiceLite.Services
 
         #region ILicenseService Implementation
 
-        public bool IsLicenseValid => _isLicenseValid;
+        // THREAD-SAFETY FIX (P1): Synchronize property read to prevent torn reads
+        // UI thread may otherwise see inconsistent values during concurrent ValidateLicenseAsync
+        public bool IsLicenseValid
+        {
+            get { lock (_cacheLock) { return _isLicenseValid; } }
+        }
 
 
         public string GetStoredLicenseKey()
@@ -585,11 +590,20 @@ namespace VoiceLite.Services
 
         public void RemoveLicenseKey()
         {
-            _storedLicenseKey = null;
-            _isLicenseValid = false;
-            _licenseEmail = null;
-            _activationCount = 0;
+            // THREAD-SAFETY FIX (P1): Wrap field updates in lock to prevent race with ValidateLicenseAsync
+            // Race scenario: ValidateLicenseAsync succeeds, RemoveLicenseKey clears fields, ValidateLicenseAsync
+            // then sets _isLicenseValid = true inside lock - resulting in corrupted state
+            lock (_cacheLock)
+            {
+                _storedLicenseKey = null;
+                _isLicenseValid = false;
+                _licenseEmail = null;
+                _activationCount = 0;
+                _cachedValidationResult = null;
+                _cacheTimestamp = null;
+            }
 
+            // File I/O OUTSIDE lock (non-blocking, prevents holding lock during disk access)
             // SECURITY FIX (LICENSE-ENC-001): Delete encrypted license file
             try
             {
@@ -607,19 +621,21 @@ namespace VoiceLite.Services
             LicenseStatusChanged?.Invoke(this, false);
         }
 
+        // THREAD-SAFETY FIX (P1): Synchronize property reads to prevent torn reads
+        // UI thread may otherwise see inconsistent values during concurrent ValidateLicenseAsync
         public string GetLicenseEmail()
         {
-            return _licenseEmail ?? string.Empty;
+            lock (_cacheLock) { return _licenseEmail ?? string.Empty; }
         }
 
         public int GetActivationCount()
         {
-            return _activationCount;
+            lock (_cacheLock) { return _activationCount; }
         }
 
         public int GetMaxActivations()
         {
-            return _maxActivations;
+            lock (_cacheLock) { return _maxActivations; }
         }
 
         #endregion
