@@ -2,7 +2,7 @@
 ; v1.2.0.5: Bundled VC++ redistributable - auto-installs silently
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
-#define MyAppVersion "1.2.0.11"
+#define MyAppVersion "1.2.0.13"
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
