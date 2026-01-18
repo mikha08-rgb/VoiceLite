@@ -315,7 +315,9 @@ namespace VoiceLite.Services
                 }
 
                 // Use the passed modelPath parameter, fall back to cached if empty
-                var effectiveModelPath = !string.IsNullOrEmpty(modelPath) ? modelPath : (cachedModelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel));
+                var effectiveModelPath = (string.IsNullOrEmpty(modelPath) ? null : modelPath)
+                    ?? cachedModelPath
+                    ?? modelResolver.ResolveModelPath(settings.WhisperModel);
                 var whisperExePath = cachedWhisperExePath ?? modelResolver.ResolveWhisperExePath();
 
                 // Build Whisper command-line arguments
@@ -1046,42 +1048,11 @@ namespace VoiceLite.Services
 
             CleanupProcess();
 
-            // Dispose semaphore safely
-            if (transcriptionSemaphore != null)
-            {
-                try
-                {
-                    transcriptionSemaphore.Dispose();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Already disposed, ignore
-                }
-            }
-
-            // Dispose cancellation token sources
-            try
-            {
-                warmupCts.Dispose();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Already disposed, ignore
-            }
-
-            // CRITICAL FIX: Dispose transcription cancellation token source
-            try
-            {
-                transcriptionCts.Dispose();
-            }
-            catch (ObjectDisposedException) { }
-
-            // MED-15 FIX: Always dispose ManualResetEventSlim in finally-equivalent position
-            try
-            {
-                disposalComplete.Dispose();
-            }
-            catch (ObjectDisposedException) { }
+            // Dispose resources safely using extension method
+            transcriptionSemaphore.SafeDispose();
+            warmupCts.SafeDispose();
+            transcriptionCts.SafeDispose();
+            disposalComplete.SafeDispose();
         }
     }
 }

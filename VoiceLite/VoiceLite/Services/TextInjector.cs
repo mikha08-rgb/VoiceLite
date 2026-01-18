@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Windows.Automation;
 using WindowsInput;
 using WindowsInput.Native;
 using VoiceLite.Models;
@@ -85,16 +84,7 @@ namespace VoiceLite.Services
                     return;
                 }
 
-                // For SmartAuto/PreferType/PreferPaste: Try UI Automation first (fastest ~5ms)
-                if (TryInjectViaUIAutomation(text))
-                {
-#if DEBUG
-                    ErrorLogger.LogMessage($"Text injected via UI Automation ({text.Length} chars)");
-#endif
-                    return;
-                }
-
-                // Fallback to existing smart logic
+                // Use smart logic for SmartAuto/PreferType/PreferPaste modes
                 if (ShouldUseTyping(text))
                 {
                     InjectViaTyping(text);
@@ -236,31 +226,6 @@ namespace VoiceLite.Services
         private const uint WM_GETTEXT = 0x000D;
         private const int GWL_STYLE = -16;
         private const long ES_PASSWORD = 0x0020;
-
-        /// <summary>
-        /// UI Automation injection is DISABLED due to fundamental limitations.
-        ///
-        /// BUG FIX (DEAD-CODE-001): Removed 60+ lines of commented-out UI Automation code.
-        ///
-        /// Why disabled:
-        /// - ValuePattern.SetValue() replaces ENTIRE field content instead of inserting at cursor
-        /// - This causes data loss when user has existing text in the field
-        /// - TextPattern API would be needed for proper cursor-aware insertion, but it's complex
-        ///   and not universally supported across all text controls
-        ///
-        /// Fallback methods (clipboard/typing) work reliably across all applications.
-        ///
-        /// TODO: If performance becomes critical, investigate TextPattern implementation with:
-        ///   1. Get cursor position via TextPatternRange
-        ///   2. Insert text at cursor using RangeFromPoint
-        ///   3. Handle applications that don't support TextPattern gracefully
-        /// </summary>
-        private bool TryInjectViaUIAutomation(string text)
-        {
-            // Always return false - UI Automation not implemented
-            // Fallback to clipboard/typing methods which work universally
-            return false;
-        }
 
         /// <summary>
         /// Gets adaptive typing delay based on focused application

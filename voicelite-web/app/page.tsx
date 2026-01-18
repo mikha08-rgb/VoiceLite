@@ -5,6 +5,8 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.2.0.8';
+
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
@@ -490,7 +492,7 @@ export default function HomePage() {
               </ul>
 
               <a
-                href="/api/download?version=1.2.0.7"
+                href={`/api/download?version=${CURRENT_VERSION}`}
                 className="block w-full rounded-lg border-2 border-blue-600 bg-transparent px-8 py-4 text-center text-lg font-semibold text-blue-600 transition-all hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/20"
               >
                 Download Free
@@ -667,7 +669,7 @@ export default function HomePage() {
                   Pricing
                 </a>
                 <a
-                  href="/api/download?version=1.2.0.7"
+                  href={`/api/download?version=${CURRENT_VERSION}`}
                   className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400"
                 >
                   Download

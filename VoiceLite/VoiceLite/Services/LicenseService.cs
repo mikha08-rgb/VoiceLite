@@ -61,6 +61,15 @@ namespace VoiceLite.Services
         // Multiple concurrent ValidateLicenseAsync calls could corrupt cache without synchronization
         private readonly object _cacheLock = new object();
 
+        private LicenseValidationResult? TryGetCachedResult(string licenseKey)
+        {
+            lock (_cacheLock)
+            {
+                return (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
+                    ? _cachedValidationResult : null;
+            }
+        }
+
         // SECURITY FIX (LICENSE-ENC-001): Encrypted license storage
         // License keys are encrypted using Windows DPAPI (Data Protection API)
         // Scope: CurrentUser (tied to Windows user account)
@@ -116,13 +125,11 @@ namespace VoiceLite.Services
                 }
 
                 // THREAD-SAFETY FIX: Check cache under lock to prevent race conditions
-                lock (_cacheLock)
+                var cached = TryGetCachedResult(licenseKey);
+                if (cached != null)
                 {
-                    if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
-                    {
-                        ErrorLogger.LogMessage("Using cached license validation result (lifetime cache)");
-                        return _cachedValidationResult;
-                    }
+                    ErrorLogger.LogMessage("Using cached license validation result (lifetime cache)");
+                    return cached;
                 }
 
                 var request = new
@@ -147,17 +154,14 @@ namespace VoiceLite.Services
                 catch (Exception retryEx)
                 {
                     // All retries exhausted - check if we have a cached result to fall back to
-                    // (This handles case where user tries to re-validate an already-cached license while offline)
-                    lock (_cacheLock)
+                    var cachedRetry = TryGetCachedResult(licenseKey);
+                    if (cachedRetry != null)
                     {
-                        if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
-                        {
-                            ErrorLogger.LogWarning(
-                                $"License API unreachable after 3 retries. Using cached result (lifetime license). " +
-                                $"Exception: {retryEx.Message}"
-                            );
-                            return _cachedValidationResult;
-                        }
+                        ErrorLogger.LogWarning(
+                            $"License API unreachable after 3 retries. Using cached result (lifetime license). " +
+                            $"Exception: {retryEx.Message}"
+                        );
+                        return cachedRetry;
                     }
 
                     // No cache available - return error (first-time activation requires internet)
@@ -239,13 +243,11 @@ namespace VoiceLite.Services
                 ErrorLogger.LogError("License validation HTTP error", ex);
 
                 // Try to use cached result even on network failure
-                lock (_cacheLock)
+                var cachedHttp = TryGetCachedResult(licenseKey);
+                if (cachedHttp != null)
                 {
-                    if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
-                    {
-                        ErrorLogger.LogWarning("Network error - using cached license validation result");
-                        return _cachedValidationResult;
-                    }
+                    ErrorLogger.LogWarning("Network error - using cached license validation result");
+                    return cachedHttp;
                 }
 
                 return new LicenseValidationResult
@@ -257,13 +259,11 @@ namespace VoiceLite.Services
             catch (TaskCanceledException ex)
             {
                 // Try to use cached result on timeout
-                lock (_cacheLock)
+                var cachedTimeout = TryGetCachedResult(licenseKey);
+                if (cachedTimeout != null)
                 {
-                    if (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
-                    {
-                        ErrorLogger.LogWarning("Request timeout - using cached license validation result");
-                        return _cachedValidationResult;
-                    }
+                    ErrorLogger.LogWarning("Request timeout - using cached license validation result");
+                    return cachedTimeout;
                 }
 
                 ErrorLogger.LogWarning($"License validation request timed out: {ex.Message}");

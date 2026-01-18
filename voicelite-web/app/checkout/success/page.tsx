@@ -4,6 +4,8 @@ import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.2.0.8';
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
@@ -73,7 +75,7 @@ function SuccessContent() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
-            href="/api/download?version=1.0.88"
+            href={`/api/download?version=${CURRENT_VERSION}`}
             className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

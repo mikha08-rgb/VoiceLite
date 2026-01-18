@@ -219,9 +219,9 @@ namespace VoiceLite
             // Show base model warning for non-English languages
             if (BaseModelWarningText != null)
             {
-                bool isBaseModel = settings.WhisperModel == "ggml-base.bin";
+                bool isSmallModel = settings.WhisperModel == "ggml-base.bin" || settings.WhisperModel == "ggml-tiny.bin";
                 bool isNonEnglish = languageCode != "en" && languageCode != "auto";
-                BaseModelWarningText.Visibility = (isBaseModel && isNonEnglish)
+                BaseModelWarningText.Visibility = (isSmallModel && isNonEnglish)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }

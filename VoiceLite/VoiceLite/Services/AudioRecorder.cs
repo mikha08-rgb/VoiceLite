@@ -731,18 +731,8 @@ namespace VoiceLite.Services
                 isDisposed = true;
 
                 // Dispose timer (already stopped above)
-                if (cleanupTimer != null)
-                {
-                    try
-                    {
-                        cleanupTimer.Dispose();
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        // Timer already disposed, ignore
-                    }
-                    cleanupTimer = null;
-                }
+                cleanupTimer.SafeDispose();
+                cleanupTimer = null;
 
                 // Stop recording if active
                 if (isRecording)
