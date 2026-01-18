@@ -89,28 +89,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Atomic claim using upsert - set processedAt immediately on create
-  // This ensures first processor wins and duplicates are rejected
+  // HIGH-5 FIX: Atomic idempotency check using INSERT-or-exists pattern
+  // The previous upsert approach had a race condition: two simultaneous requests
+  // would both create with identical timestamps and both pass the timestamp check.
+  // Now we use CREATE with unique constraint - only ONE request can succeed.
   const now = new Date();
-  const webhookEvent = await prisma.webhookEvent.upsert({
-    where: { eventId: event.id },
-    create: {
-      eventId: event.id,
-      seenAt: now,
-      processedAt: now,  // Set immediately on first insert
-    },
-    update: {
-      // Don't update - just return existing record
-    },
-  });
+  let isFirstProcessing = false;
 
-  // If timestamps match (within 1 second), this is first processing
-  // If they differ, another request already processed this event
-  const isFirstProcessing =
-    Math.abs(webhookEvent.seenAt.getTime() - webhookEvent.processedAt!.getTime()) < 1000;
+  try {
+    await prisma.webhookEvent.create({
+      data: {
+        eventId: event.id,
+        seenAt: now,
+        processedAt: now,
+      },
+    });
+    // INSERT succeeded - we're the first processor
+    isFirstProcessing = true;
+  } catch (error: any) {
+    // Check if this is a unique constraint violation (record already exists)
+    if (error?.code === 'P2002') {
+      // Record already exists - another request is processing or has processed this event
+      logger.info('Event already claimed, skipping', { eventId: event.id });
+      return NextResponse.json({ received: true, cached: true });
+    }
+    // Unexpected error - re-throw
+    throw error;
+  }
 
   if (!isFirstProcessing) {
-    logger.info('Event already processed, skipping', { eventId: event.id, processedAt: webhookEvent.processedAt?.toISOString() });
     return NextResponse.json({ received: true, cached: true });
   }
 

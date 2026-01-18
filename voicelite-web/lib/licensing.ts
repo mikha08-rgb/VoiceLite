@@ -131,38 +131,40 @@ export async function recordLicenseActivation({
   machineLabel?: string;
   machineHash?: string;
 }) {
-  // Check if this is an existing activation (re-validation)
-  const existing = await prisma.licenseActivation.findUnique({
-    where: {
-      licenseId_machineId: {
-        licenseId,
-        machineId,
-      },
-    },
-  });
-
-  if (existing) {
-    // Update existing activation
-    return prisma.licenseActivation.update({
+  // CRITICAL-4 FIX: Move ALL operations inside transaction to prevent race condition
+  // Previously, the findUnique was OUTSIDE the transaction, allowing this race:
+  // 1. Two requests for DIFFERENT machineIds both check findUnique → both get null
+  // 2. Both enter transaction → both see activeCount = 2 → both create
+  // 3. Result: 4 activations (exceeds 3-device limit)
+  return prisma.$transaction(async (tx) => {
+    // Check if this is an existing activation (re-validation) - NOW INSIDE TRANSACTION
+    const existing = await tx.licenseActivation.findUnique({
       where: {
         licenseId_machineId: {
           licenseId,
           machineId,
         },
       },
-      data: {
-        machineLabel,
-        machineHash,
-        lastValidatedAt: new Date(),
-        status: LicenseActivationStatus.ACTIVE,
-      },
     });
-  }
 
-  // MED-13 FIX: Use transaction for count+create to prevent race condition
-  // Without transaction, two simultaneous requests could both see count=2 and both create,
-  // resulting in 4 activations (exceeding 3-device limit)
-  return prisma.$transaction(async (tx) => {
+    if (existing) {
+      // Update existing activation - NOW INSIDE TRANSACTION
+      return tx.licenseActivation.update({
+        where: {
+          licenseId_machineId: {
+            licenseId,
+            machineId,
+          },
+        },
+        data: {
+          machineLabel,
+          machineHash,
+          lastValidatedAt: new Date(),
+          status: LicenseActivationStatus.ACTIVE,
+        },
+      });
+    }
+
     // New activation - check 3-device limit (inside transaction)
     const activeCount = await tx.licenseActivation.count({
       where: {

@@ -52,10 +52,12 @@ namespace VoiceLite.Services
         private int _activationCount = 0;
         private int _maxActivations = 3;
 
-        // PHASE 3 - DAY 1: Cached validation result (lifetime - no expiry)
-        // Licenses are $20 one-time payment with lifetime validity
-        // Once validated successfully, cache forever for offline use
+        // HIGH-9 FIX: Changed from lifetime cache to 30-day cache
+        // Revoked/expired licenses should stop working after cache expires
+        // 30 days provides good offline UX while still allowing revocation to take effect
         private LicenseValidationResult? _cachedValidationResult = null;
+        private DateTime? _cacheTimestamp = null;
+        private static readonly TimeSpan CacheExpiration = TimeSpan.FromDays(30);
 
         // THREAD-SAFETY FIX: Lock for cache access to prevent race conditions
         // Multiple concurrent ValidateLicenseAsync calls could corrupt cache without synchronization
@@ -65,8 +67,22 @@ namespace VoiceLite.Services
         {
             lock (_cacheLock)
             {
-                return (_cachedValidationResult != null && _storedLicenseKey == licenseKey.Trim())
-                    ? _cachedValidationResult : null;
+                // HIGH-9 FIX: Check cache expiration (30 days)
+                if (_cachedValidationResult == null || _storedLicenseKey != licenseKey.Trim())
+                {
+                    return null;
+                }
+
+                // Check if cache has expired
+                if (_cacheTimestamp.HasValue && DateTime.UtcNow - _cacheTimestamp.Value > CacheExpiration)
+                {
+                    ErrorLogger.LogMessage($"License cache expired (age: {DateTime.UtcNow - _cacheTimestamp.Value}), will re-validate");
+                    _cachedValidationResult = null;
+                    _cacheTimestamp = null;
+                    return null;
+                }
+
+                return _cachedValidationResult;
             }
         }
 
@@ -215,25 +231,36 @@ namespace VoiceLite.Services
                     ErrorMessage = result.Valid ? null : (result.Error ?? "Invalid or expired license key")
                 };
 
-                // Update activation counts from response
+                // Update activation counts and email from response
                 // HIGH-1 FIX: Use default values when JSON doesn't provide them
+                // HIGH-7 FIX: Extract email from response
                 if (result.Valid && result.License != null)
                 {
                     _activationCount = result.License.ActivationsUsed; // 0 is acceptable default
                     _maxActivations = result.License.MaxActivations > 0
                         ? result.License.MaxActivations
                         : 3; // Default to 3 activations if not provided
+                    _licenseEmail = result.License.Email; // HIGH-7 FIX: Store license email
                 }
 
-                // PHASE 3 - DAY 1: Cache successful validation result (forever - lifetime licenses)
+                // HIGH-9 FIX: Cache successful validation result with 30-day expiration
                 // THREAD-SAFETY FIX: Write cache under lock
                 if (result.Valid)
                 {
                     lock (_cacheLock)
                     {
                         _cachedValidationResult = validationResult;
+                        _cacheTimestamp = DateTime.UtcNow; // HIGH-9 FIX: Track cache timestamp for expiration
+                        // CRITICAL-2 FIX: Set _isLicenseValid to true on successful validation
+                        // Previously this was never set, causing IsLicenseValid to always return false
+                        _isLicenseValid = true;
+                        _storedLicenseKey = licenseKey.Trim();
                     }
-                    ErrorLogger.LogMessage($"License validation succeeded - cached permanently (lifetime license). Activations: {_activationCount}/{_maxActivations}");
+
+                    // CRITICAL-2 FIX: Raise LicenseStatusChanged event on successful validation
+                    LicenseStatusChanged?.Invoke(this, true);
+
+                    ErrorLogger.LogMessage($"License validation succeeded - cached for 30 days. Activations: {_activationCount}/{_maxActivations}");
                 }
 
                 return validationResult;
@@ -502,6 +529,7 @@ namespace VoiceLite.Services
         private class LicenseInfo
         {
             public string? Type { get; set; }
+            public string? Email { get; set; }  // HIGH-7 FIX: Added Email field
             public DateTime? ExpiresAt { get; set; }
             public int ActivationsUsed { get; set; }
             public int MaxActivations { get; set; }

@@ -65,10 +65,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up license in database
+    // HIGH-7 FIX: Include email in the select to return to desktop client
     const license = await prisma.license.findUnique({
       where: { licenseKey },
       select: {
         id: true,
+        email: true, // HIGH-7 FIX: Include email for desktop client
         status: true,
         type: true,
         expiresAt: true,
@@ -120,11 +122,13 @@ export async function POST(request: NextRequest) {
     }
 
     // License is valid!
+    // HIGH-7 FIX: Include email in response for desktop client to display
     return NextResponse.json({
       valid: true,
       tier: 'pro',
       license: {
         type: license.type,
+        email: license.email, // HIGH-7 FIX: Return email to desktop client
         expiresAt: license.expiresAt,
         activationsUsed: license.activations.length,
         maxActivations: 3,

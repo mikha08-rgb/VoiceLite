@@ -120,27 +120,41 @@ export const licenseValidationGlobalRateLimit = redis
 
 /**
  * Helper to check rate limit and return appropriate response
+ * CRITICAL-3 FIX: Changed from fail-open to fail-closed with in-memory fallback
+ *
  * @param identifier - User identifier (email, userId, etc.)
- * @param limiter - Rate limiter instance
+ * @param limiter - Rate limiter instance (Upstash)
+ * @param fallbackLimiter - In-memory fallback limiter (used when Upstash unavailable)
  * @returns { allowed: boolean, limit: number, remaining: number, reset: Date }
  */
 export async function checkRateLimit(
   identifier: string,
-  limiter: Ratelimit | null
+  limiter: Ratelimit | null,
+  fallbackLimiter?: InMemoryRateLimiter
 ): Promise<{
   allowed: boolean;
   limit: number;
   remaining: number;
   reset: Date;
 }> {
-  // If rate limiting not configured, allow through (fail-open)
-  // This is intentional - Upstash was disabled due to DNS timeout issues
+  // CRITICAL-3 FIX: If Upstash not configured, use in-memory fallback (fail-closed, not fail-open)
   if (!limiter) {
-    console.warn('Rate limiting not configured (Upstash disabled) - allowing request');
+    if (fallbackLimiter) {
+      console.warn('Rate limiting: Upstash not configured, using in-memory fallback');
+      const allowed = await fallbackLimiter.check(identifier);
+      return {
+        allowed,
+        limit: fallbackLimiter.maxRequests,
+        remaining: allowed ? fallbackLimiter.maxRequests - 1 : 0,
+        reset: new Date(Date.now() + fallbackLimiter.windowMs),
+      };
+    }
+    // No fallback provided - fail closed with stricter default limits
+    console.warn('Rate limiting: No Upstash or fallback configured, applying strict default limit');
     return {
-      allowed: true,
-      limit: 999,
-      remaining: 999,
+      allowed: false,
+      limit: 1,
+      remaining: 0,
       reset: new Date(Date.now() + 3600000),
     };
   }
@@ -155,13 +169,25 @@ export async function checkRateLimit(
       reset: new Date(reset),
     };
   } catch (error) {
-    // Graceful degradation: if Redis is unreachable, allow request through
-    // This prevents rate limiting infrastructure failures from blocking all users
-    console.error('Rate limiting failed (Redis unreachable), allowing request:', error);
+    // CRITICAL-3 FIX: If Redis fails, use fallback limiter instead of allowing through
+    console.error('Rate limiting failed (Redis unreachable), using fallback:', error);
+
+    if (fallbackLimiter) {
+      const allowed = await fallbackLimiter.check(identifier);
+      return {
+        allowed,
+        limit: fallbackLimiter.maxRequests,
+        remaining: allowed ? fallbackLimiter.maxRequests - 1 : 0,
+        reset: new Date(Date.now() + fallbackLimiter.windowMs),
+      };
+    }
+
+    // No fallback - fail closed
+    console.error('No fallback limiter available, blocking request');
     return {
-      allowed: true,
-      limit: 999,
-      remaining: 999,
+      allowed: false,
+      limit: 1,
+      remaining: 0,
       reset: new Date(Date.now() + 3600000),
     };
   }
@@ -170,11 +196,17 @@ export async function checkRateLimit(
 /**
  * In-memory fallback rate limiter (not recommended for production with multiple instances)
  * Used as fallback when Upstash is not configured
+ * CRITICAL-3 FIX: Made properties public for access in checkRateLimit
  */
-class InMemoryRateLimiter {
+export class InMemoryRateLimiter {
   private requests: Map<string, { count: number; resetAt: number }> = new Map();
+  public readonly maxRequests: number;
+  public readonly windowMs: number;
 
-  constructor(private maxRequests: number, private windowMs: number) {}
+  constructor(maxRequests: number, windowMs: number) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+  }
 
   async check(identifier: string): Promise<boolean> {
     const now = Date.now();
@@ -213,6 +245,12 @@ export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
 
+// CRITICAL-3 FIX: Add fallback limiters for license validation (stricter limits when Redis unavailable)
+export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour per IP
+export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour per key
+export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(500, 60 * 60 * 1000); // 500/hour global (stricter)
+export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
+
 // Cleanup fallback limiters every 10 minutes
 if (!isConfigured) {
   setInterval(() => {
@@ -220,5 +258,9 @@ if (!isConfigured) {
     fallbackOtpLimit.cleanup();
     fallbackLicenseLimit.cleanup();
     fallbackEmailResendLimit.cleanup();
+    fallbackLicenseValidationIpLimit.cleanup();
+    fallbackLicenseValidationKeyLimit.cleanup();
+    fallbackLicenseValidationGlobalLimit.cleanup();
+    fallbackProfileLimit.cleanup();
   }, 10 * 60 * 1000);
 }

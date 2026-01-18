@@ -455,6 +455,10 @@ namespace VoiceLite
                     // Save settings immediately
                     saveSettingsCallback?.Invoke();
 
+                    // SECURITY FIX (CRITICAL-1): Save license key to DPAPI-encrypted storage
+                    // Previously only saved to plaintext settings.json, now also encrypts to license.dat
+                    licenseService?.SaveLicenseKey(key);
+
                     // Update UI
                     LoadLicenseStatus();
 
