@@ -41,9 +41,10 @@ VoiceLite takes security seriously:
 - ✅ **No Cloud**: All processing happens locally
 
 ### Data Storage
-- Settings stored in `%APPDATA%\VoiceLite\settings.json`
-- No sensitive data in settings file
-- Pro license stored locally, validated against server
+- Settings stored in `%LOCALAPPDATA%\VoiceLite\settings.json` (NOT %APPDATA% - privacy fix, no cloud sync)
+- License stored encrypted in `%LOCALAPPDATA%\VoiceLite\license.dat` (DPAPI, `key|email` format)
+- Machine ID stored in `%LOCALAPPDATA%\VoiceLite\machine_id.dat` (DPAPI encrypted fallback for VMs)
+- Pro license validated against server with 3-device limit
 
 ### Known Security Considerations
 

@@ -75,6 +75,19 @@ VoiceLite is a **Windows desktop speech-to-text app** built with:
 │  │  Hotkey    │  │   License    │  │  History   │         │
 │  │  Manager   │  │   Service    │  │  Service   │         │
 │  └────────────┘  └──────────────┘  └────────────┘         │
+│                                                              │
+│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
+│  │ CustomShort│  │ModelResolver │  │ TextPost   │         │
+│  │ cutService │  │  Service     │  │ Processor  │         │
+│  └────────────┘  └──────────────┘  └────────────┘         │
+│                                                              │
+│  ┌─────────────────────────────────────────────┐           │
+│  │          Audio Preprocessing Pipeline         │           │
+│  │  ┌────────────┐ ┌──────────┐ ┌──────────┐   │           │
+│  │  │HighPassFilt│ │NoiseGate │ │AutoGain  │   │           │
+│  │  │(80Hz cutoff│ │(reduction│ │(normalize│   │           │
+│  │  └────────────┘ └──────────┘ └──────────┘   │           │
+│  └─────────────────────────────────────────────┘           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -121,9 +134,12 @@ VoiceLite/
 │           └── IHotkeyManager.cs       # Global hotkeys
 │
 ├── Presentation/                       # MVVM UI layer
-│   └── ViewModels/
-│       ├── MainViewModel.cs            # Main window logic
-│       └── SettingsViewModel.cs        # Settings window logic
+│   ├── ViewModels/
+│   │   ├── MainViewModel.cs            # Main window logic
+│   │   └── SettingsViewModel.cs        # Settings window logic
+│   └── Commands/
+│       ├── RelayCommand.cs             # ICommand implementation
+│       └── AsyncRelayCommand.cs        # Async ICommand implementation
 │
 ├── Services/                           # Service implementations
 │   ├── AudioRecorder.cs                # NAudio wrapper
@@ -134,10 +150,22 @@ VoiceLite/
 │   ├── ProFeatureService.cs            # Feature gating logic
 │   ├── TranscriptionHistoryService.cs  # History management
 │   ├── SystemTrayManager.cs            # Tray icon + menu
-│   ├── ErrorLogger.cs                  # Centralized logging
-│   └── SettingsService.cs              # Settings persistence
+│   ├── ErrorLoggerService.cs           # Centralized logging (IErrorLogger)
+│   ├── SettingsService.cs              # Settings persistence
+│   ├── CustomShortcutService.cs        # Text shortcut expansion
+│   ├── ModelResolverService.cs         # Model path + SHA256 validation
+│   ├── TextPostProcessor.cs            # Punctuation/capitalization
+│   ├── HardwareIdService.cs            # Machine ID for device activation
+│   │
+│   └── Audio/                          # Audio preprocessing pipeline
+│       ├── AudioPreprocessor.cs        # Main orchestrator
+│       ├── HighPassFilter.cs           # 80Hz rumble removal
+│       ├── SimpleNoiseGate.cs          # Background noise reduction
+│       └── AutomaticGainControl.cs     # Volume normalization
 │
 ├── Infrastructure/                     # Cross-cutting concerns
+│   ├── DependencyInjection/
+│   │   └── ServiceConfiguration.cs     # DI extension methods
 │   └── Resilience/
 │       └── RetryPolicies.cs            # Polly retry logic
 │
@@ -166,7 +194,9 @@ VoiceLite/
 
 ### DI Container Initialization
 
-**File**: `App.xaml.cs`
+DI is configured via extension methods in `Infrastructure/DependencyInjection/ServiceConfiguration.cs`:
+
+**File**: `App.xaml.cs` (simplified)
 
 ```csharp
 public partial class App : Application
@@ -177,47 +207,59 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Build DI container
+        // Build DI container using extension methods
         var services = new ServiceCollection();
-        ConfigureServices(services);
+        services.AddVoiceLiteServices();      // Core + Feature services
+        services.AddInfrastructureServices(); // Infrastructure services
+        services.ConfigureOptions();          // Service options
         _serviceProvider = services.BuildServiceProvider();
 
-        // Get main window from DI and show
         var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
-    }
-
-    private void ConfigureServices(IServiceCollection services)
-    {
-        // Register Settings (Singleton - shared across app)
-        services.AddSingleton<Settings>();
-
-        // Register Services (Singletons - one instance per app)
-        services.AddSingleton<IAudioRecorder, AudioRecorder>();
-        services.AddSingleton<IWhisperService, PersistentWhisperService>();
-        services.AddSingleton<ITextInjector, TextInjector>();
-        services.AddSingleton<IHotkeyManager, HotkeyManager>();
-        services.AddSingleton<ILicenseService, LicenseService>();
-        services.AddSingleton<IProFeatureService, ProFeatureService>();
-        services.AddSingleton<TranscriptionHistoryService>();
-        services.AddSingleton<SystemTrayManager>();
-
-        // Register Controllers (Transients - new instance per request)
-        services.AddTransient<IRecordingController, RecordingController>();
-        services.AddTransient<ITranscriptionController, TranscriptionController>();
-
-        // Register ViewModels (Transients)
-        services.AddTransient<MainViewModel>();
-        services.AddTransient<SettingsViewModel>();
-
-        // Register Windows (Transients)
-        services.AddTransient<MainWindow>();
-        services.AddTransient<SettingsWindowNew>();
     }
 }
 ```
 
-### Why Singleton vs Transient?
+**File**: `Infrastructure/DependencyInjection/ServiceConfiguration.cs` (actual registrations)
+
+```csharp
+public static IServiceCollection AddVoiceLiteServices(this IServiceCollection services)
+{
+    // Register Settings (Singleton - loaded once)
+    services.AddSingleton(provider => Settings.Load());
+
+    // Core Services (Singleton - single instance for app lifetime)
+    services.AddSingleton<IAudioRecorder, AudioRecorder>();
+    services.AddSingleton<IWhisperService, PersistentWhisperService>();
+    services.AddSingleton<ITextInjector, TextInjector>();
+    services.AddSingleton<IErrorLogger, ErrorLoggerService>();
+    services.AddSingleton<IHotkeyManager, HotkeyManager>();
+    services.AddSingleton<ISystemTrayManager, SystemTrayManager>();
+
+    // Feature Services (Singleton - state is maintained)
+    services.AddSingleton<ILicenseService, LicenseService>();
+    services.AddSingleton<IProFeatureService, ProFeatureService>();
+    services.AddSingleton<ITranscriptionHistoryService, TranscriptionHistoryService>();
+    services.AddSingleton<ICustomShortcutService, CustomShortcutService>();
+    services.AddSingleton<ISettingsService, SettingsService>();
+
+    // Controllers (Scoped - new instance per request/window)
+    services.AddScoped<IRecordingController, RecordingController>();
+    services.AddScoped<ITranscriptionController, TranscriptionController>();
+
+    // ViewModels (Transient - new instance every time)
+    services.AddTransient<MainViewModel>();
+    services.AddTransient<SettingsViewModel>();
+
+    // Windows (Transient - new instance for each window)
+    services.AddTransient<MainWindow>();
+    services.AddTransient<SettingsWindowNew>();
+
+    return services;
+}
+```
+
+### Why Singleton vs Scoped vs Transient?
 
 **Singletons** (One instance for entire app lifetime):
 - `Settings` - Shared configuration
@@ -225,9 +267,13 @@ public partial class App : Application
 - `WhisperService` - Process management requires single instance
 - `HotkeyManager` - Global hotkeys registered once
 - `LicenseService` - Caches validation result
+- `CustomShortcutService` - Processes text shortcuts
+- `ErrorLoggerService` - Centralized logging
+
+**Scoped** (New instance per request/window):
+- `Controllers` - Orchestration with per-request state
 
 **Transients** (New instance each time):
-- `Controllers` - Stateless orchestration
 - `ViewModels` - Per-window state
 - `Windows` - New window instance each time
 
@@ -294,9 +340,90 @@ void InjectText(string text, InjectionMode mode);
 
 **Security**: Detects password fields, avoids logging
 
+**Thread Safety**: Uses `volatile bool _disposed` for cross-thread disposal visibility
+
 ---
 
-### 4. RecordingController (Controller)
+### 4. CustomShortcutService (Service)
+
+**Purpose**: Expand text shortcuts in transcribed text
+**Tech**: Regex-based whole-word replacement
+**Location**: `Services/CustomShortcutService.cs`
+
+**Key Methods**:
+```csharp
+string ProcessShortcuts(string text);  // Replace trigger phrases with expansions
+```
+
+**Features**:
+- Case-insensitive whole-word matching using `\b` word boundaries
+- 100ms regex timeout to prevent catastrophic backtracking
+- Thread-safe settings access via `lock (_settings.SyncRoot)`
+
+---
+
+### 5. ModelResolverService (Service)
+
+**Purpose**: Resolve Whisper model and executable paths
+**Tech**: SHA256 hash validation for integrity
+**Location**: `Services/ModelResolverService.cs`
+
+**Key Methods**:
+```csharp
+string ResolveWhisperExePath();                     // Find whisper.exe
+string ResolveModelPath(string modelName);          // Find model file
+bool ValidateWhisperExecutable(string path);        // SHA256 validation
+```
+
+**Security** (MODEL-GATE-001):
+- Validates whisper.exe SHA256 hash before execution
+- Fails closed on hash mismatch (throws `SecurityException`)
+- Validates Pro license before returning Pro models
+
+---
+
+### 6. Audio Preprocessing Pipeline (Services/Audio/)
+
+**Purpose**: Clean audio before transcription
+**Location**: `Services/Audio/`
+
+**Pipeline** (orchestrated by `AudioPreprocessor.cs`):
+```
+Raw Audio → HighPassFilter → SimpleNoiseGate → AutomaticGainControl → Clean Audio
+                (80Hz)        (background)       (normalize)
+```
+
+**Components**:
+
+| Component | Purpose | Key Parameter |
+|-----------|---------|---------------|
+| `HighPassFilter` | Remove low-frequency rumble | 80Hz cutoff |
+| `SimpleNoiseGate` | Reduce background noise | Threshold-based |
+| `AutomaticGainControl` | Normalize volume levels | Target RMS |
+
+---
+
+### 7. HardwareIdService (Static Service)
+
+**Purpose**: Generate unique machine identifiers for device activation
+**Tech**: WMI queries + SHA256 hashing
+**Location**: `Services/HardwareIdService.cs`
+
+**Key Methods**:
+```csharp
+static string GetMachineId();     // CPU ID + Motherboard Serial hash
+static string GetMachineLabel();  // Computer name
+static string GetMachineHash();   // Full hardware hash
+```
+
+**Fallback Strategy**:
+1. Try WMI for CPU ID + Motherboard Serial
+2. If WMI fails, use Computer Name + User Domain
+3. Last resort: Persistent GUID in `%LOCALAPPDATA%\VoiceLite\machine_id.dat` (DPAPI encrypted)
+
+---
+
+### 8. RecordingController (Controller)
 
 **Purpose**: Orchestrate recording → transcription → injection workflow
 **Location**: `Core/Controllers/RecordingController.cs`
@@ -329,7 +456,7 @@ User presses hotkey
 
 ---
 
-### 5. LicenseService + ProFeatureService (Services)
+### 9. LicenseService + ProFeatureService (Services)
 
 **Purpose**: Validate licenses & gate Pro features
 **Location**: `Services/LicenseService.cs`, `Services/ProFeatureService.cs`
@@ -338,11 +465,15 @@ User presses hotkey
 - Validates license keys via `POST https://voicelite.app/api/licenses/validate`
 - Caches result locally (lifetime cache - $20 lifetime license)
 - Retry logic: 3 attempts with exponential backoff (Polly)
+- DPAPI encrypted storage at `%LOCALAPPDATA%\VoiceLite\license.dat`
+- Stores `key|email` format for tamper detection
+- Thread-safe cache access via `_cacheLock` object
 
 **ProFeatureService**:
 - Checks `Settings.IsProLicense` flag
 - Controls UI visibility (`AIModelsTabVisibility`, etc.)
-- Restricts model selection (Tiny for free, all 5 for Pro)
+- Restricts model selection (Base for free, all 5 for Pro)
+- Thread-safe: Uses `ReaderWriterLockSlim` for concurrent property reads
 
 **Adding Pro Feature** (3 steps):
 ```csharp
@@ -353,6 +484,37 @@ public Visibility NewFeatureVisibility => IsProUser ? Visible : Collapsed;
 <TabItem Visibility="{Binding NewFeatureVisibility}" />
 
 // 3. Done!
+```
+
+---
+
+## Thread Safety Patterns
+
+The following thread-safety patterns are used throughout the codebase:
+
+### ProFeatureService
+Uses `ReaderWriterLockSlim` to allow concurrent reads while ensuring exclusive access during `RefreshProStatus()`:
+```csharp
+private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
+```
+
+### TextInjector
+Uses `volatile` disposal flag for cross-thread visibility:
+```csharp
+private volatile bool _disposed = false;
+```
+
+### LicenseService
+Uses lock object for thread-safe cache access:
+```csharp
+private readonly object _cacheLock = new object();
+lock (_cacheLock) { /* cache operations */ }
+```
+
+### CustomShortcutService
+Uses lock on Settings.SyncRoot for thread-safe settings access:
+```csharp
+lock (_settings.SyncRoot) { /* process shortcuts */ }
 ```
 
 ---

@@ -28,15 +28,17 @@ cd voicelite-web && npm run dev
 
 **Why static HttpClient in LicenseService**: Single API endpoint (voicelite.app). Prevents socket exhaustion. Intentionally NOT disposed.
 
-**Why DPAPI for license storage**: Windows-native encryption, tied to user account. `%LOCALAPPDATA%\VoiceLite\license.dat`. Auto-migrates from plaintext settings.json.
+**Why DPAPI for license storage**: Windows-native encryption, tied to user account. `%LOCALAPPDATA%\VoiceLite\license.dat`. Auto-migrates from plaintext settings.json. Stores `key|email` format for tamper detection via `VerifyLicenseKeyMatchesStorage()`.
 
 **Why Q8_0 quantization**: 45% smaller models, 30-40% faster inference, 99.98% identical accuracy. large-v3 still F16 (no upstream Q8).
 
 ## Critical Paths
 
-**Recording flow**: `MainWindow` → `AudioRecorder.StartRecording()` → 16kHz mono WAV → `PersistentWhisperService.TranscribeAsync()` → `TextInjector.InjectText()`
+**Recording flow**: `MainWindow` → `RecordingController` → `AudioRecorder.StartRecording()` → 16kHz mono WAV → `PersistentWhisperService.TranscribeAsync()` → `CustomShortcutService.ProcessShortcuts()` → `TextPostProcessor` → `TextInjector.InjectText()`
 
-**License validation**: Desktop calls `/api/licenses/validate` → Prisma lookup → device activation (3-device limit) → DPAPI-cached locally
+**License validation**: Desktop calls `/api/licenses/validate` → Prisma lookup → device activation (3-device limit) → DPAPI-cached locally as `key|email` format
+
+**Model resolution**: `PersistentWhisperService` → `ModelResolverService.ResolveModelPath()` → Pro license check → SHA256 validation → path returned
 
 ## Gotchas & Past Failures
 
@@ -45,6 +47,10 @@ cd voicelite-web && npm run dev
 - **Process disposal timeout**: Whisper processes can zombie. `PersistentWhisperService` has 2-second disposal timeout + taskkill fallback.
 - **Semaphore tracking**: `TranscribeAsync()` tracks `semaphoreAcquired` bool to prevent `SemaphoreFullException` on cancellation.
 - **TextInjector window capture**: Captures foreground window at start of transcription, not at injection time. Long transcriptions may redirect to wrong window.
+- **Regex timeout in shortcuts**: `CustomShortcutService` uses 100ms timeout to prevent catastrophic backtracking on malicious patterns.
+- **Hardware ID fallback**: `HardwareIdService` gracefully falls back if WMI fails (VM/headless systems) to persistent GUID.
+- **Model validation (MODEL-GATE-001)**: `ModelResolverService` validates whisper.exe SHA256 hash before execution. Fails closed on mismatch.
+- **License tamper detection**: `VerifyLicenseKeyMatchesStorage()` validates both key AND email from `key|email` storage format.
 
 ## Patterns to Follow
 
@@ -71,8 +77,11 @@ recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
 | Path | Purpose |
 |------|---------|
 | `VoiceLite/VoiceLite/Services/` | Core services (AudioRecorder, PersistentWhisperService, TextInjector, etc.) |
+| `VoiceLite/VoiceLite/Services/Audio/` | Audio preprocessing pipeline (HighPassFilter, NoiseGate, AGC) |
 | `VoiceLite/VoiceLite/Core/Interfaces/` | Service interfaces (IWhisperService, IAudioRecorder, etc.) |
-| `VoiceLite/VoiceLite/Presentation/ViewModels/` | MVVM ViewModels (in-progress extraction) |
+| `VoiceLite/VoiceLite/Infrastructure/DependencyInjection/` | DI configuration (ServiceConfiguration.cs) |
+| `VoiceLite/VoiceLite/Presentation/ViewModels/` | MVVM ViewModels |
+| `VoiceLite/VoiceLite/Presentation/Commands/` | RelayCommand, AsyncRelayCommand implementations |
 | `VoiceLite/VoiceLite/Models/` | Settings, WhisperModelInfo, TranscriptionPreset |
 | `VoiceLite/whisper/` | whisper.exe + models (ggml-base.bin bundled) |
 | `voicelite-web/app/api/` | Next.js API routes (licenses, checkout, feedback) |
