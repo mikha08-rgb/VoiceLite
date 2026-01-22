@@ -91,7 +91,7 @@ namespace VoiceLite.Models
         private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
         private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "ggml-base.bin"; // FREE TIER DEFAULT: Base model (85-90% accuracy, fast enough for real-time)
+        private string _whisperModel = "ggml-base.bin"; // DEFAULT: Base model (free tier restricted to tiny model only)
         private double _whisperTimeoutMultiplier = 2.0;
         private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced; // Default to balanced for good speed/accuracy tradeoff
         private bool _enableVAD = true; // TUNED: VAD with conservative parameters (80ms min speech, 500ms min silence, 200ms padding)

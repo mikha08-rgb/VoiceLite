@@ -71,6 +71,11 @@ model LicenseEvent {
   @@index([type], map: "idx_licenseevent_type")
 }
 
+// WebhookEvent stores Stripe webhook event IDs for idempotency (prevents duplicate processing).
+// CLEANUP POLICY: This table grows indefinitely (~1 row per Stripe event). For production use
+// at scale, consider adding a scheduled job to delete events older than 90 days, or use
+// Supabase's pg_cron extension. Current growth rate (~100 events/month at typical volume)
+// is acceptable for years without cleanup.
 model WebhookEvent {
   eventId     String   @id
   seenAt      DateTime @default(now())

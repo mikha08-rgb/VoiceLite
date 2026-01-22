@@ -68,7 +68,7 @@ namespace VoiceLite.Services
         {
             lock (_cacheLock)
             {
-                // HIGH-9 FIX: Check cache expiration (30 days)
+                // HIGH-9 FIX: Check cache expiration (14 days)
                 if (_cachedValidationResult == null || _storedLicenseKey != licenseKey.Trim())
                 {
                     return null;
@@ -313,7 +313,7 @@ namespace VoiceLite.Services
                     ErrorMessage = result.Valid ? null : (result.Error ?? "Invalid or expired license key")
                 };
 
-                // HIGH-9 FIX: Cache successful validation result with 30-day expiration
+                // HIGH-9 FIX: Cache successful validation result with 14-day expiration
                 // THREAD-SAFETY FIX: Write cache and ALL state fields under lock
                 // MED-2 FIX: Extended lock coverage to include _activationCount, _maxActivations, _licenseEmail
                 // Previously these were updated outside the lock, causing race conditions

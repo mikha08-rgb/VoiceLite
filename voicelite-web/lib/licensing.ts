@@ -19,7 +19,9 @@ export function mapStripeSubscriptionStatus(status: string): LicenseStatus {
     case 'past_due':
       return LicenseStatus.EXPIRED;
     default:
-      return LicenseStatus.ACTIVE;
+      // Fail-closed: unknown statuses default to EXPIRED for security
+      // If Stripe adds new status types, licenses won't be granted by default
+      return LicenseStatus.EXPIRED;
   }
 }
 
