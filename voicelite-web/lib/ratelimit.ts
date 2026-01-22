@@ -87,14 +87,14 @@ export const emailResendRateLimit = redis
 
 /**
  * License validation multi-layer rate limiting (prevents brute force attacks)
- * Layer 1: IP-based (3/hour per IP)
- * Layer 2: License key-based (10/hour per key)
+ * Layer 1: IP-based (30/hour per IP) - allows retries for typos, NAT/VPN users
+ * Layer 2: License key-based (30/hour per key)
  * Layer 3: Global (1000/hour across all requests)
  */
 export const licenseValidationIpRateLimit = redis
   ? new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(3, '1 h'),
+      limiter: Ratelimit.slidingWindow(30, '1 h'),
       analytics: true,
       prefix: 'ratelimit:license-validation:ip',
     })
@@ -103,7 +103,7 @@ export const licenseValidationIpRateLimit = redis
 export const licenseValidationKeyRateLimit = redis
   ? new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      limiter: Ratelimit.slidingWindow(30, '1 h'),
       analytics: true,
       prefix: 'ratelimit:license-validation:key',
     })
@@ -245,11 +245,10 @@ export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
 
-// CRITICAL-3 FIX: Add fallback limiters for license validation (stricter limits when Redis unavailable)
-export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour per IP
-export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour per key
-// HIGH-8 FIX: Reduced from 500/hour to 100/hour to prevent brute force during Redis outages
-export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour global (strict)
+// Fallback limiters for license validation (matches Redis limits for consistency)
+export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(30, 60 * 60 * 1000); // 30/hour per IP
+export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(30, 60 * 60 * 1000); // 30/hour per key
+export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(1000, 60 * 60 * 1000); // 1000/hour global
 export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 // Cleanup fallback limiters every 10 minutes
