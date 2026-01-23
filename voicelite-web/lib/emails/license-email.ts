@@ -31,6 +31,28 @@ export interface LicenseEmailResult {
   success: boolean;
   messageId?: string;
   error?: unknown;
+  attempts?: number;
+}
+
+/**
+ * Retry configuration for email sending
+ * Uses exponential backoff: 1s, 2s, 4s delays between attempts
+ */
+const RETRY_CONFIG = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+};
+
+/**
+ * Delay helper with exponential backoff
+ */
+async function delay(attempt: number): Promise<void> {
+  const delayMs = Math.min(
+    RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
+    RETRY_CONFIG.maxDelayMs
+  );
+  return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
 export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
@@ -141,30 +163,57 @@ Need help? Just reply to this email.
 – The VoiceLite Team
 `.trim();
 
-  try {
-    console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
-    const resend = getResendClient();
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: email,
-      subject: 'Your VoiceLite Pro License Key',
-      html,
-      text,
-    });
+  // HIGH-1 FIX: Retry with exponential backoff (3 attempts)
+  // Previously relied on Stripe webhook retries which is unreliable
+  let lastError: unknown;
 
-    console.log(`✅ Resend API response:`, {
-      success: true,
-      messageId: result.data?.id,
-      email: email
-    });
+  for (let attempt = 0; attempt < RETRY_CONFIG.maxAttempts; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`📧 Resend API: Retry attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} for ${email}`);
+        await delay(attempt - 1); // Exponential backoff before retry
+      } else {
+        console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
+      }
 
-    return { success: true, messageId: result.data?.id };
-  } catch (error) {
-    console.error('❌ Failed to send license email:', {
-      email,
-      error: error instanceof Error ? error.message : String(error),
-      errorDetails: error,
-    });
-    return { success: false, error };
+      const resend = getResendClient();
+      const result = await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        subject: 'Your VoiceLite Pro License Key',
+        html,
+        text,
+      });
+
+      console.log(`✅ Resend API response:`, {
+        success: true,
+        messageId: result.data?.id,
+        email: email,
+        attempt: attempt + 1,
+      });
+
+      return { success: true, messageId: result.data?.id, attempts: attempt + 1 };
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Email attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} failed:`, {
+        email,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Don't retry on configuration errors (API key issues)
+      if (error instanceof Error && error.message.includes('RESEND_API_KEY')) {
+        console.error('Configuration error - not retrying');
+        break;
+      }
+    }
   }
+
+  // All retries exhausted
+  console.error('❌ Failed to send license email after all retries:', {
+    email,
+    attempts: RETRY_CONFIG.maxAttempts,
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+    errorDetails: lastError,
+  });
+  return { success: false, error: lastError, attempts: RETRY_CONFIG.maxAttempts };
 }

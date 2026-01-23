@@ -7,7 +7,7 @@ import { checkRateLimit,
   licenseValidationKeyRateLimit,
   licenseValidationGlobalRateLimit
 } from '@/lib/ratelimit';
-import { recordLicenseActivation } from '@/lib/licensing';
+import { recordLicenseActivation, recordLicenseEvent } from '@/lib/licensing';
 import { logger } from '@/lib/logger';
 
 const bodySchema = z.object({
@@ -97,6 +97,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // MED-6 FIX: Track activation count AFTER recording (not from initial query)
+    // Previously returned stale count showing "2/3" when actually "3/3"
+    let activationsUsed = license.activations.length;
+
     // If machineId provided, record activation (enforces 3-device limit)
     if (machineId) {
       try {
@@ -106,9 +110,37 @@ export async function POST(request: NextRequest) {
           machineLabel,
           machineHash,
         });
+
+        // MED-6 FIX: Query fresh activation count AFTER recording
+        // This ensures the UI shows accurate "X/3 devices" count
+        const freshCount = await prisma.licenseActivation.count({
+          where: {
+            licenseId: license.id,
+            status: 'ACTIVE',
+          },
+        });
+        activationsUsed = freshCount;
       } catch (error: any) {
         // Check if it's the activation limit error
         if (error.message && error.message.startsWith('ACTIVATION_LIMIT_REACHED')) {
+          // MED-5 FIX: Audit log activation limit failures for abuse tracking
+          // This allows monitoring for patterns like repeated limit hits from different IPs
+          await recordLicenseEvent(license.id, 'activation_limit_reached', {
+            machineId,
+            machineLabel,
+            ip,
+            timestamp: new Date().toISOString(),
+          }).catch(logError => {
+            // Don't fail the request if audit logging fails
+            logger.warn('Failed to record activation limit event', { error: logError });
+          });
+
+          logger.warn('Activation limit reached', {
+            licenseId: license.id,
+            machineId,
+            ip,
+          });
+
           return NextResponse.json({
             valid: false,
             tier: 'free',
@@ -130,7 +162,7 @@ export async function POST(request: NextRequest) {
         type: license.type,
         email: license.email, // HIGH-7 FIX: Return email to desktop client
         expiresAt: license.expiresAt,
-        activationsUsed: license.activations.length,
+        activationsUsed, // MED-6 FIX: Use fresh count from after activation recording
         maxActivations: 3,
       },
     });

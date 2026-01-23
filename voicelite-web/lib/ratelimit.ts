@@ -194,12 +194,43 @@ export async function checkRateLimit(
 }
 
 /**
+ * Simple async lock for preventing race conditions in concurrent access
+ * HIGH-2 FIX: Added to prevent rate limit bypass when multiple requests arrive simultaneously
+ */
+class AsyncLock {
+  private locked = false;
+  private waitQueue: (() => void)[] = [];
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+
+    return new Promise<void>(resolve => {
+      this.waitQueue.push(resolve);
+    });
+  }
+
+  release(): void {
+    const next = this.waitQueue.shift();
+    if (next) {
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+/**
  * In-memory fallback rate limiter (not recommended for production with multiple instances)
  * Used as fallback when Upstash is not configured
  * CRITICAL-3 FIX: Made properties public for access in checkRateLimit
+ * HIGH-2 FIX: Added async lock for thread-safe access in concurrent requests
  */
 export class InMemoryRateLimiter {
   private requests: Map<string, { count: number; resetAt: number }> = new Map();
+  private lock = new AsyncLock();
   public readonly maxRequests: number;
   public readonly windowMs: number;
 
@@ -209,32 +240,46 @@ export class InMemoryRateLimiter {
   }
 
   async check(identifier: string): Promise<boolean> {
-    const now = Date.now();
-    const record = this.requests.get(identifier);
+    // HIGH-2 FIX: Acquire lock to prevent race conditions
+    // Without this, concurrent requests could both read count=2, both pass,
+    // and both increment to count=3, bypassing the limit
+    await this.lock.acquire();
 
-    if (!record || now > record.resetAt) {
-      this.requests.set(identifier, {
-        count: 1,
-        resetAt: now + this.windowMs,
-      });
+    try {
+      const now = Date.now();
+      const record = this.requests.get(identifier);
+
+      if (!record || now > record.resetAt) {
+        this.requests.set(identifier, {
+          count: 1,
+          resetAt: now + this.windowMs,
+        });
+        return true;
+      }
+
+      if (record.count >= this.maxRequests) {
+        return false;
+      }
+
+      record.count++;
       return true;
+    } finally {
+      this.lock.release();
     }
-
-    if (record.count >= this.maxRequests) {
-      return false;
-    }
-
-    record.count++;
-    return true;
   }
 
   // Cleanup old entries periodically
-  cleanup() {
-    const now = Date.now();
-    for (const [key, record] of this.requests.entries()) {
-      if (now > record.resetAt) {
-        this.requests.delete(key);
+  async cleanup(): Promise<void> {
+    await this.lock.acquire();
+    try {
+      const now = Date.now();
+      for (const [key, record] of this.requests.entries()) {
+        if (now > record.resetAt) {
+          this.requests.delete(key);
+        }
       }
+    } finally {
+      this.lock.release();
     }
   }
 }
@@ -252,15 +297,18 @@ export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(1000
 export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 // Cleanup fallback limiters every 10 minutes
+// HIGH-2 FIX: Updated to use async cleanup methods
 if (!isConfigured) {
-  setInterval(() => {
-    fallbackEmailLimit.cleanup();
-    fallbackOtpLimit.cleanup();
-    fallbackLicenseLimit.cleanup();
-    fallbackEmailResendLimit.cleanup();
-    fallbackLicenseValidationIpLimit.cleanup();
-    fallbackLicenseValidationKeyLimit.cleanup();
-    fallbackLicenseValidationGlobalLimit.cleanup();
-    fallbackProfileLimit.cleanup();
+  setInterval(async () => {
+    await Promise.all([
+      fallbackEmailLimit.cleanup(),
+      fallbackOtpLimit.cleanup(),
+      fallbackLicenseLimit.cleanup(),
+      fallbackEmailResendLimit.cleanup(),
+      fallbackLicenseValidationIpLimit.cleanup(),
+      fallbackLicenseValidationKeyLimit.cleanup(),
+      fallbackLicenseValidationGlobalLimit.cleanup(),
+      fallbackProfileLimit.cleanup(),
+    ]);
   }, 10 * 60 * 1000);
 }
