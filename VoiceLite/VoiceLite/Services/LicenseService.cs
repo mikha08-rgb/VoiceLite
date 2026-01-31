@@ -284,6 +284,22 @@ namespace VoiceLite.Services
                         };
                     }
 
+                    // 429 = Rate limited - parse actual error message from response
+                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        var errorBody = await response.Content.ReadAsStringAsync();
+                        var errorResult = JsonSerializer.Deserialize<ValidationResponse>(errorBody, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                        return new LicenseValidationResult
+                        {
+                            IsValid = false,
+                            ErrorMessage = errorResult?.Error ?? "Too many validation attempts. Please wait a few minutes and try again."
+                        };
+                    }
+
                     return new LicenseValidationResult
                     {
                         IsValid = false,

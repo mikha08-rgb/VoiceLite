@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ipAddress } from '@vercel/edge';
 import { prisma } from '@/lib/prisma';
-import { checkRateLimit,
+import {
+  checkRateLimit,
   licenseValidationIpRateLimit,
   licenseValidationKeyRateLimit,
-  licenseValidationGlobalRateLimit
+  licenseValidationGlobalRateLimit,
+  fallbackLicenseValidationIpLimit,
+  fallbackLicenseValidationKeyLimit,
+  fallbackLicenseValidationGlobalLimit,
+  isUpstashConfigured
 } from '@/lib/ratelimit';
 import { recordLicenseActivation, recordLicenseEvent } from '@/lib/licensing';
 import { logger } from '@/lib/logger';
@@ -47,21 +52,28 @@ export async function POST(request: NextRequest) {
     // HIGH-1 FIX: Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
     const ip = ipAddress(request) || 'unknown';
 
-    // Check all three rate limiters (IP, license key, global)
-    const ipRateLimit = await checkRateLimit(ip, licenseValidationIpRateLimit);
-    const keyRateLimit = await checkRateLimit(licenseKey, licenseValidationKeyRateLimit);
-    const globalRateLimit = await checkRateLimit('global', licenseValidationGlobalRateLimit);
+    // LONG-TERM FIX: Only apply rate limiting when Upstash Redis is properly configured
+    // In-memory fallback on serverless is unreliable (persists across warm starts, inconsistent across instances)
+    // When Upstash isn't configured, rely on database-level protection (3-device activation limit)
+    if (isUpstashConfigured) {
+      const ipRateLimit = await checkRateLimit(ip, licenseValidationIpRateLimit, fallbackLicenseValidationIpLimit);
+      const keyRateLimit = await checkRateLimit(licenseKey, licenseValidationKeyRateLimit, fallbackLicenseValidationKeyLimit);
+      const globalRateLimit = await checkRateLimit('global', licenseValidationGlobalRateLimit, fallbackLicenseValidationGlobalLimit);
 
-    if (!ipRateLimit.allowed || !keyRateLimit.allowed || !globalRateLimit.allowed) {
-      const reason = !ipRateLimit.allowed ? 'IP limit exceeded' :
-                     !keyRateLimit.allowed ? 'License key limit exceeded' :
-                     'Global rate limit exceeded';
-      logger.warn('Rate limit exceeded', { reason, ip });
+      if (!ipRateLimit.allowed || !keyRateLimit.allowed || !globalRateLimit.allowed) {
+        const reason = !ipRateLimit.allowed ? 'IP limit exceeded' :
+                       !keyRateLimit.allowed ? 'License key limit exceeded' :
+                       'Global rate limit exceeded';
+        logger.warn('Rate limit exceeded', { reason, ip });
 
-      return NextResponse.json(
-        { error: 'Too many validation attempts. Please try again later.' },
-        { status: 429 }
-      );
+        return NextResponse.json(
+          { error: 'Too many validation attempts. Please try again later.' },
+          { status: 429 }
+        );
+      }
+    } else {
+      // Log warning that rate limiting is disabled (will appear in Vercel logs)
+      logger.warn('Rate limiting disabled for license validation - Upstash not configured', { ip });
     }
 
     // Look up license in database

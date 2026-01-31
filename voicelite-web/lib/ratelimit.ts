@@ -12,6 +12,19 @@ const isConfigured = Boolean(
   process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
 );
 
+// Export for use in routes that need to know if rate limiting is properly configured
+export const isUpstashConfigured = isConfigured;
+
+// LONG-TERM FIX: Log warning when Upstash is not configured
+// This makes it obvious in production logs that rate limiting is in degraded mode
+if (!isConfigured && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '[RATE-LIMIT WARNING] Upstash Redis not configured. ' +
+    'Using in-memory fallback with lenient limits. ' +
+    'Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for proper rate limiting.'
+  );
+}
+
 // Create Redis client (only if configured)
 const redis = isConfigured
   ? new Redis({
@@ -290,10 +303,13 @@ export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
 
-// Fallback limiters for license validation (matches Redis limits for consistency)
-export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(30, 60 * 60 * 1000); // 30/hour per IP
-export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(30, 60 * 60 * 1000); // 30/hour per key
-export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(1000, 60 * 60 * 1000); // 1000/hour global
+// Fallback limiters for license validation
+// LONG-TERM FIX: Higher limits than Redis because in-memory fallback is per-instance and unreliable
+// When Upstash is not configured, we use lenient limits to avoid blocking legitimate users
+// Real protection comes from database-level activation limits (3 devices max)
+export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour per IP (lenient)
+export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour per key (lenient)
+export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(5000, 60 * 60 * 1000); // 5000/hour global (lenient)
 export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 // Cleanup fallback limiters every 10 minutes
