@@ -13,7 +13,7 @@ dotnet run --project VoiceLite/VoiceLite/VoiceLite.csproj
 dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" VoiceLite/Installer/VoiceLiteSetup.iss
 
-# Tests (~412 tests, must all pass before commit)
+# Tests (~403 tests, must all pass before commit)
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
 
 # Web backend
@@ -24,7 +24,7 @@ cd voicelite-web && npm run dev
 
 **Why subprocess for Whisper**: whisper.cpp as Process, not library binding. Easier to kill zombie processes, debug crashes, update whisper version independently.
 
-**Why DI container**: Uses Microsoft.Extensions.DependencyInjection. Services registered in `ServiceConfiguration.cs`, wired via `AddVoiceLiteServices()` in App.xaml.cs. ViewModels own events, MainWindow wires handlers.
+**Why no DI container**: DI infrastructure was removed — MainWindow directly instantiates all services. App.xaml.cs just does `new MainWindow()`. This matches what actually ran at runtime (MainWindow always bypassed the DI layer).
 
 **Why static HttpClient in LicenseService**: Single API endpoint (voicelite.app). Prevents socket exhaustion. Intentionally NOT disposed.
 
@@ -34,7 +34,7 @@ cd voicelite-web && npm run dev
 
 ## Critical Paths
 
-**Recording flow**: `MainWindow` → `RecordingController` → `AudioRecorder.StartRecording()` → 16kHz mono WAV → `PersistentWhisperService.TranscribeAsync()` → `CustomShortcutService.ProcessShortcuts()` → `TextPostProcessor` → `TextInjector.InjectText()`
+**Recording flow**: `MainWindow` → `AudioRecorder.StartRecording()` → 16kHz mono WAV → `PersistentWhisperService.TranscribeAsync()` → `CustomShortcutService.ProcessShortcuts()` → `TextPostProcessor` → `TextInjector.InjectText()`
 
 **License validation**: Desktop calls `/api/licenses/validate` → Prisma lookup → device activation (3-device limit) → DPAPI-cached locally as `key|email` format
 
@@ -51,6 +51,8 @@ cd voicelite-web && npm run dev
 - **Hardware ID fallback**: `HardwareIdService` gracefully falls back if WMI fails (VM/headless systems) to persistent GUID.
 - **Model validation (MODEL-GATE-001)**: `ModelResolverService` validates whisper.exe SHA256 hash before execution. Fails closed on mismatch.
 - **License tamper detection**: `VerifyLicenseKeyMatchesStorage()` validates both key AND email from `key|email` storage format.
+- **Interface removal gotcha**: Deleted interfaces (`IAudioRecorder`, `IWhisperService`, etc.) extended `IDisposable`. Removing them silently drops `IDisposable` from implementing classes — must add `: IDisposable` back explicitly.
+- **Helper types in interface files**: `InjectionMode` lives in `TextInjector.cs`, `HotkeyEventArgs` in `HotkeyManager.cs`, `TranscriptionItem`/`ExportFormat` in `TranscriptionHistoryService.cs`, `LicenseValidationResult` in `LicenseService.cs`.
 
 ## Patterns to Follow
 
@@ -63,14 +65,11 @@ ErrorLogger.LogError("context", ex); // Always shows
 
 **Process cleanup**: Always `process.Kill(entireProcessTree: true)` for whisper.exe. Child processes can orphan.
 
-**Disposal**: Every service implements `IDisposable`. Tests validate disposal (`*DisposalTests.cs`).
+**Disposal**: Services with resources implement `IDisposable` directly (no interfaces). Tests validate disposal (`*DisposalTests.cs`).
 
 **Settings path**: `%LOCALAPPDATA%\VoiceLite\` - NOT Roaming (privacy fix, no cloud sync).
 
-**ViewModel events**: ViewModels expose `*Requested` events. MainWindow subscribes, calls services:
-```csharp
-recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
-```
+**Only surviving interface**: `IProFeatureService` in `Core/Interfaces/Features/` — used as a DI seam in `ModelResolverService` and `PersistentWhisperService` constructors, mocked in `ModelResolverServiceTests`.
 
 ## File Locations
 
@@ -78,9 +77,8 @@ recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
 |------|---------|
 | `VoiceLite/VoiceLite/Services/` | Core services (AudioRecorder, PersistentWhisperService, TextInjector, etc.) |
 | `VoiceLite/VoiceLite/Services/Audio/` | Audio preprocessing pipeline (HighPassFilter, NoiseGate, AGC) |
-| `VoiceLite/VoiceLite/Core/Interfaces/` | Service interfaces (IWhisperService, IAudioRecorder, etc.) |
-| `VoiceLite/VoiceLite/Infrastructure/DependencyInjection/` | DI configuration (ServiceConfiguration.cs) |
-| `VoiceLite/VoiceLite/Presentation/ViewModels/` | MVVM ViewModels |
+| `VoiceLite/VoiceLite/Core/Interfaces/Features/` | IProFeatureService (only surviving interface) |
+| `VoiceLite/VoiceLite/Infrastructure/Resilience/` | RetryPolicies (Polly) |
 | `VoiceLite/VoiceLite/Presentation/Commands/` | RelayCommand, AsyncRelayCommand implementations |
 | `VoiceLite/VoiceLite/Models/` | Settings, WhisperModelInfo, TranscriptionPreset |
 | `VoiceLite/whisper/` | whisper.exe + models (ggml-base.bin bundled) |
@@ -122,6 +120,7 @@ Free tier: Base model only. Pro ($20): All 5 models + AI Models settings tab.
 
 ## Testing
 
+- ~403 passing tests, 37 skipped (hardware/UI dependent)
 - Coverage target: ≥75% overall, ≥80% Services/
 - Disposal tests are critical (memory leak prevention)
 - Run `dotnet test` before every commit
