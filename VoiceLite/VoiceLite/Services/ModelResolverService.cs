@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Security;
 using VoiceLite.Core.Interfaces.Features;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
@@ -13,7 +12,7 @@ namespace VoiceLite.Services
     /// Extracted from PersistentWhisperService for better separation of concerns.
     /// SECURITY FIX (MODEL-GATE-001): Added Pro license validation to prevent freemium bypass
     /// </summary>
-    public class ModelResolverService : IModelResolverService
+    public class ModelResolverService
     {
         private readonly string _baseDir;
         private readonly IProFeatureService? _proFeatureService;

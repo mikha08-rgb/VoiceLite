@@ -5,16 +5,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
-using Microsoft.Extensions.DependencyInjection;
-using VoiceLite.Infrastructure.DependencyInjection;
 using VoiceLite.Services;
 
 namespace VoiceLite
 {
     public partial class App : Application
     {
-        private ServiceProvider? _serviceProvider;
-
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -30,22 +26,8 @@ namespace VoiceLite
             // Clean up any orphaned whisper processes from previous crashes
             CleanupOrphanedWhisperProcesses();
 
-            // Configure and build the DI container (WPF-appropriate, not web hosting)
-            var serviceCollection = new ServiceCollection();
-
-            // Add all application services
-            serviceCollection.AddVoiceLiteServices();
-            serviceCollection.AddInfrastructureServices();
-            serviceCollection.ConfigureOptions();
-
-            // Build the service provider
-            _serviceProvider = serviceCollection.BuildServiceProvider();
-
-            // Initialize the service provider wrapper for global access
-            ServiceProviderWrapper.Initialize(_serviceProvider);
-
             // Create and show the main window
-            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+            var mainWindow = new MainWindow();
             mainWindow.Show();
         }
 
@@ -53,9 +35,6 @@ namespace VoiceLite
         {
             // Clean up on exit
             CleanupOrphanedWhisperProcesses();
-
-            // Dispose the service provider
-            _serviceProvider?.Dispose();
 
             base.OnExit(e);
         }

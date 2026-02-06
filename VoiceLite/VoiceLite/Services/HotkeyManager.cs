@@ -6,11 +6,10 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class HotkeyManager : IHotkeyManager
+    public class HotkeyManager : IDisposable
     {
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -605,6 +604,13 @@ namespace VoiceLite.Services
             // CRIT-003 FIX: Dispose ManualResetEventSlim to release resources
             unregisterComplete.SafeDispose();
         }
+    }
+
+    public class HotkeyEventArgs : EventArgs
+    {
+        public Key Key { get; set; }
+        public ModifierKeys Modifiers { get; set; }
+        public int HotkeyId { get; set; }
     }
 }
 

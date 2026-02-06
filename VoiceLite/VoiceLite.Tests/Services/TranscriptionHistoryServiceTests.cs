@@ -2,7 +2,6 @@ using FluentAssertions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Models;
 using VoiceLite.Services;
 using Xunit;

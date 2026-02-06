@@ -4,7 +4,6 @@ using FluentAssertions;
 using Moq;
 using VoiceLite.Models;
 using VoiceLite.Services;
-using VoiceLite.Core.Interfaces.Services;
 using Xunit;
 
 namespace VoiceLite.Tests.Services
@@ -258,7 +257,7 @@ namespace VoiceLite.Tests.Services
             var injector = new TextInjector(_settings);
 
             // Act - Using very short text to minimize side effects during test
-            Func<Task> act = async () => await injector.InjectTextAsync("a", ITextInjector.InjectionMode.Type);
+            Func<Task> act = async () => await injector.InjectTextAsync("a", TextInjector.InjectionMode.Type);
 
             // Assert - Should complete without throwing
             await act.Should().NotThrowAsync();
@@ -271,7 +270,7 @@ namespace VoiceLite.Tests.Services
             var injector = new TextInjector(_settings);
 
             // Act
-            Func<Task> act = async () => await injector.InjectTextAsync("test", ITextInjector.InjectionMode.Paste);
+            Func<Task> act = async () => await injector.InjectTextAsync("test", TextInjector.InjectionMode.Paste);
 
             // Assert
             await act.Should().NotThrowAsync();
@@ -284,7 +283,7 @@ namespace VoiceLite.Tests.Services
             var injector = new TextInjector(_settings);
 
             // Act - Using short text to trigger typing mode in SmartAuto
-            Func<Task> act = async () => await injector.InjectTextAsync("hi", ITextInjector.InjectionMode.SmartAuto);
+            Func<Task> act = async () => await injector.InjectTextAsync("hi", TextInjector.InjectionMode.SmartAuto);
 
             // Assert
             await act.Should().NotThrowAsync();

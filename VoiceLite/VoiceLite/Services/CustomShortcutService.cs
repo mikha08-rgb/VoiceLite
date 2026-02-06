@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
-using VoiceLite.Core.Interfaces.Services;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
@@ -10,7 +9,7 @@ namespace VoiceLite.Services
     /// Service for processing custom text expansion shortcuts.
     /// Replaces trigger phrases with their defined replacement text (case-insensitive, whole-word matching).
     /// </summary>
-    public class CustomShortcutService : ICustomShortcutService
+    public class CustomShortcutService
     {
         private readonly Settings _settings;
 

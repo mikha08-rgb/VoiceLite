@@ -11,15 +11,14 @@ using System.Threading.Tasks;
 using NAudio.Wave;
 using VoiceLite.Models;
 using VoiceLite.Core.Interfaces.Features;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class PersistentWhisperService : IWhisperService
+    public class PersistentWhisperService : IDisposable
     {
         private readonly Settings settings;
         private readonly string baseDir;
-        private readonly IModelResolverService modelResolver;
+        private readonly ModelResolverService modelResolver;
         private string? cachedWhisperExePath;
         private string? cachedModelPath;
         private string? dummyAudioPath;
@@ -56,17 +55,12 @@ namespace VoiceLite.Services
         /// </summary>
         private const int DISPOSAL_COMPLETION_TIMEOUT_SECONDS = 5;
 
-        // Interface implementation properties and events
         public bool IsProcessing => isProcessing;
-#pragma warning disable CS0067 // Event is never used - kept for interface compatibility
         public event EventHandler<string>? TranscriptionComplete;
-#pragma warning restore CS0067
         public event EventHandler<Exception>? TranscriptionError;
-#pragma warning disable CS0067 // Event is never used - kept for interface compatibility
         public event EventHandler<int>? ProgressChanged;
-#pragma warning restore CS0067
 
-        public PersistentWhisperService(Settings settings, IModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
+        public PersistentWhisperService(Settings settings, ModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;

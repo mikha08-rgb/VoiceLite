@@ -8,12 +8,21 @@ using System.Windows.Forms;
 using WindowsInput;
 using WindowsInput.Native;
 using VoiceLite.Models;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class TextInjector : ITextInjector, IDisposable
+    public class TextInjector : IDisposable
     {
+        /// <summary>
+        /// Text injection modes for InjectTextAsync
+        /// </summary>
+        public enum InjectionMode
+        {
+            Type,
+            Paste,
+            SmartAuto
+        }
+
         // Thread-safe AutoPaste property (Issue 3)
         private volatile bool _autoPaste = true;
         public bool AutoPaste
@@ -555,7 +564,7 @@ namespace VoiceLite.Services
 
         // Interface implementation methods
         // THREAD-SAFETY FIX (P2): Capture foreground window BEFORE Task.Run to get correct window
-        public async Task InjectTextAsync(string text, ITextInjector.InjectionMode mode)
+        public async Task InjectTextAsync(string text, InjectionMode mode)
         {
             // Capture foreground window on calling thread (UI thread)
             IntPtr capturedHandle = GetForegroundWindow();
@@ -564,13 +573,13 @@ namespace VoiceLite.Services
             {
                 switch (mode)
                 {
-                    case ITextInjector.InjectionMode.Type:
+                    case InjectionMode.Type:
                         InjectViaTyping(text, capturedHandle);
                         break;
-                    case ITextInjector.InjectionMode.Paste:
+                    case InjectionMode.Paste:
                         InjectViaClipboard(text, capturedHandle);
                         break;
-                    case ITextInjector.InjectionMode.SmartAuto:
+                    case InjectionMode.SmartAuto:
                         // THREAD-SAFETY FIX (P3): Use captured handle instead of calling InjectText()
                         // InjectText() would recapture the foreground window on the worker thread,
                         // potentially getting the wrong window during rapid window switching

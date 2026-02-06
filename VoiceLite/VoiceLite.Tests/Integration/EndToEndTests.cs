@@ -7,8 +7,6 @@ using Xunit;
 using FluentAssertions;
 using VoiceLite.Services;
 using VoiceLite.Models;
-using VoiceLite.Core.Interfaces.Features;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Tests.Integration
 {
@@ -155,7 +153,7 @@ namespace VoiceLite.Tests.Integration
                     var testText = "Test transcription text";
 
                     // Act
-                    await _textInjector.InjectTextAsync(testText, ITextInjector.InjectionMode.Paste);
+                    await _textInjector.InjectTextAsync(testText, TextInjector.InjectionMode.Paste);
 
                     // Wait for clipboard restoration
                     await Task.Delay(200);

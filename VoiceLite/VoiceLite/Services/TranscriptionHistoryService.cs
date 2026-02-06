@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
@@ -10,7 +9,7 @@ namespace VoiceLite.Services
     /// <summary>
     /// Manages the transcription history, including adding, removing, pinning, and limiting items.
     /// </summary>
-    public class TranscriptionHistoryService : ITranscriptionHistoryService
+    public class TranscriptionHistoryService
     {
         private readonly Settings settings;
         private const int MAX_TEXT_LENGTH = 5000; // Prevent extremely long transcriptions from bloating settings file
@@ -280,5 +279,26 @@ namespace VoiceLite.Services
         public int TotalWords { get; set; }
         public double AverageDuration { get; set; }
         public DateTime OldestTimestamp { get; set; }
+    }
+
+    public class TranscriptionItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Text { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public double ProcessingTime { get; set; }
+        public string? ModelUsed { get; set; }
+        public bool IsPinned { get; set; }
+        public string? AudioFilePath { get; set; }
+        public string? ApplicationContext { get; set; }
+        public int WordCount => Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
+    }
+
+    public enum ExportFormat
+    {
+        Text,
+        Json,
+        Csv,
+        Markdown
     }
 }

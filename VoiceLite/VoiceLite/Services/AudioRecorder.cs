@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NAudio.Wave;
-using VoiceLite.Core.Interfaces.Services;
 using VoiceLite.Services.Audio;
 
 namespace VoiceLite.Services
@@ -17,7 +16,7 @@ namespace VoiceLite.Services
         public override string ToString() => Name;
     }
 
-    public class AudioRecorder : IAudioRecorder
+    public class AudioRecorder : IDisposable
     {
         private WaveInEvent? waveIn;
         private WaveFileWriter? waveFile;

@@ -2,11 +2,10 @@ using System;
 using System.IO;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
-using VoiceLite.Core.Interfaces.Services;
 
 namespace VoiceLite.Services
 {
-    public class SystemTrayManager : ISystemTrayManager
+    public class SystemTrayManager : IDisposable
     {
         private TaskbarIcon? trayIcon;
         private System.Drawing.Icon? customIcon;

@@ -6,12 +6,11 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Infrastructure.Resilience;
 
 namespace VoiceLite.Services
 {
-    public class LicenseService : ILicenseService, IDisposable
+    public class LicenseService : IDisposable
     {
         /// <summary>
         /// Static HttpClient for license validation requests.
@@ -699,4 +698,12 @@ namespace VoiceLite.Services
         }
     }
 
+    public class LicenseValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string Tier { get; set; } = "free";
+        public string? ErrorMessage { get; set; }
+        public string? Email { get; set; }
+        public int? ActivationCount { get; set; }
+    }
 }
