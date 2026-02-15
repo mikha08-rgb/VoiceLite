@@ -27,9 +27,9 @@ namespace VoiceLite.Tests.Services
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
             Directory.CreateDirectory(_tempDirectory);
 
-            // Only create service if whisper.exe exists
-            var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
-            if (File.Exists(whisperPath))
+            // Only create service if model file exists (Whisper.net loads model in-process)
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
+            if (File.Exists(modelPath))
             {
                 _service = new PersistentWhisperService(_settings);
             }
@@ -57,7 +57,7 @@ namespace VoiceLite.Tests.Services
         {
             if (_service == null)
             {
-                // Skip test if whisper.exe doesn't exist
+                // Skip test if model doesn't exist
                 return;
             }
 
@@ -76,7 +76,7 @@ namespace VoiceLite.Tests.Services
                 .WithMessage($"Audio file not found: {nonExistentFile}");
         }
 
-        [Fact(Skip = "Integration test - silent WAV causes whisper.exe exit code -1")]
+        [Fact(Skip = "Integration test - silent WAV may produce empty transcription")]
         public async Task TranscribeAsync_ReturnsTranscriptionForValidAudio()
         {
             if (_service == null) return;

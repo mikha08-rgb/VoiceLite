@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Moq;
 using System;
 using System.IO;
-using System.Security;
 using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Services;
 using Xunit;
@@ -78,6 +77,7 @@ namespace VoiceLite.Tests.Services
         [InlineData("base", "ggml-base.bin")]
         [InlineData("small", "ggml-small.bin")]
         [InlineData("medium", "ggml-medium.bin")]
+        [InlineData("turbo", "ggml-large-v3-turbo-q8_0.bin")]
         [InlineData("large", "ggml-large-v3.bin")]
         public void NormalizeModelName_ShortName_ReturnsFullFilename(string shortName, string expected)
         {
@@ -96,6 +96,7 @@ namespace VoiceLite.Tests.Services
         [InlineData("ggml-base.bin")]
         [InlineData("ggml-small.bin")]
         [InlineData("ggml-medium.bin")]
+        [InlineData("ggml-large-v3-turbo-q8_0.bin")]
         [InlineData("ggml-large-v3.bin")]
         public void NormalizeModelName_FullFilename_ReturnsUnchanged(string filename)
         {
@@ -119,6 +120,7 @@ namespace VoiceLite.Tests.Services
             service.NormalizeModelName("TINY").Should().Be("ggml-tiny.bin");
             service.NormalizeModelName("Base").Should().Be("ggml-base.bin");
             service.NormalizeModelName("SMALL").Should().Be("ggml-small.bin");
+            service.NormalizeModelName("TURBO").Should().Be("ggml-large-v3-turbo-q8_0.bin");
         }
 
         [Theory]
@@ -148,77 +150,6 @@ namespace VoiceLite.Tests.Services
 
             // Assert
             result.Should().Be("ggml-base.bin", "Unknown names without .bin extension default to base");
-        }
-
-        #endregion
-
-        #region ResolveWhisperExePath Tests
-
-        [Fact]
-        public void ResolveWhisperExePath_InWhisperSubdir_ReturnsCorrectPath()
-        {
-            // Arrange
-            var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
-            File.WriteAllText(whisperExePath, "dummy exe"); // Create dummy file
-            // Use internal constructor to skip integrity validation for path resolution test
-            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
-
-            // Act
-            var result = service.ResolveWhisperExePath();
-
-            // Assert
-            result.Should().Be(whisperExePath);
-            File.Exists(result).Should().BeTrue();
-        }
-
-        [Fact]
-        public void ResolveWhisperExePath_InBaseDir_ReturnsCorrectPath()
-        {
-            // Arrange
-            var whisperExePath = Path.Combine(_testBaseDir, "whisper.exe");
-            File.WriteAllText(whisperExePath, "dummy exe");
-            // Use internal constructor to skip integrity validation for path resolution test
-            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
-
-            // Act
-            var result = service.ResolveWhisperExePath();
-
-            // Assert
-            result.Should().Be(whisperExePath);
-        }
-
-        [Fact]
-        public void ResolveWhisperExePath_PrefersWhisperSubdir_OverBaseDir()
-        {
-            // Arrange - Create whisper.exe in both locations
-            var subdirExePath = Path.Combine(_testWhisperDir, "whisper.exe");
-            var baseDirExePath = Path.Combine(_testBaseDir, "whisper.exe");
-            File.WriteAllText(subdirExePath, "subdir exe");
-            File.WriteAllText(baseDirExePath, "base exe");
-
-            // Use internal constructor to skip integrity validation for path resolution test
-            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
-
-            // Act
-            var result = service.ResolveWhisperExePath();
-
-            // Assert
-            result.Should().Be(subdirExePath, "Whisper subdir should be preferred");
-        }
-
-        [Fact]
-        public void ResolveWhisperExePath_NotFound_ThrowsFileNotFoundException()
-        {
-            // Arrange
-            var service = new ModelResolverService(_testBaseDir);
-
-            // Act
-            Action act = () => service.ResolveWhisperExePath();
-
-            // Assert
-            act.Should().Throw<FileNotFoundException>()
-                .WithMessage("*Whisper.exe not found*")
-                .WithMessage("*reinstall VoiceLite*");
         }
 
         #endregion
@@ -282,6 +213,25 @@ namespace VoiceLite.Tests.Services
                 .WithMessage("*download it from Settings*");
         }
 
+        [Fact]
+        public void ResolveModelPath_TurboModel_ReturnsCorrectPath()
+        {
+            // Arrange
+            var modelPath = Path.Combine(_testWhisperDir, "ggml-large-v3-turbo-q8_0.bin");
+            File.WriteAllText(modelPath, "dummy turbo model");
+
+            var mockProService = new Mock<IProFeatureService>();
+            mockProService.Setup(x => x.CanUseModel("ggml-large-v3-turbo-q8_0.bin")).Returns(true);
+
+            var service = new ModelResolverService(_testBaseDir, mockProService.Object);
+
+            // Act
+            var result = service.ResolveModelPath("turbo");
+
+            // Assert
+            result.Should().Be(modelPath);
+        }
+
         #endregion
 
         #region Security Tests - MODEL-GATE-001 (v1.2.0.3)
@@ -314,6 +264,28 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void SecurityTest_FreeUser_CannotAccessTurboModel()
+        {
+            // Arrange - Create Turbo model file on disk
+            var turboModelPath = Path.Combine(_testWhisperDir, "ggml-large-v3-turbo-q8_0.bin");
+            File.WriteAllText(turboModelPath, "turbo model data");
+
+            var mockProService = new Mock<IProFeatureService>();
+            mockProService.Setup(x => x.CanUseModel("ggml-large-v3-turbo-q8_0.bin")).Returns(false);
+            mockProService.Setup(x => x.GetUpgradeMessage(It.IsAny<string>()))
+                .Returns("Upgrade to Pro for $20");
+
+            var service = new ModelResolverService(_testBaseDir, mockProService.Object);
+
+            // Act
+            Action act = () => service.ResolveModelPath("turbo");
+
+            // Assert
+            act.Should().Throw<UnauthorizedAccessException>()
+                .WithMessage("*requires Pro license*");
+        }
+
+        [Fact]
         public void SecurityTest_FreeUser_CanAccessBaseModel()
         {
             // Arrange
@@ -343,6 +315,7 @@ namespace VoiceLite.Tests.Services
                 "ggml-base.bin",
                 "ggml-small.bin",
                 "ggml-medium.bin",
+                "ggml-large-v3-turbo-q8_0.bin",
                 "ggml-large-v3.bin"
             };
 
@@ -360,8 +333,7 @@ namespace VoiceLite.Tests.Services
             // Act & Assert - All models should be accessible
             foreach (var modelFile in modelFiles)
             {
-                var shortName = modelFile.Replace("ggml-", "").Replace(".bin", "").Replace("-v3", "");
-                var result = service.ResolveModelPath(shortName);
+                var result = service.ResolveModelPath(modelFile);
                 result.Should().NotBeNullOrEmpty();
                 File.Exists(result).Should().BeTrue();
             }
@@ -499,7 +471,6 @@ namespace VoiceLite.Tests.Services
         {
             // Arrange
             File.WriteAllText(Path.Combine(_testWhisperDir, "ggml-base.bin"), "model");
-            File.WriteAllText(Path.Combine(_testWhisperDir, "whisper.exe"), "exe");
             File.WriteAllText(Path.Combine(_testWhisperDir, "readme.txt"), "text");
 
             var service = new ModelResolverService(_testBaseDir);
@@ -510,54 +481,7 @@ namespace VoiceLite.Tests.Services
             // Assert
             models.Should().HaveCount(1);
             models.Should().Contain(p => p.EndsWith("ggml-base.bin"));
-            models.Should().NotContain(p => p.EndsWith("whisper.exe"));
             models.Should().NotContain(p => p.EndsWith("readme.txt"));
-        }
-
-        #endregion
-
-        #region Whisper.exe Integrity Validation Tests
-
-        [Fact]
-        public void ValidateWhisperExecutable_InvalidHash_ThrowsSecurityException()
-        {
-            // Arrange
-            var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
-            File.WriteAllText(whisperExePath, "test exe with wrong hash");
-
-            var service = new ModelResolverService(_testBaseDir);
-
-            // Act & Assert - Fail closed on hash mismatch (security-critical)
-            Action act = () => service.ValidateWhisperExecutable(whisperExePath);
-            act.Should().Throw<SecurityException>()
-                .WithMessage("*integrity verification failed*");
-        }
-
-        [Fact]
-        public void ValidateWhisperExecutable_FileNotFound_ThrowsSecurityException()
-        {
-            // Arrange
-            var service = new ModelResolverService(_testBaseDir);
-
-            // Act & Assert - Fail closed on file errors (security-critical)
-            Action act = () => service.ValidateWhisperExecutable("C:\\nonexistent\\whisper.exe");
-            act.Should().Throw<SecurityException>()
-                .WithMessage("*integrity check failed*");
-        }
-
-        [Fact]
-        public void ValidateWhisperExecutable_SkipValidation_ReturnsTrue()
-        {
-            // Arrange - Use internal constructor to skip validation
-            var whisperExePath = Path.Combine(_testWhisperDir, "whisper.exe");
-            File.WriteAllText(whisperExePath, "dummy content");
-            var service = new ModelResolverService(_testBaseDir, null, skipIntegrityValidation: true);
-
-            // Act
-            var result = service.ValidateWhisperExecutable(whisperExePath);
-
-            // Assert - Validation bypassed for testing
-            result.Should().BeTrue();
         }
 
         #endregion

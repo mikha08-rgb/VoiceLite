@@ -17,7 +17,7 @@ namespace VoiceLite.Tests.Stress
     /// - Recovery after errors (retry logic from Day 1)
     /// - Mixed success/failure scenarios
     ///
-    /// Critical: Whisper.exe is external process - must handle all edge cases
+    /// Critical: Whisper.net loads native DLLs in-process - must handle all edge cases
     /// </summary>
     [Trait("Category", "Stress")]
     public class WhisperRecoveryStressTests : StressTestBase

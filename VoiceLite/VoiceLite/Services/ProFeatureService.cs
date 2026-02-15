@@ -155,6 +155,7 @@ namespace VoiceLite.Services
                     "ggml-base.bin",
                     "ggml-small.bin",
                     "ggml-medium.bin",
+                    "ggml-large-v3-turbo-q8_0.bin",
                     "ggml-large-v3.bin"
                 };
             }

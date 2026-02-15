@@ -1,7 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -23,9 +20,6 @@ namespace VoiceLite
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-            // Clean up any orphaned whisper processes from previous crashes
-            CleanupOrphanedWhisperProcesses();
-
             // Create and show the main window
             var mainWindow = new MainWindow();
             mainWindow.Show();
@@ -33,16 +27,11 @@ namespace VoiceLite
 
         protected override void OnExit(ExitEventArgs e)
         {
-            // Clean up on exit
-            CleanupOrphanedWhisperProcesses();
-
             base.OnExit(e);
         }
 
         private void OnProcessExit(object? sender, EventArgs e)
         {
-            // Clean up on any type of exit
-            CleanupOrphanedWhisperProcesses();
         }
 
         private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
@@ -60,9 +49,6 @@ namespace VoiceLite
                 MessageBox.Show($"Fatal error: {ex.Message}\n\nCheck voicelite_error.log for details.",
                     "VoiceLite Crash", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-
-            // Clean up before crash
-            CleanupOrphanedWhisperProcesses();
         }
 
         private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
@@ -91,51 +77,6 @@ namespace VoiceLite
                    ex is StackOverflowException ||
                    ex is AccessViolationException ||
                    ex is TypeInitializationException;
-        }
-
-        private void CleanupOrphanedWhisperProcesses()
-        {
-            try
-            {
-                var orphanedProcesses = Process.GetProcessesByName("whisper")
-                    .Where(p =>
-                    {
-                        try
-                        {
-                            // CRITICAL FIX #2: Only kill processes started by this user
-                            // to avoid permission errors and killing system processes
-                            var processPath = p.MainModule?.FileName ?? "";
-                            var ourWhisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
-
-                            // Check if it's OUR whisper process
-                            return processPath.Equals(ourWhisperPath, StringComparison.OrdinalIgnoreCase);
-                        }
-                        catch
-                        {
-                            // Can't access process info (probably system process) - skip it
-                            return false;
-                        }
-                    });
-
-                foreach (var process in orphanedProcesses)
-                {
-                    try
-                    {
-                        ErrorLogger.LogMessage($"Killing orphaned whisper process: PID {process.Id}");
-                        process.Kill();
-                        process.WaitForExit(1000); // Wait up to 1 second
-                        process.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogMessage($"Failed to kill whisper process {process.Id}: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Failed to cleanup orphaned processes", ex);
-            }
         }
     }
 }

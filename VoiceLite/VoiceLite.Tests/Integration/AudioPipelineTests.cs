@@ -33,9 +33,9 @@ namespace VoiceLite.Tests.Integration
 
             _recorder = new AudioRecorder();
 
-            // Only create transcriber if whisper.exe exists
-            var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
-            _transcriber = File.Exists(whisperPath)
+            // Only create transcriber if model file exists
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
+            _transcriber = File.Exists(modelPath)
                 ? new PersistentWhisperService(_settings)
                 : null!;
 
@@ -53,7 +53,7 @@ namespace VoiceLite.Tests.Integration
         {
             if (_transcriber == null)
             {
-                // Skip if whisper.exe not available
+                // Skip if model not available
                 return;
             }
 
@@ -170,7 +170,7 @@ namespace VoiceLite.Tests.Integration
                     }
 
                     // Simulate a successful transcription without calling actual whisper
-                    // (avoid dependency on whisper.exe being available or functioning)
+                    // (avoid dependency on whisper model being available)
                     await Task.Delay(10); // Simulate async work
 
                     Interlocked.Increment(ref successfulCompletions);

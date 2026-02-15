@@ -37,10 +37,9 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper files (Base model bundled - 78MB Q8_0 quantized)
-; CRITICAL FIX v1.2.0.1: ggml-base.bin is the new default bundled model (was tiny)
-; Copy from publish directory (consistent with .exe/.dll copying above)
-; Tiny model is downloadable via AI Models tab for users with slow PCs
+; Whisper model files only (no executables - Whisper.net runs in-process via NuGet DLLs)
+; Base model bundled (78MB Q8_0 quantized), other models downloadable via AI Models tab
+; Whisper.net native DLLs are included in the *.dll wildcard above
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file

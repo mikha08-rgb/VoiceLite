@@ -2,118 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security;
 using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
     /// <summary>
-    /// Service for resolving Whisper model and executable paths.
-    /// Extracted from PersistentWhisperService for better separation of concerns.
+    /// Service for resolving Whisper model paths.
     /// SECURITY FIX (MODEL-GATE-001): Added Pro license validation to prevent freemium bypass
     /// </summary>
     public class ModelResolverService
     {
         private readonly string _baseDir;
         private readonly IProFeatureService? _proFeatureService;
-        private readonly bool _skipIntegrityValidation;
-        private static bool _integrityWarningLogged = false;
-
-        // Expected SHA256 hash of the official whisper.exe binary (whisper.cpp v1.7.6)
-        private const string EXPECTED_WHISPER_HASH = "B7C6DC2E999A80BC2D23CD4C76701211F392AE55D5CABDF0D45EB2CA4FAF09AF";
 
         public ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService = null)
-            : this(baseDirectory, proFeatureService, skipIntegrityValidation: false)
-        {
-        }
-
-        /// <summary>
-        /// Internal constructor for testing - allows bypassing integrity validation
-        /// </summary>
-        internal ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService, bool skipIntegrityValidation)
         {
             if (string.IsNullOrWhiteSpace(baseDirectory))
                 throw new ArgumentNullException(nameof(baseDirectory));
 
             _baseDir = baseDirectory;
             _proFeatureService = proFeatureService;
-            _skipIntegrityValidation = skipIntegrityValidation;
-        }
-
-        /// <summary>
-        /// Resolves the full path to whisper.exe executable.
-        /// Searches in: baseDir/whisper/, baseDir/
-        /// </summary>
-        public string ResolveWhisperExePath()
-        {
-            // Check whisper/ subdirectory first (preferred location)
-            var whisperExePath = Path.Combine(_baseDir, "whisper", "whisper.exe");
-            if (File.Exists(whisperExePath))
-            {
-                ValidateWhisperExecutable(whisperExePath);
-                return whisperExePath;
-            }
-
-            // Check base directory
-            whisperExePath = Path.Combine(_baseDir, "whisper.exe");
-            if (File.Exists(whisperExePath))
-            {
-                ValidateWhisperExecutable(whisperExePath);
-                return whisperExePath;
-            }
-
-            throw new FileNotFoundException(
-                "Whisper.exe not found.\n\n" +
-                "Please reinstall VoiceLite to restore the whisper executable.\n\n" +
-                $"Expected locations:\n" +
-                $"- {Path.Combine(_baseDir, "whisper", "whisper.exe")}\n" +
-                $"- {Path.Combine(_baseDir, "whisper.exe")}");
-        }
-
-        /// <summary>
-        /// Validates whisper.exe integrity using SHA256 hash verification.
-        /// Fails open (warns but allows execution) to avoid breaking legitimate updates.
-        /// </summary>
-        public bool ValidateWhisperExecutable(string whisperExePath)
-        {
-            // Skip validation if bypass flag set (testing only)
-            if (_skipIntegrityValidation)
-            {
-                return true;
-            }
-
-            try
-            {
-                using var sha256 = System.Security.Cryptography.SHA256.Create();
-                using var stream = File.OpenRead(whisperExePath);
-                var hash = sha256.ComputeHash(stream);
-                var hashString = BitConverter.ToString(hash).Replace("-", "");
-
-                // HIGH-4 FIX: Fail CLOSED on hash mismatch (security-critical)
-                if (!hashString.Equals(EXPECTED_WHISPER_HASH, StringComparison.OrdinalIgnoreCase))
-                {
-                    var hashMismatchEx = new SecurityException("Whisper executable integrity verification failed. Please reinstall VoiceLite.");
-                    ErrorLogger.LogError("Whisper.exe integrity check FAILED - refusing to execute", hashMismatchEx);
-                    throw hashMismatchEx;
-                }
-
-                // Only log success on first check
-                if (!_integrityWarningLogged)
-                {
-                    ErrorLogger.LogMessage("Whisper.exe integrity check passed");
-                }
-                return true;
-            }
-            catch (SecurityException)
-            {
-                throw; // Re-throw security exceptions (hash mismatch)
-            }
-            catch (Exception ex)
-            {
-                // HIGH-4 FIX: Fail CLOSED on validation error (security-critical)
-                ErrorLogger.LogError("Failed to validate whisper.exe integrity", ex);
-                throw new SecurityException("Whisper executable integrity check failed. Please reinstall VoiceLite.", ex);
-            }
         }
 
         /// <summary>
@@ -126,7 +34,6 @@ namespace VoiceLite.Services
             var modelFile = NormalizeModelName(modelName);
 
             // SECURITY FIX (MODEL-GATE-001): Validate Pro license before resolving Pro models
-            // This prevents freemium bypass where users manually download Pro models
             if (_proFeatureService != null && !_proFeatureService.CanUseModel(modelFile))
             {
                 throw new UnauthorizedAccessException(
@@ -136,6 +43,7 @@ namespace VoiceLite.Services
                     "Upgrade to Pro to unlock:\n" +
                     "- Pro model (90-93% accuracy)\n" +
                     "- Elite model (95-97% accuracy)\n" +
+                    "- Turbo model (97-99% accuracy, 3-4x faster than Ultra)\n" +
                     "- Ultra model (97-99% Dragon-level quality)");
             }
 
@@ -161,7 +69,7 @@ namespace VoiceLite.Services
             // Model not found - provide helpful error message
             throw new FileNotFoundException(
                 $"Whisper model '{modelFile}' not found.\n\n" +
-                $"Please download it from Settings → AI Models tab, or reinstall VoiceLite.\n\n" +
+                $"Please download it from Settings -> AI Models tab, or reinstall VoiceLite.\n\n" +
                 $"Expected locations:\n" +
                 $"- Bundled: {Path.Combine(_baseDir, "whisper", modelFile)}\n" +
                 $"- Downloaded: {localDataPath}");
@@ -178,6 +86,7 @@ namespace VoiceLite.Services
                 "ggml-base.bin" => "Swift",
                 "ggml-small.bin" => "Pro",
                 "ggml-medium.bin" => "Elite",
+                "ggml-large-v3-turbo-q8_0.bin" => "Turbo",
                 "ggml-large-v3.bin" => "Ultra",
                 _ => modelFile
             };
@@ -185,7 +94,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Normalizes a model name to its full filename.
-        /// Supports short names (tiny, base, small, medium, large) and full filenames.
+        /// Supports short names (tiny, base, small, medium, turbo, large) and full filenames.
         /// </summary>
         public string NormalizeModelName(string modelName)
         {
@@ -198,6 +107,7 @@ namespace VoiceLite.Services
                 "base" => "ggml-base.bin",
                 "small" => "ggml-small.bin",
                 "medium" => "ggml-medium.bin",
+                "turbo" => "ggml-large-v3-turbo-q8_0.bin",
                 "large" => "ggml-large-v3.bin",
                 _ => modelName.EndsWith(".bin") ? modelName : "ggml-base.bin"
             };

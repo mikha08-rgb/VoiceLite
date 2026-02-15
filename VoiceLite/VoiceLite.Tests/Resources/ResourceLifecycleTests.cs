@@ -90,38 +90,37 @@ namespace VoiceLite.Tests.Resources
         }
 
         [Fact]
-        public void WhisperService_DisposeCleansUpProcessPool()
+        public void WhisperService_DisposeReleasesResources()
         {
             var settings = new Settings { WhisperModel = "base" };
 
-            // Only run if whisper.exe exists
-            var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
-            if (!File.Exists(whisperPath))
+            // Only run if model file exists
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
+            if (!File.Exists(modelPath))
             {
                 return;
             }
 
+            var initialMemory = GC.GetTotalMemory(true);
+
             var service = new PersistentWhisperService(settings);
             _disposables.Add(service);
 
-            // Allow warmup to potentially start
+            // Allow warmup to load model
             Thread.Sleep(500);
-
-            // Get process count before dispose
-            var processName = "whisper";
-            var beforeDispose = Process.GetProcessesByName(processName).Length;
 
             service.Dispose();
 
-            // Give time for processes to terminate
-            Thread.Sleep(500);
+            // Force GC to reclaim model memory
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
 
-            var afterDispose = Process.GetProcessesByName(processName).Length;
-
-            // Should have fewer or same number of whisper processes (allow +5 for background warmup from other concurrent tests)
-            // NOTE: Due to parallel test execution and warmup process timing, we allow some tolerance
-            afterDispose.Should().BeLessThanOrEqualTo(beforeDispose + 5,
-                "dispose should not spawn new whisper processes");
+            // Memory should not grow unboundedly after dispose
+            var finalMemory = GC.GetTotalMemory(true);
+            // Allow 50MB tolerance (model loading/unloading has overhead)
+            (finalMemory - initialMemory).Should().BeLessThan(50L * 1024 * 1024,
+                "dispose should release model memory");
         }
 
         [Fact]
@@ -224,8 +223,8 @@ namespace VoiceLite.Tests.Resources
         {
             var settings = new Settings { WhisperModel = "base" };
 
-            var whisperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "whisper.exe");
-            if (!File.Exists(whisperPath))
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
+            if (!File.Exists(modelPath))
             {
                 return;
             }

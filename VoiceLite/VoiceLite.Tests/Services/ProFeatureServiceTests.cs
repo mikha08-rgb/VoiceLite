@@ -271,7 +271,7 @@ namespace VoiceLite.Tests.Services
         #region GetAvailableModels Tests
 
         [Fact]
-        public void GetAvailableModels_ProUser_ReturnsAll5Models()
+        public void GetAvailableModels_ProUser_ReturnsAll6Models()
         {
             // Arrange
             var settings = new Settings { IsProLicense = true };
@@ -281,11 +281,12 @@ namespace VoiceLite.Tests.Services
             var models = service.GetAvailableModels();
 
             // Assert
-            models.Should().HaveCount(5);
+            models.Should().HaveCount(6);
             models.Should().Contain("ggml-tiny.bin");
             models.Should().Contain("ggml-base.bin");
             models.Should().Contain("ggml-small.bin");
             models.Should().Contain("ggml-medium.bin");
+            models.Should().Contain("ggml-large-v3-turbo-q8_0.bin");
             models.Should().Contain("ggml-large-v3.bin");
         }
 

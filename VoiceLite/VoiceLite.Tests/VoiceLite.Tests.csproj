@@ -16,6 +16,8 @@
     <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="AwesomeAssertions" Version="9.3.0" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
   </ItemGroup>
 
   <ItemGroup>

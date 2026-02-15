@@ -35,15 +35,17 @@
   <ItemGroup>
     <PackageReference Include="H.InputSimulator" Version="1.5.0" />
     <PackageReference Include="NAudio" Version="2.2.1" />
-    <PackageReference Include="System.Text.Json" Version="9.0.9" />
+    <PackageReference Include="System.Text.Json" Version="10.0.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Polly" Version="8.4.2" />
+    <PackageReference Include="Whisper.net" Version="1.9.0" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\whisper\**\*">
-      <Link>whisper\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="..\whisper\ggml-*.bin">
+      <Link>whisper\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

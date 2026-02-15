@@ -589,7 +589,7 @@ namespace VoiceLite
                 {
                     errorMessage += "Troubleshooting:\n" +
                                   "1. Verify VoiceLite installed correctly\n" +
-                                  "2. Check if whisper.exe exists in installation folder\n" +
+                                  "2. Check if model files exist in installation folder\n" +
                                   "3. Try reinstalling VoiceLite";
                 }
                 else if (ex.Message.Contains("microphone") || ex.Message.Contains("audio"))
@@ -1342,7 +1342,7 @@ namespace VoiceLite
         /// Stuck-state recovery callback - CRITICAL failsafe to prevent permanent "Processing" state
         /// Fires if app is stuck in processing for >15 seconds without completion
         /// </summary>
-        private async void OnStuckStateRecovery(object? sender, EventArgs e)
+        private void OnStuckStateRecovery(object? sender, EventArgs e)
         {
             // CRIT-006 FIX: Wrap entire async void method in try-catch
             try
@@ -1351,10 +1351,6 @@ namespace VoiceLite
 
                 // Stop the timer immediately
                 StopStuckStateRecoveryTimer();
-
-                // CRITICAL FIX: Kill any hung whisper.exe processes BEFORE showing dialog
-                // This prevents PC freeze from stuck processes consuming resources
-                await KillHungWhisperProcessesAsync();
 
             // Force UI back to ready state
             try
@@ -1417,53 +1413,6 @@ namespace VoiceLite
                 }
                 catch { /* Ignore */ }
             }
-        }
-
-        /// <summary>
-        /// Kill any hung whisper.exe processes that may be stuck
-        /// CRITICAL: Prevents PC freeze from stuck processes consuming resources
-        /// </summary>
-        private async Task KillHungWhisperProcessesAsync()
-        {
-            await Task.Run(() =>
-            {
-                try
-                {
-                    var whisperProcesses = System.Diagnostics.Process.GetProcessesByName("whisper");
-                    if (whisperProcesses.Length > 0)
-                    {
-                        ErrorLogger.LogWarning($"KillHungWhisperProcesses: Found {whisperProcesses.Length} whisper.exe process(es) - attempting to kill...");
-
-                        foreach (var process in whisperProcesses)
-                        {
-                            try
-                            {
-                                if (!process.HasExited)
-                                {
-                                    ErrorLogger.LogWarning($"Killing hung whisper.exe process (PID: {process.Id})");
-                                    process.Kill(entireProcessTree: true); // Kill process and all children
-                                    process.WaitForExit(2000); // Wait up to 2 seconds for clean exit
-                                }
-                                process.Dispose();
-                            }
-                            catch (Exception ex)
-                            {
-                                ErrorLogger.LogError($"Failed to kill whisper.exe process (PID: {process.Id})", ex);
-                            }
-                        }
-
-                        ErrorLogger.LogWarning("KillHungWhisperProcesses: All whisper.exe processes terminated");
-                    }
-                    else
-                    {
-                        ErrorLogger.LogDebug("KillHungWhisperProcesses: No whisper.exe processes found");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("KillHungWhisperProcesses: Failed to enumerate/kill processes", ex);
-                }
-            });
         }
 
         private async void OnAutoTimeout(object? sender, System.Timers.ElapsedEventArgs e)
@@ -2068,10 +2017,6 @@ namespace VoiceLite
 
             // WEEK 1 FIX: Use new cleanup method for proper timer disposal
             CleanupAllTimers();
-
-            // CRITICAL FIX: Kill any hung whisper.exe processes on shutdown
-            // Prevents orphaned processes from consuming resources after app closes
-            _ = KillHungWhisperProcessesAsync();
 
             // Clean up with proper disposal order
             try

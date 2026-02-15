@@ -52,7 +52,7 @@ namespace VoiceLite.Tests.Models
         }
 
         [Fact]
-        public void GetAvailableModels_ReturnsAllFourModels()
+        public void GetAvailableModels_ReturnsAllFiveModels()
         {
             var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(tempPath);
@@ -61,10 +61,11 @@ namespace VoiceLite.Tests.Models
             {
                 var models = WhisperModelInfo.GetAvailableModels(tempPath);
 
-                models.Should().HaveCount(4);
+                models.Should().HaveCount(5);
                 models.Should().Contain(m => m.FileName == "ggml-base.bin");
                 models.Should().Contain(m => m.FileName == "ggml-small.bin");
                 models.Should().Contain(m => m.FileName == "ggml-medium.bin");
+                models.Should().Contain(m => m.FileName == "ggml-large-v3-turbo-q8_0.bin");
                 models.Should().Contain(m => m.FileName == "ggml-large-v3.bin");
             }
             finally
@@ -148,21 +149,21 @@ namespace VoiceLite.Tests.Models
         }
 
         [Fact]
-        public void GetRecommendedModel_MediumRAM_ReturnsSmallModel()
+        public void GetRecommendedModel_MediumRAM_ReturnsTurboModel()
         {
             var recommended = WhisperModelInfo.GetRecommendedModel(2.5, prioritizeSpeed: false);
 
             recommended.Should().NotBeNull();
-            recommended!.FileName.Should().Be("ggml-small.bin");
+            recommended!.FileName.Should().Be("ggml-large-v3-turbo-q8_0.bin");
         }
 
         [Fact]
-        public void GetRecommendedModel_HighRAM_ReturnsMediumModel()
+        public void GetRecommendedModel_HighRAM_ReturnsTurboModel()
         {
             var recommended = WhisperModelInfo.GetRecommendedModel(4.0, prioritizeSpeed: false);
 
             recommended.Should().NotBeNull();
-            recommended!.FileName.Should().Be("ggml-medium.bin");
+            recommended!.FileName.Should().Be("ggml-large-v3-turbo-q8_0.bin");
         }
 
         [Fact]

@@ -49,6 +49,7 @@ namespace VoiceLite.Models
                 "ggml-base.bin" => "Swift",
                 "ggml-small.bin" => "Pro",
                 "ggml-medium.bin" => "Elite",
+                "ggml-large-v3-turbo-q8_0.bin" => "Turbo",
                 "ggml-large-v3.bin" => "Ultra",
                 _ => "Unknown"
             };
@@ -137,6 +138,31 @@ namespace VoiceLite.Models
                 },
                 new WhisperModelInfo
                 {
+                    FileName = "ggml-large-v3-turbo-q8_0.bin",
+                    DisplayName = "Turbo",
+                    FileSizeBytes = 874L * 1024 * 1024, // 874MB
+                    SpeedRating = 3,
+                    AccuracyRating = 5,
+                    TypicalProcessingTime = 0.4,
+                    RequiredRAMGB = 2.5,
+                    Description = "Near-Ultra accuracy at 3-4x the speed",
+                    SupportsMultilingual = true,
+                    IsRecommended = Visibility.Collapsed,
+                    Pros = new List<string>
+                    {
+                        "Near-identical accuracy to Ultra",
+                        "3-4x faster than Ultra",
+                        "70% smaller than Ultra (874MB vs 2.9GB)",
+                        "Excellent multilingual support"
+                    },
+                    Cons = new List<string>
+                    {
+                        "2.5GB+ RAM required",
+                        "Larger download than Pro/Elite"
+                    }
+                },
+                new WhisperModelInfo
+                {
                     FileName = "ggml-large-v3.bin",
                     DisplayName = "Ultra",
                     FileSizeBytes = 2900L * 1024 * 1024, // 2.9GB
@@ -188,10 +214,11 @@ namespace VoiceLite.Models
             else
             {
                 // For accuracy priority, pick best model that fits in RAM
+                // Turbo offers near-Ultra accuracy at much lower resource cost
                 if (availableRAMGB >= 5.0)
                     return models.Find(m => m.FileName == "ggml-large-v3.bin") ?? models.LastOrDefault();
-                else if (availableRAMGB >= 3.0)
-                    return models.Find(m => m.FileName == "ggml-medium.bin") ?? models.LastOrDefault();
+                else if (availableRAMGB >= 2.5)
+                    return models.Find(m => m.FileName == "ggml-large-v3-turbo-q8_0.bin") ?? models.Find(m => m.FileName == "ggml-medium.bin") ?? models.LastOrDefault();
                 else if (availableRAMGB >= 2.0)
                     return models.Find(m => m.FileName == "ggml-small.bin") ?? models.FirstOrDefault();
                 else
