@@ -4,6 +4,32 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.0.0] - 2026-02-14
+
+### Changed
+- **Architecture**: Removed dead DI infrastructure — interfaces, controllers, ViewModels, SettingsService, ServiceConfiguration (~4800 lines deleted)
+- **Settings**: Removed 15 unused properties (SelectedModel, UseGpu, HotkeyKey, GlobalHotkey, etc.)
+- **AsyncHelper**: Removed unused WrapEventHandler, RunOnUIThread, RunOnUIThreadAsync methods
+- **TextInjector**: Removed no-op SetTypingDelay method (adaptive delays used instead)
+- **TranscriptionHistoryItem**: Consolidated duplicate truncation logic into TextAnalyzer.Truncate()
+- **LicenseService**: Fixed misleading "lifetime license" log message → "14-day cached result"
+
+### Fixed
+- **Web: Rate limiter**: Skip rate limiting when Upstash unavailable to prevent license activation failures
+- **Web: Rate limiter**: Thread-safe in-memory fallback with AsyncLock
+- **Web: Email**: Added retry logic with exponential backoff (3 attempts)
+- **Web: Licensing**: Subscription status defaults to fail-closed for unknown Stripe statuses
+- **Web: Rate limits**: Increased license validation rate limits to reduce TooManyRequests errors
+- **Web: Resend-email**: Fixed Zod validation using .issues instead of .errors
+- **Web: Prisma**: Removed duplicate index on LicenseActivation.licenseId
+- **Web: Email retry**: Fixed off-by-one in exponential backoff delay calculation
+
+### Updated
+- FluentAssertions → AwesomeAssertions 9.3.0 (test assertion library)
+- coverlet.collector → 6.0.4
+- H.InputSimulator → 1.5.0
+- GitHub Actions v3 → v4
+
 ## [1.2.0.14] - 2026-01-18
 
 ### Fixed

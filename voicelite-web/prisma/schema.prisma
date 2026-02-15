@@ -52,7 +52,6 @@ model LicenseActivation {
   @@index([licenseId])
   @@index([licenseId, status])
   @@index([machineId], map: "LicenseActivation_machineId_idx")
-  @@index([licenseId], map: "idx_activation_licenseid")
 }
 
 model LicenseEvent {

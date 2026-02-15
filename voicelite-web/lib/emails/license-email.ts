@@ -171,7 +171,7 @@ Need help? Just reply to this email.
     try {
       if (attempt > 0) {
         console.log(`📧 Resend API: Retry attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} for ${email}`);
-        await delay(attempt - 1); // Exponential backoff before retry
+        await delay(attempt); // Exponential backoff before retry
       } else {
         console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
       }
