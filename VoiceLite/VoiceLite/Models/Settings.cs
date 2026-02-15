@@ -35,11 +35,9 @@ namespace VoiceLite.Models
     public class WhisperPresetConfig
     {
         public int BeamSize { get; set; }
-        public int BestOf { get; set; }
         public double EntropyThreshold { get; set; }
         public bool UseFallback { get; set; }
         public int MaxContext { get; set; }
-        public bool UseFlashAttention { get; set; }
         public string Description { get; set; } = string.Empty;
 
         public static WhisperPresetConfig GetPresetConfig(TranscriptionPreset preset)
@@ -49,31 +47,25 @@ namespace VoiceLite.Models
                 TranscriptionPreset.Speed => new WhisperPresetConfig
                 {
                     BeamSize = 1,
-                    BestOf = 1,
                     EntropyThreshold = 3.0,
                     UseFallback = false,
                     MaxContext = 64,
-                    UseFlashAttention = true,
                     Description = "Fastest transcription - Good for quick notes and commands"
                 },
                 TranscriptionPreset.Balanced => new WhisperPresetConfig
                 {
                     BeamSize = 3,
-                    BestOf = 2,
                     EntropyThreshold = 2.5,
                     UseFallback = true,
                     MaxContext = 224,
-                    UseFlashAttention = true,
                     Description = "Balanced speed and accuracy - Recommended for most users"
                 },
                 TranscriptionPreset.Accuracy => new WhisperPresetConfig
                 {
-                    BeamSize = 5,           // Dragon-level beam search (5+ for professional dictation)
-                    BestOf = 5,             // Evaluate 5 candidates, pick best (Dragon uses N-best lists)
-                    EntropyThreshold = 2.3, // Lower = more conservative (Dragon's "high confidence" threshold)
-                    UseFallback = true,     // CRITICAL: Temperature fallback [0.0, 0.4, 0.8] like Dragon
-                    MaxContext = -1,        // Use all available context (Dragon uses full context window)
-                    UseFlashAttention = true,
+                    BeamSize = 5,
+                    EntropyThreshold = 2.3,
+                    UseFallback = true,
+                    MaxContext = -1,
                     Description = "Dragon-level quality - Professional dictation (99% accuracy)"
                 },
                 _ => GetPresetConfig(TranscriptionPreset.Balanced)
@@ -133,11 +125,8 @@ namespace VoiceLite.Models
             set => _transcriptionPreset = Enum.IsDefined(typeof(TranscriptionPreset), value) ? value : TranscriptionPreset.Balanced;
         }
 
-        // UPDATED v1.2.0: BeamSize and BestOf are now driven by TranscriptionPreset
-        // Users can choose Speed/Balanced/Accuracy presets in Settings UI
-        // This provides better UX than exposing raw Whisper parameters
+        // BeamSize is driven by TranscriptionPreset (Speed/Balanced/Accuracy)
         public int BeamSize => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BeamSize;
-        public int BestOf => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BestOf;
 
         public double WhisperTimeoutMultiplier
         {
@@ -269,10 +258,6 @@ namespace VoiceLite.Models
             {
                 settings.Threads = 4;
             }
-
-            // v1.1.6: BeamSize and BestOf are now hard-coded properties (always return 1)
-            // No need to validate/reset since they can't be changed via JSON deserialization
-            // Old settings.json files with BeamSize/BestOf will be ignored on load
 
             // Force re-validation by triggering property setters
             settings.WhisperTimeoutMultiplier = settings.WhisperTimeoutMultiplier;

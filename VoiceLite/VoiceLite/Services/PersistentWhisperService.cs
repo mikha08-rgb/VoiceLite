@@ -16,7 +16,8 @@ namespace VoiceLite.Services
         private readonly string baseDir;
         private readonly ModelResolverService modelResolver;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
-        private readonly CancellationTokenSource transcriptionCts = new();
+        private CancellationTokenSource transcriptionCts = new();
+        private readonly object ctsLock = new();
 
         private WhisperFactory? whisperFactory;
         private string? currentModelPath;
@@ -154,11 +155,19 @@ namespace VoiceLite.Services
 
         private async Task<string> TranscribeFromStreamAsync(Stream audioStream, string? modelPath = null)
         {
+            if (isDisposed)
+                throw new ObjectDisposedException(nameof(PersistentWhisperService));
+
             bool semaphoreAcquired = false;
+            CancellationToken cancellationToken;
+            lock (ctsLock)
+            {
+                cancellationToken = transcriptionCts.Token;
+            }
 
             try
             {
-                await transcriptionSemaphore.WaitAsync(transcriptionCts.Token);
+                await transcriptionSemaphore.WaitAsync(cancellationToken);
                 semaphoreAcquired = true;
                 isProcessing = true;
                 var startTime = DateTime.Now;
@@ -168,10 +177,11 @@ namespace VoiceLite.Services
 
                 ErrorLogger.LogWarning($"Whisper: threads=4, model={Path.GetFileName(effectiveModelPath)}");
 
-                // Create a linked cancellation token with 60-second timeout
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                // Create a linked cancellation token with configurable timeout
+                var timeoutSeconds = 60 * Math.Max(settings.WhisperTimeoutMultiplier, 0.5);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                    transcriptionCts.Token, timeoutCts.Token);
+                    cancellationToken, timeoutCts.Token);
 
                 var result = new StringBuilder(4096);
 
@@ -222,12 +232,12 @@ namespace VoiceLite.Services
                 isProcessing = false;
                 return finalResult;
             }
-            catch (OperationCanceledException) when (!transcriptionCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 // Timeout (not user cancellation)
                 isProcessing = false;
                 throw new TimeoutException(
-                    "Transcription timed out after 60 seconds. Please try speaking less or using a smaller model.");
+                    $"Transcription timed out after {60 * Math.Max(settings.WhisperTimeoutMultiplier, 0.5):F0} seconds. Please try speaking less or using a smaller model.");
             }
             catch (OperationCanceledException)
             {
@@ -298,7 +308,12 @@ namespace VoiceLite.Services
 
         public void CancelTranscription()
         {
-            transcriptionCts?.Cancel();
+            lock (ctsLock)
+            {
+                transcriptionCts.Cancel();
+                transcriptionCts.Dispose();
+                transcriptionCts = new CancellationTokenSource();
+            }
         }
 
         public bool ValidateWhisperSetup()
@@ -339,8 +354,11 @@ namespace VoiceLite.Services
 
             isDisposed = true;
 
-            try { transcriptionCts.Cancel(); }
-            catch (Exception ex) { ErrorLogger.LogDebug($"CancellationTokenSource.Cancel failed: {ex.Message}"); }
+            lock (ctsLock)
+            {
+                try { transcriptionCts.Cancel(); }
+                catch (Exception ex) { ErrorLogger.LogDebug($"CancellationTokenSource.Cancel failed: {ex.Message}"); }
+            }
 
             lock (factoryLock)
             {

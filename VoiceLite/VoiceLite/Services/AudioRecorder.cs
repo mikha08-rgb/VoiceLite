@@ -651,7 +651,7 @@ namespace VoiceLite.Services
                         var vadProcessed = vadService.ProcessAudio(processedAudioData, (float)vadSettings.VADThreshold);
                         if (vadProcessed.Length > 100)
                         {
-                            ErrorLogger.LogWarning($"VAD trimmed: {processedAudioData.Length} -> {vadProcessed.Length} bytes ({100 - vadProcessed.Length * 100 / processedAudioData.Length}% removed)");
+                            ErrorLogger.LogWarning($"VAD trimmed: {processedAudioData.Length} -> {vadProcessed.Length} bytes ({100.0 - (double)vadProcessed.Length * 100.0 / processedAudioData.Length:F0}% removed)");
                             processedAudioData = vadProcessed;
                         }
                         else

@@ -511,7 +511,7 @@ namespace VoiceLite
                 // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
                 proFeatureService = new ProFeatureService(settings);
 
-                // Initialize Whisper service using process mode
+                // Initialize Whisper service (in-process via Whisper.net)
                 // SECURITY FIX (MODEL-GATE-001): Pass proFeatureService to enable license validation
                 whisperService = new PersistentWhisperService(settings, null, proFeatureService);
 

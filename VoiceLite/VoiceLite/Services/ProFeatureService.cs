@@ -90,7 +90,7 @@ namespace VoiceLite.Services
         /// <summary>
         /// Checks if user can use a specific Whisper model.
         /// Free tier: Base only (bundled with installer)
-        /// Pro tier: All 5 models (Tiny, Base, Small, Medium, Large)
+        /// Pro tier: All 6 models (Tiny, Base, Small, Medium, Turbo, Large)
         /// </summary>
         /// <param name="modelFileName">Model file name (e.g., "ggml-small.bin")</param>
         /// <returns>True if user can use this model</returns>

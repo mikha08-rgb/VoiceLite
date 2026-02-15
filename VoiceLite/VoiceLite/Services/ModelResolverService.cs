@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using VoiceLite.Core.Interfaces.Features;
+using VoiceLite.Models;
 
 namespace VoiceLite.Services
 {
@@ -75,21 +76,10 @@ namespace VoiceLite.Services
                 $"- Downloaded: {localDataPath}");
         }
 
-        /// <summary>
-        /// Gets user-friendly display name for model file
-        /// </summary>
         private string GetModelDisplayName(string modelFile)
         {
-            return modelFile.ToLower() switch
-            {
-                "ggml-tiny.bin" => "Lite",
-                "ggml-base.bin" => "Swift",
-                "ggml-small.bin" => "Pro",
-                "ggml-medium.bin" => "Elite",
-                "ggml-large-v3-turbo-q8_0.bin" => "Turbo",
-                "ggml-large-v3.bin" => "Ultra",
-                _ => modelFile
-            };
+            var name = WhisperModelInfo.GetDisplayName(modelFile);
+            return name == "Unknown" ? modelFile : name;
         }
 
         /// <summary>
