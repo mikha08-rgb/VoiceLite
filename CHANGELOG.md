@@ -4,6 +4,28 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.0.0] - 2026-02-15
+
+### Added
+- **Whisper.net in-process**: Migrated from whisper.cpp subprocess to Whisper.net 1.9.0 (C# P/Invoke). Model loads once into memory; subsequent transcriptions reuse it (2-10x faster). No more subprocess management, zombie processes, or temp WAV files.
+- **Silero VAD preprocessing**: Runs Silero VAD v5 (ONNX) as a preprocessing step before Whisper. Detects speech segments and trims silence to reduce hallucinations from long pauses. Pipeline: HPF → NoiseGate → AGC → VAD → Whisper. Controlled by existing EnableVAD setting (default on, threshold 0.35).
+- **large-v3-turbo-q8_0 model**: New "Turbo" tier (874MB, Q8_0 quantized) — near Ultra accuracy at 3x the speed.
+
+### Removed
+- Old whisper.cpp subprocess binaries (~60MB): whisper.exe, whisper.dll, ggml.dll, libopenblas.dll, clblast.dll, SDL2.dll
+- Dead download scripts: create-release.ps1, download-whisper.ps1/.py/.bat
+- Dead installer files: Product.wxs, Add-VoiceLite-Exclusion.ps1
+- Dead code: AsyncHelper.cs, unused Settings properties, ResolveVADModelPath()
+
+### Changed
+- FluentAssertions → AwesomeAssertions 9.3.0
+- Test count: 375 → 412 passing (15 new VAD tests)
+
+### Dependencies
+- Added: Microsoft.ML.OnnxRuntime 1.17.3, Whisper.net 1.9.0, Whisper.net.Runtime 1.9.0
+- Added: System.Text.Json 10.0.0 (required by Whisper.net)
+- Removed: Microsoft.Extensions.DependencyInjection
+
 ## [1.3.0.0] - 2026-02-14
 
 ### Changed
