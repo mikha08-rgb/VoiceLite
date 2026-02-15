@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WindowsInput;
-using WindowsInput.Native;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
