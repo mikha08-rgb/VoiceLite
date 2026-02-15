@@ -33,6 +33,7 @@ namespace VoiceLite
         private TranscriptionHistoryService? historyService;
         private CustomShortcutService? customShortcutService;
         private ProFeatureService? proFeatureService;
+        private Services.Audio.SileroVadService? vadService;
         // SoundService removed per user request - no audio feedback
 
         // ViewModels
@@ -484,6 +485,26 @@ namespace VoiceLite
                 if (audioRecorder != null && settings.SelectedMicrophoneIndex >= 0)
                 {
                     audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
+                }
+
+                // Initialize Silero VAD for silence trimming
+                var vadModelPath = Services.Audio.SileroVadService.FindModelPath();
+                if (vadModelPath != null)
+                {
+                    try
+                    {
+                        vadService = new Services.Audio.SileroVadService(vadModelPath);
+                        audioRecorder.SetVadService(vadService, settings);
+                        ErrorLogger.LogWarning($"Silero VAD initialized (threshold={settings.VADThreshold})");
+                    }
+                    catch (Exception vadEx)
+                    {
+                        ErrorLogger.LogWarning($"Silero VAD init failed, continuing without VAD: {vadEx.Message}");
+                    }
+                }
+                else
+                {
+                    ErrorLogger.LogWarning("Silero VAD model not found, silence trimming disabled");
                 }
 
                 // Initialize Pro feature service (for license validation)
@@ -2083,6 +2104,9 @@ namespace VoiceLite
 
                 whisperService?.Dispose();
                 whisperService = null;
+
+                vadService?.Dispose();
+                vadService = null;
 
                 audioRecorder?.Dispose();
                 audioRecorder = null;

@@ -257,43 +257,6 @@ namespace VoiceLite.Services
             }
         }
 
-        private string? ResolveVADModelPath()
-        {
-            const string vadModelFile = "ggml-silero-vad.bin";
-
-            var bundledPath = Path.Combine(baseDir, "whisper", vadModelFile);
-            if (File.Exists(bundledPath))
-            {
-                ErrorLogger.LogMessage($"VAD model found (bundled): {bundledPath}");
-                return bundledPath;
-            }
-
-            var basePath = Path.Combine(baseDir, vadModelFile);
-            if (File.Exists(basePath))
-            {
-                ErrorLogger.LogMessage($"VAD model found (base dir): {basePath}");
-                return basePath;
-            }
-
-            var localDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VoiceLite",
-                "whisper",
-                vadModelFile
-            );
-            if (File.Exists(localDataPath))
-            {
-                ErrorLogger.LogMessage($"VAD model found (local data): {localDataPath}");
-                return localDataPath;
-            }
-
-            ErrorLogger.LogWarning($"VAD model '{vadModelFile}' not found. Checked locations:\n" +
-                                 $"1. {bundledPath}\n" +
-                                 $"2. {basePath}\n" +
-                                 $"3. {localDataPath}");
-            return null;
-        }
-
         private string SanitizeLanguageCode(string languageCode)
         {
             if (string.IsNullOrWhiteSpace(languageCode))

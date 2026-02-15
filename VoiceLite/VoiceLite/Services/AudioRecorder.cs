@@ -39,6 +39,10 @@ namespace VoiceLite.Services
         // Audio preprocessing settings (enabled by default for better transcription quality)
         private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
 
+        // Silero VAD preprocessing (trims silence before Whisper)
+        private SileroVadService? vadService;
+        private Models.Settings? vadSettings;
+
         // Timing constants (in milliseconds)
         private const int NAUDIO_BUFFER_FLUSH_DELAY_MS = 10; // Minimal delay for NAudio buffer flush
         private const int STOP_COMPLETION_DELAY_MS = 10; // Brief pause to let stop complete
@@ -254,6 +258,18 @@ namespace VoiceLite.Services
                 throw new InvalidOperationException("Cannot change preprocessing settings while recording");
 
             preprocessingSettings = settings ?? new AudioPreprocessingSettings();
+        }
+
+        /// <summary>
+        /// Configures Silero VAD for silence trimming. Must be called before StartRecording().
+        /// </summary>
+        public void SetVadService(SileroVadService? service, Models.Settings? settings)
+        {
+            if (isRecording)
+                throw new InvalidOperationException("Cannot change VAD settings while recording");
+
+            vadService = service;
+            vadSettings = settings;
         }
 
         public void StartRecording()
@@ -624,6 +640,28 @@ namespace VoiceLite.Services
                         // Fallback to unprocessed audio if preprocessing fails
                         ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: Preprocessing failed, using raw audio: {preprocessEx.Message}");
                         processedAudioData = audioData;
+                    }
+                }
+
+                // Stage 4: Silero VAD — trim silence segments before Whisper
+                if (vadService != null && vadSettings?.EnableVAD == true)
+                {
+                    try
+                    {
+                        var vadProcessed = vadService.ProcessAudio(processedAudioData, (float)vadSettings.VADThreshold);
+                        if (vadProcessed.Length > 100)
+                        {
+                            ErrorLogger.LogWarning($"VAD trimmed: {processedAudioData.Length} -> {vadProcessed.Length} bytes ({100 - vadProcessed.Length * 100 / processedAudioData.Length}% removed)");
+                            processedAudioData = vadProcessed;
+                        }
+                        else
+                        {
+                            ErrorLogger.LogWarning("VAD: All audio classified as silence, using original");
+                        }
+                    }
+                    catch (Exception vadEx)
+                    {
+                        ErrorLogger.LogWarning($"VAD failed, using pre-VAD audio: {vadEx.Message}");
                     }
                 }
 
