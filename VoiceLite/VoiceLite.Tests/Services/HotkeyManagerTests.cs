@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows.Input;
-using FluentAssertions;
+using AwesomeAssertions;
 using VoiceLite.Services;
 using Xunit;
 

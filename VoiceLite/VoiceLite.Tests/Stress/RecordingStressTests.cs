@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Xunit;
 using VoiceLite.Services;
 
@@ -86,7 +86,7 @@ namespace VoiceLite.Tests.Stress
             AssertMemoryWithinLimits(maxMemoryGrowthMB, "Rapid Start/Stop Cycles");
 
             // At least 90% should succeed
-            successCount.Should().BeGreaterOrEqualTo((int)(cycles * 0.9),
+            successCount.Should().BeGreaterThanOrEqualTo((int)(cycles * 0.9),
                 "at least 90% of start/stop cycles should succeed");
         }
 
@@ -140,7 +140,7 @@ namespace VoiceLite.Tests.Stress
 
             AssertMemoryWithinLimits(maxMemoryGrowthMB, "Multiple Recorder Instances");
 
-            successCount.Should().BeGreaterOrEqualTo((int)(instances * 0.9),
+            successCount.Should().BeGreaterThanOrEqualTo((int)(instances * 0.9),
                 "at least 90% of recorder instances should work");
         }
 
@@ -187,7 +187,7 @@ namespace VoiceLite.Tests.Stress
             AssertMemoryWithinLimits(maxMemoryGrowthMB, "Start/Stop Without Recording");
 
             // This edge case should succeed most of the time
-            successCount.Should().BeGreaterOrEqualTo((int)(cycles * 0.8),
+            successCount.Should().BeGreaterThanOrEqualTo((int)(cycles * 0.8),
                 "at least 80% should handle immediate start/stop");
         }
 

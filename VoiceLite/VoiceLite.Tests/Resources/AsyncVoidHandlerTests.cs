@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using Xunit;
-using FluentAssertions;
+using AwesomeAssertions;
 using VoiceLite.Helpers;
 using VoiceLite.Services;
 

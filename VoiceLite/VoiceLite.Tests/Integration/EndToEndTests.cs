@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Windows.Input;
 using Xunit;
-using FluentAssertions;
+using AwesomeAssertions;
 using VoiceLite.Services;
 using VoiceLite.Models;
 

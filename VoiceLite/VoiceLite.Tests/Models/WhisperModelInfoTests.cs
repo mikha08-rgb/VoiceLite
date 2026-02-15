@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Windows;
-using FluentAssertions;
+using AwesomeAssertions;
 using VoiceLite.Models;
 using Xunit;
 

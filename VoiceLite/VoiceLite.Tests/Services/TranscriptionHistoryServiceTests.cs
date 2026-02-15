@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -165,7 +165,7 @@ namespace VoiceLite.Tests.Services
 
             // Assert
             var addedItem = settings.TranscriptionHistory[0];
-            addedItem.Text.Length.Should().BeLessOrEqualTo(5000 + 20); // +20 for "... (truncated)"
+            addedItem.Text.Length.Should().BeLessThanOrEqualTo(5000 + 20); // +20 for "... (truncated)"
             addedItem.Text.Should().EndWith("... (truncated)");
         }
 

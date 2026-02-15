@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Xunit;
-using FluentAssertions;
+using AwesomeAssertions;
 using VoiceLite.Services;
 using System.Net.Http;
 using System.Reflection;

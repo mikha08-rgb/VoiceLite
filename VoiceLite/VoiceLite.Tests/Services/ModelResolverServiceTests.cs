@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Moq;
 using System;
 using System.IO;
@@ -478,7 +478,7 @@ namespace VoiceLite.Tests.Services
             var models = service.GetAvailableModelPaths();
 
             // Assert - Should contain both paths (different locations)
-            models.Should().HaveCountGreaterOrEqualTo(1);
+            models.Should().HaveCountGreaterThanOrEqualTo(1);
         }
 
         [Fact]
