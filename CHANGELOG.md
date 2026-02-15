@@ -19,7 +19,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 - FluentAssertions → AwesomeAssertions 9.3.0
-- Test count: 375 → 412 passing (15 new VAD tests)
+- Test count: 375 → 402 passing, 35 skipped (15 new VAD tests)
 
 ### Dependencies
 - Added: Microsoft.ML.OnnxRuntime 1.17.3, Whisper.net 1.9.0, Whisper.net.Runtime 1.9.0
