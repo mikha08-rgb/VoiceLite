@@ -114,8 +114,8 @@ jobs:
 
         New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
 
-        # CRITICAL FIX: Use whisper files from source directory (v1.7.6)
-        # DO NOT download old v1.5.4 - it cannot read NAudio WAV format correctly
+        # Copy model files and Silero VAD ONNX from source directory
+        # Whisper.net native DLLs come from NuGet (included in publish output)
         Copy-Item -Path "VoiceLite/whisper/*" -Destination "VoiceLite/whisper_installer_lite/" -Force
 
         echo "Copied Whisper files. Installer directory contents:"
@@ -132,7 +132,7 @@ jobs:
         $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
         New-Item -ItemType Directory -Force -Path $publishDir
 
-        # Copy all Whisper files (Tiny model + whisper.exe + DLLs)
+        # Copy model files and Silero VAD model to publish directory
         Copy-Item -Path "VoiceLite/whisper_installer_lite/*" -Destination $publishDir -Force
 
         echo "Copied files to publish directory:"
@@ -277,7 +277,7 @@ jobs:
           If installation fails, see [TROUBLESHOOTING.md](https://github.com/${{ github.repository }}/blob/master/TROUBLESHOOTING.md)
 
           **Common issues**:
-          - **Antivirus blocking**: Add VoiceLite.exe and whisper.exe to antivirus exclusions
+          - **Antivirus blocking**: Add VoiceLite.exe to antivirus exclusions
           - **Model corruption**: Verify SHA256 hash, re-download if mismatch
           - **VC++ install fails**: Installer auto-installs VC++ Runtime - if it fails, manually download from [Microsoft](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 

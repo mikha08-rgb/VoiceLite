@@ -1,6 +1,6 @@
 # VoiceLite
 
-Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
+Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [Whisper.net](https://github.com/sandrohanea/whisper.net).
 
 [![Download](https://img.shields.io/github/v/release/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -9,15 +9,14 @@ Windows speech-to-text app. Hold a key, speak, release — text appears wherever
 
 **Requirements:** Windows 10/11 (64-bit), 4GB RAM
 
-1. Install [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) (required)
-2. Download [VoiceLite installer](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
-3. Run installer, launch from Start Menu
+1. Download [VoiceLite installer](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
+2. Run installer, launch from Start Menu
 
-If VoiceLite won't start: install [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) (Windows x64)
+Everything is bundled — .NET 8 runtime and VC++ Redistributable install automatically.
 
 ## Usage
 
-**Default hotkey:** `Ctrl+Alt+R`
+**Default hotkey:** `Shift+Z`
 
 Hold hotkey → speak → release → text appears in active window.
 
@@ -27,17 +26,18 @@ Change hotkey in Settings (right-click tray icon).
 
 | Model | Size | Speed | Accuracy | Tier |
 |-------|------|-------|----------|------|
-| Tiny | 42MB | Fastest | ~80-85% | Free |
-| Base | 74MB | Fast | ~87% | Pro |
-| Small | 244MB | Medium | ~90% | Pro |
-| Medium | 769MB | Slow | ~95% | Pro |
-| Large | 1.5GB | Slowest | ~98% | Pro |
+| Swift | 142MB | 4/5 | 2/5 | Free |
+| Pro | 466MB | 3/5 | 3/5 | Pro |
+| Elite | 1.5GB | 2/5 | 4/5 | Pro |
+| Turbo | 874MB | 3/5 | 5/5 | Pro |
+| Ultra | 2.9GB | 1/5 | 5/5 | Pro |
 
-Free tier includes Tiny model with unlimited usage. Pro ($20 one-time) unlocks all models — upgrade in Settings → Account.
+Free tier includes Swift model with unlimited usage. Pro ($20 one-time) unlocks all models — upgrade in Settings → Account.
 
 ## Features
 
 - Works in any Windows application
+- Silero VAD preprocessing (trims silence before transcription)
 - Customizable hotkeys
 - Low resource usage when idle
 
@@ -55,8 +55,6 @@ Free tier includes Tiny model with unlimited usage. Pro ($20 one-time) unlocks a
 
 | Problem | Fix |
 |---------|-----|
-| "VCRUNTIME140_1.dll not found" | Install [VC++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
-| Won't start | Install [.NET 8 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime) |
 | Windows Defender warning | Click "More info" → "Run anyway" |
 | Hotkey doesn't work | Change in Settings — another app may use it |
 | Low accuracy | Use larger model (Pro) or speak more clearly |
@@ -81,7 +79,8 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 ## Tech Stack
 
 - .NET 8 / WPF
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (speech recognition)
+- [Whisper.net](https://github.com/sandrohanea/whisper.net) (speech recognition, in-process via P/Invoke)
+- [Silero VAD](https://github.com/snakers4/silero-vad) (voice activity detection, ONNX)
 - [NAudio](https://github.com/naudio/NAudio) (audio capture)
 
 ## Contributing

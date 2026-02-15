@@ -47,9 +47,9 @@ jobs:
         # Verify critical files
         $required = @(
           "VoiceLite.exe",
-          "whisper/whisper.exe",
           "NAudio.dll",
-          "H.InputSimulator.dll"
+          "H.InputSimulator.dll",
+          "Whisper.net.dll"
         )
 
         $missing = @()
@@ -80,29 +80,22 @@ jobs:
           exit 1
         }
 
-    - name: Test whisper.exe can run
+    - name: Verify Whisper.net and VAD files
       run: |
-        $whisperExe = Get-ChildItem -Path "VoiceLite-Test" -Filter "whisper.exe" -Recurse | Select-Object -First 1
+        $whisperDll = Get-ChildItem -Path "VoiceLite-Test" -Filter "whisper.net.dll" -Recurse | Select-Object -First 1
+        $vadModel = Get-ChildItem -Path "VoiceLite-Test" -Filter "silero_vad_v5.onnx" -Recurse | Select-Object -First 1
 
-        if ($whisperExe) {
-          Write-Host "Testing whisper.exe..."
+        if ($whisperDll) {
+          Write-Host "✓ Whisper.net DLL found: $($whisperDll.FullName)"
+        } else {
+          Write-Error "Whisper.net DLL not found!"
+        }
 
-          try {
-            $proc = Start-Process -FilePath $whisperExe.FullName `
-                                  -ArgumentList "--help" `
-                                  -PassThru `
-                                  -NoNewWindow `
-                                  -Wait
-
-            if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 1) {
-              Write-Host "✓ Whisper.exe runs successfully"
-            } else {
-              Write-Warning "Whisper.exe exit code: $($proc.ExitCode)"
-            }
-          } catch {
-            Write-Error "Failed to run whisper.exe: $_"
-            Write-Host "This is expected on GitHub Actions without VC++ Runtime"
-          }
+        if ($vadModel) {
+          $sizeInMB = [math]::Round($vadModel.Length / 1MB, 2)
+          Write-Host "✓ Silero VAD model found ($sizeInMB MB)"
+        } else {
+          Write-Warning "Silero VAD model not found (VAD preprocessing won't work)"
         }
 
     - name: Test VoiceLite startup (no audio)
@@ -141,7 +134,7 @@ jobs:
           TestResults = @{
             FilesPresent = $true
             ModelFound = $true
-            WhisperExecutable = $false  # Expected to fail without VC++
+            WhisperNetDll = $true
           }
         }
 

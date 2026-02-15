@@ -97,9 +97,9 @@ taskkill /F /IM VoiceLite.exe
 **Cause**: Missing Visual C++ Runtime
 **Fix**: Installer auto-installs it, or manually install VC++ 2015-2022 x64
 
-### Issue: Whisper.exe not found
+### Issue: Whisper model not found
 **Cause**: Model file missing or path incorrect
-**Fix**: Verify `VoiceLite/whisper/ggml-tiny.bin` exists (42MB)
+**Fix**: Verify `VoiceLite/whisper/ggml-base.bin` exists (142MB)
 
 ## Performance Benchmarks
 

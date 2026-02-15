@@ -1,114 +1,18 @@
-# VoiceLite Architecture Guide
+# VoiceLite Architecture
 
-**Version**: v1.2.0.11
-**Last Updated**: Phase 4D Day 1
-**Status**: Production-ready MVVM architecture with DI
-
----
-
-## Quick Overview
-
-VoiceLite is a **Windows desktop speech-to-text app** built with:
-- **Framework**: .NET 8.0 + WPF
-- **Pattern**: MVVM (Model-View-ViewModel)
-- **DI**: Microsoft.Extensions.DependencyInjection
-- **Architecture**: Clean separation of concerns (4 layers)
-
-**Core Flow**: Recording → Whisper AI → Text Injection
+**Version**: v1.4.0.0
+**Framework**: .NET 8.0, WPF
+**Pattern**: Direct instantiation (no DI container, no MVVM controllers)
 
 ---
 
-## Table of Contents
+## Overview
 
-1. [High-Level Architecture](#high-level-architecture)
-2. [Project Structure](#project-structure)
-3. [Dependency Injection Setup](#dependency-injection-setup)
-4. [Core Components](#core-components)
-5. [Data Flow](#data-flow)
-6. [Adding New Features](#adding-new-features)
-7. [Testing Strategy](#testing-strategy)
-8. [Performance Characteristics](#performance-characteristics)
+VoiceLite is a Windows desktop speech-to-text application. The user presses a hotkey, speaks, and the transcribed text is injected into the active window.
 
----
+**Core pipeline**: Audio capture (NAudio) -> Preprocessing (HPF/NoiseGate/AGC) -> Silence trimming (Silero VAD) -> Transcription (Whisper.net in-process) -> Text injection (InputSimulator)
 
-## High-Level Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     VoiceLite Desktop App                    │
-│                      (.NET 8.0 + WPF)                       │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    PRESENTATION LAYER                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │  MainWindow  │  │SettingsWindow│  │ Converters   │     │
-│  │   (View)     │  │   (View)     │  │   (XAML)     │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
-│          │                  │                               │
-│          ▼                  ▼                               │
-│  ┌──────────────┐  ┌──────────────┐                       │
-│  │ MainViewModel│  │SettingsVM    │                       │
-│  │  (MVVM)      │  │  (MVVM)      │                       │
-│  └──────────────┘  └──────────────┘                       │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     CONTROLLER LAYER                         │
-│  ┌──────────────────┐  ┌──────────────────┐               │
-│  │ RecordingCtrl    │  │ TranscriptionCtrl│               │
-│  │ (Orchestration)  │  │ (Orchestration)  │               │
-│  └──────────────────┘  └──────────────────┘               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      SERVICE LAYER                           │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
-│  │AudioRecorder│ │WhisperService│  │TextInjector│         │
-│  │  (NAudio)  │  │(whisper.cpp) │  │(Simulator) │         │
-│  └────────────┘  └──────────────┘  └────────────┘         │
-│                                                              │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
-│  │  Hotkey    │  │   License    │  │  History   │         │
-│  │  Manager   │  │   Service    │  │  Service   │         │
-│  └────────────┘  └──────────────┘  └────────────┘         │
-│                                                              │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
-│  │ CustomShort│  │ModelResolver │  │ TextPost   │         │
-│  │ cutService │  │  Service     │  │ Processor  │         │
-│  └────────────┘  └──────────────┘  └────────────┘         │
-│                                                              │
-│  ┌─────────────────────────────────────────────┐           │
-│  │          Audio Preprocessing Pipeline         │           │
-│  │  ┌────────────┐ ┌──────────┐ ┌──────────┐   │           │
-│  │  │HighPassFilt│ │NoiseGate │ │AutoGain  │   │           │
-│  │  │(80Hz cutoff│ │(reduction│ │(normalize│   │           │
-│  │  └────────────┘ └──────────┘ └──────────┘   │           │
-│  └─────────────────────────────────────────────┘           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   INFRASTRUCTURE LAYER                       │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
-│  │   Polly    │  │    Logging   │  │   File I/O │         │
-│  │  (Retry)   │  │ (ErrorLogger)│  │  (Atomic)  │         │
-│  └────────────┘  └──────────────┘  └────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      EXTERNAL SYSTEMS                        │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────┐         │
-│  │whisper.exe │  │voicelite.app │  │  Windows   │         │
-│  │ (Subprocess│  │   (License   │  │   (OS API) │         │
-│  │    AI)     │  │    Validation│  │            │         │
-│  └────────────┘  └──────────────┘  └────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-```
+**Backend**: Next.js 15 web API at voicelite.app handles license validation, Stripe checkout, and webhook processing.
 
 ---
 
@@ -116,867 +20,315 @@ VoiceLite is a **Windows desktop speech-to-text app** built with:
 
 ```
 VoiceLite/
-├── Core/                               # Business logic interfaces
-│   ├── Controllers/                    # Orchestration layer
-│   │   ├── IRecordingController.cs     # Recording workflow
-│   │   └── ITranscriptionController.cs # Transcription workflow
-│   │
-│   └── Interfaces/                     # Service contracts
-│       ├── Features/
-│       │   ├── ILicenseService.cs      # License validation
-│       │   ├── IProFeatureService.cs   # Pro tier gating
-│       │   └── ISettingsService.cs     # Settings management
-│       │
-│       └── Services/
-│           ├── IAudioRecorder.cs       # Audio capture
-│           ├── IWhisperService.cs      # AI transcription
-│           ├── ITextInjector.cs        # Text simulation
-│           └── IHotkeyManager.cs       # Global hotkeys
+├── Core/Interfaces/Features/
+│   └── IProFeatureService.cs           # Only surviving interface (DI seam for testing)
 │
-├── Presentation/                       # MVVM UI layer
-│   ├── ViewModels/
-│   │   ├── MainViewModel.cs            # Main window logic
-│   │   └── SettingsViewModel.cs        # Settings window logic
+├── Services/
+│   ├── AudioRecorder.cs                # NAudio 16kHz mono capture
+│   ├── PersistentWhisperService.cs     # Whisper.net in-process transcription
+│   ├── TextInjector.cs                 # H.InputSimulator keyboard/clipboard injection
+│   ├── HotkeyManager.cs               # Win32 RegisterHotKey global hotkeys
+│   ├── LicenseService.cs              # HTTP license validation + DPAPI storage
+│   ├── ProFeatureService.cs           # Pro tier feature gating (implements IProFeatureService)
+│   ├── ModelResolverService.cs        # Model path resolution + license check
+│   ├── TranscriptionHistoryService.cs # History persistence + export
+│   ├── CustomShortcutService.cs       # Regex text shortcuts (100ms timeout)
+│   ├── SystemTrayManager.cs           # Tray icon and context menu
+│   ├── TextPostProcessor.cs           # Punctuation/capitalization cleanup
+│   ├── HardwareIdService.cs           # WMI machine ID for device activation
+│   ├── ErrorLogger.cs                 # Static logging (Debug + Release levels)
+│   ├── DisposableExtensions.cs        # Safe disposal helpers
+│   └── Audio/
+│       ├── AudioPreprocessor.cs       # Pipeline orchestrator (ISampleProvider chain)
+│       ├── SileroVadService.cs        # Silero VAD v5 ONNX speech detection
+│       ├── HighPassFilter.cs          # 80Hz rumble removal
+│       ├── SimpleNoiseGate.cs         # Background noise reduction
+│       └── AutomaticGainControl.cs    # Volume normalization
+│
+├── Presentation/
+│   ├── ViewModels/                    # Lightweight data-binding only (no business logic)
+│   │   ├── ViewModelBase.cs           # INotifyPropertyChanged base
+│   │   ├── RecordingViewModel.cs      # Recording state + elapsed timer
+│   │   ├── HistoryViewModel.cs        # History list display
+│   │   └── StatusViewModel.cs         # Status bar display
 │   └── Commands/
-│       ├── RelayCommand.cs             # ICommand implementation
-│       └── AsyncRelayCommand.cs        # Async ICommand implementation
+│       ├── RelayCommand.cs            # ICommand implementation
+│       └── AsyncRelayCommand.cs       # Async ICommand implementation
 │
-├── Services/                           # Service implementations
-│   ├── AudioRecorder.cs                # NAudio wrapper
-│   ├── PersistentWhisperService.cs     # Whisper subprocess
-│   ├── TextInjector.cs                 # InputSimulator wrapper
-│   ├── HotkeyManager.cs                # Win32 hotkey API
-│   ├── LicenseService.cs               # HTTP license validation
-│   ├── ProFeatureService.cs            # Feature gating logic
-│   ├── TranscriptionHistoryService.cs  # History management
-│   ├── SystemTrayManager.cs            # Tray icon + menu
-│   ├── ErrorLoggerService.cs           # Centralized logging (IErrorLogger)
-│   ├── SettingsService.cs              # Settings persistence
-│   ├── CustomShortcutService.cs        # Text shortcut expansion
-│   ├── ModelResolverService.cs         # Model path + SHA256 validation
-│   ├── TextPostProcessor.cs            # Punctuation/capitalization
-│   ├── HardwareIdService.cs            # Machine ID for device activation
-│   │
-│   └── Audio/                          # Audio preprocessing pipeline
-│       ├── AudioPreprocessor.cs        # Main orchestrator
-│       ├── HighPassFilter.cs           # 80Hz rumble removal
-│       ├── SimpleNoiseGate.cs          # Background noise reduction
-│       └── AutomaticGainControl.cs     # Volume normalization
+├── Models/
+│   ├── Settings.cs                    # App config + WhisperPresetConfig
+│   ├── WhisperModelInfo.cs            # Model metadata (name, size, tier)
+│   ├── TranscriptionHistoryItem.cs    # Single history entry
+│   ├── CustomShortcut.cs              # Shortcut trigger/replacement pair
+│   └── LanguageInfo.cs                # Language display name + code
 │
-├── Infrastructure/                     # Cross-cutting concerns
-│   ├── DependencyInjection/
-│   │   └── ServiceConfiguration.cs     # DI extension methods
-│   └── Resilience/
-│       └── RetryPolicies.cs            # Polly retry logic
+├── Infrastructure/Resilience/
+│   └── RetryPolicies.cs              # Polly retry/circuit breaker for HTTP
 │
-├── Models/                             # Data models
-│   └── Settings.cs                     # App configuration
+├── Helpers/
+│   └── AsyncHelper.cs                # Safe async void wrappers
 │
-├── Resources/                          # XAML styles
-│   └── ModernStyles.xaml               # UI theme
+├── Utilities/
+│   ├── HotkeyDisplayHelper.cs        # Key combo display formatting
+│   ├── StatusColors.cs               # UI color constants
+│   ├── TimingConstants.cs            # Shared timing values
+│   ├── TextAnalyzer.cs               # Text statistics
+│   ├── RelativeTimeConverter.cs      # "2 minutes ago" formatting
+│   └── TruncateTextConverter.cs      # XAML text truncation converter
 │
-├── Helpers/                            # Utilities
-│   ├── AsyncHelper.cs                  # Async void wrappers
-│   └── Converters/                     # XAML converters
+├── App.xaml.cs                       # Exception handlers + new MainWindow()
+├── MainWindow.xaml.cs                # Entry point: instantiates all services, orchestrates everything
+├── MainWindow.xaml                   # Main UI
+├── SettingsWindowNew.xaml            # Settings UI
 │
-├── App.xaml.cs                         # DI container setup
-├── MainWindow.xaml                     # Main UI
-├── SettingsWindowNew.xaml              # Settings UI
-└── whisper/                            # AI models
-    ├── whisper.exe                     # Inference engine
-    ├── ggml-tiny.bin                   # Free tier model
-    └── ggml-small.bin                  # Pro tier model
+└── whisper/                          # Model files (not code)
+    ├── ggml-base.bin                 # Swift model (142MB, bundled)
+    └── silero_vad_v5.onnx            # VAD model (~2.3MB, bundled)
 ```
 
 ---
 
-## Dependency Injection Setup
+## Startup Flow
 
-### DI Container Initialization
+```
+App.xaml.cs
+  └─ OnStartup()
+       ├─ Register global exception handlers
+       └─ new MainWindow() → .Show()
 
-DI is configured via extension methods in `Infrastructure/DependencyInjection/ServiceConfiguration.cs`:
-
-**File**: `App.xaml.cs` (simplified)
-
-```csharp
-public partial class App : Application
-{
-    private ServiceProvider? _serviceProvider;
-
-    protected override void OnStartup(StartupEventArgs e)
-    {
-        base.OnStartup(e);
-
-        // Build DI container using extension methods
-        var services = new ServiceCollection();
-        services.AddVoiceLiteServices();      // Core + Feature services
-        services.AddInfrastructureServices(); // Infrastructure services
-        services.ConfigureOptions();          // Service options
-        _serviceProvider = services.BuildServiceProvider();
-
-        var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-        mainWindow.Show();
-    }
-}
+MainWindow constructor
+  ├─ LoadSettings()
+  ├─ Create ViewModels (RecordingViewModel, HistoryViewModel, StatusViewModel)
+  ├─ Set DataContext = this
+  └─ Background init (Task.Run):
+       ├─ new AudioRecorder()
+       ├─ new PersistentWhisperService(settings, modelResolver, proFeatureService)
+       │     └─ Background model warm-up: WhisperFactory.FromPath(modelPath)
+       ├─ new HotkeyManager()
+       ├─ new TextInjector()
+       ├─ new ProFeatureService(settings)
+       ├─ new SileroVadService(vadModelPath)
+       ├─ new TranscriptionHistoryService(settings)
+       ├─ new CustomShortcutService(settings)
+       └─ new SystemTrayManager()
 ```
 
-**File**: `Infrastructure/DependencyInjection/ServiceConfiguration.cs` (actual registrations)
+There is no DI container. MainWindow directly instantiates every service. `App.xaml.cs` just does `new MainWindow()` plus exception handling.
 
-```csharp
-public static IServiceCollection AddVoiceLiteServices(this IServiceCollection services)
-{
-    // Register Settings (Singleton - loaded once)
-    services.AddSingleton(provider => Settings.Load());
+The ViewModels (RecordingViewModel, HistoryViewModel, StatusViewModel) are lightweight data-binding wrappers. They hold UI state (recording elapsed time, status text) and fire events back to MainWindow. MainWindow is the actual controller -- it wires events, orchestrates the recording/transcription flow, and calls services directly.
 
-    // Core Services (Singleton - single instance for app lifetime)
-    services.AddSingleton<IAudioRecorder, AudioRecorder>();
-    services.AddSingleton<IWhisperService, PersistentWhisperService>();
-    services.AddSingleton<ITextInjector, TextInjector>();
-    services.AddSingleton<IErrorLogger, ErrorLoggerService>();
-    services.AddSingleton<IHotkeyManager, HotkeyManager>();
-    services.AddSingleton<ISystemTrayManager, SystemTrayManager>();
+---
 
-    // Feature Services (Singleton - state is maintained)
-    services.AddSingleton<ILicenseService, LicenseService>();
-    services.AddSingleton<IProFeatureService, ProFeatureService>();
-    services.AddSingleton<ITranscriptionHistoryService, TranscriptionHistoryService>();
-    services.AddSingleton<ICustomShortcutService, CustomShortcutService>();
-    services.AddSingleton<ISettingsService, SettingsService>();
+## Data Flow: Recording to Text
 
-    // Controllers (Scoped - new instance per request/window)
-    services.AddScoped<IRecordingController, RecordingController>();
-    services.AddScoped<ITranscriptionController, TranscriptionController>();
-
-    // ViewModels (Transient - new instance every time)
-    services.AddTransient<MainViewModel>();
-    services.AddTransient<SettingsViewModel>();
-
-    // Windows (Transient - new instance for each window)
-    services.AddTransient<MainWindow>();
-    services.AddTransient<SettingsWindowNew>();
-
-    return services;
-}
 ```
-
-### Why Singleton vs Scoped vs Transient?
-
-**Singletons** (One instance for entire app lifetime):
-- `Settings` - Shared configuration
-- `AudioRecorder` - Only one microphone active at a time
-- `WhisperService` - Process management requires single instance
-- `HotkeyManager` - Global hotkeys registered once
-- `LicenseService` - Caches validation result
-- `CustomShortcutService` - Processes text shortcuts
-- `ErrorLoggerService` - Centralized logging
-
-**Scoped** (New instance per request/window):
-- `Controllers` - Orchestration with per-request state
-
-**Transients** (New instance each time):
-- `ViewModels` - Per-window state
-- `Windows` - New window instance each time
+User presses Shift+Z (or configured hotkey)
+  │
+  ▼
+HotkeyManager (Win32 RegisterHotKey)
+  │ fires HotkeyPressed event
+  ▼
+MainWindow.OnHotkeyPressed()
+  │
+  ├─ START RECORDING:
+  │   AudioRecorder.StartRecording()
+  │   └─ NAudio WaveInEvent → 16kHz mono PCM → MemoryStream
+  │      └─ Audio pipeline (real-time via AudioPreprocessor ISampleProvider chain):
+  │           HighPassFilter (80Hz) → SimpleNoiseGate → AutomaticGainControl
+  │
+  ├─ ... user speaks ...
+  │
+  └─ STOP RECORDING (hotkey pressed again):
+      AudioRecorder.StopRecording()
+        │ returns WAV byte[]
+        ▼
+      SileroVadService.TrimSilence(wavBytes, threshold: 0.35)
+        │ ONNX inference on 512-sample windows
+        │ detects speech segments, strips leading/trailing silence
+        ▼
+      PersistentWhisperService.TranscribeFromStreamAsync(stream)
+        │ EnsureFactoryLoaded(modelPath)  ← model stays in memory
+        │ factory.CreateBuilder() → configure → .Build() → WhisperProcessor
+        │ processor.ProcessAsync(wavStream) → segments
+        ▼
+      TextPostProcessor.Process(rawText)
+        │ punctuation cleanup, capitalization
+        ▼
+      CustomShortcutService.ProcessShortcuts(text)
+        │ regex-based trigger → expansion
+        ▼
+      TextInjector.InjectText(text, mode)
+        │ SmartAuto: clipboard paste for >100 chars, typing for short text
+        ▼
+      Text appears in the previously-active window
+```
 
 ---
 
 ## Core Components
 
-### 1. AudioRecorder (Service)
+### PersistentWhisperService
 
-**Purpose**: Record audio from microphone
-**Tech**: NAudio library (16kHz, 16-bit mono WAV)
-**Location**: `Services/AudioRecorder.cs`
+Whisper.net C# bindings via P/Invoke. Loads the GGML model once via `WhisperFactory.FromPath()` and keeps it resident in memory. Each transcription creates a `WhisperProcessor` from the factory, runs `ProcessAsync()`, then disposes the processor.
 
-**Key Methods**:
-```csharp
-void StartRecording();                  // Begin capture
-void StopRecording();                   // End capture, save to temp file
-event EventHandler<string>? AudioReady; // Fires when WAV file ready
-void Dispose();                         // Cleanup NAudio resources
-```
+- Model switching: disposes old factory, creates new one (under `factoryLock`)
+- Cancellation: `transcriptionCts` protected by `ctsLock`, `semaphoreAcquired` bool prevents `SemaphoreFullException`
+- Initial prompt guides vocabulary (technical terms, proper nouns)
+- Preset system: `WhisperPresetConfig` controls beam size, entropy threshold, temperature fallback
 
-**Threading**: Runs on background thread (NAudio callback)
+### SileroVadService
 
----
+Silero VAD v5 ONNX model (~2.3MB). Runs as a preprocessing step BEFORE Whisper to trim silence and reduce hallucinations. Input: 512-sample windows + 64-sample context = 576 floats per inference. Output: speech probability 0-1 per window. Segments above threshold are kept; the rest is stripped.
 
-### 2. PersistentWhisperService (Service)
+- Lazy ONNX session loading (double-checked locking)
+- Settings: `EnableVAD` (default true), `VADThreshold` (default 0.35)
 
-**Purpose**: Transcribe audio using Whisper AI
-**Tech**: whisper.cpp subprocess (local AI, no cloud)
-**Location**: `Services/PersistentWhisperService.cs`
+### AudioPreprocessor
 
-**Key Methods**:
-```csharp
-Task<string> TranscribeAsync(string audioFilePath);  // Run transcription
-void Dispose();                                      // Kill processes
-```
+NAudio `ISampleProvider` chain. Wraps the raw microphone input in three processing stages applied during recording (real-time, not post-hoc):
 
-**Process Management**:
-- Spawns `whisper.exe` subprocess per transcription
-- Command: `whisper.exe -m model.bin -f audio.wav --no-timestamps`
-- Cleanup: Kills process tree on disposal
+1. **HighPassFilter**: Butterworth 80Hz cutoff, removes rumble/wind
+2. **SimpleNoiseGate**: Threshold-based, reduces background hum during silence
+3. **AutomaticGainControl**: Normalizes volume to target RMS
 
-**Performance**:
-- Tiny model: 0.4-0.8s per 5s audio
-- Small model: 2.5-3.5s per 5s audio
+### LicenseService
 
----
+Validates license keys via `POST https://voicelite.app/api/licenses/validate`. Uses static `HttpClient` (prevents socket exhaustion). Retry with Polly (3 attempts, exponential backoff). Caches result locally via DPAPI encryption at `%LOCALAPPDATA%\VoiceLite\license.dat` in `key|email` format for tamper detection.
 
-### 3. TextInjector (Service)
+### ModelResolverService
 
-**Purpose**: Inject transcribed text into active window
-**Tech**: H.InputSimulator library (keyboard/clipboard simulation)
-**Location**: `Services/TextInjector.cs`
+Resolves model file paths. Searches: `baseDir/whisper/`, `baseDir/`, `%LocalAppData%/VoiceLite/whisper/`. Validates Pro license via `IProFeatureService.CanUseModel()` before returning Pro-tier model paths. Throws `UnauthorizedAccessException` for free users requesting Pro models.
 
-**Key Methods**:
-```csharp
-void InjectText(string text, InjectionMode mode);
-```
+### TextInjector
 
-**Modes**:
-- **SmartAuto**: Clipboard for >100 chars, typing for short text
+Uses H.InputSimulator for keyboard simulation. Three modes:
+- **SmartAuto**: Clipboard paste for text >100 chars, character typing for short text
 - **Type**: Always types character-by-character
 - **Paste**: Always uses clipboard (Ctrl+V)
 
-**Security**: Detects password fields, avoids logging
-
-**Thread Safety**: Uses `volatile bool _disposed` for cross-thread disposal visibility
+Captures the foreground window handle at START of transcription (not at injection time).
 
 ---
 
-### 4. CustomShortcutService (Service)
+## Thread Safety
 
-**Purpose**: Expand text shortcuts in transcribed text
-**Tech**: Regex-based whole-word replacement
-**Location**: `Services/CustomShortcutService.cs`
-
-**Key Methods**:
-```csharp
-string ProcessShortcuts(string text);  // Replace trigger phrases with expansions
-```
-
-**Features**:
-- Case-insensitive whole-word matching using `\b` word boundaries
-- 100ms regex timeout to prevent catastrophic backtracking
-- Thread-safe settings access via `lock (_settings.SyncRoot)`
+| Component | Mechanism | Protects |
+|-----------|-----------|----------|
+| PersistentWhisperService | `factoryLock` (object lock) | Model loading/switching |
+| PersistentWhisperService | `ctsLock` (object lock) | CancellationTokenSource access |
+| PersistentWhisperService | `transcriptionSemaphore` (SemaphoreSlim) | Serializes transcriptions |
+| SileroVadService | `sessionLock` (object lock) | ONNX session initialization |
+| LicenseService | `_cacheLock` (object lock) | Thread-safe license cache |
+| ProFeatureService | `ReaderWriterLockSlim` | Concurrent reads, exclusive refresh |
+| TextInjector | `volatile bool _disposed` | Cross-thread disposal visibility |
+| MainWindow | `recordingLock` (object lock) | Recording state transitions |
+| MainWindow | `saveSettingsSemaphore` (SemaphoreSlim) | Settings file writes |
 
 ---
 
-### 5. ModelResolverService (Service)
+## Testing
 
-**Purpose**: Resolve Whisper model and executable paths
-**Tech**: SHA256 hash validation for integrity
-**Location**: `Services/ModelResolverService.cs`
+**412 passing tests, 35 skipped** (hardware/UI dependent). Framework: xUnit + Moq.
 
-**Key Methods**:
-```csharp
-string ResolveWhisperExePath();                     // Find whisper.exe
-string ResolveModelPath(string modelName);          // Find model file
-bool ValidateWhisperExecutable(string path);        // SHA256 validation
-```
+Key test areas:
+- **Disposal tests**: Every service with resources has disposal tests (memory leak prevention)
+- **ModelResolverServiceTests**: Mocks `IProFeatureService` to test license gating
+- **Audio pipeline tests**: Each filter tested independently with known signals
+- **SileroVadService tests**: Speech detection on real audio patterns (note: pure sine waves are not detected as speech)
+- **Stress tests**: Concurrent transcription, rapid start/stop, resource exhaustion
 
-**Security** (MODEL-GATE-001):
-- Validates whisper.exe SHA256 hash before execution
-- Fails closed on hash mismatch (throws `SecurityException`)
-- Validates Pro license before returning Pro models
-
----
-
-### 6. Audio Preprocessing Pipeline (Services/Audio/)
-
-**Purpose**: Clean audio before transcription
-**Location**: `Services/Audio/`
-
-**Pipeline** (orchestrated by `AudioPreprocessor.cs`):
-```
-Raw Audio → HighPassFilter → SimpleNoiseGate → AutomaticGainControl → Clean Audio
-                (80Hz)        (background)       (normalize)
-```
-
-**Components**:
-
-| Component | Purpose | Key Parameter |
-|-----------|---------|---------------|
-| `HighPassFilter` | Remove low-frequency rumble | 80Hz cutoff |
-| `SimpleNoiseGate` | Reduce background noise | Threshold-based |
-| `AutomaticGainControl` | Normalize volume levels | Target RMS |
-
----
-
-### 7. HardwareIdService (Static Service)
-
-**Purpose**: Generate unique machine identifiers for device activation
-**Tech**: WMI queries + SHA256 hashing
-**Location**: `Services/HardwareIdService.cs`
-
-**Key Methods**:
-```csharp
-static string GetMachineId();     // CPU ID + Motherboard Serial hash
-static string GetMachineLabel();  // Computer name
-static string GetMachineHash();   // Full hardware hash
-```
-
-**Fallback Strategy**:
-1. Try WMI for CPU ID + Motherboard Serial
-2. If WMI fails, use Computer Name + User Domain
-3. Last resort: Persistent GUID in `%LOCALAPPDATA%\VoiceLite\machine_id.dat` (DPAPI encrypted)
-
----
-
-### 8. RecordingController (Controller)
-
-**Purpose**: Orchestrate recording → transcription → injection workflow
-**Location**: `Core/Controllers/RecordingController.cs`
-
-**Responsibilities**:
-- Start/stop recording via AudioRecorder
-- Queue transcription via WhisperService
-- Inject text via TextInjector
-- Update UI via ViewModel events
-
-**Key Method**:
-```csharp
-async Task<RecordingResult> StartRecordingAsync();
-RecordingResult StopAndTranscribeAsync();
-```
-
-**Flow**:
-```
-User presses hotkey
-    → RecordingController.StartRecordingAsync()
-    → AudioRecorder.StartRecording()
-    → ... recording ...
-    → User presses hotkey again
-    → RecordingController.StopAndTranscribeAsync()
-    → AudioRecorder.StopRecording() → audio.wav
-    → WhisperService.TranscribeAsync(audio.wav) → text
-    → TextInjector.InjectText(text)
-    → MainViewModel updated via event
-```
-
----
-
-### 9. LicenseService + ProFeatureService (Services)
-
-**Purpose**: Validate licenses & gate Pro features
-**Location**: `Services/LicenseService.cs`, `Services/ProFeatureService.cs`
-
-**LicenseService**:
-- Validates license keys via `POST https://voicelite.app/api/licenses/validate`
-- Caches result locally (lifetime cache - $20 lifetime license)
-- Retry logic: 3 attempts with exponential backoff (Polly)
-- DPAPI encrypted storage at `%LOCALAPPDATA%\VoiceLite\license.dat`
-- Stores `key|email` format for tamper detection
-- Thread-safe cache access via `_cacheLock` object
-
-**ProFeatureService**:
-- Checks `Settings.IsProLicense` flag
-- Controls UI visibility (`AIModelsTabVisibility`, etc.)
-- Restricts model selection (Base for free, all 5 for Pro)
-- Thread-safe: Uses `ReaderWriterLockSlim` for concurrent property reads
-
-**Adding Pro Feature** (3 steps):
-```csharp
-// 1. Add property to ProFeatureService
-public Visibility NewFeatureVisibility => IsProUser ? Visible : Collapsed;
-
-// 2. Bind in XAML
-<TabItem Visibility="{Binding NewFeatureVisibility}" />
-
-// 3. Done!
-```
-
----
-
-## Thread Safety Patterns
-
-The following thread-safety patterns are used throughout the codebase:
-
-### ProFeatureService
-Uses `ReaderWriterLockSlim` to allow concurrent reads while ensuring exclusive access during `RefreshProStatus()`:
-```csharp
-private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
-```
-
-### TextInjector
-Uses `volatile` disposal flag for cross-thread visibility:
-```csharp
-private volatile bool _disposed = false;
-```
-
-### LicenseService
-Uses lock object for thread-safe cache access:
-```csharp
-private readonly object _cacheLock = new object();
-lock (_cacheLock) { /* cache operations */ }
-```
-
-### CustomShortcutService
-Uses lock on Settings.SyncRoot for thread-safe settings access:
-```csharp
-lock (_settings.SyncRoot) { /* process shortcuts */ }
-```
-
----
-
-## Data Flow
-
-### Recording → Transcription → Injection
-
-```
-┌─────────────┐
-│    USER     │
-│ (Presses    │
-│  Ctrl+Alt+R)│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────┐
-│  HotkeyManager      │ (Detects global hotkey)
-│  Fires: HotkeyPressed│
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│  MainViewModel      │ (Handles UI logic)
-│  Calls: ToggleRecordingCommand│
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│ RecordingController │ (Orchestrates workflow)
-│ StartRecordingAsync()│
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│   AudioRecorder     │ (NAudio captures audio)
-│   StartRecording()  │
-└─────────────────────┘
-
-... User speaks for 5 seconds ...
-
-┌─────────────┐
-│    USER     │
-│ (Presses    │
-│  Ctrl+Alt+R)│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────┐
-│ RecordingController │
-│StopAndTranscribeAsync│
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│   AudioRecorder     │ (Saves to temp/audio.wav)
-│   StopRecording()   │
-│   Fires: AudioReady │
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│ RecordingController │ (Receives file path)
-│   → WhisperService  │
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│ PersistentWhisper   │ (Spawns whisper.exe)
-│ TranscribeAsync()   │ (Waits for output)
-└──────┬──────────────┘
-       │ (Returns: "Hello world")
-       ▼
-┌─────────────────────┐
-│ RecordingController │
-│   → TextInjector    │
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│   TextInjector      │ (Simulates Ctrl+V)
-│   InjectText()      │
-└──────┬──────────────┘
-       │
-       ▼
-┌─────────────────────┐
-│  Active Window      │ (Text appears: "Hello world")
-└─────────────────────┘
-```
-
----
-
-## Adding New Features
-
-### Example: Adding "Voice Shortcuts" (Pro Feature)
-
-**Step 1: Create Service Interface**
-```csharp
-// Core/Interfaces/Features/IVoiceShortcutService.cs
-public interface IVoiceShortcutService
-{
-    void AddShortcut(string trigger, string action);
-    void RemoveShortcut(string trigger);
-    Task<string?> MatchShortcutAsync(string transcription);
-}
-```
-
-**Step 2: Implement Service**
-```csharp
-// Services/VoiceShortcutService.cs
-public class VoiceShortcutService : IVoiceShortcutService
-{
-    private Dictionary<string, string> _shortcuts = new();
-
-    public void AddShortcut(string trigger, string action)
-    {
-        _shortcuts[trigger.ToLower()] = action;
-    }
-
-    public Task<string?> MatchShortcutAsync(string transcription)
-    {
-        return Task.FromResult(_shortcuts.GetValueOrDefault(transcription.ToLower()));
-    }
-}
-```
-
-**Step 3: Register in DI**
-```csharp
-// App.xaml.cs
-services.AddSingleton<IVoiceShortcutService, VoiceShortcutService>();
-```
-
-**Step 4: Add UI Visibility to ProFeatureService**
-```csharp
-// Services/ProFeatureService.cs
-public Visibility VoiceShortcutsTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
-```
-
-**Step 5: Create UI (XAML)**
-```xml
-<!-- SettingsWindowNew.xaml -->
-<TabItem Header="Voice Shortcuts"
-         Visibility="{Binding VoiceShortcutsTabVisibility}">
-    <!-- Shortcut management UI here -->
-</TabItem>
-```
-
-**Step 6: Create ViewModel**
-```csharp
-// Presentation/ViewModels/VoiceShortcutsViewModel.cs
-public class VoiceShortcutsViewModel : INotifyPropertyChanged
-{
-    private readonly IVoiceShortcutService _shortcutService;
-
-    public VoiceShortcutsViewModel(IVoiceShortcutService shortcutService)
-    {
-        _shortcutService = shortcutService;
-    }
-
-    public ICommand AddShortcutCommand { get; }
-}
-```
-
-**Step 7: Integrate into RecordingController**
-```csharp
-// Core/Controllers/RecordingController.cs
-public async Task<string> ProcessTranscriptionAsync(string rawText)
-{
-    // Check for voice shortcuts FIRST (before injection)
-    var shortcutMatch = await _shortcutService.MatchShortcutAsync(rawText);
-    if (shortcutMatch != null)
-    {
-        // Execute shortcut action instead of injecting text
-        return shortcutMatch;
-    }
-
-    // Normal text injection
-    return rawText;
-}
-```
-
-**Done!** - New feature added with proper separation of concerns.
-
----
-
-## Testing Strategy
-
-### Unit Tests (xUnit + Moq)
-
-**Coverage Target**: ≥75% overall, ≥80% Services/
-
-**Test Structure**:
-```
-VoiceLite.Tests/
-├── Controllers/
-│   ├── RecordingControllerTests.cs      # 15 tests
-│   └── TranscriptionControllerTests.cs  # 12 tests
-│
-├── Services/
-│   ├── AudioRecorderTests.cs            # 20 tests
-│   ├── WhisperServiceTests.cs           # 18 tests
-│   ├── LicenseServiceTests.cs           # 10 tests
-│   └── ProFeatureServiceTests.cs        # 8 tests
-│
-├── ViewModels/
-│   ├── MainViewModelTests.cs            # 25 tests
-│   └── SettingsViewModelTests.cs        # 15 tests
-│
-├── Integration/
-│   └── EndToEndTests.cs                 # 5 tests
-│
-├── Stress/
-│   ├── TranscriptionStressTests.cs      # 3 tests
-│   ├── RecordingStressTests.cs          # 4 tests
-│   └── WhisperRecoveryStressTests.cs    # 5 tests
-│
-└── Resilience/
-    └── RetryPolicyTests.cs              # 7 tests
-```
-
-**Total**: ~412 tests
-
-### Running Tests
-
+Run tests:
 ```bash
-# All tests
 dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj
-
-# With coverage
-dotnet test --collect:"XPlat Code Coverage"
-
-# Stress tests (manual, skip by default)
-dotnet test --filter "Category=Stress"
 ```
 
 ---
 
-## Performance Characteristics
+## Performance
 
-### Resource Usage (Phase 4A Baseline)
+### Resource Usage
 
-| State | RAM | CPU | Disk I/O |
-|-------|-----|-----|----------|
-| Idle (tray) | 60-90MB | 0-2% | 0 |
-| Recording | 100-150MB | 2-5% | Minimal |
-| Transcribing (Tiny) | 150-250MB | 15-40% | Read audio |
-| Transcribing (Small) | 200-300MB | 30-60% | Read audio |
+| State | RAM | CPU |
+|-------|-----|-----|
+| Idle (tray) | 60-90MB | 0-2% |
+| Recording | 100-150MB | 2-5% |
+| Transcribing (base) | 150-300MB | 15-40% |
+| Transcribing (large-v3) | 3-4GB | 60-90% |
 
-### Latency Targets (All MET)
+### Why Whisper.net In-Process
 
-| Operation | Target | Actual |
-|-----------|--------|--------|
-| Transcription latency | <200ms after speech | <200ms ✅ |
-| Tiny model | <0.8s per 5s | 0.4-0.8s ✅ |
-| Small model | ~3s per 5s | 2.5-3.5s ✅ |
-| Audio start/stop | <50ms | 10-30ms ✅ |
-| Text injection | <100ms | 20-50ms ✅ |
-| Settings load | <50ms | 10-30ms ✅ |
+The previous architecture spawned a `whisper.exe` subprocess for each transcription. This required: writing temp WAV files, parsing stdout, managing zombie processes, and reloading the model every time.
 
-### Optimizations Applied (v1.0.84-88)
+Whisper.net loads the model once via `WhisperFactory.FromPath()`. Subsequent transcriptions reuse the loaded model. Result: 2-10x faster (no model reload), no temp files, no subprocess management, no stdout parsing.
 
-1. **Whisper command-line flags** (v1.0.85):
-   - `--beam-size 1` (greedy decoding)
-   - `--entropy-thold 3.0` (early stopping)
-   - `--no-fallback` (skip retries)
-   - Result: 40% faster
+### Model Sizes
 
-2. **whisper.cpp upgrade** (v1.0.86):
-   - v1.6.0 → v1.7.6
-   - SIMD improvements
-   - Result: Additional 20-40% faster
+| Display Name | File | Size | Speed | Tier |
+|-------------|------|------|-------|------|
+| Swift | ggml-base.bin | 142MB | Fast | Free |
+| Pro | ggml-small.bin | 466MB | Medium | Pro |
+| Elite | ggml-medium.bin | 1.5GB | Slow | Pro |
+| Turbo | ggml-large-v3-turbo-q8_0.bin | 874MB | Medium | Pro |
+| Ultra | ggml-large-v3.bin | 2.9GB | Slowest | Pro |
 
-3. **Q8_0 quantization** (v1.0.87-88):
-   - 8-bit integer quantization
-   - 45% smaller files, 30-40% faster
-   - 99.98% identical accuracy to F16
-   - Result: 67-73% faster overall vs v1.0.84
-
-See CLAUDE.md for performance optimization details (Q8_0 quantization, whisper.cpp flags).
+Q8_0 quantization: 45% smaller, 30-40% faster, 99.98% identical accuracy vs F16.
 
 ---
 
-## Common Pitfalls & Solutions
+## Debugging
 
-### 1. Dispatcher Thread Issues
+### Log Locations
 
-**Problem**: UI updates from background threads crash
-**Solution**: Always use `Dispatcher.Invoke()` or `DispatcherPriority.Normal`
+- **Application log**: `%LOCALAPPDATA%\VoiceLite\logs\voicelite.log`
+- **Error log**: `%LOCALAPPDATA%\VoiceLite\voicelite_error.log`
+- **Settings**: `%LOCALAPPDATA%\VoiceLite\settings.json`
+- **License cache**: `%LOCALAPPDATA%\VoiceLite\license.dat` (DPAPI encrypted)
 
-```csharp
-// WRONG
-StatusText = "Recording..."; // Crashes if called from background thread
-
-// RIGHT
-Application.Current.Dispatcher.Invoke(() =>
-{
-    StatusText = "Recording...";
-}, DispatcherPriority.Normal);
-```
-
-### 2. Resource Leaks
-
-**Problem**: NAudio, Whisper processes, HttpClient not disposed
-**Solution**: Implement IDisposable, add disposal tests
+### Logging Levels
 
 ```csharp
-public class MyService : IDisposable
-{
-    private readonly AudioRecorder _recorder;
-
-    public void Dispose()
-    {
-        _recorder?.Dispose();
-        GC.SuppressFinalize(this);
-    }
-}
+ErrorLogger.LogMessage("info");      // Debug builds only
+ErrorLogger.LogWarning("visible");   // Shows in Release builds
+ErrorLogger.LogError("context", ex); // Always shows, writes to error log
 ```
 
-**Test**:
-```csharp
-[Fact]
-public void MyService_Dispose_CleansUpResources()
-{
-    var service = new MyService();
-    service.Dispose();
-    // Assert no exceptions, memory released
-}
-```
+### Common Issues
 
-### 3. Async Void Handlers
+**Model not loading**: Check `%LOCALAPPDATA%\VoiceLite\whisper\` and `baseDir\whisper\` for model files. `ModelResolverService` searches both locations.
 
-**Problem**: Exceptions in `async void` crash app
-**Solution**: Wrap in try-catch or use `AsyncHelper.SafeFireAndForget()`
+**Text injected into wrong window**: `TextInjector` captures the foreground window at START of transcription. Long transcriptions may finish after the user switches windows.
 
-```csharp
-// WRONG
-private async void Button_Click(object sender, EventArgs e)
-{
-    await DoWorkAsync(); // Exception here crashes app
-}
+**License validation fails**: Check network connectivity to `voicelite.app`. Polly retries 3 times with exponential backoff. Cached license in `license.dat` allows offline use after first successful validation.
 
-// RIGHT
-private async void Button_Click(object sender, EventArgs e)
-{
-    try
-    {
-        await DoWorkAsync();
-    }
-    catch (Exception ex)
-    {
-        ErrorLogger.LogError("Button click failed", ex);
-        MessageBox.Show($"Error: {ex.Message}");
-    }
-}
-```
+**VAD trimming too aggressively**: Lower `VADThreshold` in settings (default 0.35). Lower values = more permissive speech detection.
 
-### 4. Static HttpClient
-
-**Problem**: Creating HttpClient per request exhausts sockets
-**Solution**: Use static HttpClient (singleton)
-
-```csharp
-// WRONG
-public async Task<string> CallApiAsync()
-{
-    using var client = new HttpClient(); // Socket exhaustion!
-    return await client.GetStringAsync("https://api.example.com");
-}
-
-// RIGHT (LicenseService pattern)
-private static readonly HttpClient _httpClient = new HttpClient
-{
-    Timeout = TimeSpan.FromSeconds(10)
-};
-
-public async Task<string> CallApiAsync()
-{
-    return await _httpClient.GetStringAsync("https://api.example.com");
-}
-```
+**Whisper hallucinations on silence**: This is why Silero VAD was added. If VAD is disabled (`EnableVAD = false`), Whisper may hallucinate text from background noise or silence.
 
 ---
 
-## Debugging Tips
+## Security
 
-### Enable Debug Logging
-
-**Location**: `%LOCALAPPDATA%\VoiceLite\logs\voicelite.log`
-
-```csharp
-// Add debug logging
-ErrorLogger.LogMessage("DEBUG: Transcription started");
-ErrorLogger.LogWarning("WARNING: Model not found, using fallback");
-ErrorLogger.LogError("ERROR: Whisper process crashed", ex);
-```
-
-### Attach Debugger to Whisper Process
-
-1. Start VoiceLite in Debug mode (F5)
-2. Start recording
-3. Debug → Attach to Process → `whisper.exe`
-4. Set breakpoints in whisper.cpp (if rebuilt from source)
-
-### Test DI Container
-
-```csharp
-// Verify service registration
-var serviceProvider = BuildServiceProvider();
-var recorder = serviceProvider.GetService<IAudioRecorder>();
-Assert.NotNull(recorder); // Fails if not registered
-```
+- **HTTPS enforced** for all API calls to voicelite.app
+- **DPAPI encryption** for license storage (tied to Windows user account, not portable)
+- **License tamper detection**: `key|email` format in storage, verified on load via `VerifyLicenseKeyMatchesStorage()`
+- **Model access control**: `ModelResolverService` checks `IProFeatureService.CanUseModel()` before resolving Pro model paths
+- **3-device activation limit**: Enforced server-side via `LicenseActivation` table
+- **Password field detection**: `TextInjector` detects password inputs and avoids logging
+- **Regex timeout**: `CustomShortcutService` uses 100ms regex timeout to prevent catastrophic backtracking
+- **No secrets in code**: License key stored via DPAPI, API calls use HTTPS
+- **Hardware ID fallback**: `HardwareIdService` gracefully handles WMI failures (VMs, headless systems) with persistent GUID fallback
 
 ---
 
-## Security Considerations
+## Web Backend
 
-**Key Points**:
-- HTTPS enforced for all API calls
-- No secrets in code
-- Server-side license validation (primary defense)
-- Client-side Pro feature gating (secondary defense - UX)
-- Password field detection (prevents logging credentials)
-- 3-device activation limit (server-side)
+**Stack**: Next.js 15.5, React 19, Prisma 6, Supabase PostgreSQL, Stripe
 
-**Pro Feature Gating**:
-- Cannot be bypassed without modifying binary (accepted risk for $20 software)
-- settings.json edits detected and reverted on startup
-- Model selection restricted by tier
+**Key endpoints**:
+- `POST /api/licenses/validate` -- License validation (rate limited: 5/hour/IP)
+- `POST /api/checkout` -- Stripe checkout session creation
+- `POST /api/webhook` -- Stripe webhook handler (idempotent via WebhookEvent table)
 
----
+**Database**: License, LicenseActivation (3-device limit), LicenseEvent (audit trail), WebhookEvent (idempotency)
 
-## Phase 1-4 Transformation Summary
-
-### Before (v1.0.76 - "Held Together Weakly")
-- ❌ MainWindow.xaml.cs: 2,591 lines (monolith)
-- ❌ No dependency injection (tight coupling)
-- ❌ Resource leaks (HttpClient, AudioRecorder)
-- ❌ Async void crashes (unhandled exceptions)
-- ❌ No integration tests (no safety net)
-
-### After (v1.0.96 - "Solid Foundations")
-- ✅ MVVM architecture (ViewModels, Controllers, Services)
-- ✅ Dependency injection (Microsoft.Extensions.DependencyInjection)
-- ✅ Resource leaks fixed (IDisposable pattern + tests)
-- ✅ Async void eliminated (proper error handling)
-- ✅ Polly retry policies (resilient HTTP calls)
-- ✅ 99 automated tests (unit + integration + stress)
-- ✅ 146/187 tests passing (78% pass rate)
-- ✅ Performance optimized (67-73% faster than v1.0.84)
-- ✅ Security audited (no critical vulnerabilities)
-
-**Time Investment**: ~5 weeks → Production-ready architecture
-
----
-
-## Further Reading
-
-- [CLAUDE.md](CLAUDE.md) - Project context & commands
-- [SECURITY.md](SECURITY.md) - Security policy & vulnerability reporting
-
----
-
-**Questions? Check the code or ask in GitHub Issues.**
-
-**Last Updated**: Phase 4D Day 1 - Developer Documentation
+**Location**: `voicelite-web/` directory, separate from desktop app.

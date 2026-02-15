@@ -26,10 +26,10 @@ If you discover a security vulnerability in VoiceLite, please report it responsi
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.2.0.x | ✅ Yes (Latest)    |
-| 1.1.x   | ✅ Yes             |
-| 1.0.x   | ⚠️ Limited         |
-| < 1.0   | ❌ No (Please upgrade) |
+| 1.4.0.x | ✅ Yes (Latest)    |
+| 1.3.0.x | ✅ Yes             |
+| 1.2.0.x | ⚠️ Limited         |
+| < 1.2   | ❌ No (Please upgrade) |
 
 ## Security Measures
 

@@ -23,7 +23,7 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <Authors>VoiceLite Software</Authors>
     <PackageProjectUrl>https://voicelite.app</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/yourusername/voicelite</RepositoryUrl>
+    <RepositoryUrl>https://github.com/mikha08-rgb/VoiceLite</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 

@@ -127,12 +127,12 @@ Success rate: 100.0%
 
 ### Tests Fail Due to Missing Model
 
-**Cause**: `ggml-tiny.bin` not found in test output directory
-**Fix**: Copy model file to `VoiceLite.Tests/bin/Debug/net8.0-windows/whisper/ggml-tiny.bin`
+**Cause**: `ggml-base.bin` not found in test output directory
+**Fix**: Copy model file to `VoiceLite.Tests/bin/Debug/net8.0-windows/whisper/ggml-base.bin`
 
 ```bash
 mkdir -p "VoiceLite/VoiceLite.Tests/bin/Debug/net8.0-windows/whisper"
-cp "VoiceLite/whisper/ggml-tiny.bin" "VoiceLite/VoiceLite.Tests/bin/Debug/net8.0-windows/whisper/"
+cp "VoiceLite/whisper/ggml-base.bin" "VoiceLite/VoiceLite.Tests/bin/Debug/net8.0-windows/whisper/"
 ```
 
 ### Memory Growth Exceeds Limit
