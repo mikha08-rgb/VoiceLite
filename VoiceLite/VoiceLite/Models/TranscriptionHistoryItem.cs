@@ -1,4 +1,5 @@
 using System;
+using VoiceLite.Utilities;
 
 namespace VoiceLite.Models
 {
@@ -64,19 +65,6 @@ namespace VoiceLite.Models
         /// <summary>
         /// Truncated preview of text for compact display
         /// </summary>
-        public string PreviewText
-        {
-            get
-            {
-                // BUG FIX (BUG-015): Add null check to prevent NullReferenceException
-                if (string.IsNullOrEmpty(Text))
-                    return string.Empty;
-
-                const int maxLength = 100;
-                if (Text.Length <= maxLength)
-                    return Text;
-                return Text.Substring(0, maxLength) + "...";
-            }
-        }
+        public string PreviewText => TextAnalyzer.Truncate(Text, 100);
     }
 }

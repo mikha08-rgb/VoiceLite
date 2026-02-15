@@ -255,7 +255,7 @@ namespace VoiceLite.Services
                     if (cachedRetry != null)
                     {
                         ErrorLogger.LogWarning(
-                            $"License API unreachable after 3 retries. Using cached result (lifetime license). " +
+                            $"License API unreachable after 3 retries. Using 14-day cached result. " +
                             $"Exception: {retryEx.Message}"
                         );
                         return cachedRetry;

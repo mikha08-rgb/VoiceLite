@@ -321,19 +321,6 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public void SetTypingDelay_AcceptsValue_DoesNotThrow()
-        {
-            // Arrange
-            var injector = new TextInjector(_settings);
-
-            // Act
-            Action act = () => injector.SetTypingDelay(10);
-
-            // Assert
-            act.Should().NotThrow();
-        }
-
-        [Fact]
         public void InjectText_WithNewlineCharacter_HandlesCorrectly()
         {
             // Arrange

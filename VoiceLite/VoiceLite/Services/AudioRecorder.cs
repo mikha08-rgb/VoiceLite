@@ -30,9 +30,6 @@ namespace VoiceLite.Services
         private System.Timers.Timer? cleanupTimer;
         private const int CleanupIntervalMinutes = 30;
 
-        // BUG FIX (DEAD-CODE-002): Removed useMemoryBuffer constant - memory mode is now permanent
-        // All file-mode code paths have been removed - memory buffering is the only implementation
-        // This eliminates dead code and makes the codebase clearer
         private volatile bool isDisposed = false; // DISPOSAL SAFETY: Prevents cleanup timer from running after disposal
         // MED-3 FIX: Session ID for rejecting stale callbacks
         // OVERFLOW FIX: Use Interlocked.Increment for atomic increment with wrap-around safety
@@ -312,8 +309,6 @@ namespace VoiceLite.Services
                     waveIn.RecordingStopped += OnRecordingStopped;
                     eventHandlersAttached = true;
 
-                    // QUICK WIN 1: Memory buffer mode is now enforced (useMemoryBuffer = const true)
-                    // File mode code paths removed to eliminate dead code warnings
                     audioMemoryStream = new MemoryStream();
                     waveFile = new WaveFileWriter(audioMemoryStream, waveIn.WaveFormat);
                     ErrorLogger.LogDebug($"StartRecording: Using memory buffer mode (session #{sessionId})");
@@ -480,7 +475,6 @@ namespace VoiceLite.Services
                     {
                         waveFile.Flush();
 
-                        // QUICK WIN 1: Memory buffer is always used (const true)
                         if (audioMemoryStream != null)
                         {
                             waveFile.Dispose(); // Must dispose to finalize WAV headers
@@ -524,7 +518,6 @@ namespace VoiceLite.Services
                                 ErrorLogger.LogWarning($"StopRecording: Skipping TINY/EMPTY buffer - only {audioData.Length} bytes!");
                             }
                         }
-                        // QUICK WIN 1: File-based recording code removed (memory mode is enforced)
                     }
                     catch (Exception ex)
                     {
@@ -656,9 +649,6 @@ namespace VoiceLite.Services
                 currentAudioFilePath = null;
             }
         }
-
-        // QUICK WIN 1: SetMemoryBufferMode removed - memory mode is now enforced (const = true)
-        // This eliminates 50-100ms file I/O latency per recording session
 
         // Interface implementation methods
         public async Task<string> GetLastAudioFileAsync()

@@ -131,7 +131,6 @@ namespace VoiceLite.Services
                    key == Key.LeftAlt || key == Key.RightAlt ||
                    key == Key.LeftShift || key == Key.RightShift ||
                    key == Key.LWin || key == Key.RWin;
-            // REMOVED CapsLock - it's not a true modifier, should use regular RegisterHotKey
         }
 
         private bool IsSpecialKey(Key key)

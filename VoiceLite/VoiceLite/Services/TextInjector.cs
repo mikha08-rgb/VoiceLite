@@ -635,20 +635,6 @@ namespace VoiceLite.Services
             }
         }
 
-        /// <summary>
-        /// Sets the typing delay between keystrokes.
-        /// Issue 9: This is intentionally a no-op because adaptive per-application
-        /// delays are used instead (see GetTypingDelayForApplication). The delay
-        /// is automatically optimized based on the target application for best
-        /// balance between speed and reliability.
-        /// </summary>
-        /// <param name="millisecondsDelay">Ignored - adaptive delays are used instead</param>
-        public void SetTypingDelay(int millisecondsDelay)
-        {
-            // Intentional no-op: Adaptive per-application delays are used instead
-            // See GetTypingDelayForApplication() for the actual delay logic
-        }
-
         // Virtual key codes
         private const byte VK_CONTROL = 0x11;
         private const byte VK_V = 0x56;

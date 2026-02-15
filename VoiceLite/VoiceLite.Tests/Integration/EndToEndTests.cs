@@ -31,7 +31,7 @@ namespace VoiceLite.Tests.Integration
             // Initialize services with test settings
             _testSettings = new Settings
             {
-                SelectedModel = "tiny",
+                WhisperModel = "tiny",
                 TextInjectionMode = TextInjectionMode.AlwaysType,
                 RecordHotkey = Key.F8,
                 HotkeyModifiers = ModifierKeys.Alt
@@ -249,8 +249,8 @@ namespace VoiceLite.Tests.Integration
         {
             // Arrange
             var settingsPath = Path.Combine(_testDataPath, "test-settings.json");
-            var settings1 = new Settings { SelectedModel = "tiny", RecordHotkey = Key.F8 };
-            var settings2 = new Settings { SelectedModel = "base", RecordHotkey = Key.F9 };
+            var settings1 = new Settings { WhisperModel = "tiny", RecordHotkey = Key.F8 };
+            var settings2 = new Settings { WhisperModel = "base", RecordHotkey = Key.F9 };
 
             // Act - Save multiple times rapidly (simulating race condition)
             var tasks = new[]
@@ -267,7 +267,7 @@ namespace VoiceLite.Tests.Integration
 
             // Assert - Should have valid settings (either one)
             loadedSettings.Should().NotBeNull();
-            loadedSettings.SelectedModel.Should().BeOneOf("tiny", "base");
+            loadedSettings.WhisperModel.Should().BeOneOf("tiny", "base");
             loadedSettings.RecordHotkey.Should().BeOneOf(Key.F8, Key.F9);
         }
 

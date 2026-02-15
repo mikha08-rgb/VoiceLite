@@ -16,7 +16,6 @@ namespace VoiceLite.Utilities
         {
             if (value is string text)
             {
-                // BUG FIX (BUG-003): Add null/empty check to prevent NullReferenceException
                 if (string.IsNullOrEmpty(text))
                     return string.Empty;
 
@@ -31,10 +30,7 @@ namespace VoiceLite.Utilities
                     maxLength = parsedLength;
                 }
 
-                if (text.Length <= maxLength)
-                    return text;
-
-                return text.Substring(0, maxLength) + "...";
+                return TextAnalyzer.Truncate(text, maxLength);
             }
 
             return value;

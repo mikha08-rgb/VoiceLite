@@ -163,19 +163,12 @@ namespace VoiceLite.Models
         public bool LaunchAtStartup { get; set; } = false;
         public bool CloseToTray { get; set; } = false;
         public bool CheckForUpdates { get; set; } = true;
-        public string SelectedModel { get; set; } = "ggml-base.bin";
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
 
-        // Additional properties for SettingsService compatibility
-        public bool UseGpu { get; set; } = false;
-        public bool UseGpuAcceleration { get; set; } = false;
         public int TypingDelay { get; set; } = 10;
-        public int TypingDelayMs { get; set; } = 10;
-        public bool AddSpaceAfter { get; set; } = false;
-        public bool AddSpaceAfterInjection { get; set; } = false;
 
         // Clipboard Restoration Delay (v1.2.0)
         // Controls how long to wait before restoring user's original clipboard content
@@ -186,14 +179,6 @@ namespace VoiceLite.Models
             get => _clipboardRestorationDelayMs;
             set => _clipboardRestorationDelayMs = Math.Clamp(value, 30, 100);
         }
-        public Key HotkeyKey { get; set; } = Key.LeftAlt;
-        public string GlobalHotkey { get; set; } = "Alt";
-        public bool HotkeyEnabled { get; set; } = true;
-        public bool HotkeysEnabled { get; set; } = true;
-        public string InputDevice { get; set; } = "Default";
-        public string SelectedAudioDevice { get; set; } = "Default";
-        public int SampleRate { get; set; } = 16000;
-        public bool PlaySoundFeedback { get; set; } = false;
         public bool SaveHistory { get; set; } = true;
         public int ActivationCount { get; set; } = 0;
 
