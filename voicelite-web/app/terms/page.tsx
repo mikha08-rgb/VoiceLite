@@ -62,7 +62,7 @@ export default function TermsOfService() {
 
             <h3 className="text-xl font-semibold text-gray-800 mb-3">3.2 Pro Version ($20 one-time payment)</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 space-y-2">
-              <li>Access to all 5 AI models (Tiny, Base, Small, Medium, Large)</li>
+              <li>Access to all 6 AI models (Tiny, Swift, Pro, Elite, Turbo, Ultra)</li>
               <li>Unlimited usage</li>
               <li>Priority email support</li>
               <li>Offline functionality (license validation requires one-time internet connection)</li>

@@ -5,7 +5,7 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.2.0.8';
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.4.0.0';
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -16,7 +16,7 @@ const jsonLd = {
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "1.2.0",
+  "softwareVersion": "1.4.0",
   "offers": [
     {
       "@type": "Offer",
@@ -437,6 +437,13 @@ export default function HomePage() {
                   <td className="px-6 py-4 text-stone-600 dark:text-stone-400">93-96%</td>
                   <td className="px-6 py-4 text-stone-600 dark:text-stone-400">4.0s</td>
                   <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Articles, reports</td>
+                </tr>
+                <tr className="border-b border-stone-200 dark:border-stone-800">
+                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Turbo</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">874MB</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">97-99%</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">3.0s</td>
+                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Near-Ultra accuracy, 3x faster</td>
                 </tr>
                 <tr>
                   <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Ultra</td>

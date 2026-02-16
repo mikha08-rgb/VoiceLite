@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const VERSION_REGEX = /^\d+\.\d+\.\d+\.\d+$/;
 const MAX_VERSION_LENGTH = 20;
 const FETCH_TIMEOUT_MS = 30000; // 30 seconds
-const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.2.0.8';
+const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.4.0.0';
 
 // Mask IP for privacy (show first octet only)
 function maskIp(ip: string): string {

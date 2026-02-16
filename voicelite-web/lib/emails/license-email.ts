@@ -97,7 +97,7 @@ export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData):
     <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 20px; margin: 25px 0; border-radius: 8px;">
       <h3 style="margin-top: 0; color: #1f2937; font-size: 18px;">✨ What's Included:</h3>
       <ul style="color: #4b5563; padding-left: 20px; margin: 10px 0; list-style: none;">
-        <li style="margin: 8px 0;">✓ <strong>All 5 AI models</strong> (Tiny, Swift, Pro, Elite, Ultra)</li>
+        <li style="margin: 8px 0;">✓ <strong>All 6 AI models</strong> (Tiny, Swift, Pro, Elite, Turbo, Ultra)</li>
         <li style="margin: 8px 0;">✓ <strong>90-98% accuracy</strong> (vs 80-85% free tier)</li>
         <li style="margin: 8px 0;">✓ <strong>Lifetime updates</strong></li>
         <li style="margin: 8px 0;">✓ <strong>Commercial use allowed</strong></li>
@@ -149,7 +149,7 @@ How to Activate:
 4. Click "Activate"
 
 What's Included:
-✓ All 5 AI models (Tiny, Swift, Pro, Elite, Ultra)
+✓ All 6 AI models (Tiny, Swift, Pro, Elite, Turbo, Ultra)
 ✓ 90-98% accuracy (vs 80-85% free tier)
 ✓ Lifetime updates
 ✓ Commercial use allowed
