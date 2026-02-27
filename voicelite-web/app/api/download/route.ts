@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // Validate version format: must be X.X.X.X (e.g., 1.2.0.1)
 const VERSION_REGEX = /^\d+\.\d+\.\d+\.\d+$/;
 const MAX_VERSION_LENGTH = 20;
-const FETCH_TIMEOUT_MS = 30000; // 30 seconds
 const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.4.0.0';
 
 // Mask IP for privacy (show first octet only)
@@ -43,44 +42,9 @@ export async function GET(request: NextRequest) {
   // GitHub releases direct download URL (triggers immediate download, no GitHub page)
   const downloadUrl = `https://github.com/mikha08-rgb/VoiceLite/releases/download/v${version}/VoiceLite-Setup-${version}.exe`;
 
-  try {
-    // Fetch with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  console.log(`[download] OK version=${version} ip=${maskedIp}`);
 
-    const response = await fetch(downloadUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.log(`[download] FAIL not_found version=${version} status=${response.status} ip=${maskedIp}`);
-      return new Response('Download not found', { status: 404 });
-    }
-
-    // Size limit check: max 200MB to prevent abuse
-    const MAX_SIZE_BYTES = 200 * 1024 * 1024; // 200MB
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_SIZE_BYTES) {
-      console.log(`[download] FAIL file_too_large version=${version} size=${contentLength} ip=${maskedIp}`);
-      return new Response('File too large', { status: 413 });
-    }
-
-    console.log(`[download] OK version=${version} ip=${maskedIp}`);
-
-    // Stream the file with download headers (prevents redirect to GitHub)
-    return new Response(response.body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="VoiceLite-Setup-${version}.exe"`,
-        'Cache-Control': 'public, max-age=3600',
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.log(`[download] FAIL timeout version=${version} ip=${maskedIp}`);
-      return new Response('Download timed out. Please try again.', { status: 504 });
-    }
-    console.log(`[download] FAIL fetch_error version=${version} error=${error} ip=${maskedIp}`);
-    return new Response('Download failed. Please try again.', { status: 502 });
-  }
+  // Redirect to GitHub release asset — file is too large to proxy through serverless.
+  // GitHub will return 404 itself if the release doesn't exist.
+  return NextResponse.redirect(downloadUrl, { status: 302 });
 }
