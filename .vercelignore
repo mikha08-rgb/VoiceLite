@@ -1,0 +1,5 @@
+VoiceLite/
+*.bin
+*.onnx
+*.exe
+.git/

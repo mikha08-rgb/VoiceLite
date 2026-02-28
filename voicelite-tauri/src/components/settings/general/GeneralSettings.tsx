@@ -1,82 +1,37 @@
-import { useSettings } from "../../../hooks/useSettings";
-import { LANGUAGES } from "../../../lib/constants";
-import { SettingContainer } from "../../ui/SettingContainer";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { MicrophoneSelector } from "../MicrophoneSelector";
+import { ShortcutInput } from "../ShortcutInput";
 import { SettingsGroup } from "../../ui/SettingsGroup";
-import { ToggleSwitch } from "../../ui/ToggleSwitch";
-import { Select } from "../../ui/Select";
+import { OutputDeviceSelector } from "../OutputDeviceSelector";
+import { PushToTalk } from "../PushToTalk";
+import { AudioFeedback } from "../AudioFeedback";
+import { useSettings } from "../../../hooks/useSettings";
+import { VolumeSlider } from "../VolumeSlider";
+import { MuteWhileRecording } from "../MuteWhileRecording";
+import { ModelSettingsCard } from "./ModelSettingsCard";
 
-export function GeneralSettings() {
-  const { settings, devices, updateSetting } = useSettings();
-
-  const micOptions = [
-    { value: "", label: "System Default" },
-    ...devices.map((d) => ({ value: d.name, label: d.name })),
-  ];
-
+export const GeneralSettings: React.FC = () => {
+  const { t } = useTranslation();
+  const { audioFeedbackEnabled } = useSettings();
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-        General
-      </h2>
-
-      <SettingsGroup title="Input">
-        <SettingContainer
-          label="Hotkey"
-          description="Keyboard shortcut to toggle recording"
-        >
-          <div className="bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-md px-3 py-1.5 text-sm text-[var(--text-primary)] font-mono">
-            {settings.hotkey}
-          </div>
-        </SettingContainer>
-
-        <SettingContainer
-          label="Microphone"
-          description="Select audio input device"
-        >
-          <Select
-            value={settings.selected_microphone ?? ""}
-            options={micOptions}
-            onChange={(v) =>
-              updateSetting("selected_microphone", v || null)
-            }
-          />
-        </SettingContainer>
+    <div className="max-w-3xl w-full mx-auto space-y-6">
+      <SettingsGroup title={t("settings.general.title")}>
+        <ShortcutInput shortcutId="transcribe" grouped={true} />
+        <PushToTalk descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
-
-      <SettingsGroup title="Transcription">
-        <SettingContainer
-          label="Language"
-          description="Transcription language"
-        >
-          <Select
-            value={settings.language}
-            options={LANGUAGES}
-            onChange={(v) => updateSetting("language", v)}
-          />
-        </SettingContainer>
-
-        <SettingContainer
-          label="Voice Activity Detection"
-          description="Trim silence before transcribing"
-        >
-          <ToggleSwitch
-            checked={settings.enable_vad}
-            onChange={(v) => updateSetting("enable_vad", v)}
-          />
-        </SettingContainer>
-      </SettingsGroup>
-
-      <SettingsGroup title="Output">
-        <SettingContainer
-          label="Auto Paste"
-          description="Automatically paste transcription via Ctrl+V"
-        >
-          <ToggleSwitch
-            checked={settings.auto_paste}
-            onChange={(v) => updateSetting("auto_paste", v)}
-          />
-        </SettingContainer>
+      <ModelSettingsCard />
+      <SettingsGroup title={t("settings.sound.title")}>
+        <MicrophoneSelector descriptionMode="tooltip" grouped={true} />
+        <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
+        <AudioFeedback descriptionMode="tooltip" grouped={true} />
+        <OutputDeviceSelector
+          descriptionMode="tooltip"
+          grouped={true}
+          disabled={!audioFeedbackEnabled}
+        />
+        <VolumeSlider disabled={!audioFeedbackEnabled} />
       </SettingsGroup>
     </div>
   );
-}
+};

@@ -1,31 +1,43 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { APP_VERSION } from "../../lib/constants";
+import React, { useState, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 
-interface StateEvent {
-  state: "Idle" | "Recording" | "Processing";
-  text: string | null;
-  error: string | null;
-}
+import ModelSelector from "../model-selector";
+import UpdateChecker from "../update-checker";
 
-export function Footer() {
-  const [status, setStatus] = useState("Idle");
+const Footer: React.FC = () => {
+  const [version, setVersion] = useState("");
 
   useEffect(() => {
-    const unlisten = listen<StateEvent>("state-changed", (event) => {
-      setStatus(event.payload.state);
-    });
-    return () => {
-      unlisten.then((fn) => fn()).catch(() => {});
+    const fetchVersion = async () => {
+      try {
+        const appVersion = await getVersion();
+        setVersion(appVersion);
+      } catch (error) {
+        console.error("Failed to get app version:", error);
+        setVersion("0.1.2");
+      }
     };
+
+    fetchVersion();
   }, []);
 
   return (
-    <div className="px-4 py-2 border-t border-[var(--border)] text-[10px] text-[var(--text-secondary)] flex justify-between">
-      <span>VoiceLite v{APP_VERSION}</span>
-      <span className={status === "Recording" ? "text-[var(--error)]" : ""}>
-        {status}
-      </span>
+    <div className="w-full border-t border-mid-gray/20 pt-3">
+      <div className="flex justify-between items-center text-xs px-4 pb-3 text-text/60">
+        <div className="flex items-center gap-4">
+          <ModelSelector />
+        </div>
+
+        {/* Update Status */}
+        <div className="flex items-center gap-1">
+          <UpdateChecker />
+          <span>•</span>
+          {/* eslint-disable-next-line i18next/no-literal-string */}
+          <span>v{version}</span>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Footer;

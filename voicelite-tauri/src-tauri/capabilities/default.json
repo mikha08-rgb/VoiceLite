@@ -1,24 +1,25 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-v2-schema/main/capabilities-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for VoiceLite",
-  "windows": ["main", "overlay"],
+  "description": "Capabilities for the app",
+  "windows": ["main", "recording_overlay"],
   "permissions": [
     "core:default",
-    "core:window:default",
-    "core:window:allow-create",
-    "core:window:allow-show",
-    "core:window:allow-hide",
-    "core:window:allow-close",
-    "core:window:allow-set-focus",
-    "core:tray:default",
-    "global-shortcut:default",
+    "opener:default",
+    "store:default",
+    "updater:default",
+    "process:default",
+    "dialog:default",
+    "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "clipboard-manager:default",
-    "clipboard-manager:allow-write-text",
-    "os:default",
-    "log:default",
-    "store:default"
+    "global-shortcut:allow-unregister-all",
+    "macos-permissions:default",
+    "fs:read-files",
+    "fs:allow-resource-read-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**/*" }]
+    }
   ]
 }

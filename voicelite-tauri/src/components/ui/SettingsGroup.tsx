@@ -1,19 +1,31 @@
-import { ReactNode } from "react";
+import React from "react";
 
-interface Props {
-  title: string;
-  children: ReactNode;
+interface SettingsGroupProps {
+  title?: string;
+  description?: string;
+  children: React.ReactNode;
 }
 
-export function SettingsGroup({ title, children }: Props) {
+export const SettingsGroup: React.FC<SettingsGroupProps> = ({
+  title,
+  description,
+  children,
+}) => {
   return (
-    <div className="mb-6">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 px-1">
-        {title}
-      </h3>
-      <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)] divide-y divide-[var(--border)] px-3">
-        {children}
+    <div className="space-y-2">
+      {title && (
+        <div className="px-4">
+          <h2 className="text-xs font-medium text-mid-gray uppercase tracking-wide">
+            {title}
+          </h2>
+          {description && (
+            <p className="text-xs text-mid-gray mt-1">{description}</p>
+          )}
+        </div>
+      )}
+      <div className="bg-background border border-mid-gray/20 rounded-lg overflow-visible">
+        <div className="divide-y divide-mid-gray/20">{children}</div>
       </div>
     </div>
   );
-}
+};

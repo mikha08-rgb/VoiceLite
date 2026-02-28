@@ -1,3 +1,4 @@
-pub mod audio_manager;
-pub mod transcription_manager;
-pub mod coordinator;
+pub mod audio;
+pub mod history;
+pub mod model;
+pub mod transcription;

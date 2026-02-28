@@ -1,12 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { RecordingOverlay } from "./RecordingOverlay";
-import { ErrorBoundary } from "../components/ErrorBoundary";
+import RecordingOverlay from "./RecordingOverlay";
+import "@/i18n";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <RecordingOverlay />
-    </ErrorBoundary>
+    <RecordingOverlay />
   </React.StrictMode>,
 );
