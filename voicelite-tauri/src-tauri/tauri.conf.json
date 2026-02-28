@@ -1,52 +1,46 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-v2-schema/main/schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "VoiceLite",
-  "version": "0.1.0",
-  "identifier": "app.voicelite.desktop",
+  "version": "0.7.8",
+  "identifier": "com.voicelite.app",
   "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build"
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": false,
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    },
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
         "title": "VoiceLite",
         "width": 680,
         "height": 570,
+        "minWidth": 680,
+        "minHeight": 570,
         "resizable": true,
-        "minWidth": 500,
-        "minHeight": 400,
-        "decorations": true,
-        "center": true,
-        "visible": true
-      },
-      {
-        "label": "overlay",
-        "title": "VoiceLite Overlay",
-        "url": "/src/overlay/index.html",
-        "width": 200,
-        "height": 80,
-        "resizable": false,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "visible": false,
-        "skipTaskbar": true,
-        "center": true
+        "maximizable": false,
+        "visible": false
       }
-    ]
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["**"],
+          "requireLiteralLeadingDot": false
+        }
+      }
+    }
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
+    "resources": ["resources/**/*"],
+    "license": "MIT",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -54,9 +48,37 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources/models/*"
-    ]
+    "macOS": {
+      "files": {},
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist"
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libgtk-layer-shell0"]
+      },
+      "rpm": {
+        "compression": {
+          "type": "none"
+        }
+      },
+      "appimage": {
+        "bundleMediaFramework": true,
+        "files": {}
+      }
+    },
+    "windows": {
+      "signCommand": "trusted-signing-cli -e https://eus.codesigning.azure.net/ -a CJ-Signing -c cjpais-dev -d VoiceLite %1"
+    }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
+      "endpoints": [
+        "https://github.com/MishkaMN/VoiceLite/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }
