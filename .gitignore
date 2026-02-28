@@ -63,6 +63,7 @@ VoiceLite/Installer/publish/
 publish/
 TestResults/
 VoiceLite-*/
+!voicelite-tauri/
 *_output.txt
 *-results-*.txt
 

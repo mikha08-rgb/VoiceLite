@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-v2-schema/main/schema.json",
+  "productName": "VoiceLite",
+  "version": "0.1.0",
+  "identifier": "app.voicelite.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "VoiceLite",
+        "width": 680,
+        "height": 570,
+        "resizable": true,
+        "minWidth": 500,
+        "minHeight": 400,
+        "decorations": true,
+        "center": true,
+        "visible": true
+      },
+      {
+        "label": "overlay",
+        "title": "VoiceLite Overlay",
+        "url": "/src/overlay/index.html",
+        "width": 200,
+        "height": 80,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/models/*"
+    ]
+  },
+  "plugins": {}
+}

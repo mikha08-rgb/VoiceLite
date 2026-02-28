@@ -1,0 +1,8 @@
+node_modules/
+dist/
+bun.lock
+src-tauri/target/
+src-tauri/resources/models/
+*.ggml
+*.bin
+*.onnx
