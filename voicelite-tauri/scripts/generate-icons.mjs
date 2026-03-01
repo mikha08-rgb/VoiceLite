@@ -40,7 +40,7 @@ function makeSvg(size, { rounded = true, padding = 0.15 } = {}) {
   const baseW = micW * 0.7;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${r}" fill="#E87AB2"/>
+  <rect width="${size}" height="${size}" rx="${r}" fill="#3B82F6"/>
   <rect x="${cx - micRx}" y="${micTop}" width="${micW}" height="${micH}" rx="${micRx}" fill="white"/>
   <path d="M${cx - arcR} ${arcY} A${arcR} ${arcR * 0.9} 0 0 0 ${cx + arcR} ${arcY}" stroke="white" stroke-width="${size * 0.045}" fill="none" stroke-linecap="round"/>
   <line x1="${cx}" y1="${arcBottom - size * 0.02}" x2="${cx}" y2="${stemBottom}" stroke="white" stroke-width="${size * 0.045}" stroke-linecap="round"/>
@@ -83,7 +83,7 @@ function makeSmallColorSvg(size) {
   const stemBottom = arcBottom + size * 0.08;
   const baseW = micW * 0.55;
   const sw = Math.max(size * 0.07, 2);
-  const color = "#E87AB2";
+  const color = "#3B82F6";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <rect x="${cx - micRx}" y="${micTop}" width="${micW}" height="${micH}" rx="${micRx}" stroke="${color}" stroke-width="${sw}" fill="${color}" fill-opacity="0.2"/>
