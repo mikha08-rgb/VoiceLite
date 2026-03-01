@@ -2,7 +2,7 @@
 name = "voicelite"
 version = "0.7.8"
 description = "VoiceLite - Speech to Text"
-authors = ["cjpais"]
+authors = ["VoiceLite"]
 edition = "2021"
 license = "MIT"
 default-run = "voicelite"
