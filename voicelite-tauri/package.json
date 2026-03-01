@@ -39,6 +39,7 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^16.4.1",
     "react-select": "^5.8.0",
+    "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.1.16",
     "tauri-plugin-macos-permissions-api": "2.3.0",
