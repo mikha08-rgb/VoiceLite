@@ -64,7 +64,7 @@ namespace VoiceLite.Services
                 if (whisperFactory != null)
                 {
                     ErrorLogger.LogMessage($"Switching model from {Path.GetFileName(currentModelPath)} to {Path.GetFileName(modelPath)}");
-                    try { whisperFactory.Dispose(); } catch { }
+                    try { whisperFactory.Dispose(); } catch (Exception ex) { ErrorLogger.LogDebug($"WhisperFactory disposal failed during model switch: {ex.Message}"); }
                     whisperFactory = null;
                 }
 
@@ -177,9 +177,8 @@ namespace VoiceLite.Services
 
                 ErrorLogger.LogWarning($"Whisper: threads=4, model={Path.GetFileName(effectiveModelPath)}");
 
-                // Create a linked cancellation token with configurable timeout
-                var timeoutSeconds = 60 * Math.Max(settings.WhisperTimeoutMultiplier, 0.5);
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                // 120s timeout — generous enough for the Ultra model on slow CPUs.
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken, timeoutCts.Token);
 
@@ -215,7 +214,7 @@ namespace VoiceLite.Services
 
                         if (finalResult != rawResult)
                         {
-                            ErrorLogger.LogDebug($"Text post-processing applied: '{rawResult}' -> '{finalResult}'");
+                            ErrorLogger.LogDebug("Text post-processing applied");
                         }
                     }
                     catch (Exception postProcessEx)
@@ -227,7 +226,6 @@ namespace VoiceLite.Services
 
                 var totalTime = DateTime.Now - startTime;
                 ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {finalResult.Length} chars");
-                ErrorLogger.LogWarning($"Transcription result: '{finalResult.Substring(0, Math.Min(finalResult.Length, 200))}'");
 
                 isProcessing = false;
                 return finalResult;
@@ -237,7 +235,7 @@ namespace VoiceLite.Services
                 // Timeout (not user cancellation)
                 isProcessing = false;
                 throw new TimeoutException(
-                    $"Transcription timed out after {60 * Math.Max(settings.WhisperTimeoutMultiplier, 0.5):F0} seconds. Please try speaking less or using a smaller model.");
+                    "Transcription timed out after 120 seconds. Please try speaking less or using a smaller model.");
             }
             catch (OperationCanceledException)
             {
@@ -367,8 +365,10 @@ namespace VoiceLite.Services
                 currentModelPath = null;
             }
 
-            transcriptionSemaphore.SafeDispose();
-            transcriptionCts.SafeDispose();
+            try { transcriptionSemaphore?.Dispose(); }
+            catch (Exception ex) { ErrorLogger.LogDebug($"transcriptionSemaphore dispose failed: {ex.Message}"); }
+            try { transcriptionCts?.Dispose(); }
+            catch (Exception ex) { ErrorLogger.LogDebug($"transcriptionCts dispose failed: {ex.Message}"); }
         }
     }
 }

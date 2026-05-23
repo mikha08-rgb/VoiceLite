@@ -18,8 +18,6 @@ namespace VoiceLite.Tests.Services
         {
             return new Settings
             {
-                EnableHistory = true,
-                MaxHistoryItems = 100,
                 TranscriptionHistory = new List<TranscriptionHistoryItem>()
             };
         }
@@ -69,8 +67,7 @@ namespace VoiceLite.Tests.Services
             // Arrange
             var settings = new Settings
             {
-                EnableHistory = true,
-                TranscriptionHistory = null // Null initially
+                TranscriptionHistory = null! // Null initially
             };
 
             // Act
@@ -136,22 +133,6 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public void AddToHistory_WhenHistoryDisabled_DoesNotAdd()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            settings.EnableHistory = false;
-            var service = new TranscriptionHistoryService(settings);
-            var item = CreateTestItem();
-
-            // Act
-            service.AddToHistory(item);
-
-            // Assert
-            settings.TranscriptionHistory.Should().BeEmpty("History is disabled");
-        }
-
-        [Fact]
         public void AddToHistory_VeryLongText_TruncatesTo5000Chars()
         {
             // Arrange
@@ -176,72 +157,18 @@ namespace VoiceLite.Tests.Services
         [Fact]
         public void CleanupOldItems_BelowLimit_NoCleanup()
         {
-            // Arrange
+            // Arrange — MAX_HISTORY_ITEMS is hardcoded to 250.
             var settings = CreateTestSettings();
-            settings.MaxHistoryItems = 10;
             var service = new TranscriptionHistoryService(settings);
 
-            // Add 5 items (below limit)
-            for (int i = 0; i < 5; i++)
-            {
-                service.AddToHistory(CreateTestItem($"Item {i}"));
-            }
-
-            // Assert
-            settings.TranscriptionHistory.Should().HaveCount(5, "All items should remain");
-        }
-
-        [Fact]
-        public void CleanupOldItems_ExceedsLimit_RemovesOldest()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            settings.MaxHistoryItems = 3;
-            var service = new TranscriptionHistoryService(settings);
-
-            // Act - Add items with delays to ensure different timestamps
-            var firstItem = CreateTestItem("First (oldest)");
-            firstItem.Timestamp = DateTime.Now.AddMinutes(-5);
-            service.AddToHistory(firstItem);
-
-            var secondItem = CreateTestItem("Second");
-            secondItem.Timestamp = DateTime.Now.AddMinutes(-3);
-            service.AddToHistory(secondItem);
-
-            var thirdItem = CreateTestItem("Third");
-            thirdItem.Timestamp = DateTime.Now.AddMinutes(-1);
-            service.AddToHistory(thirdItem);
-
-            var fourthItem = CreateTestItem("Fourth (newest)");
-            fourthItem.Timestamp = DateTime.Now;
-            service.AddToHistory(fourthItem);
-
-            // Assert
-            settings.TranscriptionHistory.Should().HaveCount(3, "Should enforce max limit");
-            settings.TranscriptionHistory.Should().Contain(x => x.Text == "Fourth (newest)");
-            settings.TranscriptionHistory.Should().Contain(x => x.Text == "Third");
-            settings.TranscriptionHistory.Should().Contain(x => x.Text == "Second");
-            settings.TranscriptionHistory.Should().NotContain(x => x.Text == "First (oldest)",
-                "Oldest item should be removed");
-        }
-
-        [Fact]
-        public void CleanupOldItems_P1Optimization_EarlyExitWorksCorrectly()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            settings.MaxHistoryItems = 100;
-            var service = new TranscriptionHistoryService(settings);
-
-            // Act - Add 50 items (well below limit)
+            // Add 50 items (well below the 250 cap)
             for (int i = 0; i < 50; i++)
             {
                 service.AddToHistory(CreateTestItem($"Item {i}"));
             }
 
-            // Assert - P1 optimization should prevent allocations
-            settings.TranscriptionHistory.Should().HaveCount(50);
-            // Note: Early exit path doesn't allocate itemsToRemove list when count <= limit
+            // Assert
+            settings.TranscriptionHistory.Should().HaveCount(50, "All items should remain when below cap");
         }
 
         #endregion
@@ -600,23 +527,5 @@ namespace VoiceLite.Tests.Services
 
         #endregion
 
-        #region MaxHistoryItems Property Tests
-
-        [Fact]
-        public void MaxHistoryItems_GetSet_WorksCorrectly()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            // Act
-            service.MaxHistoryItems = 50;
-
-            // Assert
-            service.MaxHistoryItems.Should().Be(50);
-            settings.MaxHistoryItems.Should().Be(50);
-        }
-
-        #endregion
     }
 }

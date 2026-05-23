@@ -76,7 +76,7 @@ namespace VoiceLite.Tests.Services
                 .WithMessage($"Audio file not found: {nonExistentFile}");
         }
 
-        [Fact(Skip = "Integration test - silent WAV may produce empty transcription")]
+        [Fact]
         public async Task TranscribeAsync_ReturnsTranscriptionForValidAudio()
         {
             if (_service == null) return;
@@ -100,7 +100,7 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact(Skip = "Integration test - requires real voice audio")]
+        [Fact]
         public async Task TranscribeFromMemoryAsync_HandlesValidData()
         {
             if (_service == null) return;

@@ -236,7 +236,6 @@ namespace VoiceLite.Tests.Services
             var largePath = Path.Combine(_tempDirectory, "large_audio.wav");
             CreateSilentWavFile(largePath, 60); // 1 minute
 
-            _settings.WhisperTimeoutMultiplier = 5.0; // Reasonable timeout
             _service = new PersistentWhisperService(_settings);
 
             // Act

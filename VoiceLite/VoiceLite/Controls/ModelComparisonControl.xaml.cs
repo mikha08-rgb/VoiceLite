@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -16,6 +17,16 @@ namespace VoiceLite.Controls
 {
     public partial class ModelComparisonControl : UserControl
     {
+        // Static HttpClient prevents socket exhaustion on repeated downloads.
+        private static readonly HttpClient _downloadHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(30),
+            DefaultRequestHeaders =
+            {
+                { "User-Agent", "VoiceLite-Desktop/1.0" }
+            }
+        };
+
         private WhisperModelInfo? selectedModel;
         private List<WhisperModelInfo> models = new List<WhisperModelInfo>();
         private string whisperPath;
@@ -277,14 +288,8 @@ namespace VoiceLite.Controls
                 // Inner try for download-specific errors
                 try
                 {
-                // Determine download URL based on model
-                string? downloadUrl = model.FileName switch
-                {
-                    "ggml-medium.bin" => "https://github.com/mikha08-rgb/VoiceLite/releases/download/v1.0.0/ggml-medium.bin",
-                    // Large model (2.9GB) exceeds GitHub's 2GB limit - fallback to Hugging Face
-                    "ggml-large-v3.bin" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
-                    _ => null
-                };
+                // Resolve download URL from centralized endpoints registry
+                string? downloadUrl = DownloadEndpoints.GetUrlForFileName(model.FileName);
 
                 if (downloadUrl == null)
                 {
@@ -314,17 +319,12 @@ namespace VoiceLite.Controls
                 IsEnabled = false;
                 Mouse.OverrideCursor = Cursors.Wait;
 
-                using (var client = new System.Net.Http.HttpClient())
+                using (var response = await _downloadHttpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
-                    client.Timeout = TimeSpan.FromMinutes(30);
-
-                    using (var response = await client.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
-                    {
-                        response.EnsureSuccessStatusCode();
-                        await using var sourceStream = await response.Content.ReadAsStreamAsync();
-                        await using var targetStream = File.Create(targetPath);
-                        await sourceStream.CopyToAsync(targetStream);
-                    }
+                    response.EnsureSuccessStatusCode();
+                    await using var sourceStream = await response.Content.ReadAsStreamAsync();
+                    await using var targetStream = File.Create(targetPath);
+                    await sourceStream.CopyToAsync(targetStream);
                 }
 
                 MessageBox.Show($"{model.DisplayName} downloaded successfully!\n\nThe model is now available for use.",

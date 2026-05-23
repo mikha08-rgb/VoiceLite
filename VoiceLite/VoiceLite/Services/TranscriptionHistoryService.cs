@@ -13,6 +13,7 @@ namespace VoiceLite.Services
     {
         private readonly Settings settings;
         private const int MAX_TEXT_LENGTH = 5000; // Prevent extremely long transcriptions from bloating settings file
+        private const int MAX_HISTORY_ITEMS = 250; // ~500KB-1MB memory footprint at full capacity
 
         public TranscriptionHistoryService(Settings settings)
         {
@@ -35,12 +36,6 @@ namespace VoiceLite.Services
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
-            if (!settings.EnableHistory)
-            {
-                ErrorLogger.LogMessage("History is disabled, skipping add");
-                return;
-            }
-
             // Truncate very long transcriptions to prevent bloat
             if (item.Text.Length > MAX_TEXT_LENGTH)
             {
@@ -54,7 +49,7 @@ namespace VoiceLite.Services
             {
                 // Insert at the beginning (newest first)
                 settings.TranscriptionHistory.Insert(0, item);
-                ErrorLogger.LogMessage($"Added history item: '{item.PreviewText}' (ID: {item.Id})");
+                ErrorLogger.LogMessage($"Added history item (ID: {item.Id}, {item.Text.Length} chars)");
 
                 // Clean up old items beyond the max limit (but keep pinned items)
                 CleanupOldItemsLocked();
@@ -69,10 +64,10 @@ namespace VoiceLite.Services
         private void CleanupOldItemsLocked()
         {
             // P1 OPTIMIZATION: Early exit if no cleanup needed
-            if (settings.TranscriptionHistory.Count <= settings.MaxHistoryItems)
+            if (settings.TranscriptionHistory.Count <= MAX_HISTORY_ITEMS)
                 return; // No cleanup needed
 
-            int itemsToRemoveCount = settings.TranscriptionHistory.Count - settings.MaxHistoryItems;
+            int itemsToRemoveCount = settings.TranscriptionHistory.Count - MAX_HISTORY_ITEMS;
 
             // O(n log n): Sort to find oldest items
             var itemIdsToRemove = settings.TranscriptionHistory
@@ -103,7 +98,7 @@ namespace VoiceLite.Services
                 if (item != null)
                 {
                     settings.TranscriptionHistory.Remove(item);
-                    ErrorLogger.LogMessage($"Manually removed history item: '{item.PreviewText}' (ID: {id})");
+                    ErrorLogger.LogMessage($"Manually removed history item (ID: {id})");
                     return true;
                 }
             }
@@ -152,11 +147,7 @@ namespace VoiceLite.Services
 
         #region ITranscriptionHistoryService Implementation
 
-        public int MaxHistoryItems
-        {
-            get => settings.MaxHistoryItems;
-            set => settings.MaxHistoryItems = value;
-        }
+        public int MaxHistoryItems => MAX_HISTORY_ITEMS;
 
         public event EventHandler<TranscriptionItem>? ItemAdded;
 
@@ -250,7 +241,6 @@ namespace VoiceLite.Services
                 if (item != null)
                 {
                     item.IsPinned = !item.IsPinned;
-                    settings.Save();
                 }
             }
         }
