@@ -1,12 +1,14 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using VoiceLite.Infrastructure.Resilience;
+using Polly;
+using Polly.Retry;
 
 namespace VoiceLite.Services
 {
@@ -58,6 +60,24 @@ namespace VoiceLite.Services
         private LicenseValidationResult? _cachedValidationResult = null;
         private DateTime? _cacheTimestamp = null;
         private static readonly TimeSpan CacheExpiration = TimeSpan.FromDays(14);
+
+        // Retry transient HTTP failures (5xx, network exceptions) with exponential backoff.
+        private static readonly AsyncRetryPolicy<HttpResponseMessage> _httpRetryPolicy =
+            Policy<HttpResponseMessage>
+                .Handle<HttpRequestException>()
+                .Or<TaskCanceledException>()
+                .OrResult(r => !r.IsSuccessStatusCode && (int)r.StatusCode >= 500 && (int)r.StatusCode < 600)
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
+                    onRetry: (outcome, timespan, retryCount, _) =>
+                    {
+                        var statusCode = outcome.Result?.StatusCode.ToString() ?? "N/A";
+                        var exception = outcome.Exception?.Message ?? "No exception";
+                        ErrorLogger.LogWarning(
+                            $"HTTP Retry {retryCount}/3 after {timespan.TotalSeconds:F1}s | " +
+                            $"Status: {statusCode} | Exception: {exception}");
+                    });
 
         // THREAD-SAFETY FIX: Lock for cache access to prevent race conditions
         // Multiple concurrent ValidateLicenseAsync calls could corrupt cache without synchronization
@@ -240,12 +260,12 @@ namespace VoiceLite.Services
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                // PHASE 3 - DAY 1: Wrap API call with Polly retry policy
-                // This will automatically retry up to 3 times on transient failures (5xx errors, network issues)
+                // Retry up to 3 times on transient failures (5xx, network errors, timeouts).
+                // Exponential backoff: 2s, 4s, 8s.
                 HttpResponseMessage response;
                 try
                 {
-                    response = await RetryPolicies.HttpRetryPolicy.ExecuteAsync(async () =>
+                    response = await _httpRetryPolicy.ExecuteAsync(async () =>
                         await _httpClient.PostAsync($"{_apiBaseUrl}/api/licenses/validate", content));
                 }
                 catch (Exception retryEx)

@@ -36,14 +36,8 @@ namespace VoiceLite
         private Services.Audio.SileroVadService? vadService;
         // SoundService removed per user request - no audio feedback
 
-        // ViewModels
-        private RecordingViewModel? recordingViewModel;
-        private HistoryViewModel? historyViewModel;
+        // StatusViewModel drives the status indicator binding in MainWindow.xaml.
         private StatusViewModel? statusViewModel;
-
-        // Expose ViewModels for XAML data binding
-        public RecordingViewModel RecordingViewModel => recordingViewModel!;
-        public HistoryViewModel HistoryViewModel => historyViewModel!;
         public StatusViewModel StatusViewModel => statusViewModel!;
 
         // Recording state (keeping for compatibility during transition)
@@ -97,19 +91,6 @@ namespace VoiceLite
         {
             InitializeComponent();
             LoadSettings();
-
-            // Initialize ViewModels
-            recordingViewModel = new RecordingViewModel();
-            recordingViewModel.RecordingStartRequested += OnRecordingStartRequested;
-            recordingViewModel.RecordingStopRequested += OnRecordingStopRequested;
-
-            historyViewModel = new HistoryViewModel();
-            historyViewModel.ClearHistoryRequested += OnClearHistoryRequested;
-            historyViewModel.ClearAllHistoryRequested += OnClearAllHistoryRequested;
-            historyViewModel.CopyToClipboardRequested += OnCopyToClipboardRequested;
-            historyViewModel.DeleteItemRequested += OnDeleteItemRequested;
-            historyViewModel.ReInjectRequested += OnReInjectRequested;
-            // SearchTextChanged removed - search feature not needed
 
             statusViewModel = new StatusViewModel();
             statusViewModel.SetReady(); // Start with Ready state
@@ -425,7 +406,7 @@ namespace VoiceLite
                     catch (Exception validationEx)
                     {
                         // Delete corrupt temp file
-                        try { File.Delete(tempPath); } catch { }
+                        try { File.Delete(tempPath); } catch (Exception ex) { ErrorLogger.LogDebug($"Settings temp file cleanup failed: {ex.Message}"); }
                         throw new InvalidOperationException("Settings save failed - temp file validation failed", validationEx);
                     }
 
@@ -495,7 +476,7 @@ namespace VoiceLite
                     {
                         vadService = new Services.Audio.SileroVadService(vadModelPath);
                         audioRecorder.SetVadService(vadService, settings);
-                        ErrorLogger.LogWarning($"Silero VAD initialized (threshold={settings.VADThreshold})");
+                        ErrorLogger.LogWarning("Silero VAD initialized (threshold=0.35)");
                     }
                     catch (Exception vadEx)
                     {
@@ -822,14 +803,6 @@ namespace VoiceLite
                 recordingStartTime = DateTime.Now;
                 isRecording = true;
 
-                // Sync ViewModel state
-                if (recordingViewModel != null)
-                {
-                    recordingViewModel.IsRecording = true;
-                    recordingViewModel.CanRecord = false;
-                    recordingViewModel.StartRecordingTimer();
-                }
-
                 // IMMEDIATE FEEDBACK: Update UI before starting recorder for instant response
                 UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
                 UpdateUIForCurrentMode();
@@ -856,11 +829,6 @@ namespace VoiceLite
                     {
                         ErrorLogger.LogWarning("StartRecording: Recording failed to start, rolling back state");
                         isRecording = false;
-                        if (recordingViewModel != null)
-                        {
-                            recordingViewModel.ResetRecording();
-                            recordingViewModel.CanRecord = true;
-                        }
                         UpdateStatus("Failed to start recording", Brushes.Red);
                     }
                 }
@@ -868,11 +836,6 @@ namespace VoiceLite
                 {
                     ErrorLogger.LogError("StartRecording", ex);
                     isRecording = false;
-                    if (recordingViewModel != null)
-                    {
-                        recordingViewModel.ResetRecording();
-                        recordingViewModel.CanRecord = true;
-                    }
                     UpdateStatus("Failed to start recording", Brushes.Red);
                 }
             }
@@ -892,14 +855,6 @@ namespace VoiceLite
             recordingElapsedTimer = null;
 
             isRecording = false;
-
-            // Sync ViewModel state
-            if (recordingViewModel != null)
-            {
-                recordingViewModel.StopRecordingTimer();
-                recordingViewModel.IsRecording = false;
-                recordingViewModel.CanRecord = !isTranscribing; // Can record again if not transcribing
-            }
 
             try
             {
@@ -925,103 +880,6 @@ namespace VoiceLite
             }
         }
 
-        /// <summary>
-        /// Handle RecordingViewModel request to start recording
-        /// </summary>
-        private void OnRecordingStartRequested(object? sender, EventArgs e)
-        {
-            StartRecording();
-        }
-
-        /// <summary>
-        /// Handle RecordingViewModel request to stop recording
-        /// </summary>
-        private void OnRecordingStopRequested(object? sender, EventArgs e)
-        {
-            StopRecording();
-        }
-
-        /// <summary>
-        /// Handle HistoryViewModel request to clear history
-        /// </summary>
-        private void OnClearHistoryRequested(object? sender, EventArgs e)
-        {
-            var result = MessageBox.Show(
-                "This will remove all transcriptions from history.\n\nContinue?",
-                "Clear History",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                historyService?.ClearHistory();
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Handle HistoryViewModel request to clear all history (including pinned)
-        /// </summary>
-        private void OnClearAllHistoryRequested(object? sender, EventArgs e)
-        {
-            var result = MessageBox.Show(
-                "This will remove ALL transcriptions from history including pinned items.\n\nThis action cannot be undone.\n\nContinue?",
-                "Clear All History",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                historyService?.ClearHistory();
-                _ = UpdateHistoryUI();
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Handle HistoryViewModel request to copy item to clipboard
-        /// </summary>
-        private void OnCopyToClipboardRequested(object? sender, TranscriptionHistoryItem item)
-        {
-            try
-            {
-                System.Windows.Clipboard.SetText(item.Text);
-                UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Copy to clipboard", ex);
-            }
-        }
-
-        /// <summary>
-        /// Handle HistoryViewModel request to delete item
-        /// </summary>
-        private void OnDeleteItemRequested(object? sender, TranscriptionHistoryItem item)
-        {
-            historyService?.RemoveFromHistory(item.Id);
-            _ = UpdateHistoryUI();
-            SaveSettings();
-        }
-
-        /// <summary>
-        /// Handle HistoryViewModel request to re-inject item
-        /// </summary>
-        private void OnReInjectRequested(object? sender, TranscriptionHistoryItem item)
-        {
-            try
-            {
-                // Use OriginalText if available (before shortcuts), otherwise use Text
-                var textToProcess = item.OriginalText ?? item.Text;
-                var processedText = customShortcutService?.ProcessShortcuts(textToProcess) ?? textToProcess;
-                textInjector?.InjectText(processedText);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogError("Re-inject", ex);
-            }
-        }
 
         // REMOVED: OnSearchTextChanged - search feature not needed
 
@@ -1416,7 +1274,7 @@ namespace VoiceLite
                             }
                         });
                     }
-                    catch { /* Ignore cleanup errors */ }
+                    catch (Exception ex) { ErrorLogger.LogDebug($"Timeout recovery cleanup failed: {ex.Message}"); }
                 });
             }
             catch (Exception innerEx)
@@ -1432,7 +1290,7 @@ namespace VoiceLite
                 {
                     UpdateStatus("Error during recovery", Brushes.Red);
                 }
-                catch { /* Ignore */ }
+                catch (Exception ex) { ErrorLogger.LogDebug($"UpdateStatus failed during error recovery: {ex.Message}"); }
             }
         }
 
@@ -1511,7 +1369,7 @@ namespace VoiceLite
 
                 ErrorLogger.LogWarning($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
                 var transcription = await transcriber.TranscribeAsync(audioFilePath);
-                ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned: '{transcription}'");
+                ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned {transcription?.Length ?? 0} chars");
 
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -1812,14 +1670,6 @@ namespace VoiceLite
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Handle Ctrl+F - Toggle search box
-            if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                historyViewModel?.ToggleSearchCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
             // Handle Ctrl+E - Export history
             if (e.Key == Key.E && Keyboard.Modifiers == ModifierKeys.Control)
             {
@@ -2061,25 +1911,6 @@ namespace VoiceLite
                     hotkeyManager.PollingModeActivated -= OnPollingModeActivated;
                 }
 
-                // MEMORY LEAK FIX: Unsubscribe ViewModel event handlers
-                // ViewModels hold references to MainWindow via event subscriptions
-                // Must unsubscribe to allow MainWindow to be garbage collected
-                if (recordingViewModel != null)
-                {
-                    recordingViewModel.RecordingStartRequested -= OnRecordingStartRequested;
-                    recordingViewModel.RecordingStopRequested -= OnRecordingStopRequested;
-                }
-
-                if (historyViewModel != null)
-                {
-                    historyViewModel.ClearHistoryRequested -= OnClearHistoryRequested;
-                    historyViewModel.ClearAllHistoryRequested -= OnClearAllHistoryRequested;
-                    historyViewModel.CopyToClipboardRequested -= OnCopyToClipboardRequested;
-                    historyViewModel.DeleteItemRequested -= OnDeleteItemRequested;
-                    historyViewModel.ReInjectRequested -= OnReInjectRequested;
-                }
-
-
                 // Dispose child windows (WPF Window resources)
 
                 try { currentSettingsWindow?.Close(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: Settings window close failed: {ex.Message}"); }
@@ -2188,15 +2019,7 @@ namespace VoiceLite
         /// </summary>
         private System.Windows.Controls.Border CreateHistoryCard(TranscriptionHistoryItem item)
         {
-            // Check UI preset and create appropriate card layout
-            if (settings.UIPreset == UIPreset.Compact)
-            {
-                return CreateCompactHistoryCard(item);
-            }
-            else
-            {
-                return CreateDefaultHistoryCard(item);
-            }
+            return CreateCompactHistoryCard(item);
         }
 
         /// <summary>
@@ -2357,188 +2180,6 @@ namespace VoiceLite
 
             // Attach context menu using shared helper
             border.ContextMenu = CreateHistoryContextMenu(item);
-            border.Child = grid;
-            return border;
-        }
-
-        private System.Windows.Controls.Border CreateDefaultHistoryCard(TranscriptionHistoryItem item)
-        {
-            // Main container
-            var border = new System.Windows.Controls.Border
-            {
-                Background = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(14),
-                Margin = new Thickness(0, 0, 0, 10),
-                CornerRadius = new CornerRadius(6),
-                Cursor = Cursors.Hand,
-                Tag = item, // Store the item for event handlers
-                Effect = new DropShadowEffect
-                {
-                    Color = Colors.Black,
-                    BlurRadius = 4,
-                    ShadowDepth = 1,
-                    Opacity = 0.06,
-                    Direction = 270,
-                    RenderingBias = RenderingBias.Quality
-                },
-                // Improve rendering clarity
-                UseLayoutRounding = true,
-                SnapsToDevicePixels = true
-            };
-
-            // Improve text rendering for the entire card
-            System.Windows.Media.TextOptions.SetTextRenderingMode(border, System.Windows.Media.TextRenderingMode.ClearType);
-            System.Windows.Media.TextOptions.SetTextFormattingMode(border, System.Windows.Media.TextFormattingMode.Display);
-
-            // Enhanced hover effects
-
-            // Click to copy
-            border.MouseLeftButtonDown += (s, e) =>
-            {
-                try
-                {
-                    System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
-
-                    // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    lock (timerLock) { activeStatusTimers.Add(timer); } // HIGH-13 FIX: Use lock for thread safety
-                    EventHandler? handler = null;
-                    handler = (ts, te) =>
-                    {
-                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-                        timer.Stop();
-                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        lock (timerLock) { activeStatusTimers.Remove(timer); } // HIGH-13 FIX: Use lock for thread safety
-                    };
-                    timer.Tick += handler;
-                    timer.Start();
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Copy history item", ex);
-                }
-            };
-
-            // Attach context menu using shared helper
-            border.ContextMenu = CreateHistoryContextMenu(item);
-
-            // Content grid (simplified - no metadata row)
-            var grid = new System.Windows.Controls.Grid();
-            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
-
-            // Timestamp header
-            var headerGrid = new System.Windows.Controls.Grid();
-            System.Windows.Controls.Grid.SetRow(headerGrid, 0);
-            headerGrid.Margin = new Thickness(0, 0, 0, 6);
-
-            var relativeConverter = new Utilities.RelativeTimeConverter();
-            var timeText = new System.Windows.Controls.TextBlock
-            {
-                Text = (string)relativeConverter.Convert(item.Timestamp, null!, null!, null!),
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(149, 165, 166)),
-                VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = item.Timestamp.ToString("MMM d, yyyy h:mm tt") // Full timestamp on hover
-            };
-            headerGrid.Children.Add(timeText);
-
-            // Copy button (visible on hover) - NO ANIMATIONS
-            var copyButton = new System.Windows.Controls.Button
-            {
-                Content = "📋 Copy",
-                FontSize = 11,
-                Padding = new Thickness(8, 3, 8, 3),
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(224, 224, 224)),
-                BorderThickness = new Thickness(1),
-                Cursor = Cursors.Hand,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Opacity = 0, // Hidden by default via opacity, NOT visibility
-                IsHitTestVisible = false, // Can't be clicked when hidden
-                Margin = new Thickness(0, 0, 0, 0),
-                UseLayoutRounding = true,
-                SnapsToDevicePixels = true
-            };
-
-            // Improve text rendering clarity
-            System.Windows.Media.TextOptions.SetTextRenderingMode(copyButton, System.Windows.Media.TextRenderingMode.ClearType);
-            System.Windows.Media.TextOptions.SetTextFormattingMode(copyButton, System.Windows.Media.TextFormattingMode.Display);
-
-            copyButton.Click += (s, e) =>
-            {
-                e.Handled = true; // Prevent card click event
-                try
-                {
-                    System.Windows.Clipboard.SetText(item.Text);
-                    UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
-
-                    // Revert to "Ready" after 1.5 seconds
-                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
-                    lock (timerLock) { activeStatusTimers.Add(timer); } // HIGH-13 FIX: Use lock for thread safety
-                    EventHandler? handler = null;
-                    handler = (ts, te) =>
-                    {
-                        UpdateStatus("Ready", new SolidColorBrush(StatusColors.Ready));
-                        timer.Stop();
-                        if (handler != null) timer.Tick -= handler; // MEMORY FIX: Unsubscribe to prevent leak
-                        lock (timerLock) { activeStatusTimers.Remove(timer); } // HIGH-13 FIX: Use lock for thread safety
-                    };
-                    timer.Tick += handler;
-                    timer.Start();
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Copy button", ex);
-                }
-            };
-            headerGrid.Children.Add(copyButton);
-
-            // Instant hover effects - NO animations
-            border.MouseEnter += (s, e) =>
-            {
-                // Instant background change
-                border.Background = new SolidColorBrush(Color.FromRgb(248, 249, 250));
-
-                // Show copy button instantly via opacity (no WPF visibility animations)
-                copyButton.Opacity = 1;
-                copyButton.IsHitTestVisible = true;
-            };
-
-            border.MouseLeave += (s, e) =>
-            {
-                // Instant background reset
-                border.Background = Brushes.White;
-
-                // Hide copy button instantly via opacity
-                copyButton.Opacity = 0;
-                copyButton.IsHitTestVisible = false;
-            };
-
-            grid.Children.Add(headerGrid);
-
-            // Transcription text
-            var truncateConverter = new Utilities.TruncateTextConverter();
-            var textBlock = new System.Windows.Controls.TextBlock
-            {
-                Text = (string)truncateConverter.Convert(item.Text, null!, null!, null!),
-                FontSize = 13,
-                Foreground = new SolidColorBrush(Color.FromRgb(44, 62, 80)),
-                TextWrapping = TextWrapping.Wrap,
-                MaxHeight = 60,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Margin = new Thickness(0, 0, 0, 6),
-                ToolTip = item.Text // Full text on hover
-            };
-            System.Windows.Controls.Grid.SetRow(textBlock, 1);
-            grid.Children.Add(textBlock);
-
-            // Metadata removed - cleaner UI with just timestamp + text
-
             border.Child = grid;
             return border;
         }

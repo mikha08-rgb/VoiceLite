@@ -10,26 +10,11 @@ namespace VoiceLite.Models
         Toggle
     }
 
-    public enum TextInjectionMode
-    {
-        SmartAuto,      // Automatically choose based on text length and context
-        AlwaysType,     // Always use keyboard typing (most compatible)
-        AlwaysPaste,    // Always use clipboard paste (fastest)
-        PreferType,     // Type for short text, paste for long
-        PreferPaste     // Paste when possible, type when necessary
-    }
-
-    public enum UIPreset
-    {
-        Default,        // Hybrid baseline - clean and balanced
-        Compact         // Power user - maximum density
-    }
-
     public enum TranscriptionPreset
     {
-        Speed,          // Ultra-fast transcription (beam_size=1, all speed optimizations) - Current performance
-        Balanced,       // Good balance of speed and accuracy (beam_size=3, moderate optimizations) - Recommended
-        Accuracy        // Best transcription quality (beam_size=5, minimal optimizations) - Slower but more accurate
+        Speed,          // Ultra-fast transcription (beam_size=1, all speed optimizations)
+        Balanced,       // Good balance of speed and accuracy (beam_size=3) - Recommended
+        Accuracy        // Best transcription quality (beam_size=5)
     }
 
     public class WhisperPresetConfig
@@ -75,30 +60,20 @@ namespace VoiceLite.Models
 
     public class Settings
     {
-        // THREAD SAFETY: Lock object for synchronizing access from multiple threads
-        // Use this when reading/writing settings from different threads
+        // Lock object for synchronizing access from multiple threads.
         public readonly object SyncRoot = new object();
 
-        private RecordMode _mode = RecordMode.Toggle; // Default to Toggle mode (Dragon-like behavior)
-        private TextInjectionMode _textInjectionMode = TextInjectionMode.SmartAuto;
-        private Key _recordHotkey = Key.Z; // Default hotkey: Shift+Z
+        private RecordMode _mode = RecordMode.Toggle;
+        private Key _recordHotkey = Key.Z;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "ggml-base.bin"; // DEFAULT: Base model (free tier restricted to tiny model only)
-        private double _whisperTimeoutMultiplier = 2.0;
-        private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced; // Default to balanced for good speed/accuracy tradeoff
-        private bool _enableVAD = true; // TUNED: VAD with conservative parameters (80ms min speech, 500ms min silence, 200ms padding)
-        private double _vadThreshold = 0.35; // Conservative VAD threshold - Silero default is 0.5, we use 0.35 for better speech retention
+        private string _whisperModel = "ggml-base.bin";
+        private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced;
+        private bool _enableVAD = true;
 
         public RecordMode Mode
         {
             get => _mode;
             set => _mode = Enum.IsDefined(typeof(RecordMode), value) ? value : RecordMode.PushToTalk;
-        }
-
-        public TextInjectionMode TextInjectionMode
-        {
-            get => _textInjectionMode;
-            set => _textInjectionMode = Enum.IsDefined(typeof(TextInjectionMode), value) ? value : TextInjectionMode.SmartAuto;
         }
 
         public Key RecordHotkey
@@ -128,99 +103,23 @@ namespace VoiceLite.Models
         // BeamSize is driven by TranscriptionPreset (Speed/Balanced/Accuracy)
         public int BeamSize => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BeamSize;
 
-        public double WhisperTimeoutMultiplier
-        {
-            get => _whisperTimeoutMultiplier;
-            set => _whisperTimeoutMultiplier = Math.Clamp(value, 0.5, 10.0);
-        }
-
         public bool EnableVAD
         {
             get => _enableVAD;
             set => _enableVAD = value;
         }
 
-        public double VADThreshold
-        {
-            get => _vadThreshold;
-            set => _vadThreshold = Math.Clamp(value, 0.0, 1.0);
-        }
-
-        public bool ShowTrayIcon { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
-        public bool StartMinimized { get; set; } = false;
-        public bool LaunchAtStartup { get; set; } = false;
-        public bool CloseToTray { get; set; } = false;
-        public bool CheckForUpdates { get; set; } = true;
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
-        public bool AutoPaste { get; set; } = true; // Auto-paste after transcription (default enabled)
+        public bool AutoPaste { get; set; } = true;
 
-        public int TypingDelay { get; set; } = 10;
-
-        // Clipboard Restoration Delay (v1.2.0)
-        // Controls how long to wait before restoring user's original clipboard content
-        // Range: 30-100ms (balance between speed and reliability)
-        private int _clipboardRestorationDelayMs = 50;
-        public int ClipboardRestorationDelayMs
-        {
-            get => _clipboardRestorationDelayMs;
-            set => _clipboardRestorationDelayMs = Math.Clamp(value, 30, 100);
-        }
-        public bool SaveHistory { get; set; } = true;
-        public int ActivationCount { get; set; } = 0;
-
-        // Transcription History
-        private int _maxHistoryItems = 50;
-
-        // BUG FIX (BUG-016 + BUG-003): Reduced cap from 1000 to 250 to prevent memory bloat
-        // 250 items = ~500KB-1MB memory footprint (reasonable for 24/7 usage)
-        // 1000 items = ~2-5MB memory + slow UI rendering with large lists
-        public int MaxHistoryItems
-        {
-            get => _maxHistoryItems;
-            set => _maxHistoryItems = Math.Clamp(value, 1, 250); // BUG-003 FIX: Reduced from 1000 to 250
-        }
-        public bool EnableHistory { get; set; } = true; // Allow users to disable history tracking
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
-
-        // Custom Shortcuts (Text Expansion)
         public List<CustomShortcut> CustomShortcuts { get; set; } = new List<CustomShortcut>();
 
-        // History Display Preferences
-        public bool ShowHistoryPanel { get; set; } = true; // Toggle history panel visibility
-        public bool HistoryShowWordCount { get; set; } = true; // Show word count in history items
-        public bool HistoryShowTimestamp { get; set; } = true; // Show timestamp in history items
-        public double HistoryPanelWidth { get; set; } = 280; // Remember panel width
-
-        // UI Preset (Appearance) - Hardcoded to Compact
-        public UIPreset UIPreset => UIPreset.Compact;
-
-        // License Management
-        public string? LicenseKey { get; set; } = null; // Pro license key
-        public bool IsProLicense { get; set; } = false; // True if Pro license is activated
-
-        // Performance Settings
-        // CRITICAL: Always capped at 4 threads to prevent CPU thrashing (see v1.1.2 performance fix)
-        public int Threads { get; set; } = 4; // Fixed optimal thread count
-
-        // Static methods for loading/saving settings
-        public static Settings Load()
-        {
-            // This is a placeholder - actual implementation would load from JSON
-            return new Settings();
-        }
-
-        public void Save()
-        {
-            // This is a placeholder - actual implementation would save to JSON
-        }
-
-        public void Reload()
-        {
-            // This is a placeholder - actual implementation would reload from JSON
-        }
+        public string? LicenseKey { get; set; } = null;
+        public bool IsProLicense { get; set; } = false;
     }
 
     public static class SettingsValidator
@@ -231,7 +130,8 @@ namespace VoiceLite.Models
                 return new Settings();
 
             // Validate language code (top 30 most popular languages supported by Whisper + auto-detect)
-            var validLanguages = new HashSet<string> {
+            var validLanguages = new HashSet<string>
+            {
                 "auto", "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",
                 "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi",
                 "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no"
@@ -246,21 +146,6 @@ namespace VoiceLite.Models
             {
                 settings.SelectedMicrophoneIndex = -1;
             }
-
-            // CRITICAL FIX (v1.1.5): Cap Threads at 4 to prevent CPU thrashing
-            // Issue: Settings persisted Threads=8 causing severe performance degradation
-            // This ensures even if settings.json has a bad value, we cap it
-            if (settings.Threads > 4)
-            {
-                settings.Threads = 4;
-            }
-            else if (settings.Threads < 1)
-            {
-                settings.Threads = 4;
-            }
-
-            // Force re-validation by triggering property setters
-            settings.WhisperTimeoutMultiplier = settings.WhisperTimeoutMultiplier;
 
             return settings;
         }

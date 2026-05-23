@@ -70,13 +70,6 @@ namespace VoiceLite
                 if (AutoPasteCheckBox != null)
                     AutoPasteCheckBox.IsChecked = settings.AutoPaste;
 
-                // Clipboard Delay Settings
-                if (ClipboardDelaySlider != null)
-                {
-                    ClipboardDelaySlider.Value = settings.ClipboardRestorationDelayMs;
-                    UpdateClipboardDelayLabel();
-                }
-
                 // Audio Enhancement - sync UI from settings
                 SyncAudioUIFromSettings();
 
@@ -169,15 +162,6 @@ namespace VoiceLite
             // Load VAD settings (with null checks for safety)
             if (EnableVADCheckBox != null)
                 EnableVADCheckBox.IsChecked = settings.EnableVAD;
-
-            if (VADThresholdSlider != null)
-                VADThresholdSlider.Value = settings.VADThreshold;
-
-            if (VADThresholdText != null)
-                VADThresholdText.Text = settings.VADThreshold.ToString("F2");
-
-            if (VADSettingsPanel != null)
-                VADSettingsPanel.IsEnabled = settings.EnableVAD;
         }
 
         private void LoadLanguages()
@@ -399,11 +383,9 @@ namespace VoiceLite
 
             // VAD Settings
             settings.EnableVAD = EnableVADCheckBox.IsChecked ?? true;
-            settings.VADThreshold = VADThresholdSlider.Value;
 
             // Audio Settings
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
-            settings.ClipboardRestorationDelayMs = (int)ClipboardDelaySlider.Value;
 
             if (MicrophoneComboBox.SelectedItem is AudioDevice selectedDevice)
             {
@@ -423,7 +405,7 @@ namespace VoiceLite
         }
 
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
-        private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch { } }
+        private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch (Exception ex) { ErrorLogger.LogDebug($"LoadVersionInfo failed: {ex.Message}"); } }
         private void SyncAudioUIFromSettings() { }
 
         // License Management Event Handlers
@@ -545,47 +527,6 @@ namespace VoiceLite
                 }
             }
         }
-
-        private void EnableVADCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (VADSettingsPanel != null)
-            {
-                VADSettingsPanel.IsEnabled = EnableVADCheckBox.IsChecked ?? false;
-            }
-        }
-
-        private void VADThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (VADThresholdText != null)
-            {
-                VADThresholdText.Text = e.NewValue.ToString("F2");
-            }
-        }
-
-        private void ClipboardDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            UpdateClipboardDelayLabel();
-        }
-
-        private void UpdateClipboardDelayLabel()
-        {
-            if (ClipboardDelayLabel != null && ClipboardDelaySlider != null)
-            {
-                ClipboardDelayLabel.Text = $"{(int)ClipboardDelaySlider.Value}ms";
-            }
-        }
-
-        // Stub event handlers for removed/unimplemented features
-        private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { }
-        private void DownloadModelsButton_Click(object sender, RoutedEventArgs e) { }
-        private void StudioPreset_Click(object sender, RoutedEventArgs e) { }
-        private void OfficePreset_Click(object sender, RoutedEventArgs e) { }
-        private void DefaultPreset_Click(object sender, RoutedEventArgs e) { }
-        private void AudioSetting_Changed(object sender, RoutedEventArgs e) { }
-        private void VolumeBoost_Changed(object sender, RoutedEventArgs e) { }
-        private void NoiseGate_Changed(object sender, RoutedEventArgs e) { }
-        private void TestAudio_Click(object sender, RoutedEventArgs e) { }
-        private void AdvancedAudioSetting_Changed(object sender, RoutedEventArgs e) { }
 
         // ========== Custom Shortcuts Management ==========
 

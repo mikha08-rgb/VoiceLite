@@ -60,11 +60,6 @@ namespace VoiceLite.Core.Interfaces.Features
         string[] GetAvailableModels();
 
         /// <summary>
-        /// Refreshes the Pro status from the license service
-        /// </summary>
-        void RefreshProStatus();
-
-        /// <summary>
         /// Shows the upgrade prompt to the user
         /// </summary>
         void ShowUpgradePrompt();
