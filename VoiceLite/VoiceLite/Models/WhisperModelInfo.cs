@@ -6,6 +6,10 @@ using System.Windows;
 
 namespace VoiceLite.Models
 {
+    /// <summary>
+    /// Single-engine model registry. Class name kept (was the 5-tier Whisper registry) to
+    /// limit blast radius of the engine swap — rename to AsrModelInfo is a follow-up sweep.
+    /// </summary>
     public class WhisperModelInfo
     {
         public string FileName { get; set; } = string.Empty;
@@ -14,9 +18,9 @@ namespace VoiceLite.Models
         public string FileSizeDisplay => FormatFileSize(FileSizeBytes);
         public int SpeedRating { get; set; } // 1-5 (5 = fastest)
         public int AccuracyRating { get; set; } // 1-5 (5 = most accurate)
-        public double SpeedRatingWidth => (SpeedRating / 5.0) * 150; // Convert to width
-        public double AccuracyRatingWidth => (AccuracyRating / 5.0) * 150; // Convert to width
-        public Visibility IsRecommended { get; set; } // Changed to Visibility type
+        public double SpeedRatingWidth => (SpeedRating / 5.0) * 150;
+        public double AccuracyRatingWidth => (AccuracyRating / 5.0) * 150;
+        public Visibility IsRecommended { get; set; }
         public double TypicalProcessingTime { get; set; } // seconds per audio second
         public double RequiredRAMGB { get; set; }
         public bool IsInstalled { get; set; }
@@ -24,6 +28,21 @@ namespace VoiceLite.Models
         public List<string> Cons { get; set; } = new List<string>();
         public string Description { get; set; } = string.Empty;
         public bool SupportsMultilingual { get; set; }
+
+        // Canonical id for the single Parakeet entry.
+        public const string ParakeetId = "parakeet-tdt-0.6b-v3-int8";
+
+        // Legacy GGML filenames previous versions persisted in settings.json.
+        // Used by SettingsMigration to detect upgrade paths.
+        public static readonly IReadOnlyList<string> LegacyGgmlFileNames = new[]
+        {
+            "ggml-tiny.bin",
+            "ggml-base.bin",
+            "ggml-small.bin",
+            "ggml-medium.bin",
+            "ggml-large-v3-turbo-q8_0.bin",
+            "ggml-large-v3.bin",
+        };
 
         private static string FormatFileSize(long bytes)
         {
@@ -39,191 +58,98 @@ namespace VoiceLite.Models
         }
 
         /// <summary>
-        /// Gets the display name for a model file name (e.g., "ggml-small.bin" → "Pro")
+        /// Returns the display name for a model id. Legacy GGML filenames are tagged "(legacy)"
+        /// — they should never appear post-migration but rendering them gracefully avoids crashes.
         /// </summary>
         public static string GetDisplayName(string fileName)
         {
-            return fileName?.ToLower() switch
-            {
-                "ggml-tiny.bin" => "Lite",
-                "ggml-base.bin" => "Swift",
-                "ggml-small.bin" => "Pro",
-                "ggml-medium.bin" => "Elite",
-                "ggml-large-v3-turbo-q8_0.bin" => "Turbo",
-                "ggml-large-v3.bin" => "Ultra",
-                _ => "Unknown"
-            };
+            if (string.IsNullOrEmpty(fileName))
+                return "Unknown";
+
+            var lower = fileName.ToLower();
+            if (lower == ParakeetId)
+                return "Parakeet v3";
+
+            if (LegacyGgmlFileNames.Any(n => n.Equals(lower, StringComparison.OrdinalIgnoreCase)))
+                return "(legacy)";
+
+            return "Unknown";
         }
 
+        /// <summary>
+        /// Returns the single-entry model registry. The <paramref name="whisperPath"/> argument
+        /// is kept for call-site compatibility; install detection now probes the standard
+        /// Parakeet model directory under it.
+        /// </summary>
         public static List<WhisperModelInfo> GetAvailableModels(string whisperPath)
         {
-            var models = new List<WhisperModelInfo>
+            var parakeet = new WhisperModelInfo
             {
-                new WhisperModelInfo
+                FileName = ParakeetId,
+                DisplayName = "Parakeet v3",
+                FileSizeBytes = 640L * 1024 * 1024, // ~640MB int8 quantized
+                SpeedRating = 4,
+                AccuracyRating = 5,
+                TypicalProcessingTime = 0.15,
+                RequiredRAMGB = 2.0,
+                Description = "NVIDIA Parakeet TDT v3 — multilingual transducer ASR (25 European languages).",
+                SupportsMultilingual = true,
+                IsRecommended = Visibility.Visible,
+                Pros = new List<string>
                 {
-                    FileName = "ggml-base.bin",
-                    DisplayName = "Swift",
-                    FileSizeBytes = 142 * 1024 * 1024, // 142MB
-                    SpeedRating = 4,
-                    AccuracyRating = 2,
-                    TypicalProcessingTime = 0.2,
-                    RequiredRAMGB = 1.0,
-                    Description = "Fast model with improved accuracy",
-                    SupportsMultilingual = false,
-                    IsRecommended = Visibility.Collapsed,
-                    Pros = new List<string>
-                    {
-                        "Fast processing",
-                        "Good for most casual use",
-                        "Better with common terms",
-                        "Low resource usage"
-                    },
-                    Cons = new List<string>
-                    {
-                        "Limited technical vocabulary",
-                        "English only",
-                        "May miss complex phrases"
-                    }
+                    "Beats Whisper Large v3 on Open ASR Leaderboard (6.34% avg WER)",
+                    "Transducer architecture — no hallucinations on silence",
+                    "2–3x faster than Whisper Large on CPU",
+                    "Multilingual: 25 European languages",
                 },
-                new WhisperModelInfo
+                Cons = new List<string>
                 {
-                    FileName = "ggml-small.bin",
-                    DisplayName = "Pro",
-                    FileSizeBytes = 466 * 1024 * 1024, // 466MB
-                    SpeedRating = 3,
-                    AccuracyRating = 3,
-                    TypicalProcessingTime = 0.4,
-                    RequiredRAMGB = 2.0,
-                    Description = "Balanced model - recommended for most users",
-                    SupportsMultilingual = true,
-                    IsRecommended = Visibility.Visible,
-                    Pros = new List<string>
-                    {
-                        "Good balance of speed/accuracy",
-                        "Handles technical terms well",
-                        "Supports multiple languages",
-                        "Reliable for coding dictation"
-                    },
-                    Cons = new List<string>
-                    {
-                        "Moderate processing time",
-                        "2GB+ RAM recommended"
-                    }
+                    "640MB download on first launch",
+                    "2GB+ RAM recommended",
                 },
-                new WhisperModelInfo
-                {
-                    FileName = "ggml-medium.bin",
-                    DisplayName = "Elite",
-                    FileSizeBytes = 1500L * 1024 * 1024, // 1.5GB
-                    SpeedRating = 2,
-                    AccuracyRating = 4,
-                    TypicalProcessingTime = 0.8,
-                    RequiredRAMGB = 3.0,
-                    Description = "High accuracy model for demanding tasks",
-                    SupportsMultilingual = true,
-                    IsRecommended = Visibility.Collapsed,
-                    Pros = new List<string>
-                    {
-                        "High accuracy",
-                        "Excellent with technical vocabulary",
-                        "Great multilingual support",
-                        "Handles accents well"
-                    },
-                    Cons = new List<string>
-                    {
-                        "Slower processing",
-                        "3GB+ RAM required",
-                        "Large download size"
-                    }
-                },
-                new WhisperModelInfo
-                {
-                    FileName = "ggml-large-v3-turbo-q8_0.bin",
-                    DisplayName = "Turbo",
-                    FileSizeBytes = 874L * 1024 * 1024, // 874MB
-                    SpeedRating = 3,
-                    AccuracyRating = 5,
-                    TypicalProcessingTime = 0.4,
-                    RequiredRAMGB = 2.5,
-                    Description = "Near-Ultra accuracy at 3-4x the speed",
-                    SupportsMultilingual = true,
-                    IsRecommended = Visibility.Collapsed,
-                    Pros = new List<string>
-                    {
-                        "Near-identical accuracy to Ultra",
-                        "3-4x faster than Ultra",
-                        "70% smaller than Ultra (874MB vs 2.9GB)",
-                        "Excellent multilingual support"
-                    },
-                    Cons = new List<string>
-                    {
-                        "2.5GB+ RAM required",
-                        "Larger download than Pro/Elite"
-                    }
-                },
-                new WhisperModelInfo
-                {
-                    FileName = "ggml-large-v3.bin",
-                    DisplayName = "Ultra",
-                    FileSizeBytes = 2900L * 1024 * 1024, // 2.9GB
-                    SpeedRating = 1,
-                    AccuracyRating = 5,
-                    TypicalProcessingTime = 1.5,
-                    RequiredRAMGB = 5.0,
-                    Description = "State-of-the-art accuracy, latest Whisper model",
-                    SupportsMultilingual = true,
-                    IsRecommended = Visibility.Collapsed,
-                    Pros = new List<string>
-                    {
-                        "Highest possible accuracy",
-                        "Best-in-class performance",
-                        "Excellent for all languages",
-                        "Handles complex audio well"
-                    },
-                    Cons = new List<string>
-                    {
-                        "Very slow processing",
-                        "5GB+ RAM required",
-                        "Large storage requirement"
-                    }
-                }
             };
 
-            // Check which models are actually installed
-            foreach (var model in models)
-            {
-                var modelPath = Path.Combine(whisperPath, model.FileName);
-                model.IsInstalled = File.Exists(modelPath);
-            }
+            // IsInstalled checks the Parakeet directory under the supplied base path.
+            // Probes both ./models/parakeet-v3 and ./whisper/parakeet-v3 for installer-folder compat.
+            parakeet.IsInstalled = IsParakeetInstalledAt(whisperPath);
 
-            return models;
+            return new List<WhisperModelInfo> { parakeet };
         }
 
+        private static bool IsParakeetInstalledAt(string basePath)
+        {
+            if (string.IsNullOrWhiteSpace(basePath))
+                return false;
+
+            string[] candidates =
+            {
+                Path.Combine(basePath, "parakeet-v3"),
+                Path.Combine(basePath, "..", "models", "parakeet-v3"),
+            };
+
+            foreach (var dir in candidates)
+            {
+                if (Directory.Exists(dir)
+                    && File.Exists(Path.Combine(dir, "encoder.int8.onnx"))
+                    && File.Exists(Path.Combine(dir, "decoder.int8.onnx"))
+                    && File.Exists(Path.Combine(dir, "joiner.int8.onnx"))
+                    && File.Exists(Path.Combine(dir, "tokens.txt")))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Single-model lineup means this always returns the same entry.
+        /// Kept for call-site compatibility with the previous RAM/speed advisor.
+        /// </summary>
         public static WhisperModelInfo? GetRecommendedModel(double availableRAMGB, bool prioritizeSpeed = false)
         {
-            var models = GetAvailableModels(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper"));
-
-            if (prioritizeSpeed)
-            {
-                // For speed priority, pick fastest model that fits in RAM
-                if (availableRAMGB < 2.0)
-                    return models.Find(m => m.FileName == "ggml-base.bin") ?? models.FirstOrDefault();
-                else
-                    return models.Find(m => m.FileName == "ggml-small.bin") ?? models.FirstOrDefault();
-            }
-            else
-            {
-                // For accuracy priority, pick best model that fits in RAM
-                // Turbo offers near-Ultra accuracy at much lower resource cost
-                if (availableRAMGB >= 5.0)
-                    return models.Find(m => m.FileName == "ggml-large-v3.bin") ?? models.LastOrDefault();
-                else if (availableRAMGB >= 2.5)
-                    return models.Find(m => m.FileName == "ggml-large-v3-turbo-q8_0.bin") ?? models.Find(m => m.FileName == "ggml-medium.bin") ?? models.LastOrDefault();
-                else if (availableRAMGB >= 2.0)
-                    return models.Find(m => m.FileName == "ggml-small.bin") ?? models.FirstOrDefault();
-                else
-                    return models.Find(m => m.FileName == "ggml-base.bin") ?? models.FirstOrDefault();
-            }
+            return GetAvailableModels(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models"))
+                .FirstOrDefault();
         }
     }
 }

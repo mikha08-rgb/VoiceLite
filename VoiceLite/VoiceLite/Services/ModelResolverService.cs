@@ -8,13 +8,17 @@ using VoiceLite.Models;
 namespace VoiceLite.Services
 {
     /// <summary>
-    /// Service for resolving Whisper model paths.
-    /// SECURITY FIX (MODEL-GATE-001): Added Pro license validation to prevent freemium bypass
+    /// Resolves the directory containing Parakeet TDT ONNX model files.
+    /// Pro-tier model gating was removed when the model lineup collapsed to one.
     /// </summary>
     public class ModelResolverService
     {
         private readonly string _baseDir;
         private readonly IProFeatureService? _proFeatureService;
+
+        // Canonical model id used by Settings.WhisperModel after migration.
+        public const string ParakeetModelId = "parakeet-tdt-0.6b-v3-int8";
+        public const string ParakeetDirName = "parakeet-v3";
 
         public ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService = null)
         {
@@ -26,117 +30,52 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Resolves the full path to the specified Whisper model file.
-        /// Searches in: baseDir/whisper/, baseDir/, %LocalAppData%/VoiceLite/whisper/
-        /// SECURITY FIX (MODEL-GATE-001): Validates Pro license before returning Pro models
+        /// Returns the directory containing encoder.int8.onnx, decoder.int8.onnx,
+        /// joiner.int8.onnx, and tokens.txt. The <paramref name="modelName"/> argument
+        /// is preserved for call-site compatibility but is no longer load-bearing —
+        /// the single-model lineup means the resolver always probes the same locations.
         /// </summary>
         public string ResolveModelPath(string modelName)
         {
-            var modelFile = NormalizeModelName(modelName);
-
-            // SECURITY FIX (MODEL-GATE-001): Validate Pro license before resolving Pro models
-            if (_proFeatureService != null && !_proFeatureService.CanUseModel(modelFile))
+            foreach (var dir in CandidateDirectories())
             {
-                throw new UnauthorizedAccessException(
-                    $"Model '{GetModelDisplayName(modelFile)}' requires Pro license.\n\n" +
-                    _proFeatureService.GetUpgradeMessage("Advanced AI Models") + "\n\n" +
-                    "Free tier includes Swift model (ggml-base.bin) which provides excellent accuracy for most users.\n" +
-                    "Upgrade to Pro to unlock:\n" +
-                    "- Pro model (90-93% accuracy)\n" +
-                    "- Elite model (95-97% accuracy)\n" +
-                    "- Turbo model (97-99% accuracy, 3-4x faster than Ultra)\n" +
-                    "- Ultra model (97-99% Dragon-level quality)");
+                if (Directory.Exists(dir) && HasRequiredFiles(dir))
+                    return dir;
             }
 
-            // Check bundled models in Program Files (read-only)
-            var modelPath = Path.Combine(_baseDir, "whisper", modelFile);
-            if (File.Exists(modelPath))
-                return modelPath;
-
-            modelPath = Path.Combine(_baseDir, modelFile);
-            if (File.Exists(modelPath))
-                return modelPath;
-
-            // Check downloaded models in LocalApplicationData (user-writable)
-            var localDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VoiceLite",
-                "whisper",
-                modelFile
-            );
-            if (File.Exists(localDataPath))
-                return localDataPath;
-
-            // Model not found - provide helpful error message
             throw new FileNotFoundException(
-                $"Whisper model '{modelFile}' not found.\n\n" +
-                $"Please download it from Settings -> AI Models tab, or reinstall VoiceLite.\n\n" +
-                $"Expected locations:\n" +
-                $"- Bundled: {Path.Combine(_baseDir, "whisper", modelFile)}\n" +
-                $"- Downloaded: {localDataPath}");
-        }
-
-        private string GetModelDisplayName(string modelFile)
-        {
-            var name = WhisperModelInfo.GetDisplayName(modelFile);
-            return name == "Unknown" ? modelFile : name;
+                "Parakeet model not found.\n\n" +
+                "Expected one of:\n  " +
+                string.Join("\n  ", CandidateDirectories()) + "\n\n" +
+                "Please download the model from Settings → AI Models, or reinstall VoiceLite.");
         }
 
         /// <summary>
-        /// Normalizes a model name to its full filename.
-        /// Supports short names (tiny, base, small, medium, turbo, large) and full filenames.
+        /// Maps any input (including legacy GGML filenames) to the canonical Parakeet id.
         /// </summary>
-        public string NormalizeModelName(string modelName)
-        {
-            if (string.IsNullOrWhiteSpace(modelName))
-                return "ggml-base.bin"; // Default fallback
-
-            return modelName.ToLower() switch
-            {
-                "tiny" => "ggml-tiny.bin",
-                "base" => "ggml-base.bin",
-                "small" => "ggml-small.bin",
-                "medium" => "ggml-medium.bin",
-                "turbo" => "ggml-large-v3-turbo-q8_0.bin",
-                "large" => "ggml-large-v3.bin",
-                _ => modelName.EndsWith(".bin") ? modelName : "ggml-base.bin"
-            };
-        }
+        public string NormalizeModelName(string modelName) => ParakeetModelId;
 
         /// <summary>
-        /// Gets all available model file paths currently installed.
-        /// Searches both bundled (Program Files) and downloaded (LocalAppData) locations.
+        /// Returns paths to all installed model directories (single-entry list when present).
         /// </summary>
-        public IEnumerable<string> GetAvailableModelPaths()
+        public IEnumerable<string> GetAvailableModelPaths() =>
+            CandidateDirectories().Where(d => Directory.Exists(d) && HasRequiredFiles(d));
+
+        private IEnumerable<string> CandidateDirectories()
         {
-            var availablePaths = new List<string>();
-
-            // Search bundled models in Program Files
-            var bundledWhisperDir = Path.Combine(_baseDir, "whisper");
-            if (Directory.Exists(bundledWhisperDir))
-            {
-                availablePaths.AddRange(Directory.GetFiles(bundledWhisperDir, "ggml-*.bin"));
-            }
-
-            // Search base directory
-            if (Directory.Exists(_baseDir))
-            {
-                availablePaths.AddRange(Directory.GetFiles(_baseDir, "ggml-*.bin"));
-            }
-
-            // Search downloaded models in LocalAppData
-            var localWhisperDir = Path.Combine(
+            yield return Path.Combine(_baseDir, "models", ParakeetDirName);
+            yield return Path.Combine(_baseDir, "whisper", ParakeetDirName);
+            yield return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VoiceLite",
-                "whisper"
-            );
-            if (Directory.Exists(localWhisperDir))
-            {
-                availablePaths.AddRange(Directory.GetFiles(localWhisperDir, "ggml-*.bin"));
-            }
-
-            // Return distinct paths (in case same file exists in multiple locations)
-            return availablePaths.Distinct().OrderBy(p => Path.GetFileName(p));
+                "models",
+                ParakeetDirName);
         }
+
+        private static bool HasRequiredFiles(string dir) =>
+            File.Exists(Path.Combine(dir, "encoder.int8.onnx"))
+            && File.Exists(Path.Combine(dir, "decoder.int8.onnx"))
+            && File.Exists(Path.Combine(dir, "joiner.int8.onnx"))
+            && File.Exists(Path.Combine(dir, "tokens.txt"));
     }
 }

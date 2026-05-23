@@ -66,21 +66,11 @@ namespace VoiceLite.Services
         public Visibility AdvancedSettingsVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
-        /// Checks if user can use a specific Whisper model.
-        /// Free tier: Base only (bundled with installer)
-        /// Pro tier: All 6 models (Tiny, Base, Small, Medium, Turbo, Large)
+        /// Model gating is a no-op post-Parakeet swap — single model lineup means
+        /// every user gets the same engine. Kept on the seam so monetization can later
+        /// re-gate (e.g., by model variant) without touching call sites.
         /// </summary>
-        /// <param name="modelFileName">Model file name (e.g., "ggml-small.bin")</param>
-        /// <returns>True if user can use this model</returns>
-        public bool CanUseModel(string modelFileName)
-        {
-            if (IsProUser)
-                return true; // Pro users can use any model
-
-            // Free tier: Base only
-            var lowerFileName = modelFileName?.ToLower();
-            return lowerFileName == "ggml-base.bin";
-        }
+        public bool CanUseModel(string modelFileName) => true;
 
         /// <summary>
         /// Gets upgrade message for a specific feature.
@@ -102,61 +92,34 @@ namespace VoiceLite.Services
         /// Gets a description of the current tier
         /// </summary>
         public string TierDescription => IsProUser
-            ? "Pro tier unlocked! You have access to all 5 AI models and future Pro features."
-            : "Free tier includes Base model (85-90% accuracy). Upgrade to Pro for all 5 models and up to 98% accuracy.";
+            ? "Pro license active. Your license is preserved for upcoming Pro features."
+            : "Free tier includes the full Parakeet v3 engine. Pro features coming soon.";
 
         #region IProFeatureService Methods
 
         /// <summary>
-        /// Checks if a specific model is available
+        /// No-op gating post-Parakeet swap — single model lineup.
         /// </summary>
-        public bool IsModelAvailable(string modelName)
-        {
-            if (IsProUser)
-                return true; // Pro users can use all models
-
-            // Free users can only use base model
-            var lowerName = modelName?.ToLower();
-            return lowerName?.Contains("base") == true;
-        }
+        public bool IsModelAvailable(string modelName) => true;
 
         /// <summary>
-        /// Gets the list of available models based on license status
+        /// Returns the single-entry Parakeet lineup. Method kept for call-site compatibility.
         /// </summary>
-        public string[] GetAvailableModels()
-        {
-            if (IsProUser)
-            {
-                return new[]
-                {
-                    "ggml-tiny.bin",
-                    "ggml-base.bin",
-                    "ggml-small.bin",
-                    "ggml-medium.bin",
-                    "ggml-large-v3-turbo-q8_0.bin",
-                    "ggml-large-v3.bin"
-                };
-            }
-            else
-            {
-                return new[] { "ggml-base.bin" };
-            }
-        }
+        public string[] GetAvailableModels() => new[] { "parakeet-tdt-0.6b-v3-int8" };
 
         /// <summary>
-        /// Shows the upgrade prompt to the user
+        /// Shows the upgrade prompt. Copy is intentionally vague — specific Pro features
+        /// (Voice Shortcuts, Export History, Custom Dictionary) are not yet shipped, so we
+        /// avoid promising them until they exist.
         /// </summary>
         public void ShowUpgradePrompt()
         {
             System.Windows.MessageBox.Show(
-                "Upgrade to VoiceLite Pro for just $20 (one-time payment) to unlock:\n\n" +
-                "• All 5 AI models (up to 98% accuracy)\n" +
-                "• Voice shortcuts\n" +
-                "• Export history\n" +
-                "• Custom dictionary\n" +
-                "• Priority support\n\n" +
-                "Visit voicelite.app to upgrade!",
-                "Upgrade to Pro",
+                "VoiceLite Pro is in development.\n\n" +
+                "Existing Pro licenses are preserved and continue to validate. " +
+                "Upcoming Pro features include productivity tools beyond the core ASR engine.\n\n" +
+                "Visit voicelite.app for updates.",
+                "VoiceLite Pro",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
         }

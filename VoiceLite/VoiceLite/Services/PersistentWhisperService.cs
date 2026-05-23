@@ -1,15 +1,21 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Whisper.net;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using SherpaOnnx;
 using VoiceLite.Models;
 using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
+    /// <summary>
+    /// In-process ASR service backed by Sherpa-ONNX + Parakeet TDT v3.
+    /// Class name kept (was Whisper-backed) to limit blast radius — rename to a
+    /// Parakeet-prefixed name is a follow-up sweep.
+    /// </summary>
     public class PersistentWhisperService : IDisposable
     {
         private readonly Settings settings;
@@ -19,9 +25,9 @@ namespace VoiceLite.Services
         private CancellationTokenSource transcriptionCts = new();
         private readonly object ctsLock = new();
 
-        private WhisperFactory? whisperFactory;
-        private string? currentModelPath;
-        private readonly object factoryLock = new();
+        private OfflineRecognizer? recognizer;
+        private string? currentModelDir;
+        private readonly object recognizerLock = new();
 
         private volatile bool isDisposed = false;
         private volatile bool isProcessing = false;
@@ -35,16 +41,16 @@ namespace VoiceLite.Services
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
             this.modelResolver = modelResolver ?? new ModelResolverService(baseDir, proFeatureService);
 
-            // Background-load the model so first transcription is fast
-            var modelPath = this.modelResolver.ResolveModelPath(settings.WhisperModel);
+            // Background-load the model so the first transcription is fast.
+            // Errors here are logged but non-fatal — the first transcribe call will retry.
             _ = Task.Run(() =>
             {
                 try
                 {
-                    EnsureFactoryLoaded(modelPath);
+                    var modelDir = this.modelResolver.ResolveModelPath(settings.WhisperModel);
+                    EnsureRecognizerLoaded(modelDir);
                 }
                 catch (Exception ex)
                 {
@@ -53,75 +59,52 @@ namespace VoiceLite.Services
             });
         }
 
-        private void EnsureFactoryLoaded(string modelPath)
+        private void EnsureRecognizerLoaded(string modelDir)
         {
-            lock (factoryLock)
+            lock (recognizerLock)
             {
-                if (currentModelPath == modelPath && whisperFactory != null)
+                if (currentModelDir == modelDir && recognizer != null)
                     return;
 
-                // Dispose old factory if switching models
-                if (whisperFactory != null)
+                if (recognizer != null)
                 {
-                    ErrorLogger.LogMessage($"Switching model from {Path.GetFileName(currentModelPath)} to {Path.GetFileName(modelPath)}");
-                    try { whisperFactory.Dispose(); } catch (Exception ex) { ErrorLogger.LogDebug($"WhisperFactory disposal failed during model switch: {ex.Message}"); }
-                    whisperFactory = null;
+                    ErrorLogger.LogMessage($"Switching Parakeet model from {currentModelDir} to {modelDir}");
+                    try { recognizer.Dispose(); }
+                    catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer disposal failed during switch: {ex.Message}"); }
+                    recognizer = null;
                 }
 
-                ErrorLogger.LogMessage($"Loading Whisper model: {Path.GetFileName(modelPath)}");
-                whisperFactory = WhisperFactory.FromPath(modelPath);
-                currentModelPath = modelPath;
-                ErrorLogger.LogMessage("Whisper model loaded successfully");
+                var encoder = Path.Combine(modelDir, "encoder.int8.onnx");
+                var decoder = Path.Combine(modelDir, "decoder.int8.onnx");
+                var joiner = Path.Combine(modelDir, "joiner.int8.onnx");
+                var tokens = Path.Combine(modelDir, "tokens.txt");
+
+                foreach (var f in new[] { encoder, decoder, joiner, tokens })
+                {
+                    if (!File.Exists(f))
+                        throw new FileNotFoundException($"Parakeet model file missing: {f}");
+                }
+
+                var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
+
+                var config = new OfflineRecognizerConfig();
+                config.FeatConfig.SampleRate = 16000;
+                config.FeatConfig.FeatureDim = 80;
+                config.ModelConfig.Tokens = tokens;
+                config.ModelConfig.Transducer.Encoder = encoder;
+                config.ModelConfig.Transducer.Decoder = decoder;
+                config.ModelConfig.Transducer.Joiner = joiner;
+                config.ModelConfig.NumThreads = 4;
+                config.ModelConfig.Provider = "cpu";
+                config.ModelConfig.Debug = 0;
+                config.DecodingMethod = presetConfig.DecodingMethod;
+                config.MaxActivePaths = presetConfig.MaxActivePaths;
+
+                ErrorLogger.LogMessage($"Loading Parakeet model: dir={modelDir}, decoding={config.DecodingMethod}, beam={config.MaxActivePaths}");
+                recognizer = new OfflineRecognizer(config);
+                currentModelDir = modelDir;
+                ErrorLogger.LogMessage("Parakeet model loaded successfully");
             }
-        }
-
-        private WhisperProcessor BuildProcessor(WhisperFactory factory)
-        {
-            var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
-            var language = SanitizeLanguageCode(settings.Language);
-
-            var builder = factory.CreateBuilder();
-
-            // Set sampling strategy (don't chain from return value — it returns IWhisperSamplingStrategyBuilder)
-            if (presetConfig.BeamSize <= 1)
-            {
-                builder.WithGreedySamplingStrategy();
-            }
-            else
-            {
-                builder.WithBeamSearchSamplingStrategy();
-            }
-
-            // Common configuration
-            builder.WithThreads(4)
-                   .WithEntropyThreshold(presetConfig.EntropyThreshold > 0 ? (float)presetConfig.EntropyThreshold : 2.4f)
-                   .WithMaxLastTextTokens(presetConfig.MaxContext > 0 ? presetConfig.MaxContext : 224);
-
-            // Language
-            if (language == "auto")
-                builder.WithLanguageDetection();
-            else
-                builder.WithLanguage(language);
-
-            // Temperature fallback
-            if (presetConfig.UseFallback)
-            {
-                builder.WithTemperature(0.0f)
-                       .WithTemperatureInc(0.4f);
-            }
-            else
-            {
-                builder.WithTemperature(0.0f)
-                       .WithTemperatureInc(0.0f); // No fallback
-            }
-
-            // Initial prompt for vocabulary guidance
-            var initialPrompt = "Transcribe the following dictation with proper capitalization and punctuation. " +
-                               "Common terms: VoiceLite, GitHub, JavaScript, TypeScript, Python, C#, .NET, React, " +
-                               "Node.js, API, JSON, SQL, database, function, variable, component, repository.";
-            builder.WithPrompt(initialPrompt);
-
-            return builder.Build();
         }
 
         public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
@@ -138,22 +121,22 @@ namespace VoiceLite.Services
             return await TranscribeFromStreamAsync(stream);
         }
 
-        // Backward compatibility overload
+        // Backward compatibility overload.
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
             return await TranscribeAsync(audioFilePath, modelResolver.ResolveModelPath(settings.WhisperModel));
         }
 
-        public async Task<string> TranscribeAsync(string audioFilePath, string modelPath)
+        public async Task<string> TranscribeAsync(string audioFilePath, string modelDir)
         {
             if (!ValidateAudioFile(audioFilePath))
                 return string.Empty;
 
             using var fileStream = File.OpenRead(audioFilePath);
-            return await TranscribeFromStreamAsync(fileStream, modelPath);
+            return await TranscribeFromStreamAsync(fileStream, modelDir);
         }
 
-        private async Task<string> TranscribeFromStreamAsync(Stream audioStream, string? modelPath = null)
+        private async Task<string> TranscribeFromStreamAsync(Stream audioStream, string? modelDir = null)
         {
             if (isDisposed)
                 throw new ObjectDisposedException(nameof(PersistentWhisperService));
@@ -172,38 +155,55 @@ namespace VoiceLite.Services
                 isProcessing = true;
                 var startTime = DateTime.Now;
 
-                var effectiveModelPath = modelPath ?? modelResolver.ResolveModelPath(settings.WhisperModel);
-                EnsureFactoryLoaded(effectiveModelPath);
+                var effectiveModelDir = modelDir ?? modelResolver.ResolveModelPath(settings.WhisperModel);
+                EnsureRecognizerLoaded(effectiveModelDir);
 
-                ErrorLogger.LogWarning($"Whisper: threads=4, model={Path.GetFileName(effectiveModelPath)}");
+                ErrorLogger.LogWarning($"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
 
-                // 300s timeout — covers ~5 minutes of clinical dictation on the Ultra model
-                // even on slower CPUs. Still well under any pathological hang.
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
+                // 120s timeout — generous for long-form on slow CPUs.
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken, timeoutCts.Token);
 
-                var result = new StringBuilder(4096);
-
-                WhisperFactory factory;
-                lock (factoryLock)
+                // Decode WAV → float[] PCM @ 16kHz. AudioRecorder writes 16kHz/16-bit/mono;
+                // ToSampleProvider() handles bit-depth conversion to float.
+                float[] samples;
+                using (var wavReader = new WaveFileReader(audioStream))
                 {
-                    factory = whisperFactory ?? throw new InvalidOperationException("Whisper model not loaded");
-                }
-
-                using var processor = BuildProcessor(factory);
-
-                await foreach (var segment in processor.ProcessAsync(audioStream, linkedCts.Token))
-                {
-                    if (!string.IsNullOrWhiteSpace(segment.Text))
+                    if (wavReader.WaveFormat.SampleRate != 16000)
                     {
-                        result.Append(segment.Text);
+                        ErrorLogger.LogWarning($"Unexpected sample rate {wavReader.WaveFormat.SampleRate}, Parakeet expects 16000");
                     }
+                    ISampleProvider provider = wavReader.ToSampleProvider();
+                    if (wavReader.WaveFormat.Channels > 1)
+                    {
+                        // AudioRecorder records mono — this branch is defensive for
+                        // any external WAVs fed through the legacy TranscribeAsync(filePath) API.
+                        provider = new StereoToMonoSampleProvider(provider);
+                    }
+                    samples = ReadAllSamples(provider);
                 }
 
-                var rawResult = result.ToString().Trim();
+                linkedCts.Token.ThrowIfCancellationRequested();
 
-                // Apply text post-processing
+                OfflineRecognizer rec;
+                lock (recognizerLock)
+                {
+                    rec = recognizer ?? throw new InvalidOperationException("Parakeet recognizer not loaded");
+                }
+
+                // OfflineRecognizer.Decode is blocking native code — wrap in Task.Run
+                // so the UI thread (which calls us via async void OnAudioFileReady) doesn't freeze.
+                string rawResult = await Task.Run(() =>
+                {
+                    using var sherpaStream = rec.CreateStream();
+                    sherpaStream.AcceptWaveform(16000, samples);
+                    rec.Decode(sherpaStream);
+                    return sherpaStream.Result.Text ?? string.Empty;
+                }, linkedCts.Token);
+
+                rawResult = rawResult.Trim();
+
                 var finalResult = rawResult;
                 if (!string.IsNullOrWhiteSpace(rawResult))
                 {
@@ -233,10 +233,9 @@ namespace VoiceLite.Services
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                // Timeout (not user cancellation)
                 isProcessing = false;
                 throw new TimeoutException(
-                    "Transcription timed out after 300 seconds. Please try speaking less or using a smaller model.");
+                    "Transcription timed out after 120 seconds. Try speaking less or switching to the Speed preset.");
             }
             catch (OperationCanceledException)
             {
@@ -266,25 +265,20 @@ namespace VoiceLite.Services
             }
         }
 
-        private string SanitizeLanguageCode(string languageCode)
+        private static float[] ReadAllSamples(ISampleProvider provider)
         {
-            if (string.IsNullOrWhiteSpace(languageCode))
-                return "en";
-
-            var normalized = languageCode.Trim().ToLower();
-
-            if (normalized == "auto")
-                return "auto";
-
-            if (normalized.Length != 2 || !normalized.All(char.IsLower))
+            const int chunkSize = 4096;
+            var buffer = new float[chunkSize];
+            var collected = new List<float>(16000 * 30); // pre-size for ~30s of speech
+            int read;
+            while ((read = provider.Read(buffer, 0, chunkSize)) > 0)
             {
-                string sanitized = new string(languageCode.Where(c => !char.IsControl(c)).ToArray());
-                if (sanitized.Length > 20) sanitized = sanitized.Substring(0, 20) + "...";
-                ErrorLogger.LogWarning($"Invalid language code '{sanitized}', defaulting to 'en'");
-                return "en";
+                for (int i = 0; i < read; i++)
+                {
+                    collected.Add(buffer[i]);
+                }
             }
-
-            return normalized;
+            return collected.ToArray();
         }
 
         private bool ValidateAudioFile(string audioFilePath)
@@ -319,10 +313,10 @@ namespace VoiceLite.Services
         {
             try
             {
-                var modelPath = modelResolver.ResolveModelPath(settings.WhisperModel);
-                if (string.IsNullOrEmpty(modelPath) || !File.Exists(modelPath))
+                var modelDir = modelResolver.ResolveModelPath(settings.WhisperModel);
+                if (string.IsNullOrEmpty(modelDir) || !Directory.Exists(modelDir))
                 {
-                    TranscriptionError?.Invoke(this, new FileNotFoundException("Whisper model not found"));
+                    TranscriptionError?.Invoke(this, new DirectoryNotFoundException("Parakeet model directory not found"));
                     return false;
                 }
                 return true;
@@ -338,11 +332,11 @@ namespace VoiceLite.Services
         {
             try
             {
-                return $"Whisper.net {typeof(WhisperFactory).Assembly.GetName().Version}";
+                return $"Sherpa-ONNX {typeof(OfflineRecognizer).Assembly.GetName().Version} (Parakeet TDT v3)";
             }
             catch
             {
-                return "Whisper.net (version unknown)";
+                return "Sherpa-ONNX (version unknown)";
             }
         }
 
@@ -359,11 +353,12 @@ namespace VoiceLite.Services
                 catch (Exception ex) { ErrorLogger.LogDebug($"CancellationTokenSource.Cancel failed: {ex.Message}"); }
             }
 
-            lock (factoryLock)
+            lock (recognizerLock)
             {
-                whisperFactory?.Dispose();
-                whisperFactory = null;
-                currentModelPath = null;
+                try { recognizer?.Dispose(); }
+                catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer dispose failed: {ex.Message}"); }
+                recognizer = null;
+                currentModelDir = null;
             }
 
             try { transcriptionSemaphore?.Dispose(); }

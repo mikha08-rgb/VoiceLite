@@ -19,11 +19,12 @@ namespace VoiceLite.Models
 
     public class WhisperPresetConfig
     {
-        public int BeamSize { get; set; }
-        public double EntropyThreshold { get; set; }
-        public bool UseFallback { get; set; }
-        public int MaxContext { get; set; }
+        public string DecodingMethod { get; set; } = "greedy_search";
+        public int MaxActivePaths { get; set; } = 4;
         public string Description { get; set; } = string.Empty;
+
+        // Settings.BeamSize and other legacy callers still read this name.
+        public int BeamSize => MaxActivePaths;
 
         public static WhisperPresetConfig GetPresetConfig(TranscriptionPreset preset)
         {
@@ -31,27 +32,21 @@ namespace VoiceLite.Models
             {
                 TranscriptionPreset.Speed => new WhisperPresetConfig
                 {
-                    BeamSize = 1,
-                    EntropyThreshold = 3.0,
-                    UseFallback = false,
-                    MaxContext = 64,
-                    Description = "Fastest transcription - Good for quick notes and commands"
+                    DecodingMethod = "greedy_search",
+                    MaxActivePaths = 1,
+                    Description = "Fastest transcription — greedy decoding, good for quick notes and commands"
                 },
                 TranscriptionPreset.Balanced => new WhisperPresetConfig
                 {
-                    BeamSize = 3,
-                    EntropyThreshold = 2.5,
-                    UseFallback = true,
-                    MaxContext = 224,
-                    Description = "Balanced speed and accuracy - Recommended for most users"
+                    DecodingMethod = "modified_beam_search",
+                    MaxActivePaths = 2,
+                    Description = "Balanced speed and accuracy — recommended for most users"
                 },
                 TranscriptionPreset.Accuracy => new WhisperPresetConfig
                 {
-                    BeamSize = 5,
-                    EntropyThreshold = 2.3,
-                    UseFallback = true,
-                    MaxContext = -1,
-                    Description = "Dragon-level quality - Professional dictation (99% accuracy)"
+                    DecodingMethod = "modified_beam_search",
+                    MaxActivePaths = 4,
+                    Description = "Best quality — wider beam search for professional dictation"
                 },
                 _ => GetPresetConfig(TranscriptionPreset.Balanced)
             };
@@ -66,7 +61,7 @@ namespace VoiceLite.Models
         private RecordMode _mode = RecordMode.Toggle;
         private Key _recordHotkey = Key.Z;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "ggml-base.bin";
+        private string _whisperModel = "parakeet-tdt-0.6b-v3-int8";
         private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced;
         private bool _enableVAD = true;
 
@@ -91,7 +86,7 @@ namespace VoiceLite.Models
         public string WhisperModel
         {
             get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "ggml-base.bin" : value;
+            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "parakeet-tdt-0.6b-v3-int8" : value;
         }
 
         public TranscriptionPreset TranscriptionPreset

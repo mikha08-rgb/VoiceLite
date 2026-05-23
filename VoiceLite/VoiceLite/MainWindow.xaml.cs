@@ -282,6 +282,14 @@ namespace VoiceLite
                 settings = new Settings();
             }
 
+            // Rewrite legacy Whisper GGML model ids to the Parakeet canonical id.
+            // Must run before any service consumes settings.WhisperModel.
+            if (SettingsMigration.Migrate(settings))
+            {
+                try { SaveSettings(); }
+                catch (Exception ex) { ErrorLogger.LogError("SettingsMigration.SavePostMigration", ex); }
+            }
+
             MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
             UpdateConfigDisplay();
         }
@@ -492,8 +500,7 @@ namespace VoiceLite
                 // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
                 proFeatureService = new ProFeatureService(settings);
 
-                // Initialize Whisper service (in-process via Whisper.net)
-                // SECURITY FIX (MODEL-GATE-001): Pass proFeatureService to enable license validation
+                // Initialize ASR service (in-process via Sherpa-ONNX + Parakeet v3)
                 whisperService = new PersistentWhisperService(settings, null, proFeatureService);
 
                 // Initialize services
@@ -1723,42 +1730,15 @@ namespace VoiceLite
         {
             try
             {
-                // CRITICAL FIX: Validate Pro license + model permissions to prevent settings.json editing bypass
-                var proService = new ProFeatureService(settings);
+                // Model file presence is validated by PersistentWhisperService / ModelResolverService
+                // on first transcription. This method retains only the license-tamper checks that
+                // have nothing to do with the engine.
 
-                // Use PersistentWhisperService's logic: support both short names and full filenames
-                var modelFile = settings.WhisperModel switch
-                {
-                    "tiny" => "ggml-tiny.bin",
-                    "base" => "ggml-base.bin",
-                    "small" => "ggml-small.bin",
-                    "medium" => "ggml-medium.bin",
-                    "large" => "ggml-large-v3.bin",
-                    _ => settings.WhisperModel.EndsWith(".bin") ? settings.WhisperModel : "ggml-base.bin"
-                };
-
-                // CRITICAL FIX: If user manually edited settings.json to set Pro model without license, revert to Base
-                if (!proService.CanUseModel(modelFile))
-                {
-                    ErrorLogger.LogWarning($"SECURITY: Free user had Pro model '{modelFile}' in settings.json - reverting to Base (possible manual edit)");
-                    settings.WhisperModel = "ggml-base.bin";
-                    modelFile = "ggml-base.bin";
-                    _ = SaveSettingsInternalAsync(); // Save corrected settings
-
-                    MessageBox.Show(
-                        "VoiceLite Free includes the Base model as default.\n\n" +
-                        "The selected AI model has been reset to Base.\n\n" +
-                        "To use Base, Small, Medium, or Large models, upgrade to VoiceLite Pro for $20.\n\n" +
-                        "Visit Settings → License to upgrade.",
-                        "Free Tier Model Limit",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
+                bool needsSettingsSave = false;
 
                 // SECURITY: Verify settings.IsProLicense is backed by a DPAPI-stored license.
                 // DPAPI encrypts the license to the Windows user account, so an attacker who
                 // edits settings.json to set IsProLicense=true won't have a matching license.dat.
-                bool needsSettingsSave = false;
                 if (settings.IsProLicense && string.IsNullOrWhiteSpace(licenseService?.GetStoredLicenseKey()))
                 {
                     ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no DPAPI license found - possible manual edit, resetting to free");
@@ -1767,8 +1747,7 @@ namespace VoiceLite
                 }
 
                 // Legacy cleanup: older builds wrote the license key plaintext to settings.json.
-                // The DPAPI-encrypted license.dat is now the only authoritative store; clear any
-                // stale plaintext copy so PILOT.md's "no PII in settings.json" claim holds.
+                // The DPAPI-encrypted license.dat is now the only authoritative store.
                 if (!string.IsNullOrEmpty(settings.LicenseKey))
                 {
                     settings.LicenseKey = string.Empty;
@@ -1778,53 +1757,6 @@ namespace VoiceLite
                 if (needsSettingsSave)
                 {
                     _ = SaveSettingsInternalAsync();
-                }
-
-                var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
-                // Also check LocalAppData for downloaded models
-                var localDataPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "VoiceLite",
-                    "whisper",
-                    modelFile
-                );
-
-                if (!File.Exists(modelPath) && !File.Exists(localDataPath))
-                {
-                    // Check if base model exists as fallback
-                    var baseModelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-                    var baseLocalPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "VoiceLite", "whisper", "ggml-base.bin");
-
-                    if (File.Exists(baseModelPath) || File.Exists(baseLocalPath))
-                    {
-                        // CRITICAL FIX: Fallback to base model so app is usable
-                        ErrorLogger.LogWarning($"Model '{modelFile}' missing - falling back to ggml-base.bin");
-                        settings.WhisperModel = "ggml-base.bin";
-                        _ = SaveSettingsInternalAsync();
-
-                        MessageBox.Show(
-                            $"Model file '{modelFile}' is missing.\n\n" +
-                            "VoiceLite has switched to the bundled Swift (Base) model.\n\n" +
-                            "To download other models, go to Settings → AI Models.",
-                            "Model File Missing - Using Swift",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    }
-                    else
-                    {
-                        // No models available at all - show error
-                        MessageBox.Show(
-                            $"Model file '{modelFile}' is missing.\n\n" +
-                            "Please reinstall VoiceLite or download the model from Settings → AI Models.\n\n" +
-                            $"Expected locations:\n" +
-                            $"- Bundled: {modelPath}\n" +
-                            $"- Downloaded: {localDataPath}",
-                            "Model File Missing",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
-                    }
                 }
             }
             catch (Exception ex)
