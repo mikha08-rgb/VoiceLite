@@ -17,7 +17,7 @@ const MIN_LOG_LEVEL = process.env.NODE_ENV === 'production'
   ? LogLevel.Warning
   : LogLevel.Debug;
 
-const SENSITIVE_KEYS = ['licenseKey', 'password', 'token', 'secret', 'apiKey', 'authorization', 'webhookSecret'];
+const SENSITIVE_KEYS = ['licenseKey', 'password', 'token', 'secret', 'apiKey', 'authorization', 'webhookSecret', 'email', 'machineId', 'machineHash', 'ip'];
 
 function redactSensitive(obj: LogContext): LogContext {
   const result: LogContext = {};

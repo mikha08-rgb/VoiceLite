@@ -104,7 +104,14 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    if MsgBox('Do you want to remove VoiceLite settings and transcription history?',
+    // Silent uninstall (Intune/managed deployment) — always remove user data.
+    // Healthcare deployments don't want transcription history or DPAPI license files
+    // lingering on uninstalled workstations.
+    if UninstallSilent then
+    begin
+      DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
+    end
+    else if MsgBox('Do you want to remove VoiceLite settings and transcription history?',
               mbConfirmation, MB_YESNO) = IDYES then
     begin
       DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
