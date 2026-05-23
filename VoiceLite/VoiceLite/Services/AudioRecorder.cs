@@ -648,7 +648,8 @@ namespace VoiceLite.Services
                 {
                     try
                     {
-                        var vadProcessed = vadService.ProcessAudio(processedAudioData, (float)vadSettings.VADThreshold);
+                        // 0.35 = conservative VAD threshold (Silero default is 0.5; we use 0.35 for better speech retention)
+                        var vadProcessed = vadService.ProcessAudio(processedAudioData, 0.35f);
                         if (vadProcessed.Length > 100)
                         {
                             ErrorLogger.LogWarning($"VAD trimmed: {processedAudioData.Length} -> {vadProcessed.Length} bytes ({100.0 - (double)vadProcessed.Length * 100.0 / processedAudioData.Length:F0}% removed)");
@@ -764,7 +765,8 @@ namespace VoiceLite.Services
                 isDisposed = true;
 
                 // Dispose timer (already stopped above)
-                cleanupTimer.SafeDispose();
+                try { cleanupTimer?.Dispose(); }
+                catch (Exception ex) { ErrorLogger.LogDebug($"cleanupTimer dispose failed: {ex.Message}"); }
                 cleanupTimer = null;
 
                 // Stop recording if active
@@ -775,7 +777,7 @@ namespace VoiceLite.Services
                 }
 
                 // Minimal delay for cleanup - allow NAudio to finalize state
-                Task.Delay(10).Wait();
+                Thread.Sleep(10);
 
                 // Dispose wave file
                 waveFile?.Dispose();

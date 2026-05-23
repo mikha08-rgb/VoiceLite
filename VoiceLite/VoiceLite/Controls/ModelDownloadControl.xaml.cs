@@ -74,7 +74,7 @@ namespace VoiceLite.Controls
                 DisplayName = "Tiny (Lite)",
                 Description = "For very slow PCs - 42MB Q8_0, 80-85% accuracy, <0.8s processing",
                 FileSizeMB = 42,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q8_0.bin",
+                DownloadUrl = DownloadEndpoints.TinyQ8,
                 IsProOnly = false // Free tier model (downloadable)
             });
 
@@ -94,7 +94,7 @@ namespace VoiceLite.Controls
                 DisplayName = "Small (Pro) 🔒",
                 Description = "Pro users only - 253MB Q8_0, 90-93% accuracy, ~3 seconds processing",
                 FileSizeMB = 253,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q8_0.bin",
+                DownloadUrl = DownloadEndpoints.SmallQ8,
                 IsProOnly = true // Pro tier model
             });
 
@@ -104,7 +104,7 @@ namespace VoiceLite.Controls
                 DisplayName = "Medium (Elite) 🔒",
                 Description = "Pro users only - 823MB Q8_0, 95-97% accuracy, ~12 seconds processing",
                 FileSizeMB = 823,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q8_0.bin",
+                DownloadUrl = DownloadEndpoints.MediumQ8,
                 IsProOnly = true // Pro tier model
             });
 
@@ -114,7 +114,7 @@ namespace VoiceLite.Controls
                 DisplayName = "Large (Ultra) 🔒",
                 Description = "Pro users only - 3.1GB F16, 97-98% accuracy, ~15 seconds processing",
                 FileSizeMB = 3100,
-                DownloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+                DownloadUrl = DownloadEndpoints.LargeV3,
                 IsProOnly = true // Pro tier model
             });
         }

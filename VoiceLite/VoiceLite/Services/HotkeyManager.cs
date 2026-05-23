@@ -600,8 +600,9 @@ namespace VoiceLite.Services
                 isRegistered = false;
             }
 
-            // CRIT-003 FIX: Dispose ManualResetEventSlim to release resources
-            unregisterComplete.SafeDispose();
+            // Dispose ManualResetEventSlim to release resources
+            try { unregisterComplete?.Dispose(); }
+            catch (Exception ex) { ErrorLogger.LogDebug($"unregisterComplete dispose failed: {ex.Message}"); }
         }
     }
 
