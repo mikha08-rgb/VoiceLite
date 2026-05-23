@@ -301,6 +301,56 @@ namespace VoiceLite.Services
             }
         }
 
+        // Copy text to the Windows clipboard and schedule it to auto-clear after 2 seconds.
+        // Used by both the dictation paste flow (this class's InjectText) and the transcription
+        // history copy actions in MainWindow — clinical workstations shouldn't have transcribed
+        // text lingering on a shared clipboard. Match-before-clear preserves anything the user
+        // copies in the interim.
+        public static void CopyToClipboardWithAutoClear(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            try
+            {
+                Clipboard.SetText(text, TextDataFormat.UnicodeText);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Clipboard SetText failed: {ex.Message}");
+                return;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(CLIPBOARD_AUTO_CLEAR_DELAY_MS);
+
+                    var thread = new Thread(() =>
+                    {
+                        try
+                        {
+                            if (Clipboard.ContainsText() && Clipboard.GetText() == text)
+                            {
+                                Clipboard.Clear();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            ErrorLogger.LogDebug($"Clipboard auto-clear failed: {ex.Message}");
+                        }
+                    });
+                    thread.SetApartmentState(ApartmentState.STA);
+                    thread.Start();
+                    thread.Join(TimeSpan.FromSeconds(2));
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogDebug($"Scheduled clipboard auto-clear failed: {ex.Message}");
+                }
+            });
+        }
+
         // Virtual key codes
         private const byte VK_CONTROL = 0x11;
         private const byte VK_V = 0x56;

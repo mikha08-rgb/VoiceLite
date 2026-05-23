@@ -1755,25 +1755,29 @@ namespace VoiceLite
                         MessageBoxImage.Information);
                 }
 
-                // Also validate IsProLicense flag consistency
-                if (settings.IsProLicense && string.IsNullOrWhiteSpace(settings.LicenseKey))
+                // SECURITY: Verify settings.IsProLicense is backed by a DPAPI-stored license.
+                // DPAPI encrypts the license to the Windows user account, so an attacker who
+                // edits settings.json to set IsProLicense=true won't have a matching license.dat.
+                bool needsSettingsSave = false;
+                if (settings.IsProLicense && string.IsNullOrWhiteSpace(licenseService?.GetStoredLicenseKey()))
                 {
-                    ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no license key - possible manual edit, resetting to free");
+                    ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no DPAPI license found - possible manual edit, resetting to free");
                     settings.IsProLicense = false;
-                    settings.LicenseKey = string.Empty;
-                    _ = SaveSettingsInternalAsync();
+                    needsSettingsSave = true;
                 }
-                // HIGH-3 FIX: Verify settings.json license key matches DPAPI-encrypted storage
-                // Prevents bypass where attacker edits settings.json with fake license key
-                else if (settings.IsProLicense && !string.IsNullOrWhiteSpace(settings.LicenseKey))
+
+                // Legacy cleanup: older builds wrote the license key plaintext to settings.json.
+                // The DPAPI-encrypted license.dat is now the only authoritative store; clear any
+                // stale plaintext copy so PILOT.md's "no PII in settings.json" claim holds.
+                if (!string.IsNullOrEmpty(settings.LicenseKey))
                 {
-                    if (!LicenseService.VerifyLicenseKeyMatchesStorage(settings.LicenseKey))
-                    {
-                        ErrorLogger.LogWarning("SECURITY: License key in settings.json doesn't match DPAPI storage - possible tampering, resetting to free");
-                        settings.IsProLicense = false;
-                        settings.LicenseKey = string.Empty;
-                        _ = SaveSettingsInternalAsync();
-                    }
+                    settings.LicenseKey = string.Empty;
+                    needsSettingsSave = true;
+                }
+
+                if (needsSettingsSave)
+                {
+                    _ = SaveSettingsInternalAsync();
                 }
 
                 var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", modelFile);
@@ -2036,7 +2040,7 @@ namespace VoiceLite
             {
                 try
                 {
-                    System.Windows.Clipboard.SetText(item.Text);
+                    TextInjector.CopyToClipboardWithAutoClear(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
                     lock (timerLock) { activeStatusTimers.Add(timer); } // TIMER RACE FIX: Use lock for thread safety
@@ -2122,7 +2126,7 @@ namespace VoiceLite
             {
                 try
                 {
-                    System.Windows.Clipboard.SetText(item.Text);
+                    TextInjector.CopyToClipboardWithAutoClear(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
 
                     // Revert to "Ready" after 1.5 seconds

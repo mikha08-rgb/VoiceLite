@@ -28,7 +28,7 @@ cd voicelite-web && npm run dev
 
 **Why static HttpClient in LicenseService**: Single API endpoint (voicelite.app). Prevents socket exhaustion. Intentionally NOT disposed.
 
-**Why DPAPI for license storage**: Windows-native encryption, tied to user account. `%LOCALAPPDATA%\VoiceLite\license.dat`. Auto-migrates from plaintext settings.json. Stores `key|email` format for tamper detection via `VerifyLicenseKeyMatchesStorage()`.
+**Why DPAPI for license storage**: Windows-native encryption, tied to user account. `%LOCALAPPDATA%\VoiceLite\license.dat`. Auto-migrates from plaintext `settings.json` (cleared on first launch after upgrade). Stores `key|email` format — DPAPI presence is the authoritative source of truth for Pro tier; `settings.IsProLicense` is just a cache flag and is reset to Free at startup if `license.dat` is missing.
 
 **Why Q8_0 quantization**: 45% smaller models, 30-40% faster inference, 99.98% identical accuracy. large-v3 still F16 (no upstream Q8). large-v3-turbo uses Q8_0 (874MB vs 2.9GB for full large-v3).
 
@@ -48,7 +48,7 @@ cd voicelite-web && npm run dev
 - **TextInjector window capture**: Captures foreground window at start of transcription, not at injection time. Long transcriptions may redirect to wrong window.
 - **Regex timeout in shortcuts**: `CustomShortcutService` uses 100ms timeout to prevent catastrophic backtracking on malicious patterns.
 - **Hardware ID fallback**: `HardwareIdService` gracefully falls back if WMI fails (VM/headless systems) to persistent GUID.
-- **License tamper detection**: `VerifyLicenseKeyMatchesStorage()` validates both key AND email from `key|email` storage format.
+- **License tamper detection**: At startup, if `settings.IsProLicense=true` but `license.dat` is missing, the user is reset to Free (covers manual `settings.json` edits). Stale plaintext `LicenseKey` from older builds is cleared on next launch.
 - **Interface removal gotcha**: Deleted interfaces (`IAudioRecorder`, `IWhisperService`, etc.) extended `IDisposable`. Removing them silently drops `IDisposable` from implementing classes — must add `: IDisposable` back explicitly.
 - **Helper types in interface files**: `InjectionMode` lives in `TextInjector.cs`, `HotkeyEventArgs` in `HotkeyManager.cs`, `TranscriptionItem`/`ExportFormat` in `TranscriptionHistoryService.cs`, `LicenseValidationResult` in `LicenseService.cs`.
 - **VAD temporary regression**: Silero VAD parameters aren't exposed in Whisper.net builder. Users may notice more silence-related hallucinations. Follow-up: add VAD as separate audio preprocessing step using Silero ONNX model.

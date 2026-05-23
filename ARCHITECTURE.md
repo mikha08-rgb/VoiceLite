@@ -310,10 +310,10 @@ ErrorLogger.LogError("context", ex); // Always shows, writes to error log
 
 - **HTTPS enforced** for all API calls to voicelite.app
 - **DPAPI encryption** for license storage (tied to Windows user account, not portable)
-- **License tamper detection**: `key|email` format in storage, verified on load via `VerifyLicenseKeyMatchesStorage()`
+- **License tamper detection**: DPAPI presence is the source of truth for Pro tier. If `settings.IsProLicense=true` but `license.dat` is missing at startup, user is reset to Free. Stale plaintext `LicenseKey` in `settings.json` from older builds is cleared on next launch.
+- **Clipboard auto-clear**: Dictation paste and history-pane copy actions both auto-clear the clipboard 2s after the copy (match-before-clear, so the user's own copies aren't wiped).
 - **Model access control**: `ModelResolverService` checks `IProFeatureService.CanUseModel()` before resolving Pro model paths
 - **3-device activation limit**: Enforced server-side via `LicenseActivation` table
-- **Password field detection**: `TextInjector` detects password inputs and avoids logging
 - **Regex timeout**: `CustomShortcutService` uses 100ms regex timeout to prevent catastrophic backtracking
 - **No secrets in code**: License key stored via DPAPI, API calls use HTTPS
 - **Hardware ID fallback**: `HardwareIdService` gracefully handles WMI failures (VMs, headless systems) with persistent GUID fallback

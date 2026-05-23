@@ -441,16 +441,13 @@ namespace VoiceLite
 
                 if (result.IsValid && result.Tier == "pro")
                 {
-                    // Activate license
-                    settings.LicenseKey = key;
+                    // Activate license — DPAPI-encrypted license.dat is the only key store.
+                    // settings.IsProLicense persists the user's tier; the key itself lives in DPAPI.
+                    licenseService?.SaveLicenseKey(key);
                     settings.IsProLicense = true;
 
                     // Save settings immediately
                     saveSettingsCallback?.Invoke();
-
-                    // SECURITY FIX (CRITICAL-1): Save license key to DPAPI-encrypted storage
-                    // Previously only saved to plaintext settings.json, now also encrypts to license.dat
-                    licenseService?.SaveLicenseKey(key);
 
                     // Update UI
                     LoadLicenseStatus();
