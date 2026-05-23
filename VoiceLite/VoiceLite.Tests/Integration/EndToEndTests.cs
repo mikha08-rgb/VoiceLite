@@ -32,7 +32,6 @@ namespace VoiceLite.Tests.Integration
             _testSettings = new Settings
             {
                 WhisperModel = "tiny",
-                TextInjectionMode = TextInjectionMode.AlwaysType,
                 RecordHotkey = Key.F8,
                 HotkeyModifiers = ModifierKeys.Alt
             };
@@ -134,44 +133,6 @@ namespace VoiceLite.Tests.Integration
 
             // Assert - Should complete without deadlock
             completedTask.Should().Be(transcriptionTask, "Transcription should complete or cancel, not deadlock");
-        }
-
-        [Fact(Skip = "Requires STA thread which is not supported in xUnit async tests")]
-        public async Task ClipboardInjection_ShouldRestoreOriginalContent()
-        {
-            // Run on STA thread for clipboard access
-            var tcs = new TaskCompletionSource<bool>();
-            var thread = new Thread(async () =>
-            {
-                try
-                {
-                    // Arrange
-                    var originalClipboard = "Original clipboard content " + Guid.NewGuid();
-                    System.Windows.Clipboard.SetText(originalClipboard);
-                    await Task.Delay(100); // Let clipboard settle
-
-                    var testText = "Test transcription text";
-
-                    // Act
-                    await _textInjector.InjectTextAsync(testText, TextInjector.InjectionMode.Paste);
-
-                    // Wait for clipboard restoration
-                    await Task.Delay(200);
-
-                    // Assert
-                    var finalClipboard = System.Windows.Clipboard.GetText();
-                    finalClipboard.Should().Be(originalClipboard, "Original clipboard should be restored");
-
-                    tcs.SetResult(true);
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            await tcs.Task;
         }
 
         [Fact]
