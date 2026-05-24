@@ -1290,7 +1290,7 @@ namespace VoiceLite
                 {
                     UpdateStatus("Error during recovery", Brushes.Red);
                 }
-                catch (Exception ex) { ErrorLogger.LogDebug($"UpdateStatus failed during error recovery: {ex.Message}"); }
+                catch (Exception uiEx) { ErrorLogger.LogDebug($"UpdateStatus failed during error recovery: {uiEx.Message}"); }
             }
         }
 
