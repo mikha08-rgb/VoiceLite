@@ -177,8 +177,9 @@ namespace VoiceLite.Services
 
                 ErrorLogger.LogWarning($"Whisper: threads=4, model={Path.GetFileName(effectiveModelPath)}");
 
-                // 120s timeout — generous enough for the Ultra model on slow CPUs.
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+                // 300s timeout — covers ~5 minutes of clinical dictation on the Ultra model
+                // even on slower CPUs. Still well under any pathological hang.
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken, timeoutCts.Token);
 
@@ -235,7 +236,7 @@ namespace VoiceLite.Services
                 // Timeout (not user cancellation)
                 isProcessing = false;
                 throw new TimeoutException(
-                    "Transcription timed out after 120 seconds. Please try speaking less or using a smaller model.");
+                    "Transcription timed out after 300 seconds. Please try speaking less or using a smaller model.");
             }
             catch (OperationCanceledException)
             {

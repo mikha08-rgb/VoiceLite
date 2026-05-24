@@ -9,7 +9,7 @@ VoiceLite is designed to keep voice and transcribed text **on the user's device*
 - **Transcription is in-process.** Whisper.net loads the model into the VoiceLite process via P/Invoke (`WhisperFactory.FromPath()`) and runs inference locally. No audio or text is sent to any external service for transcription.
 - **No telemetry, no analytics, no crash reporter.** The app does not phone home for any reason other than license validation (see below).
 - **Temporary audio files** are written to `%TEMP%\VoiceLite\audio\` during recording, then cleaned on every app startup and via a 30-minute sweep timer while the app is running.
-- **Transcription history** is stored locally in `%LOCALAPPDATA%\VoiceLite\settings.json`, capped at the 250 most recent items (~500KB–1MB at full capacity). For clinical deployments where on-device history is undesirable, the settings file can be cleared on logoff via a Windows scheduled task.
+- **Transcription history** is stored locally in `%LOCALAPPDATA%\VoiceLite\settings.json`, capped at the 250 most recent items (~500KB–1MB at full capacity). For clinical deployments where on-device history is undesirable, set `"EnableHistory": false` in `settings.json` (default: `true`) — transcriptions will never be written to the history list. Alternatively, the settings file can be cleared on logoff via a Windows scheduled task.
 
 ### Australian Privacy Principles (APPs) relevance
 

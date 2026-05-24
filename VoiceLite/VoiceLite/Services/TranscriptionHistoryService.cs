@@ -36,6 +36,12 @@ namespace VoiceLite.Services
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
+            // Clinical-pilot opt-out: skip persisting transcribed text when the user
+            // has disabled history. ItemAdded subscribers in AddTranscription still fire
+            // (UI may want to show the latest result even if it's not persisted).
+            if (!settings.EnableHistory)
+                return;
+
             // Truncate very long transcriptions to prevent bloat
             if (item.Text.Length > MAX_TEXT_LENGTH)
             {

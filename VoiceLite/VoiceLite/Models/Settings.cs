@@ -115,6 +115,11 @@ namespace VoiceLite.Models
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true;
 
+        // Clinical pilot opt-out: when false, transcriptions are never written to TranscriptionHistory
+        // (and therefore never persisted to settings.json). Defaults true to match current behavior;
+        // a site that previously set this false in settings.json keeps that preference on upgrade.
+        public bool EnableHistory { get; set; } = true;
+
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
         public List<CustomShortcut> CustomShortcuts { get; set; } = new List<CustomShortcut>();
 

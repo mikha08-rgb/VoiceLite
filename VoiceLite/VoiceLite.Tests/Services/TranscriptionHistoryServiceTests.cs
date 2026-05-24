@@ -133,6 +133,21 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void AddToHistory_WhenEnableHistoryIsFalse_DoesNotPersist()
+        {
+            // Clinical-pilot opt-out: settings.EnableHistory = false must prevent
+            // any transcribed text from being written to TranscriptionHistory.
+            var settings = CreateTestSettings();
+            settings.EnableHistory = false;
+            var service = new TranscriptionHistoryService(settings);
+
+            service.AddToHistory(CreateTestItem("sensitive patient transcription"));
+
+            settings.TranscriptionHistory.Should().BeEmpty(
+                "EnableHistory=false must block all writes to history (PILOT.md privacy guarantee)");
+        }
+
+        [Fact]
         public void AddToHistory_VeryLongText_TruncatesTo5000Chars()
         {
             // Arrange

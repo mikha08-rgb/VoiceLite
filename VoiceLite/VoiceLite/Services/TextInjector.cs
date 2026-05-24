@@ -82,7 +82,8 @@ namespace VoiceLite.Services
                     {
                         try
                         {
-                            if (Clipboard.ContainsText() && Clipboard.GetText() == textToClear)
+                            string? current = Clipboard.ContainsText() ? Clipboard.GetText() : null;
+                            if (ShouldClearClipboard(current, textToClear))
                             {
                                 Clipboard.Clear();
                             }
@@ -101,6 +102,14 @@ namespace VoiceLite.Services
                     ErrorLogger.LogDebug($"Scheduled clipboard auto-clear failed: {ex.Message}");
                 }
             });
+        }
+
+        // Match-before-clear: only clear the clipboard if the transcription is still on it.
+        // If the user copied something else in the 2s window, their content is preserved.
+        // This is the privacy guarantee documented in PILOT.md.
+        internal static bool ShouldClearClipboard(string? currentClipboard, string expectedText)
+        {
+            return currentClipboard != null && currentClipboard == expectedText;
         }
 
         private void PasteViaClipboard(string text, IntPtr targetHandle)

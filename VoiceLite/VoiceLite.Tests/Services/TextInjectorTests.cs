@@ -75,5 +75,33 @@ namespace VoiceLite.Tests.Services
         {
             typeof(TextInjector).Should().Implement<IDisposable>();
         }
+
+        // Match-before-clear: the privacy guarantee documented in PILOT.md.
+        // If the clipboard still has the transcribed text, clear it. If the user
+        // copied something else in between, leave their content alone.
+
+        [Fact]
+        public void ShouldClearClipboard_WhenClipboardStillHasTranscription_ReturnsTrue()
+        {
+            TextInjector.ShouldClearClipboard("hello world", "hello world").Should().BeTrue();
+        }
+
+        [Fact]
+        public void ShouldClearClipboard_WhenUserCopiedSomethingElse_ReturnsFalse()
+        {
+            TextInjector.ShouldClearClipboard("user's new content", "hello world").Should().BeFalse();
+        }
+
+        [Fact]
+        public void ShouldClearClipboard_WhenClipboardIsEmpty_ReturnsFalse()
+        {
+            TextInjector.ShouldClearClipboard(null, "hello world").Should().BeFalse();
+        }
+
+        [Fact]
+        public void ShouldClearClipboard_WhenClipboardHasEmptyString_ReturnsFalse()
+        {
+            TextInjector.ShouldClearClipboard("", "hello world").Should().BeFalse();
+        }
     }
 }

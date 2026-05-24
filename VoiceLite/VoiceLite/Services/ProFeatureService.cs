@@ -18,6 +18,9 @@ namespace VoiceLite.Services
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
+        // Settings is shared by reference across the app; LicenseService mutates IsProLicense
+        // directly on activation, so this property reflects the new state on the next read.
+        // bool reads are atomic in .NET, so no lock is needed here.
         public bool IsProUser => _settings.IsProLicense;
 
         /// <summary>
