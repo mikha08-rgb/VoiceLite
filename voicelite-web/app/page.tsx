@@ -5,7 +5,10 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.1.0';
+// Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
+// Previously read from NEXT_PUBLIC_CURRENT_VERSION env var; the env var got baked
+// into the client bundle at build time and silently lagged behind code on every ship.
+const CURRENT_VERSION = '2.1.0';
 
 const jsonLd = {
   "@context": "https://schema.org",

@@ -15,7 +15,7 @@ namespace VoiceLite.Tests.Services
     {
         #region IsProUser Tests
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void IsProUser_WhenLicenseIsActivated_ReturnsTrue()
         {
             // Arrange
@@ -29,7 +29,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeTrue();
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void IsProUser_WhenLicenseNotActivated_ReturnsFalse()
         {
             // Arrange
@@ -43,7 +43,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeFalse();
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void Constructor_WithNullSettings_ThrowsArgumentNullException()
         {
             // Act

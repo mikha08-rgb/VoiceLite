@@ -133,6 +133,12 @@ namespace VoiceLite.Services
         // the user mutates their dictionary (Settings replaces the List<T> reference on edit).
         // ConditionalWeakTable lets the cache entries get GC'd if the list is replaced and
         // the old reference is no longer held anywhere.
+        //
+        // FOOTGUN: cache invalidation depends on the caller assigning a NEW list reference
+        // (settings.CustomDictionary = newList) when entries change. If a future feature
+        // mutates the list in place (settings.CustomDictionary.Add(entry)), the cached
+        // regex will be stale. Today only SettingsWindowNew.CommitCustomDictionaryToSettings
+        // touches this collection and it always reassigns; keep that invariant.
         private static readonly ConditionalWeakTable<IReadOnlyList<CustomDictionaryEntry>, CustomDictionaryCache> CustomDictCache = new();
 
         private sealed class CustomDictionaryCache

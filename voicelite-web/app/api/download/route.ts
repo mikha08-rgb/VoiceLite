@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 // v2.0+ uses 3-part versions for the user-facing tag; pre-v2 used 4-part.
 const VERSION_REGEX = /^\d+\.\d+\.\d+(\.\d+)?$/;
 const MAX_VERSION_LENGTH = 20;
-const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.1.0';
+// Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
+// Previously read from NEXT_PUBLIC_CURRENT_VERSION env var, which silently lagged
+// behind code on every ship (the env var lived in Vercel UI and got forgotten).
+const DEFAULT_VERSION = '2.1.0';
 
 // Mask IP for privacy (show first octet only)
 function maskIp(ip: string): string {
