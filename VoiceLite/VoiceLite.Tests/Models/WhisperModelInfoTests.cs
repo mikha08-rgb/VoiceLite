@@ -10,28 +10,28 @@ namespace VoiceLite.Tests.Models
 {
     public class WhisperModelInfoTests
     {
-        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup (collapsed to single Parakeet entry), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void FileSizeDisplay_FormatsBytes_Correctly()
         {
             var model = new WhisperModelInfo { FileSizeBytes = 1024 };
             model.FileSizeDisplay.Should().Be("1 KB");
         }
 
-        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup (collapsed to single Parakeet entry), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void FileSizeDisplay_FormatsMegabytes_Correctly()
         {
             var model = new WhisperModelInfo { FileSizeBytes = 5 * 1024 * 1024 };
             model.FileSizeDisplay.Should().Contain("MB");
         }
 
-        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup (collapsed to single Parakeet entry), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void FileSizeDisplay_FormatsGigabytes_Correctly()
         {
             var model = new WhisperModelInfo { FileSizeBytes = 2L * 1024 * 1024 * 1024 };
             model.FileSizeDisplay.Should().Contain("GB");
         }
 
-        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup (collapsed to single Parakeet entry), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void SpeedRatingWidth_CalculatesCorrectly()
         {
             var model = new WhisperModelInfo { SpeedRating = 5 };
@@ -41,7 +41,7 @@ namespace VoiceLite.Tests.Models
             model.SpeedRatingWidth.Should().Be(90);
         }
 
-        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup (collapsed to single Parakeet entry), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void AccuracyRatingWidth_CalculatesCorrectly()
         {
             var model = new WhisperModelInfo { AccuracyRating = 5 };
