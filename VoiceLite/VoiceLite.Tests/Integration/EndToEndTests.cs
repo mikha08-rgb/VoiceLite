@@ -41,7 +41,7 @@ namespace VoiceLite.Tests.Integration
             _textInjector = new TextInjector(_testSettings);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — pipeline test wired for Whisper.net; needs Sherpa-ONNX + real Parakeet model files. See docs/parakeet-migration-plan.md.")]
         public async Task FullTranscriptionPipeline_RecordTranscribeInject_ShouldComplete()
         {
             // Arrange

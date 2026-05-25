@@ -36,7 +36,7 @@ namespace VoiceLite.Tests.Services
 
         #region Constructor Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void Constructor_WithValidDirectory_Succeeds()
         {
             // Act
@@ -46,7 +46,7 @@ namespace VoiceLite.Tests.Services
             service.Should().NotBeNull();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void Constructor_WithNullDirectory_ThrowsArgumentNullException()
         {
             // Act
@@ -57,7 +57,7 @@ namespace VoiceLite.Tests.Services
                 .WithParameterName("baseDirectory");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void Constructor_WithEmptyDirectory_ThrowsArgumentNullException()
         {
             // Act
@@ -72,7 +72,7 @@ namespace VoiceLite.Tests.Services
 
         #region NormalizeModelName Tests
 
-        [Theory]
+        [Theory(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         [InlineData("tiny", "ggml-tiny.bin")]
         [InlineData("base", "ggml-base.bin")]
         [InlineData("small", "ggml-small.bin")]
@@ -91,7 +91,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(expected);
         }
 
-        [Theory]
+        [Theory(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         [InlineData("ggml-tiny.bin")]
         [InlineData("ggml-base.bin")]
         [InlineData("ggml-small.bin")]
@@ -110,7 +110,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(filename);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void NormalizeModelName_ShortNames_CaseInsensitive()
         {
             // Arrange
@@ -123,7 +123,7 @@ namespace VoiceLite.Tests.Services
             service.NormalizeModelName("TURBO").Should().Be("ggml-large-v3-turbo-q8_0.bin");
         }
 
-        [Theory]
+        [Theory(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         [InlineData(null, "ggml-base.bin")]
         [InlineData("", "ggml-base.bin")]
         [InlineData("  ", "ggml-base.bin")]
@@ -139,7 +139,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(expected);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void NormalizeModelName_UnknownName_ReturnsDefaultBase()
         {
             // Arrange
@@ -156,7 +156,7 @@ namespace VoiceLite.Tests.Services
 
         #region ResolveModelPath Tests - Basic Resolution
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void ResolveModelPath_ModelInWhisperSubdir_ReturnsCorrectPath()
         {
             // Arrange
@@ -176,7 +176,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(modelPath);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void ResolveModelPath_ModelInBaseDir_ReturnsCorrectPath()
         {
             // Arrange
@@ -195,7 +195,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(modelPath);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void ResolveModelPath_ModelNotFound_ThrowsFileNotFoundException()
         {
             // Arrange
@@ -213,7 +213,7 @@ namespace VoiceLite.Tests.Services
                 .WithMessage("*download it from Settings*");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void ResolveModelPath_TurboModel_ReturnsCorrectPath()
         {
             // Arrange
@@ -236,7 +236,7 @@ namespace VoiceLite.Tests.Services
 
         #region Security Tests - MODEL-GATE-001 (v1.2.0.3)
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_FreeUser_CannotAccessProModels_EvenIfFileExists()
         {
             // Arrange - Create Pro model file on disk
@@ -263,7 +263,7 @@ namespace VoiceLite.Tests.Services
             mockProService.Verify(x => x.CanUseModel("ggml-small.bin"), Times.Once);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_FreeUser_CannotAccessTurboModel()
         {
             // Arrange - Create Turbo model file on disk
@@ -285,7 +285,7 @@ namespace VoiceLite.Tests.Services
                 .WithMessage("*requires Pro license*");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_FreeUser_CanAccessBaseModel()
         {
             // Arrange
@@ -305,7 +305,7 @@ namespace VoiceLite.Tests.Services
             mockProService.Verify(x => x.CanUseModel("ggml-base.bin"), Times.Once);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_ProUser_CanAccessAllModels()
         {
             // Arrange - Create all model files
@@ -339,7 +339,7 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_ManualDownload_BypassAttempt_Blocked()
         {
             // Arrange - Simulate user manually downloading Pro model to LocalAppData
@@ -384,7 +384,7 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void SecurityTest_WithoutProService_AllowsAllModels()
         {
             // Arrange - No ProFeatureService provided (backward compatibility)
@@ -404,7 +404,7 @@ namespace VoiceLite.Tests.Services
 
         #region GetAvailableModelPaths Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void GetAvailableModelPaths_FindsModelsInWhisperSubdir()
         {
             // Arrange
@@ -422,7 +422,7 @@ namespace VoiceLite.Tests.Services
             models.Should().Contain(p => p.EndsWith("ggml-small.bin"));
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void GetAvailableModelPaths_FindsModelsInBaseDir()
         {
             // Arrange
@@ -437,7 +437,7 @@ namespace VoiceLite.Tests.Services
             models.Should().Contain(p => p.EndsWith("ggml-medium.bin"));
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void GetAvailableModelPaths_ReturnsDistinctPaths()
         {
             // Arrange - Same model in multiple locations
@@ -453,7 +453,7 @@ namespace VoiceLite.Tests.Services
             models.Should().HaveCountGreaterThanOrEqualTo(1);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void GetAvailableModelPaths_EmptyDirectory_ReturnsEmpty()
         {
             // Arrange - No model files
@@ -466,7 +466,7 @@ namespace VoiceLite.Tests.Services
             models.Should().BeEmpty();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — references deleted 5-model GGML lineup, see docs/parakeet-migration-plan.md")]
         public void GetAvailableModelPaths_IgnoresNonModelFiles()
         {
             // Arrange

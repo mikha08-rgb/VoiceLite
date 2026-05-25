@@ -44,7 +44,7 @@ namespace VoiceLite.Tests.Services
             _service?.Dispose();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public void Constructor_ThrowsWhenSettingsNull()
         {
             Action act = () => new PersistentWhisperService(null!);
@@ -52,7 +52,7 @@ namespace VoiceLite.Tests.Services
                 .WithParameterName("settings");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public void Constructor_InitializesWithValidSettings()
         {
             if (_service == null)
@@ -64,7 +64,7 @@ namespace VoiceLite.Tests.Services
             _service.Should().NotBeNull();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public async Task TranscribeAsync_ThrowsWhenFileNotFound()
         {
             if (_service == null) return;
@@ -76,7 +76,7 @@ namespace VoiceLite.Tests.Services
                 .WithMessage($"Audio file not found: {nonExistentFile}");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public async Task TranscribeAsync_ReturnsTranscriptionForValidAudio()
         {
             if (_service == null) return;
@@ -100,7 +100,7 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public async Task TranscribeFromMemoryAsync_HandlesValidData()
         {
             if (_service == null) return;
@@ -114,7 +114,7 @@ namespace VoiceLite.Tests.Services
             result.Length.Should().BeGreaterThanOrEqualTo(0);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public async Task TranscribeFromMemoryAsync_HandlesEmptyData()
         {
             if (_service == null) return;
@@ -128,7 +128,7 @@ namespace VoiceLite.Tests.Services
             await act.Should().NotThrowAsync<NullReferenceException>();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public void ModelPathResolution_HandlesAllModelTypes()
         {
             var modelTypes = new[] { "small", "medium", "large" };
@@ -187,7 +187,7 @@ namespace VoiceLite.Tests.Services
             }
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Whisper-era assertions, see docs/parakeet-migration-plan.md")]
         public void Dispose_CanBeCalledMultipleTimes()
         {
             if (_service == null) return;

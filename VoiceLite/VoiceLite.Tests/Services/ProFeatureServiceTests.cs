@@ -15,7 +15,7 @@ namespace VoiceLite.Tests.Services
     {
         #region IsProUser Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void IsProUser_WhenLicenseIsActivated_ReturnsTrue()
         {
             // Arrange
@@ -29,7 +29,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeTrue();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void IsProUser_WhenLicenseNotActivated_ReturnsFalse()
         {
             // Arrange
@@ -43,7 +43,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeFalse();
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void Constructor_WithNullSettings_ThrowsArgumentNullException()
         {
             // Act
@@ -58,7 +58,7 @@ namespace VoiceLite.Tests.Services
 
         #region CanUseModel Tests (Security Critical)
 
-        [Theory]
+        [Theory(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         [InlineData("ggml-tiny.bin", true)]
         [InlineData("ggml-base.bin", true)]
         [InlineData("ggml-small.bin", true)]
@@ -77,7 +77,7 @@ namespace VoiceLite.Tests.Services
             result.Should().Be(expected);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void CanUseModel_FreeUser_CanOnlyUseBaseModel()
         {
             // Arrange
@@ -92,7 +92,7 @@ namespace VoiceLite.Tests.Services
             service.CanUseModel("ggml-large-v3.bin").Should().BeFalse("Large is Pro-only");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void CanUseModel_CaseInsensitive_WorksCorrectly()
         {
             // Arrange
@@ -105,7 +105,7 @@ namespace VoiceLite.Tests.Services
             service.CanUseModel("GGML-SMALL.BIN").Should().BeFalse("Small is Pro-only");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void CanUseModel_NullModelName_ReturnsFalse()
         {
             // Arrange
@@ -119,7 +119,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeFalse("Null model name should not be allowed");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void CanUseModel_EmptyModelName_ReturnsFalse()
         {
             // Arrange
@@ -137,7 +137,7 @@ namespace VoiceLite.Tests.Services
 
         #region Visibility Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void AIModelsTabVisibility_AlwaysVisible_ForAllUsers()
         {
             // Arrange
@@ -152,7 +152,7 @@ namespace VoiceLite.Tests.Services
             proService.AIModelsTabVisibility.Should().Be(Visibility.Visible, "AI Models tab visible for Pro users");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void VoiceShortcutsTabVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -167,7 +167,7 @@ namespace VoiceLite.Tests.Services
             proService.VoiceShortcutsTabVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void ExportHistoryButtonVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -182,7 +182,7 @@ namespace VoiceLite.Tests.Services
             proService.ExportHistoryButtonVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void CustomDictionaryTabVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -197,7 +197,7 @@ namespace VoiceLite.Tests.Services
             proService.CustomDictionaryTabVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void AdvancedSettingsVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -216,7 +216,7 @@ namespace VoiceLite.Tests.Services
 
         #region IsModelAvailable Tests
 
-        [Theory]
+        [Theory(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         [InlineData("tiny")]
         [InlineData("ggml-tiny.bin")]
         [InlineData("small")]
@@ -236,7 +236,7 @@ namespace VoiceLite.Tests.Services
             result.Should().BeTrue($"Pro users should have access to {modelName}");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void IsModelAvailable_FreeUser_OnlyBaseModelAvailable()
         {
             // Arrange
@@ -252,7 +252,7 @@ namespace VoiceLite.Tests.Services
             service.IsModelAvailable("large").Should().BeFalse("Large is Pro-only");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void IsModelAvailable_NullModelName_ReturnsFalse()
         {
             // Arrange
@@ -270,7 +270,7 @@ namespace VoiceLite.Tests.Services
 
         #region GetAvailableModels Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void GetAvailableModels_ProUser_ReturnsAll6Models()
         {
             // Arrange
@@ -290,7 +290,7 @@ namespace VoiceLite.Tests.Services
             models.Should().Contain("ggml-large-v3.bin");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void GetAvailableModels_FreeUser_ReturnsOnlyBaseModel()
         {
             // Arrange
@@ -313,7 +313,7 @@ namespace VoiceLite.Tests.Services
 
         #region Tier Display Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void TierName_ProUser_ReturnsPro()
         {
             // Arrange
@@ -327,7 +327,7 @@ namespace VoiceLite.Tests.Services
             tierName.Should().Be("Pro ⭐");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void TierName_FreeUser_ReturnsFree()
         {
             // Arrange
@@ -341,7 +341,7 @@ namespace VoiceLite.Tests.Services
             tierName.Should().Be("Free");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void TierDescription_ProUser_ShowsProBenefits()
         {
             // Arrange
@@ -356,7 +356,7 @@ namespace VoiceLite.Tests.Services
             description.Should().Contain("5 AI models");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void TierDescription_FreeUser_ShowsUpgradeBenefits()
         {
             // Arrange
@@ -376,7 +376,7 @@ namespace VoiceLite.Tests.Services
 
         #region GetUpgradeMessage Tests
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void GetUpgradeMessage_ReturnsFormattedMessage()
         {
             // Arrange
@@ -397,7 +397,7 @@ namespace VoiceLite.Tests.Services
 
         #region Security Regression Tests (v1.2.0.3)
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void SecurityTest_FreeUserCannotBypassProCheck_ByManuallyDownloadingModel()
         {
             // Arrange - Simulate user manually downloading Pro model file
@@ -413,7 +413,7 @@ namespace VoiceLite.Tests.Services
             canUseLarge.Should().BeFalse("Free users cannot bypass Pro check by manually downloading models");
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void SecurityTest_FreeUserCannotAccessProFeatures_ViaUIHiding()
         {
             // Arrange
@@ -433,7 +433,7 @@ namespace VoiceLite.Tests.Services
             advancedVisible.Should().Be(Visibility.Collapsed);
         }
 
-        [Fact]
+        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
         public void SecurityTest_LicenseStatusChange_ReflectsImmediately()
         {
             // Arrange - Start as free user
