@@ -1,6 +1,6 @@
 END-USER LICENSE AGREEMENT (EULA) FOR VOICELITE
 Version 2.0
-Last Updated: January 2025
+Last Updated: May 2026
 
 IMPORTANT: PLEASE READ THIS END-USER LICENSE AGREEMENT ("EULA") CAREFULLY BEFORE DOWNLOADING, INSTALLING, OR USING VOICELITE SOFTWARE.
 
@@ -187,16 +187,26 @@ Some jurisdictions do not allow limitation of liability, so this may not apply t
 
 VoiceLite includes the following third-party components:
 
-a) OpenAI Whisper (MIT License): AI model for speech recognition
-b) NAudio (MIT License): Audio recording and processing library
-c) NAudio.Vorbis (MIT License): OGG audio file support
-d) H.InputSimulator (MIT License): Keyboard/mouse simulation
-e) Hardcodet.NotifyIcon.Wpf (CPOL License): System tray integration
-f) BouncyCastle.Cryptography (MIT License): Cryptographic operations for license signing
-g) System.Text.Json (MIT License): JSON serialization
-h) System.Management (MIT License): System information retrieval
+a) NVIDIA Parakeet TDT 0.6B v3 (CC-BY-4.0): Speech recognition model.
+   Copyright (c) NVIDIA Corporation. Used unmodified under the terms of the
+   Creative Commons Attribution 4.0 International License. Full license
+   text is provided in the LICENSES\ directory of the installation
+   (LICENSES\CC-BY-4.0.txt) and at https://creativecommons.org/licenses/by/4.0/.
+b) Sherpa-ONNX (Apache License 2.0): Speech recognition runtime — k2-fsa
+   project. https://github.com/k2-fsa/sherpa-onnx
+c) ONNX Runtime (MIT License): Cross-platform inference engine for ONNX models.
+d) Silero VAD (MIT License): Voice activity detection model.
+e) NAudio (MIT License): Audio recording and processing library.
+f) SharpCompress (MIT License): Archive extraction (tar.bz2) for the
+   first-launch model download.
+g) Polly (BSD-3-Clause License): Retry policies for network operations.
+h) Hardcodet.NotifyIcon.Wpf (CPOL License): System tray integration.
+i) System.Text.Json (MIT License): JSON serialization.
+j) System.Management (MIT License): System information retrieval.
 
-Full license texts for these components are available in the Software's installation directory or at: https://github.com/mikha08-rgb/VoiceLite
+Full license texts for these components are available in the Software's
+installation directory (LICENSES\ folder) or at:
+https://github.com/mikha08-rgb/VoiceLite
 
 12. DATA RETENTION
 

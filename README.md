@@ -1,6 +1,6 @@
 # VoiceLite
 
-Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [Whisper.net](https://github.com/sandrohanea/whisper.net).
+Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) running NVIDIA's [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model.
 
 [![Download](https://img.shields.io/github/v/release/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -22,17 +22,11 @@ Hold hotkey → speak → release → text appears in active window.
 
 Change hotkey in Settings (right-click tray icon).
 
-## Models
+## Speech Engine
 
-| Model | Size | Speed | Accuracy | Tier |
-|-------|------|-------|----------|------|
-| Swift | 142MB | 4/5 | 2/5 | Free |
-| Pro | 466MB | 3/5 | 3/5 | Pro |
-| Elite | 1.5GB | 2/5 | 4/5 | Pro |
-| Turbo | 874MB | 3/5 | 5/5 | Pro |
-| Ultra | 2.9GB | 1/5 | 5/5 | Pro |
+VoiceLite v2.0 uses **Parakeet TDT 0.6B v3** (~640MB), an NVIDIA transducer model that runs entirely on CPU via [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). It outperforms Whisper Large v3 on the [HF Open ASR Leaderboard](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) (~6.3% WER) while running 2–3× faster, supports 25 European languages, and — unlike Whisper — won't hallucinate text from silence.
 
-Free tier includes Swift model with unlimited usage. Pro ($20 one-time) unlocks all models — upgrade in Settings → Account.
+The model isn't bundled with the installer. On first launch, VoiceLite downloads it from GitHub Releases and extracts it to `%LocalAppData%\VoiceLite\models\parakeet-v3\`.
 
 ## Features
 
@@ -57,7 +51,7 @@ Free tier includes Swift model with unlimited usage. Pro ($20 one-time) unlocks 
 |---------|-----|
 | Windows Defender warning | Click "More info" → "Run anyway" |
 | Hotkey doesn't work | Change in Settings — another app may use it |
-| Low accuracy | Use larger model (Pro) or speak more clearly |
+| Low accuracy | Reduce background noise; speak more clearly. Parakeet v3 is a single multilingual model — accuracy is already at SOTA for CPU-only inference. |
 
 ## Building from Source
 
@@ -79,9 +73,14 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 ## Tech Stack
 
 - .NET 8 / WPF
-- [Whisper.net](https://github.com/sandrohanea/whisper.net) (speech recognition, in-process via P/Invoke)
+- [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (speech recognition runtime, in-process via P/Invoke)
+- [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA, CC-BY-4.0) — speech model
 - [Silero VAD](https://github.com/snakers4/silero-vad) (voice activity detection, ONNX)
 - [NAudio](https://github.com/naudio/NAudio) (audio capture)
+
+## Credits & Attribution
+
+VoiceLite ships the **Parakeet TDT 0.6B v3** model from NVIDIA, used unmodified under the [Creative Commons Attribution 4.0 International (CC-BY-4.0)](https://creativecommons.org/licenses/by/4.0/) license. The full license text and our usage notice are included in the `LICENSES/` directory of the installation. See [model card](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) for model details.
 
 ## Contributing
 

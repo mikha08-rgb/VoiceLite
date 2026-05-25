@@ -45,6 +45,9 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*"; Des
 ; Icon file
 Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
 
+; Third-party license texts (NVIDIA Parakeet CC-BY-4.0 attribution is mandatory)
+Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion recursesubdirs
+
 ; VC++ Redistributable (bundled for auto-install)
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 

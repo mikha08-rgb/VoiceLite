@@ -405,6 +405,73 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- About Tab -->
+            <TabItem Header="About">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <TextBlock Text="About VoiceLite"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <GroupBox Header="Application" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock Margin="0,2,0,2">
+                                    <Run Text="Version: " FontWeight="SemiBold"/>
+                                    <Run Name="AboutVersionText" Text="2.0.0.0"/>
+                                </TextBlock>
+                                <TextBlock Margin="0,2,0,2">
+                                    <Run Text="Engine: " FontWeight="SemiBold"/>
+                                    <Run Text="Sherpa-ONNX + NVIDIA Parakeet TDT 0.6B v3"/>
+                                </TextBlock>
+                                <TextBlock Margin="0,2,0,2">
+                                    <Run Text="Website: " FontWeight="SemiBold"/>
+                                    <Hyperlink Name="AboutWebsiteLink"
+                                               NavigateUri="https://voicelite.app"
+                                               RequestNavigate="OpenExternalLink">https://voicelite.app</Hyperlink>
+                                </TextBlock>
+                                <TextBlock Margin="0,2,0,2">
+                                    <Run Text="Source: " FontWeight="SemiBold"/>
+                                    <Hyperlink NavigateUri="https://github.com/mikha08-rgb/VoiceLite"
+                                               RequestNavigate="OpenExternalLink">github.com/mikha08-rgb/VoiceLite</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Third-Party Licenses" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                    <Run Text="VoiceLite uses the "/>
+                                    <Run Text="NVIDIA Parakeet TDT 0.6B v3" FontWeight="SemiBold"/>
+                                    <Run Text=" speech recognition model, Copyright © NVIDIA Corporation, "/>
+                                    <Run Text="used unmodified under the terms of the Creative Commons Attribution 4.0 International (CC-BY-4.0) license."/>
+                                </TextBlock>
+
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                    <Hyperlink NavigateUri="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"
+                                               RequestNavigate="OpenExternalLink">Parakeet v3 model card</Hyperlink>
+                                    <Run Text=" · "/>
+                                    <Hyperlink NavigateUri="https://creativecommons.org/licenses/by/4.0/"
+                                               RequestNavigate="OpenExternalLink">CC-BY-4.0 license</Hyperlink>
+                                </TextBlock>
+
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                    <Run Text="Other open-source components: Sherpa-ONNX (Apache 2.0), ONNX Runtime (MIT), Silero VAD (MIT), NAudio (MIT), SharpCompress (MIT), Polly (BSD-3-Clause), Hardcodet.NotifyIcon.Wpf (CPOL), System.Text.Json (MIT), System.Management (MIT)."/>
+                                </TextBlock>
+
+                                <Button Name="OpenLicensesFolderButton"
+                                        Content="View full license texts (LICENSES folder)"
+                                        Width="320"
+                                        Height="32"
+                                        HorizontalAlignment="Left"
+                                        Click="OpenLicensesFolderButton_Click"
+                                        Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
 
         <!-- Footer with Buttons -->

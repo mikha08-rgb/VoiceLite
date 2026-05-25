@@ -396,7 +396,22 @@ namespace VoiceLite
         }
 
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
-        private void LoadVersionInfo() { try { var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version; if (version != null && VersionText != null) { VersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}"; } } catch (Exception ex) { ErrorLogger.LogDebug($"LoadVersionInfo failed: {ex.Message}"); } }
+        private void LoadVersionInfo()
+        {
+            try
+            {
+                var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                if (version == null) return;
+
+                var headerText = $"v{version.Major}.{version.Minor}.{version.Build}";
+                if (VersionText != null) VersionText.Text = headerText;
+                if (AboutVersionText != null) AboutVersionText.Text = version.ToString();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogDebug($"LoadVersionInfo failed: {ex.Message}");
+            }
+        }
         private void SyncAudioUIFromSettings() { }
 
         // License Management Event Handlers
@@ -500,6 +515,50 @@ namespace VoiceLite
                     "Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+            }
+        }
+
+        private void OpenLicensesFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var licensesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LICENSES");
+                if (!Directory.Exists(licensesDir))
+                {
+                    MessageBox.Show(
+                        $"LICENSES folder not found at:\n{licensesDir}",
+                        "VoiceLite",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = licensesDir,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OpenLicensesFolderButton_Click failed", ex);
+            }
+        }
+
+        private void OpenExternalLink(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = e.Uri.AbsoluteUri,
+                    UseShellExecute = true,
+                });
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError($"OpenExternalLink failed for {e.Uri}", ex);
             }
         }
 

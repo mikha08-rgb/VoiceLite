@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Ship third-party license texts alongside the binary
-$licensesSrc = Join-Path $projectDir "LICENSES"
+$licensesSrc = Join-Path $projectDir "VoiceLite\LICENSES"
 $licensesDest = Join-Path $outputDir "LICENSES"
 if (Test-Path $licensesSrc) {
     Write-Host "`nCopying third-party license texts..." -ForegroundColor Green
