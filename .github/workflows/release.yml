@@ -97,43 +97,17 @@ jobs:
     - name: Build Release
       run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
 
-    - name: Restore Whisper models cache
-      id: cache-whisper
-      uses: actions/cache@v4
-      with:
-        path: VoiceLite/whisper_installer_lite
-        key: whisper-models-lite-v1-${{ hashFiles('VoiceLite/whisper/**') }}
-        restore-keys: |
-          whisper-models-lite-v1-
-
-    - name: Copy Whisper files for installer
-      if: steps.cache-whisper.outputs.cache-hit != 'true'
+    - name: Copy Silero VAD to publish directory
       shell: pwsh
       run: |
-        echo "Copying Whisper files from VoiceLite/whisper/ directory..."
-
-        New-Item -ItemType Directory -Force -Path "VoiceLite/whisper_installer_lite"
-
-        # Copy model files and Silero VAD ONNX from source directory
-        # Whisper.net native DLLs come from NuGet (included in publish output)
-        Copy-Item -Path "VoiceLite/whisper/*" -Destination "VoiceLite/whisper_installer_lite/" -Force
-
-        echo "Copied Whisper files. Installer directory contents:"
-        Get-ChildItem "VoiceLite/whisper_installer_lite" | ForEach-Object {
-          $sizeInMB = [math]::Round($_.Length / 1MB, 2)
-          echo "  - $($_.Name) ($sizeInMB MB)"
-        }
-
-    - name: Copy Whisper models to publish directory
-      shell: pwsh
-      run: |
-        echo "Copying Whisper files from whisper_installer_lite/ to publish directory..."
+        # v2.0+ ships only the Silero VAD ONNX (~2.3MB) in the installer.
+        # The Parakeet v3 speech model (~640MB) downloads on first launch.
+        echo "Copying Silero VAD to publish directory..."
 
         $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
         New-Item -ItemType Directory -Force -Path $publishDir
 
-        # Copy model files and Silero VAD model to publish directory
-        Copy-Item -Path "VoiceLite/whisper_installer_lite/*" -Destination $publishDir -Force
+        Copy-Item -Path "VoiceLite/whisper/silero_vad_v5.onnx" -Destination $publishDir -Force
 
         echo "Copied files to publish directory:"
         Get-ChildItem $publishDir | ForEach-Object {
@@ -246,13 +220,18 @@ jobs:
 
           ---
 
+          ### What's New in v2.0
+
+          VoiceLite v2.0 swaps the speech engine to **NVIDIA Parakeet TDT 0.6B v3** via [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). Parakeet beats Whisper Large v3 on the [Open ASR Leaderboard](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) at 2–3× the CPU speed, supports 25 European languages, and physically cannot hallucinate "Thanks for watching!" on silence (transducer architecture).
+
+          Model is CC-BY-4.0 licensed — full attribution shipped in the `LICENSES/` folder.
+
           ### Download
-          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~190 MB)
-            - Includes Base model (78MB Q8_0 quantized) bundled
-            - VC++ Runtime bundled (25MB, auto-installs silently)
+          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~150 MB)
             - .NET 8 bundled (self-contained, no separate install needed)
-            - Download additional models from Settings after installation
-            - Works completely offline after setup
+            - VC++ Runtime bundled (25MB, auto-installs silently)
+            - Silero VAD model bundled (~2.3MB)
+            - **Parakeet v3 speech model downloads on first launch (~640MB)** — needs an internet connection at first run
 
           ### Installation Steps
           1. **Verify SHA256 hash** (see above) ⚠️
@@ -260,15 +239,15 @@ jobs:
           3. Right-click installer → Properties → **Unblock** (if shown)
           4. Run the installer - dependencies auto-install silently
           5. Accept EULA and complete installation
-          6. Launch VoiceLite - ready to use immediately!
-
-          **No manual downloads or restarts required** ✨
+          6. Launch VoiceLite — first-launch screen downloads the speech model (~640MB)
+          7. Once download completes, you're ready to dictate
 
           ### System Requirements
           - Windows 10/11 (64-bit)
-          - ~200 MB free disk space
+          - ~1 GB free disk space (installer + first-launch model download)
           - Microphone (built-in or USB)
-          - **All dependencies bundled** - VC++ Runtime and .NET 8 install automatically
+          - Internet connection for first launch (for model download); offline after that
+          - **All dependencies bundled** — VC++ Runtime and .NET 8 install automatically
 
           ### SHA256 Hashes
           ${{ steps.generate-hashes.outputs.HASHES }}
