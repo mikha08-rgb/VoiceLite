@@ -87,6 +87,9 @@ namespace VoiceLite
 
                 // Load Custom Shortcuts
                 LoadShortcuts();
+
+                // Load Custom Dictionary (Pro feature)
+                LoadCustomDictionary();
             }
             catch (Exception ex)
             {
@@ -131,10 +134,58 @@ namespace VoiceLite
             // Control AI Models tab visibility
             AIModelsTab.Visibility = proFeatureService.AIModelsTabVisibility;
 
+            // Custom Dictionary tab — Pro-only feature
+            CustomDictionaryTab.Visibility = proFeatureService.CustomDictionaryTabVisibility;
+
             // Future: Add more Pro feature visibility controls here
             // Example:
             // VoiceShortcutsTab.Visibility = proFeatureService.VoiceShortcutsTabVisibility;
             // ExportHistoryButton.Visibility = proFeatureService.ExportHistoryButtonVisibility;
+        }
+
+        private System.Collections.ObjectModel.ObservableCollection<Models.CustomDictionaryEntry>? customDictionaryView;
+
+        private void LoadCustomDictionary()
+        {
+            // DataGrid needs INotifyCollectionChanged for inline add/remove to work cleanly.
+            // We project the persisted List<T> into an ObservableCollection bound to the UI,
+            // then materialize it back to the List on save (see CommitCustomDictionaryToSettings).
+            customDictionaryView = new System.Collections.ObjectModel.ObservableCollection<Models.CustomDictionaryEntry>(settings.CustomDictionary);
+            CustomDictionaryGrid.ItemsSource = customDictionaryView;
+            customDictionaryView.CollectionChanged += (_, _) => UpdateDictionaryEntryCountText();
+            UpdateDictionaryEntryCountText();
+        }
+
+        private void CommitCustomDictionaryToSettings()
+        {
+            if (customDictionaryView == null) return;
+
+            // Strip rows with blank Spoken (DataGrid leaves a "new row" placeholder + users may
+            // add empty rows by accident). Trim whitespace so "  github  " behaves like "github".
+            settings.CustomDictionary = customDictionaryView
+                .Where(e => !string.IsNullOrWhiteSpace(e.Spoken))
+                .Select(e => new Models.CustomDictionaryEntry
+                {
+                    Spoken = e.Spoken.Trim(),
+                    Written = e.Written ?? string.Empty,
+                })
+                .ToList();
+        }
+
+        private void UpdateDictionaryEntryCountText()
+        {
+            if (DictionaryEntryCountText == null || customDictionaryView == null) return;
+            var count = customDictionaryView.Count(e => !string.IsNullOrWhiteSpace(e.Spoken));
+            DictionaryEntryCountText.Text = count == 1 ? "1 entry" : $"{count} entries";
+        }
+
+        private void RemoveDictionaryEntryButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (customDictionaryView == null) return;
+            if (CustomDictionaryGrid.SelectedItem is Models.CustomDictionaryEntry selected)
+            {
+                customDictionaryView.Remove(selected);
+            }
         }
 
         private void LoadTranscriptionPreset()
@@ -355,6 +406,9 @@ namespace VoiceLite
 
         private void SaveSettings()
         {
+            // Custom Dictionary — materialize the ObservableCollection back into the persisted List
+            CommitCustomDictionaryToSettings();
+
             // Recording Mode
             settings.Mode = (PushToTalkRadio.IsChecked == true) ? RecordMode.PushToTalk : RecordMode.Toggle;
 

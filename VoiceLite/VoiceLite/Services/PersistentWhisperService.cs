@@ -211,7 +211,8 @@ namespace VoiceLite.Services
                     {
                         finalResult = TextPostProcessor.Process(rawResult,
                             enablePunctuation: true,
-                            enableCapitalization: true);
+                            enableCapitalization: true,
+                            customDictionary: settings.CustomDictionary);
 
                         if (finalResult != rawResult)
                         {

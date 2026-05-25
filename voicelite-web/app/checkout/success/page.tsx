@@ -4,7 +4,7 @@ import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.2';
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.1.0';
 
 function SuccessContent() {
   const searchParams = useSearchParams();

@@ -5,7 +5,7 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.2';
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.1.0';
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -16,7 +16,7 @@ const jsonLd = {
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "2.0.2",
+  "softwareVersion": "2.1.0",
   "offers": [
     {
       "@type": "Offer",
@@ -515,7 +515,11 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  <strong>Early access</strong> to upcoming Pro features (Voice Shortcuts, Export History, Custom Dictionary, Advanced Settings)
+                  <strong>Custom Dictionary</strong> — add your own spoken→written replacements for accurate domain vocabulary
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Early access to upcoming Pro features (Voice Shortcuts, Export History, Advanced Settings)
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>

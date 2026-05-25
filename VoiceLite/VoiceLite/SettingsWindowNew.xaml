@@ -278,6 +278,66 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Custom Dictionary Tab (Pro feature) -->
+            <TabItem Header="Dictionary" Name="CustomDictionaryTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+                    <StackPanel>
+                        <TextBlock Text="Custom Dictionary"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="Gray"
+                                   Margin="0,0,0,15"
+                                   FontSize="12">
+                            <Run Text="Add your own spoken-phrase → written-form pairs. Applied to every transcription after VoiceLite's built-in developer dictionary, so your entries take precedence over the defaults."/>
+                            <LineBreak/>
+                            <Run Text="Examples: "/>
+                            <Run Text="medicare → Medicare,  egfr → eGFR,  copilot → GitHub Copilot™" FontStyle="Italic"/>
+                        </TextBlock>
+
+                        <DataGrid Name="CustomDictionaryGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="True"
+                                  CanUserDeleteRows="True"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  Background="White"
+                                  BorderBrush="#E0E0E0"
+                                  BorderThickness="1"
+                                  RowBackground="White"
+                                  AlternatingRowBackground="#FAFAFA"
+                                  MinHeight="200"
+                                  MaxHeight="380"
+                                  Margin="0,0,0,10">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Spoken phrase"
+                                                    Binding="{Binding Spoken, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="*"/>
+                                <DataGridTextColumn Header="Written form"
+                                                    Binding="{Binding Written, UpdateSourceTrigger=PropertyChanged}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                            <Button Name="RemoveDictionaryEntryButton"
+                                    Content="Remove selected"
+                                    Width="140"
+                                    Height="30"
+                                    Click="RemoveDictionaryEntryButton_Click"
+                                    Margin="0,0,10,0"/>
+                            <TextBlock Name="DictionaryEntryCountText"
+                                       Text=""
+                                       FontSize="11"
+                                       Foreground="Gray"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- License Tab -->
             <TabItem Header="License">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
@@ -352,24 +412,25 @@
                         <GroupBox Header="Pro Roadmap" Margin="0,0,0,15">
                             <StackPanel Margin="10">
                                 <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
-                                    <Run Text="Speech accuracy is now the same for all users (Parakeet v3, multilingual, ~640MB). Pro will return with new features:"/>
+                                    <Run Text="Speech accuracy is now the same for all users (Parakeet v3, multilingual, ~640MB). Pro adds productivity features:"/>
                                 </TextBlock>
                                 <StackPanel Margin="10,0,0,0">
                                     <TextBlock Margin="0,3,0,3">
-                                        <Run Text="•" FontWeight="Bold"/>
-                                        <Run Text=" Voice Shortcuts — trigger phrases that expand to longer text"/>
+                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
+                                        <Run Text=" Custom Dictionary — user-defined vocabulary corrections " FontWeight="SemiBold"/>
+                                        <Run Text="(available now in Settings → Dictionary)"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
                                         <Run Text="•" FontWeight="Bold"/>
-                                        <Run Text=" Export Transcription History (CSV / JSON / Markdown)"/>
+                                        <Run Text=" Voice Shortcuts — trigger phrases that expand to longer text (coming)"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
                                         <Run Text="•" FontWeight="Bold"/>
-                                        <Run Text=" Custom Dictionary — user-defined vocabulary corrections"/>
+                                        <Run Text=" Export Transcription History (CSV / JSON / Markdown) (coming)"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
                                         <Run Text="•" FontWeight="Bold"/>
-                                        <Run Text=" Advanced Settings — fine-tune the speech pipeline"/>
+                                        <Run Text=" Advanced Settings — fine-tune the speech pipeline (coming)"/>
                                     </TextBlock>
                                 </StackPanel>
 

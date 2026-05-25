@@ -117,6 +117,7 @@ namespace VoiceLite.Models
 
         public List<TranscriptionHistoryItem> TranscriptionHistory { get; set; } = new List<TranscriptionHistoryItem>();
         public List<CustomShortcut> CustomShortcuts { get; set; } = new List<CustomShortcut>();
+        public List<CustomDictionaryEntry> CustomDictionary { get; set; } = new List<CustomDictionaryEntry>();
 
         public string? LicenseKey { get; set; } = null;
         public bool IsProLicense { get; set; } = false;

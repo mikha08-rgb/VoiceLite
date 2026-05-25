@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using VoiceLite.Models;
 
 namespace VoiceLite.Services
 {
@@ -89,8 +91,13 @@ namespace VoiceLite.Services
         /// <param name="text">Raw transcription text</param>
         /// <param name="enablePunctuation">Whether to add punctuation</param>
         /// <param name="enableCapitalization">Whether to fix capitalization</param>
+        /// <param name="customDictionary">Optional Pro user dictionary (applied after the built-in dev-term dictionary)</param>
         /// <returns>Processed text with punctuation and capitalization</returns>
-        public static string Process(string text, bool enablePunctuation = true, bool enableCapitalization = true)
+        public static string Process(
+            string text,
+            bool enablePunctuation = true,
+            bool enableCapitalization = true,
+            IReadOnlyList<CustomDictionaryEntry>? customDictionary = null)
         {
             if (string.IsNullOrWhiteSpace(text))
                 return text;
@@ -103,11 +110,12 @@ namespace VoiceLite.Services
                 result = AddPunctuation(result);
             }
 
-            // Step 2: Fix capitalization
+            // Step 2: Fix capitalization + apply dev-term + Pro custom dict
             if (enableCapitalization)
             {
                 result = FixCapitalization(result);
                 result = ApplyDevTermDictionary(result);
+                result = ApplyCustomDictionary(result, customDictionary);
             }
 
             return result;
@@ -118,6 +126,58 @@ namespace VoiceLite.Services
             return DevTermRegex.Replace(text, match =>
                 DevTermDictionary.TryGetValue(match.Value, out var canonical)
                     ? canonical
+                    : match.Value);
+        }
+
+        // Per-entries-instance cache: the compiled regex + lookup map are rebuilt only when
+        // the user mutates their dictionary (Settings replaces the List<T> reference on edit).
+        // ConditionalWeakTable lets the cache entries get GC'd if the list is replaced and
+        // the old reference is no longer held anywhere.
+        private static readonly ConditionalWeakTable<IReadOnlyList<CustomDictionaryEntry>, CustomDictionaryCache> CustomDictCache = new();
+
+        private sealed class CustomDictionaryCache
+        {
+            public Regex Regex { get; }
+            public Dictionary<string, string> Lookup { get; }
+
+            public CustomDictionaryCache(IReadOnlyList<CustomDictionaryEntry> entries)
+            {
+                // De-dupe by Spoken (case-insensitive); last write wins. Skip empty keys.
+                Lookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in entries)
+                {
+                    if (string.IsNullOrWhiteSpace(entry.Spoken)) continue;
+                    Lookup[entry.Spoken.Trim()] = entry.Written ?? string.Empty;
+                }
+
+                // Mirror DevTermRegex: word-boundary + length-desc sort for greedy match.
+                Regex = new Regex(
+                    @"(?<![A-Za-z0-9_])(" +
+                    string.Join("|",
+                        Lookup.Keys
+                            .OrderByDescending(t => t.Length)
+                            .Select(Regex.Escape)) +
+                    @")(?![A-Za-z0-9_])",
+                    RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            }
+        }
+
+        private static string ApplyCustomDictionary(string text, IReadOnlyList<CustomDictionaryEntry>? entries)
+        {
+            // Hot path for Free users (no Pro dictionary) — zero regex construction cost.
+            if (entries == null || entries.Count == 0)
+                return text;
+
+            // Build cache once per list-reference; subsequent calls hit the cached compiled regex.
+            var cache = CustomDictCache.GetValue(entries, key => new CustomDictionaryCache(key));
+
+            // Empty dictionary after de-dupe (e.g., all entries had blank Spoken keys) — skip.
+            if (cache.Lookup.Count == 0)
+                return text;
+
+            return cache.Regex.Replace(text, match =>
+                cache.Lookup.TryGetValue(match.Value, out var written)
+                    ? written
                     : match.Value);
         }
 
