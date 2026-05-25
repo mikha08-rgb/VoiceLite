@@ -102,12 +102,18 @@ jobs:
       run: |
         # v2.0+ ships only the Silero VAD ONNX (~2.3MB) in the installer.
         # The Parakeet v3 speech model (~640MB) downloads on first launch.
+        $sileroSrc = "VoiceLite/whisper/silero_vad_v5.onnx"
+        if (-not (Test-Path $sileroSrc)) {
+          Write-Host "ERROR: $sileroSrc not found — installer would ship without VAD" -ForegroundColor Red
+          exit 1
+        }
+
         echo "Copying Silero VAD to publish directory..."
 
         $publishDir = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/whisper"
         New-Item -ItemType Directory -Force -Path $publishDir
 
-        Copy-Item -Path "VoiceLite/whisper/silero_vad_v5.onnx" -Destination $publishDir -Force
+        Copy-Item -Path $sileroSrc -Destination $publishDir -Force
 
         echo "Copied files to publish directory:"
         Get-ChildItem $publishDir | ForEach-Object {

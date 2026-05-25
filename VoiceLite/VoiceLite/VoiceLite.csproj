@@ -9,9 +9,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>VoiceLite.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <Version>2.0.1</Version>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
     <RollForward>LatestMinor</RollForward>
 
     <!-- Rich metadata helps antivirus trust (visible in file properties) -->
@@ -19,7 +19,7 @@
     <Product>VoiceLite</Product>
     <Copyright>Copyright © 2025 VoiceLite Software</Copyright>
     <AssemblyTitle>VoiceLite - Speech to Text</AssemblyTitle>
-    <Description>Professional speech-to-text dictation software using OpenAI Whisper AI. Converts your voice to text with global hotkeys and automatic insertion.</Description>
+    <Description>Professional speech-to-text dictation software using NVIDIA Parakeet TDT 0.6B v3 via Sherpa-ONNX. Converts your voice to text with global hotkeys and automatic insertion.</Description>
     <NeutralLanguage>en-US</NeutralLanguage>
     <Authors>VoiceLite Software</Authors>
     <PackageProjectUrl>https://voicelite.app</PackageProjectUrl>

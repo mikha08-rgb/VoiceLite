@@ -4,6 +4,11 @@ Model: parakeet-tdt-0.6b-v3
 Copyright (c) NVIDIA Corporation. All rights reserved.
 License: Creative Commons Attribution 4.0 International (CC-BY-4.0)
 Source: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+License URL: https://creativecommons.org/licenses/by/4.0/legalcode
 
 This model is redistributed unmodified, under the terms of CC-BY-4.0.
 The full license text is provided in CC-BY-4.0.txt (in this directory).
+
+NO WARRANTY. The model is provided AS-IS, without warranty of any kind.
+See CC-BY-4.0.txt §§ 5 and 6 for the full disclaimer of warranties and
+limitation of liability.

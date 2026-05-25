@@ -40,25 +40,22 @@ VoiceLite retains all rights, title, and interest in and to the Software, includ
 
 4. SUBSCRIPTION TIERS AND PRICING
 
-VoiceLite offers two subscription tiers:
+VoiceLite offers two subscription tiers. As of v2.0, speech recognition accuracy is the same for all users (NVIDIA Parakeet TDT 0.6B v3 model, multilingual, downloaded on first launch). Pro tier features are being redesigned and will return as a set of productivity additions (Voice Shortcuts, Export History, Custom Dictionary, Advanced Settings).
 
-a) FREE TIER (Limited-Time Promotion):
-   - Includes Pro AI model (466MB, ~90-93% accuracy) as a temporary growth promotion
-   - Lite model (75MB, ~80-85% accuracy) available as legacy fallback
-   - Full offline functionality
+a) FREE TIER:
+   - NVIDIA Parakeet TDT 0.6B v3 speech engine (~640MB, downloaded on first launch)
+   - Full offline functionality after first-launch model download
    - No usage caps or time limits
    - No license validation required
-   - All core features (hotkeys, text injection, settings)
-   - Note: Pro model may revert to paid tier in future updates
+   - All core features (hotkeys, text injection, settings, transcription history)
 
 b) PRO TIER:
    - Subscription Options:
      * $20 USD per 3 months (quarterly subscription)
      * $99 USD lifetime (one-time payment, permanent access)
-   - Unlocks premium AI models (Swift 142MB, Elite 1.5GB, Ultra 2.9GB)
-   - Accuracy improvements (93-97% with premium models)
+   - Pro tier features are under redesign. Existing licenses are preserved and will automatically unlock new Pro features as they ship (no re-purchase required).
    - Device limit: 3 simultaneous activations per license
-   - Priority support and early access to new features
+   - Priority support
    - Managed via cryptographically signed licenses (Ed25519)
    - Requires one-time online activation per device
 
@@ -89,8 +86,7 @@ d) ANALYTICS DATA (Opt-In Only):
    - Anonymous User ID: SHA-256 hash of (Machine ID + Timestamp) - irreversible, no PII
    - Events tracked (if you opt in):
      * APP_LAUNCHED: App starts (tier, version, OS version)
-     * TRANSCRIPTION_COMPLETED: Aggregated daily counts (total words, model used, no content)
-     * MODEL_CHANGED: Model switches (old model → new model)
+     * TRANSCRIPTION_COMPLETED: Aggregated daily counts (total words, no content)
      * SETTINGS_CHANGED: Setting name only (no values)
      * ERROR_OCCURRED: Error types for debugging (no stack traces, no file paths)
      * PRO_UPGRADE: Pro tier activation events
@@ -113,11 +109,11 @@ For full privacy details, see our Privacy Policy at: https://voicelite.app/priva
 
 6. INTERNET CONNECTION
 
-- FREE TIER: No internet connection required (100% offline operation)
-- PRO TIER: Internet required only for:
+- FIRST LAUNCH (all users): Internet connection required to download the speech model (~640MB). After download completes, VoiceLite operates fully offline.
+- ONGOING USE (Free Tier): No internet connection required.
+- ONGOING USE (Pro Tier): Internet required only for:
   * Initial license activation (one-time per device)
   * License validation checks (periodic, with 7-day grace period)
-  * Downloading premium AI models
   * Optional analytics event submission (if opted in)
 
 Once activated, Pro tier operates offline with a 7-day grace period before re-validation.
@@ -133,10 +129,6 @@ b) LIFETIME LICENSES ($99 one-time):
    - 30-day money-back guarantee from purchase date
    - No refunds after 30 days or if license has been activated on 3+ devices
    - Refunds processed via original payment method within 7 business days
-
-c) PRO MODEL PROMOTION (Free Tier):
-   - No refunds applicable (free service)
-   - VoiceLite reserves the right to change free tier model in future updates
 
 To request a refund, contact: contact@voicelite.app with your license key and reason.
 
@@ -256,7 +248,7 @@ This EULA constitutes the entire agreement between you and VoiceLite regarding t
 
 MIT LICENSE (for VoiceLite source code)
 
-Copyright (c) 2025 VoiceLite
+Copyright (c) 2025 VoiceLite Software
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

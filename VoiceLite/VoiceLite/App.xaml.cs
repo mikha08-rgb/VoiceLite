@@ -63,6 +63,9 @@ namespace VoiceLite
             {
                 var handle = NativeLibrary.Load("sherpa-onnx-c-api", typeof(App).Assembly, null);
                 NativeLibrary.Free(handle);
+                // Log success so post-pilot telemetry can correlate probe-pass with
+                // first-transcription failures (i.e. detect false negatives).
+                ErrorLogger.LogMessage("Sherpa-ONNX native library loaded — VC++ runtime OK");
                 return true;
             }
             catch (DllNotFoundException ex)
