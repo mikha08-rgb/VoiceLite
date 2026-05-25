@@ -51,6 +51,38 @@ namespace VoiceLite.Services
             "windows", "linux", "macos", "android", "ios"
         };
 
+        // Canonical casing for terms users frequently dictate. Applied AFTER FixCapitalization
+        // to override the default "first letter only" cap with the right brand-style casing.
+        // Necessary because Parakeet's transducer architecture has no equivalent of Whisper's
+        // initial-prompt vocab biasing — terms like "GitHub" land as "github" without this.
+        private static readonly Dictionary<string, string> DevTermDictionary = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "github", "GitHub" },
+            { "javascript", "JavaScript" },
+            { "typescript", "TypeScript" },
+            { "python", "Python" },
+            { "voicelite", "VoiceLite" },
+            { ".net", ".NET" },
+            { "node.js", "Node.js" },
+            { "api", "API" },
+            { "json", "JSON" },
+            { "sql", "SQL" },
+            { "react", "React" },
+            { "c sharp", "C#" },
+        };
+
+        // Negative lookbehind/lookahead for word chars handles dotted terms like ".net"
+        // and multi-word terms like "c sharp" cleanly. Sort by length descending so that
+        // longer alternatives match before shorter overlapping ones.
+        private static readonly Regex DevTermRegex = new Regex(
+            @"(?<![A-Za-z0-9_])(" +
+            string.Join("|",
+                DevTermDictionary.Keys
+                    .OrderByDescending(t => t.Length)
+                    .Select(Regex.Escape)) +
+            @")(?![A-Za-z0-9_])",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>
         /// Processes transcription text to add punctuation and capitalization.
         /// </summary>
@@ -75,9 +107,18 @@ namespace VoiceLite.Services
             if (enableCapitalization)
             {
                 result = FixCapitalization(result);
+                result = ApplyDevTermDictionary(result);
             }
 
             return result;
+        }
+
+        private static string ApplyDevTermDictionary(string text)
+        {
+            return DevTermRegex.Replace(text, match =>
+                DevTermDictionary.TryGetValue(match.Value, out var canonical)
+                    ? canonical
+                    : match.Value);
         }
 
         /// <summary>

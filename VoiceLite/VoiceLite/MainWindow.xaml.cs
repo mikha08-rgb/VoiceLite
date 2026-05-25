@@ -33,6 +33,7 @@ namespace VoiceLite
         private TranscriptionHistoryService? historyService;
         private CustomShortcutService? customShortcutService;
         private ProFeatureService? proFeatureService;
+        private LicenseService? licenseService;
         private Services.Audio.SileroVadService? vadService;
         // SoundService removed per user request - no audio feedback
 
@@ -499,6 +500,10 @@ namespace VoiceLite
                 // Initialize Pro feature service (for license validation)
                 // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
                 proFeatureService = new ProFeatureService(settings);
+
+                // LicenseService backs the DPAPI tamper check in ValidateWhisperModel.
+                // Static HttpClient pattern means no MainWindow-level disposal needed (lives for process lifetime).
+                licenseService = new LicenseService();
 
                 // Initialize ASR service (in-process via Sherpa-ONNX + Parakeet v3)
                 whisperService = new PersistentWhisperService(settings, null, proFeatureService);

@@ -48,13 +48,47 @@ namespace VoiceLite.Tests.Services
         }
 
         [Theory]
-        [InlineData("i use github every day", "Github")]
+        [InlineData("i use github every day", "GitHub")]
         [InlineData("running python tests", "Python")]
         [InlineData("on windows ten", "Windows")]
         public void Process_CapitalizesTechProperNouns(string input, string expected)
         {
             var result = TextPostProcessor.Process(input);
             result.Should().Contain(expected);
+        }
+
+        // Dev-term dictionary tests — canonical casing for terms Parakeet won't get
+        // right out of the box (it has no initial-prompt vocab biasing like Whisper).
+
+        [Theory]
+        [InlineData("i love javascript", "JavaScript")]
+        [InlineData("write typescript code", "TypeScript")]
+        [InlineData("the api returns json", "API")]
+        [InlineData("the api returns json", "JSON")]
+        [InlineData("run sql queries", "SQL")]
+        [InlineData("voicelite is great", "VoiceLite")]
+        [InlineData("we use .net for the desktop", ".NET")]
+        [InlineData("node.js powers the backend", "Node.js")]
+        public void Process_AppliesCanonicalDevTermCasing(string input, string expected)
+        {
+            var result = TextPostProcessor.Process(input);
+            result.Should().Contain(expected);
+        }
+
+        [Fact]
+        public void Process_DevTermsAreCaseInsensitiveOnInput()
+        {
+            TextPostProcessor.Process("use GITHUB daily").Should().Contain("GitHub");
+            TextPostProcessor.Process("use GitHub daily").Should().Contain("GitHub");
+            TextPostProcessor.Process("use github daily").Should().Contain("GitHub");
+        }
+
+        [Fact]
+        public void Process_DevTermsRespectWordBoundaries()
+        {
+            // "github" inside a longer word ("githubactions") should NOT be replaced.
+            var result = TextPostProcessor.Process("we use githubactions for CI");
+            result.Should().NotContain("GitHubactions");
         }
 
         [Fact]

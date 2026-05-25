@@ -200,17 +200,8 @@ namespace VoiceLite
                     : Visibility.Collapsed;
             }
 
-            // Show base model warning for non-English languages
-            // HIGH-7 FIX: Add null check for WhisperModel to prevent NullReferenceException
-            if (BaseModelWarningText != null)
-            {
-                bool isSmallModel = settings.WhisperModel?.Equals("ggml-base.bin", StringComparison.OrdinalIgnoreCase) == true ||
-                                   settings.WhisperModel?.Equals("ggml-tiny.bin", StringComparison.OrdinalIgnoreCase) == true;
-                bool isNonEnglish = languageCode != "en" && languageCode != "auto";
-                BaseModelWarningText.Visibility = (isSmallModel && isNonEnglish)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
+            // Parakeet v3 is multilingual by design — the old "use a bigger Whisper model
+            // for non-English" warning is no longer relevant and was removed from XAML.
         }
 
         private void UpdatePresetDescription(TranscriptionPreset preset)

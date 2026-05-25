@@ -6,12 +6,12 @@
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="600">
     <StackPanel>
-        <TextBlock Text="Select your AI model:"
+        <TextBlock Text="Speech Recognition Engine"
                    FontSize="14"
                    FontWeight="SemiBold"
                    Margin="0,0,0,15"/>
 
-        <TextBlock Text="Larger models offer better accuracy but require more RAM and take longer to process."
+        <TextBlock Text="Parakeet v3 is the in-process ASR engine. The model is downloaded on first launch and stored locally — nothing leaves your device during transcription."
                    TextWrapping="Wrap"
                    Foreground="Gray"
                    FontSize="11"
