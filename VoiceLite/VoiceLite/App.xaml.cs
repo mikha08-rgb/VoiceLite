@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +25,18 @@ namespace VoiceLite
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+            // VC++ runtime probe: Sherpa-ONNX native DLLs link against vcruntime140 /
+            // msvcp140. The installer bundles vc_redist.x64.exe and auto-runs it, but
+            // antivirus, portable installs, or a manually-killed bootstrapper can leave
+            // the user without it. Probe BEFORE the model download UI so we don't make
+            // them sit through a 640MB download only to fail on first transcription.
+            if (!IsSherpaNativeLoadable())
+            {
+                ShowVCRuntimeMissingDialog();
+                Shutdown(1);
+                return;
+            }
+
             // First-launch gate: Parakeet model isn't bundled in the installer (~640MB
             // would balloon the .exe). Block MainWindow until the user downloads it.
             // ModelResolverService throws FileNotFoundException without this gate.
@@ -41,6 +55,67 @@ namespace VoiceLite
 
             var mainWindow = new MainWindow();
             mainWindow.Show();
+        }
+
+        private static bool IsSherpaNativeLoadable()
+        {
+            try
+            {
+                var handle = NativeLibrary.Load("sherpa-onnx-c-api", typeof(App).Assembly, null);
+                NativeLibrary.Free(handle);
+                return true;
+            }
+            catch (DllNotFoundException ex)
+            {
+                ErrorLogger.LogError("Sherpa-ONNX native DLL load failed — VC++ runtime likely missing", ex);
+                return false;
+            }
+            catch (BadImageFormatException ex)
+            {
+                ErrorLogger.LogError("Sherpa-ONNX native DLL load failed — bad image (32/64-bit mismatch or VC++ ABI mismatch)", ex);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected — log but don't block startup. Could be AV interference.
+                ErrorLogger.LogError("Sherpa-ONNX native DLL probe threw unexpected exception (continuing startup)", ex);
+                return true;
+            }
+        }
+
+        private static void ShowVCRuntimeMissingDialog()
+        {
+            const string vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe";
+
+            var result = MessageBox.Show(
+                "VoiceLite couldn't load its speech engine.\n\n" +
+                "This usually means the Microsoft Visual C++ Redistributable (x64) " +
+                "isn't installed, or was blocked by antivirus during VoiceLite setup.\n\n" +
+                "Click OK to open the Microsoft download page. Install the redistributable, " +
+                "then relaunch VoiceLite.",
+                "VoiceLite — Missing Visual C++ Runtime",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Error);
+
+            if (result != MessageBoxResult.OK) return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = vcRedistUrl,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to open VC++ redistributable download page", ex);
+                MessageBox.Show(
+                    $"Couldn't open the browser automatically. Please visit:\n\n{vcRedistUrl}",
+                    "VoiceLite",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
         }
 
         private static bool IsParakeetModelInstalled()
