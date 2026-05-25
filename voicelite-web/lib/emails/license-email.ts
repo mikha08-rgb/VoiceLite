@@ -97,12 +97,15 @@ export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData):
     <div style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 20px; margin: 25px 0; border-radius: 8px;">
       <h3 style="margin-top: 0; color: #1f2937; font-size: 18px;">✨ What's Included:</h3>
       <ul style="color: #4b5563; padding-left: 20px; margin: 10px 0; list-style: none;">
-        <li style="margin: 8px 0;">✓ <strong>All 6 AI models</strong> (Tiny, Swift, Pro, Elite, Turbo, Ultra)</li>
-        <li style="margin: 8px 0;">✓ <strong>90-98% accuracy</strong> (vs 80-85% free tier)</li>
-        <li style="margin: 8px 0;">✓ <strong>Lifetime updates</strong></li>
+        <li style="margin: 8px 0;">✓ <strong>Early access</strong> to upcoming Pro features (Voice Shortcuts, Export History, Custom Dictionary, Advanced Settings)</li>
+        <li style="margin: 8px 0;">✓ <strong>Lifetime updates</strong> — your license auto-unlocks new Pro features as they ship</li>
         <li style="margin: 8px 0;">✓ <strong>Commercial use allowed</strong></li>
         <li style="margin: 8px 0;">✓ <strong>Priority email support</strong></li>
+        <li style="margin: 8px 0;">✓ Supports continued VoiceLite development</li>
       </ul>
+      <p style="color: #6b7280; font-size: 13px; margin: 10px 0 0 0;">
+        Note: As of v2.0, speech recognition accuracy is identical for Free and Pro tiers (NVIDIA Parakeet v3). Pro features are being redesigned — your license is preserved.
+      </p>
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
@@ -149,11 +152,13 @@ How to Activate:
 4. Click "Activate"
 
 What's Included:
-✓ All 6 AI models (Tiny, Swift, Pro, Elite, Turbo, Ultra)
-✓ 90-98% accuracy (vs 80-85% free tier)
-✓ Lifetime updates
+✓ Early access to upcoming Pro features (Voice Shortcuts, Export History, Custom Dictionary, Advanced Settings)
+✓ Lifetime updates — your license auto-unlocks new Pro features as they ship
 ✓ Commercial use allowed
 ✓ Priority email support
+✓ Supports continued VoiceLite development
+
+Note: As of v2.0, speech recognition accuracy is identical for Free and Pro tiers (NVIDIA Parakeet v3). Pro features are being redesigned — your license is preserved.
 
 Download latest version:
 https://github.com/mikha08-rgb/VoiceLite/releases/latest

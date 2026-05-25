@@ -18,13 +18,15 @@ const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
 
 export const metadata: Metadata = {
   title: "VoiceLite - Instant Offline Voice Typing for Windows | Privacy-First Speech-to-Text",
-  description: "Turn your voice into text instantly in ANY Windows app. 100% offline speech-to-text with OpenAI Whisper AI. Global hotkey, <200ms latency. No internet required, your voice never leaves your PC.",
+  description: "Turn your voice into text instantly in ANY Windows app. 100% offline speech-to-text powered by NVIDIA Parakeet TDT 0.6B v3. Global hotkey, <200ms latency. No internet required, your voice never leaves your PC.",
   keywords: [
     "voice typing",
     "speech to text",
     "Windows voice typing",
     "offline transcription",
-    "Whisper AI",
+    "Parakeet TDT",
+    "NVIDIA NeMo",
+    "Sherpa-ONNX",
     "voice recognition",
     "privacy speech to text",
     "offline voice typing",
@@ -39,7 +41,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://voicelite.app"),
   openGraph: {
     title: "VoiceLite - Instant Offline Voice Typing for Windows",
-    description: "Turn your voice into text instantly in ANY Windows app. 100% offline with OpenAI Whisper AI. No internet required. <200ms latency. Your voice never leaves your PC.",
+    description: "Turn your voice into text instantly in ANY Windows app. 100% offline with NVIDIA Parakeet TDT 0.6B v3. No internet required after first launch. <200ms latency. Your voice never leaves your PC.",
     type: "website",
     locale: "en_US",
     url: "https://voicelite.app",

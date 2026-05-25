@@ -130,7 +130,11 @@ export default function TermsOfService() {
               trademarks without prior written permission.
             </p>
             <p className="text-gray-700">
-              VoiceLite uses OpenAI's Whisper models, which are licensed under the MIT License.
+              VoiceLite v2.0+ uses NVIDIA's Parakeet TDT 0.6B v3 speech recognition model, which is licensed under the{' '}
+              <a href="https://creativecommons.org/licenses/by/4.0/" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+                Creative Commons Attribution 4.0 International (CC-BY-4.0)
+              </a>{' '}
+              license. The model is redistributed unmodified, with full attribution shipped in the application's LICENSES folder.
             </p>
           </section>
 

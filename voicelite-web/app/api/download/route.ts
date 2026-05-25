@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Validate version format: must be X.X.X.X (e.g., 1.2.0.1)
-const VERSION_REGEX = /^\d+\.\d+\.\d+\.\d+$/;
+// Validate version format: must be X.X.X or X.X.X.X (e.g., 2.0.1 or 1.2.0.1)
+// v2.0+ uses 3-part versions for the user-facing tag; pre-v2 used 4-part.
+const VERSION_REGEX = /^\d+\.\d+\.\d+(\.\d+)?$/;
 const MAX_VERSION_LENGTH = 20;
-const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.4.0.0';
+const DEFAULT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.1';
 
 // Mask IP for privacy (show first octet only)
 function maskIp(ip: string): string {

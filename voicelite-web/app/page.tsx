@@ -5,18 +5,18 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '1.4.0.0';
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.1';
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "VoiceLite",
-  "description": "Windows speech-to-text app. 100% offline voice recognition with OpenAI Whisper AI. Fast, accurate, privacy-focused.",
+  "description": "Windows speech-to-text app. 100% offline voice recognition powered by NVIDIA Parakeet TDT 0.6B v3 via Sherpa-ONNX. Fast, accurate, privacy-focused.",
   "operatingSystem": "Windows 10, Windows 11",
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "1.4.0",
+  "softwareVersion": "2.0.1",
   "offers": [
     {
       "@type": "Offer",
@@ -34,10 +34,10 @@ const jsonLd = {
   "softwareRequirements": "Windows 10 or later, 4GB RAM minimum",
   "featureList": [
     "100% offline speech-to-text",
-    "OpenAI Whisper AI models",
+    "NVIDIA Parakeet TDT 0.6B v3 (multilingual, CC-BY-4.0)",
     "Global hotkey works in any app",
     "Sub-200ms latency",
-    "99 languages supported",
+    "25 European languages supported",
     "Privacy-focused - voice never leaves device"
   ],
   "author": {
@@ -72,7 +72,7 @@ const faqJsonLd = {
       "name": "How accurate is VoiceLite with technical terms?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "VoiceLite recognizes technical terms like useState, npm, git, Docker with 90-93% accuracy (Pro model). It handles code, jargon, and specialized vocabulary."
+        "text": "VoiceLite ships a built-in developer dictionary that auto-corrects common terms (GitHub, JavaScript, TypeScript, Python, Node.js, API, JSON, SQL, React, C#). The underlying Parakeet v3 model handles general technical vocabulary, code, and jargon at state-of-the-art accuracy."
       }
     },
     {
@@ -390,70 +390,56 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Model Comparison */}
+      {/* Speech Engine */}
       <section className="border-t border-stone-200 bg-stone-50 px-6 py-24 dark:border-stone-800 dark:bg-stone-900/50 md:py-32">
-        <div className="container mx-auto max-w-7xl space-y-16">
+        <div className="container mx-auto max-w-5xl space-y-12">
           <div className="space-y-4 text-center">
-            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Choose Your AI Model</h2>
-            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">All 5 models included with your purchase</p>
+            <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Powered by Parakeet v3</h2>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">
+              NVIDIA&apos;s state-of-the-art multilingual speech model, running locally on your CPU.
+            </p>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-md dark:bg-stone-900">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-800/50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Model</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Size</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Accuracy</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Speed</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">Best For</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-stone-200 dark:border-stone-800">
-                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Tiny</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">75MB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">80-85%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">1.5s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Quick notes, fast drafts</td>
-                </tr>
-                <tr className="border-b border-stone-200 dark:border-stone-800">
-                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Swift</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">142MB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">85-88%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.0s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Emails, chat messages</td>
-                </tr>
-                <tr className="border-b border-stone-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-stone-800 dark:from-blue-950/30 dark:to-indigo-950/30">
-                  <td className="px-6 py-4 font-semibold text-stone-900 dark:text-stone-50">Pro ⭐ (Recommended)</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">466MB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">90-93%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.5s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Code, technical writing</td>
-                </tr>
-                <tr className="border-b border-stone-200 dark:border-stone-800">
-                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Elite</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">1.5GB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">93-96%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">4.0s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Articles, reports</td>
-                </tr>
-                <tr className="border-b border-stone-200 dark:border-stone-800">
-                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Turbo</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">874MB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">97-99%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">3.0s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Near-Ultra accuracy, 3x faster</td>
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 text-stone-900 dark:text-stone-50">Ultra</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">2.9GB</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">96-98%</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">6.0s</td>
-                  <td className="px-6 py-4 text-stone-600 dark:text-stone-400">Professional content</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-2xl bg-white p-10 shadow-md dark:bg-stone-900">
+            <div className="grid gap-8 md:grid-cols-2">
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold text-stone-900 dark:text-stone-50">NVIDIA Parakeet TDT 0.6B v3</h3>
+                <p className="text-stone-600 dark:text-stone-400">
+                  Beats Whisper Large v3 on the HuggingFace Open ASR Leaderboard at 2–3× the CPU speed.
+                  Transducer architecture means it physically can&apos;t hallucinate &ldquo;Thanks for watching&rdquo; on silence.
+                </p>
+                <p className="text-sm text-stone-500 dark:text-stone-500">
+                  Model size: ~640MB (downloaded automatically on first launch). Licensed under{' '}
+                  <a
+                    href="https://creativecommons.org/licenses/by/4.0/"
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    CC-BY-4.0
+                  </a>{' '}
+                  — full attribution shipped in the installer.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-600 dark:text-green-400">✓</span>
+                  <span className="text-stone-700 dark:text-stone-300">25 European languages out of the box</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-600 dark:text-green-400">✓</span>
+                  <span className="text-stone-700 dark:text-stone-300">~6.3% average WER (lower is better)</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-600 dark:text-green-400">✓</span>
+                  <span className="text-stone-700 dark:text-stone-300">CPU-only — no GPU required, no cloud calls</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-600 dark:text-green-400">✓</span>
+                  <span className="text-stone-700 dark:text-stone-300">Identical accuracy on Free and Pro tiers</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -463,7 +449,7 @@ export default function HomePage() {
         <div className="container mx-auto max-w-7xl space-y-16">
           <div className="space-y-4 text-center">
             <h2 className="text-4xl font-bold text-stone-900 dark:text-stone-50 md:text-5xl">Simple, Honest Pricing</h2>
-            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Try free with Tiny model. Upgrade to Pro for best accuracy.</p>
+            <p className="mx-auto max-w-2xl text-xl text-stone-600 dark:text-stone-400">Same speech engine for everyone. Pro tier supports continued development and unlocks Pro features as they ship.</p>
           </div>
 
           <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-2">
@@ -482,7 +468,7 @@ export default function HomePage() {
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  Tiny model (80-85% accuracy)
+                  Full Parakeet v3 engine (multilingual)
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
@@ -525,27 +511,27 @@ export default function HomePage() {
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  <strong>All 4 Pro models</strong> (Small/Base/Medium/Large)
+                  Everything in Free, plus:
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  90-98% accuracy (vs 80-85% free)
+                  <strong>Early access</strong> to upcoming Pro features (Voice Shortcuts, Export History, Custom Dictionary, Advanced Settings)
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  Lifetime updates
+                  Lifetime updates — license auto-unlocks new Pro features as they ship
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  100% offline & private
-                </li>
-                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
-                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
-                  Unlimited usage
+                  Priority support
                 </li>
                 <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
                   <span className="text-lg text-green-600 dark:text-green-400">✓</span>
                   Commercial use allowed
+                </li>
+                <li className="flex items-center gap-3 text-stone-700 dark:text-stone-300">
+                  <span className="text-lg text-green-600 dark:text-green-400">✓</span>
+                  Support continued development
                 </li>
               </ul>
 
@@ -593,7 +579,7 @@ export default function HomePage() {
               },
               {
                 q: 'How accurate is VoiceLite with technical terms?',
-                a: 'VoiceLite recognizes technical terms like useState, npm, git, Docker with 90-93% accuracy (Pro model). It handles code, jargon, and specialized vocabulary.',
+                a: 'VoiceLite ships a built-in developer dictionary that auto-corrects common terms (GitHub, JavaScript, TypeScript, Python, Node.js, API, JSON, SQL, React, C#). The underlying Parakeet v3 model handles general technical vocabulary, code, and jargon at state-of-the-art accuracy.',
               },
               {
                 q: 'Can I use VoiceLite for coding?',
@@ -646,7 +632,7 @@ export default function HomePage() {
             Get VoiceLite Pro - $20
           </a>
           <p className="text-sm opacity-75">
-            Windows 10/11 • 98MB • 2-minute setup
+            Windows 10/11 • ~83MB installer + 640MB first-launch model download
             <br />
             30-day money-back guarantee • Try free tier first
           </p>
