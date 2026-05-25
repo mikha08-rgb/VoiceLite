@@ -307,9 +307,9 @@
                                                    TextWrapping="Wrap"
                                                    Foreground="#1E3A8A"
                                                    FontSize="12">
-                                            <Run Text="Free tier includes the Tiny model (80-85% accuracy)."/>
+                                            <Run Text="VoiceLite v2.0 includes the NVIDIA Parakeet TDT 0.6B v3 speech engine — SOTA accuracy for all users, free or Pro."/>
                                             <LineBreak/>
-                                            <Run Text="Upgrade to Pro to unlock all 5 AI models (90-98% accuracy) and in-app model downloads."/>
+                                            <Run Text="Pro tier features are being redesigned. Your existing license is preserved and will unlock new Pro features as they ship."/>
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
@@ -348,30 +348,28 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <!-- Pro Features Info -->
-                        <GroupBox Header="Pro Features" Margin="0,0,0,15">
+                        <!-- Pro Roadmap -->
+                        <GroupBox Header="Pro Roadmap" Margin="0,0,0,15">
                             <StackPanel Margin="10">
-                                <TextBlock Text="Unlock with Pro license:" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                                    <Run Text="Speech accuracy is now the same for all users (Parakeet v3, multilingual, ~640MB). Pro will return with new features:"/>
+                                </TextBlock>
                                 <StackPanel Margin="10,0,0,0">
                                     <TextBlock Margin="0,3,0,3">
-                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
-                                        <Run Text=" All 5 AI models (Tiny, Swift, Pro, Elite, Ultra)"/>
+                                        <Run Text="•" FontWeight="Bold"/>
+                                        <Run Text=" Voice Shortcuts — trigger phrases that expand to longer text"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
-                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
-                                        <Run Text=" 90-98% accuracy (vs 80-85% free)"/>
+                                        <Run Text="•" FontWeight="Bold"/>
+                                        <Run Text=" Export Transcription History (CSV / JSON / Markdown)"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
-                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
-                                        <Run Text=" Lifetime updates"/>
+                                        <Run Text="•" FontWeight="Bold"/>
+                                        <Run Text=" Custom Dictionary — user-defined vocabulary corrections"/>
                                     </TextBlock>
                                     <TextBlock Margin="0,3,0,3">
-                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
-                                        <Run Text=" Commercial use allowed"/>
-                                    </TextBlock>
-                                    <TextBlock Margin="0,3,0,3">
-                                        <Run Text="✓" Foreground="Green" FontWeight="Bold"/>
-                                        <Run Text=" Priority support"/>
+                                        <Run Text="•" FontWeight="Bold"/>
+                                        <Run Text=" Advanced Settings — fine-tune the speech pipeline"/>
                                     </TextBlock>
                                 </StackPanel>
 
@@ -382,15 +380,15 @@
                                         Padding="12"
                                         Margin="0,15,0,0">
                                     <StackPanel>
-                                        <TextBlock Text="Don't have a license yet?"
+                                        <TextBlock Text="Existing Pro customers:"
                                                    FontWeight="SemiBold"
                                                    Margin="0,0,0,5"/>
                                         <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
-                                            <Run Text="Get VoiceLite Pro for just $20 (one-time payment, no subscription)."/>
+                                            <Run Text="Your license is preserved. You'll automatically unlock the features above as they ship — no re-purchase required."/>
                                         </TextBlock>
                                         <Button Name="BuyProButton"
-                                                Content="Buy Pro License - $20"
-                                                Width="180"
+                                                Content="View pricing on voicelite.app"
+                                                Width="220"
                                                 Height="32"
                                                 Background="#2563EB"
                                                 Foreground="White"
