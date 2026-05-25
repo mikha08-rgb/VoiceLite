@@ -15,7 +15,7 @@ if (!(Test-Path $csprojPath)) {
 }
 
 $csprojContent = Get-Content $csprojPath -Raw
-if ($csprojContent -match '<Version>(\d+\.\d+\.\d+)</Version>') {
+if ($csprojContent -match '<Version>(\d+\.\d+\.\d+(?:\.\d+)?)</Version>') {
     $version = $matches[1]
     Write-Host "✓ Version: $version" -ForegroundColor Green
 } else {

@@ -1,8 +1,8 @@
 ; Simple Inno Setup Script for VoiceLite
-; v1.2.0.5: Bundled VC++ redistributable - auto-installs silently
+; v2.0.0.0: Parakeet v3 engine (Sherpa-ONNX). Speech model downloaded on first launch (~640MB).
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
-#define MyAppVersion "1.4.0.0"
+#define MyAppVersion "2.0.0.0"
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
@@ -37,9 +37,9 @@ Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe";
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; Whisper model files only (no executables - Whisper.net runs in-process via NuGet DLLs)
-; Base model bundled (78MB Q8_0 quantized), other models downloadable via AI Models tab
-; Whisper.net native DLLs are included in the *.dll wildcard above
+; Silero VAD ONNX model (~2.3MB, used for silence trimming before transcription)
+; Speech model (Parakeet v3, ~640MB) is downloaded on first launch — not bundled in installer
+; Sherpa-ONNX + ONNX Runtime native DLLs are included in the *.dll wildcard above
 Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\*"; DestDir: "{app}\whisper"; Flags: ignoreversion recursesubdirs
 
 ; Icon file
