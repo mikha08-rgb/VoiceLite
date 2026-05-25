@@ -256,10 +256,10 @@
             </TabItem>
 
             <!-- AI Models Tab (Pro Only) -->
-            <TabItem Header="AI Models" Name="AIModelsTab">
+            <TabItem Header="Speech Engine" Name="AIModelsTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
                     <StackPanel>
-                        <TextBlock Text="AI Model Selection"
+                        <TextBlock Text="Speech Engine"
                                    FontSize="16"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,10"/>
@@ -268,8 +268,8 @@
                                    Foreground="Gray"
                                    Margin="0,0,0,20"
                                    FontSize="12">
-                            <Run Text="Select which AI model to use for speech recognition. "/>
-                            <Run Text="Larger models offer better accuracy but require more RAM and processing time."/>
+                            <Run Text="VoiceLite v2.0 uses NVIDIA Parakeet TDT 0.6B v3 via Sherpa-ONNX — a single multilingual model that runs locally on your CPU. "/>
+                            <Run Text="The model (~640MB) downloads on first launch and is shared across all users on this machine. Use the controls below to re-download or verify the model files."/>
                         </TextBlock>
 
                         <!-- Model Download Control -->

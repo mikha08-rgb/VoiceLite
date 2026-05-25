@@ -5,7 +5,7 @@ import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 
-const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.1';
+const CURRENT_VERSION = process.env.NEXT_PUBLIC_CURRENT_VERSION || '2.0.2';
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -16,7 +16,7 @@ const jsonLd = {
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "2.0.1",
+  "softwareVersion": "2.0.2",
   "offers": [
     {
       "@type": "Offer",

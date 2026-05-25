@@ -467,9 +467,8 @@ namespace VoiceLite
                     // Show success message
                     MessageBox.Show(
                         "🎉 License activated successfully!\n\n" +
-                        "You now have access to all Pro features and AI models.\n\n" +
-                        "⚠️ IMPORTANT: Please close and restart VoiceLite for the changes to take full effect.\n\n" +
-                        "After restarting, you can download and select different models in the 'AI Models' tab.",
+                        "Your Pro license is preserved. Pro features are being redesigned and will unlock automatically as they ship.\n\n" +
+                        "⚠️ IMPORTANT: Please close and restart VoiceLite for the changes to take full effect.",
                         "License Activated - Restart Required",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
