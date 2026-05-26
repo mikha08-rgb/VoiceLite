@@ -590,6 +590,25 @@ namespace VoiceLite
 
                 // Mark initialization complete - show "Ready" status
                 UpdateStatus("Ready", Brushes.Green);
+
+                // Fire-and-forget update check. 3s delay so startup settles before
+                // we touch HTTP; try/catch around everything so any failure (no
+                // network, parse error, etc.) can never block or affect main app flow.
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+                        var info = await UpdateCheckService.CheckAsync(settings).ConfigureAwait(false);
+                        if (info == null) return;
+                        await Dispatcher.InvokeAsync(() =>
+                            systemTrayManager?.ShowUpdateAvailable(info.Version, info.DownloadUrl));
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError("Update check task failed", ex);
+                    }
+                });
             }
             catch (Exception ex)
             {

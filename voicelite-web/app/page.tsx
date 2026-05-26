@@ -8,7 +8,7 @@ import Script from 'next/script';
 // Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
 // Previously read from NEXT_PUBLIC_CURRENT_VERSION env var; the env var got baked
 // into the client bundle at build time and silently lagged behind code on every ship.
-const CURRENT_VERSION = '2.1.0';
+const CURRENT_VERSION = '2.1.1';
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -19,7 +19,7 @@ const jsonLd = {
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "2.1.0",
+  "softwareVersion": "2.1.1",
   "offers": [
     {
       "@type": "Offer",

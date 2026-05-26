@@ -2,7 +2,7 @@
 ; v2.0.0.0: Parakeet v3 engine (Sherpa-ONNX). Speech model downloaded on first launch (~640MB).
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "2.1.1"
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
@@ -21,7 +21,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequiredOverridesAllowed=dialog commandline
 ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=..\..\EULA.txt
 
@@ -105,21 +105,50 @@ begin
   end;
 end;
 
+function PurgeDataRequested: Boolean;
+var
+  i: Integer;
+begin
+  // Explicit opt-in to wipe user data: pass /PURGEDATA on the uninstaller command line.
+  // Without this flag, silent uninstall preserves %LocalAppData%\VoiceLite so that:
+  //   - Inno's auto-uninstall during in-place upgrades doesn't destroy settings/license/model
+  //   - Intune redeployments preserve the user's 640 MB Parakeet model + Pro license
+  // IT admins decommissioning a workstation should pass /PURGEDATA explicitly.
+  Result := False;
+  for i := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(i), '/PURGEDATA') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    // Silent uninstall (Intune/managed deployment) — always remove user data.
-    // Healthcare deployments don't want transcription history or DPAPI license files
-    // lingering on uninstalled workstations.
-    if UninstallSilent then
+    if PurgeDataRequested then
     begin
+      // Explicit /PURGEDATA flag: full decommission, wipe everything.
       DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
     end
-    else if MsgBox('Do you want to remove VoiceLite settings and transcription history?',
-              mbConfirmation, MB_YESNO) = IDYES then
+    else if not UninstallSilent then
     begin
-      DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
+      // Interactive uninstall: warn clearly about what's being deleted, default to NO.
+      // The 640 MB Parakeet speech model and DPAPI-encrypted Pro license live in this dir
+      // — losing them is a serious user-visible cost (re-download + re-activate).
+      if MsgBox('Also remove your VoiceLite settings, Custom Dictionary entries,'#13#10 +
+                'transcription history, Pro license, and the 640 MB speech model?'#13#10#13#10 +
+                'Choose NO to keep these (recommended — saves a long re-download if you reinstall).'#13#10 +
+                'Choose YES only if you''re sure you won''t reinstall.',
+                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+      begin
+        DelTree(ExpandConstant('{localappdata}\VoiceLite'), True, True, True);
+      end;
     end;
+    // Default (silent uninstall without /PURGEDATA): preserve all user data.
+    // This is the path hit by Inno's upgrade auto-uninstall and by routine Intune redeployments.
   end;
 end;

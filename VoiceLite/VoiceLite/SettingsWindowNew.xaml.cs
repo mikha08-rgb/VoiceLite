@@ -61,6 +61,8 @@ namespace VoiceLite
                 // System Settings
                 if (MinimizeToTrayCheckBox != null)
                     MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
+                if (CheckForUpdatesCheckBox != null)
+                    CheckForUpdatesCheckBox.IsChecked = settings.CheckForUpdates;
 
                 // Transcription Preset
                 LoadTranscriptionPreset();
@@ -414,6 +416,7 @@ namespace VoiceLite
 
             // System Settings
             settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
+            settings.CheckForUpdates = CheckForUpdatesCheckBox.IsChecked ?? true;
 
             // Transcription Preset
             if (TranscriptionPresetComboBox.SelectedItem is ComboBoxItem selectedPreset)

@@ -121,6 +121,15 @@ namespace VoiceLite.Models
 
         public string? LicenseKey { get; set; } = null;
         public bool IsProLicense { get; set; } = false;
+
+        // On startup, check GitHub Releases for a newer VoiceLite version and surface a
+        // non-blocking tray balloon. Default-on for consumer installs; IT admins on
+        // Intune-managed fleets can turn it off centrally via this settings.json field.
+        public bool CheckForUpdates { get; set; } = true;
+
+        // When the user clicks "Skip this version" on an update balloon, the version is
+        // recorded here so we don't keep nagging until a newer release lands.
+        public string? SkippedUpdateVersion { get; set; } = null;
     }
 
     public static class SettingsValidator

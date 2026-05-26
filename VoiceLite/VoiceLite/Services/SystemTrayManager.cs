@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -10,6 +11,7 @@ namespace VoiceLite.Services
         private TaskbarIcon? trayIcon;
         private System.Drawing.Icon? customIcon;
         private Window? mainWindow;
+        private string? pendingUpdateUrl;
 
         public SystemTrayManager()
         {
@@ -34,6 +36,23 @@ namespace VoiceLite.Services
             trayIcon.TrayMouseDoubleClick += (s, e) =>
             {
                 ShowMainWindow();
+            };
+
+            // When an update balloon is showing, clicking it opens the download URL.
+            // Pending URL is captured per-notification so the handler stays generic.
+            trayIcon.TrayBalloonTipClicked += (s, e) =>
+            {
+                var url = pendingUpdateUrl;
+                if (string.IsNullOrEmpty(url)) return;
+                pendingUpdateUrl = null;
+                try
+                {
+                    Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Failed to open update download URL", ex);
+                }
             };
 
             var contextMenu = new System.Windows.Controls.ContextMenu();
@@ -72,6 +91,16 @@ namespace VoiceLite.Services
         public void ShowBalloonTip(string title, string message)
         {
             trayIcon?.ShowBalloonTip(title, message, BalloonIcon.Info);
+        }
+
+        public void ShowUpdateAvailable(string version, string downloadUrl)
+        {
+            // Stash URL for the balloon-click handler. Stays set until clicked or replaced.
+            pendingUpdateUrl = downloadUrl;
+            trayIcon?.ShowBalloonTip(
+                "VoiceLite update available",
+                $"Version {version} is available. Click to download.",
+                BalloonIcon.Info);
         }
 
         private void ShowMainWindow()

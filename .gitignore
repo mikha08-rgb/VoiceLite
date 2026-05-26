@@ -64,6 +64,7 @@ publish/
 TestResults/
 VoiceLite-*/
 !voicelite-tauri/
+!voicelite-web/
 *_output.txt
 *-results-*.txt
 
