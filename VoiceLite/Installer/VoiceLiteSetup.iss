@@ -2,7 +2,7 @@
 ; v2.0.0.0: Parakeet v3 engine (Sherpa-ONNX). Speech model downloaded on first launch (~640MB).
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
-#define MyAppVersion "2.1.1"
+#define MyAppVersion "2.1.2"
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
@@ -65,8 +65,13 @@ Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg:
 Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
+; Only delete the install dir's temp folder. User data in {localappdata}\VoiceLite
+; (settings, license.dat, downloaded Parakeet model, transcription history) is
+; preserved by default and only wiped when /PURGEDATA is passed — see the
+; PurgeDataRequested / CurUninstallStepChanged logic below. Listing {localappdata}\VoiceLite
+; here would override that policy because [UninstallDelete] entries are processed during
+; the file-deletion phase (before usPostUninstall), making the PurgeDataRequested check moot.
 Type: filesandordirs; Name: "{app}\temp"
-Type: filesandordirs; Name: "{localappdata}\VoiceLite"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;

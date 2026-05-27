@@ -1442,6 +1442,21 @@ namespace VoiceLite
                                 ErrorLogger.LogError("Text injection failed", ex);
                             }
                         }
+                        else
+                        {
+                            // Manual-paste flow: copy to clipboard with longer hold so the user
+                            // has time to click into their target field before pasting. Required
+                            // for clinical workflows where auto-Ctrl+V would fire into the wrong
+                            // field (e.g., GPHealth pilot).
+                            try
+                            {
+                                TextInjector.CopyToClipboardForManualPaste(processedText);
+                            }
+                            catch (Exception ex)
+                            {
+                                ErrorLogger.LogError("Manual-paste clipboard copy failed", ex);
+                            }
+                        }
 
                         var durationMs = (DateTime.UtcNow - recordingStartTime).TotalMilliseconds;
                         var wordCount = transcription.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;

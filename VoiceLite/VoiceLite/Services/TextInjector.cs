@@ -15,7 +15,8 @@ namespace VoiceLite.Services
 
         // Timing constants (in milliseconds)
         private const int CLIPBOARD_READY_DELAY_MS = 20;       // Wait for clipboard to be ready across applications
-        private const int CLIPBOARD_AUTO_CLEAR_DELAY_MS = 2000; // Delay before auto-clearing transcription from clipboard
+        public const int CLIPBOARD_AUTO_CLEAR_DELAY_MS = 2000; // Delay before auto-clearing transcription from clipboard (auto-paste flow)
+        public const int CLIPBOARD_MANUAL_PASTE_HOLD_MS = 30000; // Longer hold for manual-paste flow — clinician needs time to click into target field
         private const int KEY_MODIFIER_DELAY_MS = 5;            // Delay for modifier keys (Ctrl)
         private const int KEY_RELEASE_DELAY_MS = 2;             // Delay after releasing keys
 
@@ -302,11 +303,19 @@ namespace VoiceLite.Services
         }
 
         // Copy text to the Windows clipboard and schedule it to auto-clear after 2 seconds.
-        // Used by both the dictation paste flow (this class's InjectText) and the transcription
-        // history copy actions in MainWindow — clinical workstations shouldn't have transcribed
-        // text lingering on a shared clipboard. Match-before-clear preserves anything the user
-        // copies in the interim.
+        // Used by the auto-paste flow + the transcription history copy actions in MainWindow —
+        // clinical workstations shouldn't have transcribed text lingering on a shared clipboard.
+        // Match-before-clear preserves anything the user copies in the interim.
         public static void CopyToClipboardWithAutoClear(string text)
+            => CopyToClipboardWithDelay(text, CLIPBOARD_AUTO_CLEAR_DELAY_MS);
+
+        // Manual-paste flow: clinician dictates, then clicks into a target field and pastes
+        // themselves. 30s hold balances "long enough to click in" against "shared workstation
+        // privacy hygiene." Same match-before-clear guarantee.
+        public static void CopyToClipboardForManualPaste(string text)
+            => CopyToClipboardWithDelay(text, CLIPBOARD_MANUAL_PASTE_HOLD_MS);
+
+        private static void CopyToClipboardWithDelay(string text, int holdMs)
         {
             if (string.IsNullOrEmpty(text)) return;
 
@@ -324,7 +333,7 @@ namespace VoiceLite.Services
             {
                 try
                 {
-                    await Task.Delay(CLIPBOARD_AUTO_CLEAR_DELAY_MS);
+                    await Task.Delay(holdMs);
 
                     var thread = new Thread(() =>
                     {

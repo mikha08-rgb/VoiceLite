@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 // Hardcoded — bump alongside csproj <Version> on each release.
-const CURRENT_VERSION = '2.1.1';
+const CURRENT_VERSION = '2.1.2';
 
 function SuccessContent() {
   const searchParams = useSearchParams();

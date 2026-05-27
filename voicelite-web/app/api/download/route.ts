@@ -7,7 +7,7 @@ const MAX_VERSION_LENGTH = 20;
 // Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
 // Previously read from NEXT_PUBLIC_CURRENT_VERSION env var, which silently lagged
 // behind code on every ship (the env var lived in Vercel UI and got forgotten).
-const DEFAULT_VERSION = '2.1.1';
+const DEFAULT_VERSION = '2.1.2';
 
 // Mask IP for privacy (show first octet only)
 function maskIp(ip: string): string {
