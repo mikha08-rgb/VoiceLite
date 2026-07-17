@@ -7,10 +7,10 @@ using System.Windows;
 namespace VoiceLite.Models
 {
     /// <summary>
-    /// Single-engine model registry. Class name kept (was the 5-tier Whisper registry) to
-    /// limit blast radius of the engine swap — rename to AsrModelInfo is a follow-up sweep.
+    /// Single-engine model registry for the Parakeet lineup.
+    /// (Named WhisperModelInfo — the 5-tier Whisper registry — until the 2026-07-17 rename.)
     /// </summary>
-    public class WhisperModelInfo
+    public class TranscriptionModelInfo
     {
         public string FileName { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
@@ -77,13 +77,12 @@ namespace VoiceLite.Models
         }
 
         /// <summary>
-        /// Returns the single-entry model registry. The <paramref name="whisperPath"/> argument
-        /// is kept for call-site compatibility; install detection now probes the standard
-        /// Parakeet model directory under it.
+        /// Returns the single-entry model registry. Install detection probes the standard
+        /// Parakeet model directory under <paramref name="basePath"/>.
         /// </summary>
-        public static List<WhisperModelInfo> GetAvailableModels(string whisperPath)
+        public static List<TranscriptionModelInfo> GetAvailableModels(string basePath)
         {
-            var parakeet = new WhisperModelInfo
+            var parakeet = new TranscriptionModelInfo
             {
                 FileName = ParakeetId,
                 DisplayName = "Parakeet v3",
@@ -111,9 +110,9 @@ namespace VoiceLite.Models
 
             // IsInstalled checks the Parakeet directory under the supplied base path.
             // Probes both ./models/parakeet-v3 and ./whisper/parakeet-v3 for installer-folder compat.
-            parakeet.IsInstalled = IsParakeetInstalledAt(whisperPath);
+            parakeet.IsInstalled = IsParakeetInstalledAt(basePath);
 
-            return new List<WhisperModelInfo> { parakeet };
+            return new List<TranscriptionModelInfo> { parakeet };
         }
 
         private static bool IsParakeetInstalledAt(string basePath)
@@ -146,7 +145,7 @@ namespace VoiceLite.Models
         /// Single-model lineup means this always returns the same entry.
         /// Kept for call-site compatibility with the previous RAM/speed advisor.
         /// </summary>
-        public static WhisperModelInfo? GetRecommendedModel(double availableRAMGB, bool prioritizeSpeed = false)
+        public static TranscriptionModelInfo? GetRecommendedModel(double availableRAMGB, bool prioritizeSpeed = false)
         {
             return GetAvailableModels(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models"))
                 .FirstOrDefault();

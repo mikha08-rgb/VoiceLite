@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Windows.Input;
 
 namespace VoiceLite.Models
@@ -17,7 +18,7 @@ namespace VoiceLite.Models
         Accuracy        // Best transcription quality (beam_size=5)
     }
 
-    public class WhisperPresetConfig
+    public class TranscriptionPresetConfig
     {
         public string DecodingMethod { get; set; } = "greedy_search";
         public int MaxActivePaths { get; set; } = 4;
@@ -26,23 +27,23 @@ namespace VoiceLite.Models
         // Settings.BeamSize and other legacy callers still read this name.
         public int BeamSize => MaxActivePaths;
 
-        public static WhisperPresetConfig GetPresetConfig(TranscriptionPreset preset)
+        public static TranscriptionPresetConfig GetPresetConfig(TranscriptionPreset preset)
         {
             return preset switch
             {
-                TranscriptionPreset.Speed => new WhisperPresetConfig
+                TranscriptionPreset.Speed => new TranscriptionPresetConfig
                 {
                     DecodingMethod = "greedy_search",
                     MaxActivePaths = 1,
                     Description = "Fastest transcription — greedy decoding, good for quick notes and commands"
                 },
-                TranscriptionPreset.Balanced => new WhisperPresetConfig
+                TranscriptionPreset.Balanced => new TranscriptionPresetConfig
                 {
                     DecodingMethod = "modified_beam_search",
                     MaxActivePaths = 2,
                     Description = "Balanced speed and accuracy — recommended for most users"
                 },
-                TranscriptionPreset.Accuracy => new WhisperPresetConfig
+                TranscriptionPreset.Accuracy => new TranscriptionPresetConfig
                 {
                     DecodingMethod = "modified_beam_search",
                     MaxActivePaths = 4,
@@ -61,7 +62,7 @@ namespace VoiceLite.Models
         private RecordMode _mode = RecordMode.Toggle;
         private Key _recordHotkey = Key.Z;
         private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
-        private string _whisperModel = "parakeet-tdt-0.6b-v3-int8";
+        private string _transcriptionModel = "parakeet-tdt-0.6b-v3-int8";
         private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced;
         private bool _enableVAD = true;
 
@@ -83,10 +84,14 @@ namespace VoiceLite.Models
             set => _hotkeyModifiers = value;
         }
 
-        public string WhisperModel
+        // COMPAT: existing users' settings.json on disk uses the legacy key "WhisperModel"
+        // (pre-rename). JsonPropertyName keeps serialization byte-compatible both directions —
+        // do NOT remove this attribute or change the key.
+        [JsonPropertyName("WhisperModel")]
+        public string TranscriptionModel
         {
-            get => _whisperModel;
-            set => _whisperModel = string.IsNullOrWhiteSpace(value) ? "parakeet-tdt-0.6b-v3-int8" : value;
+            get => _transcriptionModel;
+            set => _transcriptionModel = string.IsNullOrWhiteSpace(value) ? "parakeet-tdt-0.6b-v3-int8" : value;
         }
 
         public TranscriptionPreset TranscriptionPreset
@@ -96,7 +101,7 @@ namespace VoiceLite.Models
         }
 
         // BeamSize is driven by TranscriptionPreset (Speed/Balanced/Accuracy)
-        public int BeamSize => WhisperPresetConfig.GetPresetConfig(_transcriptionPreset).BeamSize;
+        public int BeamSize => TranscriptionPresetConfig.GetPresetConfig(_transcriptionPreset).BeamSize;
 
         public bool EnableVAD
         {
@@ -139,7 +144,7 @@ namespace VoiceLite.Models
             if (settings == null)
                 return new Settings();
 
-            // Validate language code (top 30 most popular languages supported by Whisper + auto-detect)
+            // Validate language code (top 30 language codes retained from the v1 engine + auto-detect)
             var validLanguages = new HashSet<string>
             {
                 "auto", "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr",

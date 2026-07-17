@@ -10,7 +10,7 @@ namespace VoiceLite.Models
         public string DisplayName { get; set; } = string.Empty;
 
         // MINOR-12 FIX: Static set of valid language codes for validation
-        // These are the ISO 639-1 codes supported by Whisper
+        // ISO 639-1 codes (list retained from the v1 Whisper-era engine)
         private static readonly HashSet<string> ValidLanguageCodes = new(StringComparer.OrdinalIgnoreCase)
         {
             "auto", "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt",
@@ -22,7 +22,7 @@ namespace VoiceLite.Models
         /// MINOR-12 FIX: Validates whether a language code is supported.
         /// </summary>
         /// <param name="code">The language code to validate (e.g., "en", "auto")</param>
-        /// <returns>True if the code is valid and supported by Whisper</returns>
+        /// <returns>True if the code is valid and supported</returns>
         public static bool IsValidLanguageCode(string? code)
         {
             if (string.IsNullOrWhiteSpace(code))

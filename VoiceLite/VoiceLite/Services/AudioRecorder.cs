@@ -39,7 +39,7 @@ namespace VoiceLite.Services
         // Audio preprocessing settings (enabled by default for better transcription quality)
         private AudioPreprocessingSettings preprocessingSettings = new AudioPreprocessingSettings();
 
-        // Silero VAD preprocessing (trims silence before Whisper)
+        // Silero VAD preprocessing (trims silence before transcription)
         private SileroVadService? vadService;
         private Models.Settings? vadSettings;
 
@@ -643,7 +643,7 @@ namespace VoiceLite.Services
                     }
                 }
 
-                // Stage 4: Silero VAD — trim silence segments before Whisper
+                // Stage 4: Silero VAD — trim silence segments before transcription
                 if (vadService != null && vadSettings?.EnableVAD == true)
                 {
                     try

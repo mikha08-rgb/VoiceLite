@@ -26,7 +26,7 @@ namespace VoiceLite
 
         // Service dependencies
         private AudioRecorder? audioRecorder;
-        private PersistentWhisperService? whisperService;
+        private TranscriptionService? transcriptionService;
         private HotkeyManager? hotkeyManager;
         private TextInjector? textInjector;
         private SystemTrayManager? systemTrayManager;
@@ -240,8 +240,8 @@ namespace VoiceLite
                         // MIGRATION 3: Upgrade Default UI preset to Compact (v1.0.38+) - ONE-TIME ONLY
                         // UI Preset is now hardcoded to Compact - migration code removed
 
-                        // Verify whisper model exists
-                        ValidateWhisperModel();
+                        // Verify transcription model exists
+                        ValidateTranscriptionModel();
 
                         // BUG-011 FIX: Only cleanup history if we successfully loaded existing settings
                         // DO NOT cleanup on default settings (prevents accidental data loss)
@@ -284,7 +284,7 @@ namespace VoiceLite
             }
 
             // Rewrite legacy Whisper GGML model ids to the Parakeet canonical id.
-            // Must run before any service consumes settings.WhisperModel.
+            // Must run before any service consumes settings.TranscriptionModel.
             if (SettingsMigration.Migrate(settings))
             {
                 try { SaveSettings(); }
@@ -501,12 +501,12 @@ namespace VoiceLite
                 // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
                 proFeatureService = new ProFeatureService(settings);
 
-                // LicenseService backs the DPAPI tamper check in ValidateWhisperModel.
+                // LicenseService backs the DPAPI tamper check in ValidateTranscriptionModel.
                 // Static HttpClient pattern means no MainWindow-level disposal needed (lives for process lifetime).
                 licenseService = new LicenseService();
 
                 // Initialize ASR service (in-process via Sherpa-ONNX + Parakeet v3)
-                whisperService = new PersistentWhisperService(settings, null, proFeatureService);
+                transcriptionService = new TranscriptionService(settings, null, proFeatureService);
 
                 // Initialize services
                 historyService = new TranscriptionHistoryService(settings);
@@ -514,7 +514,7 @@ namespace VoiceLite
                 // SoundService removed per user request - no audio feedback
 
                 // CRITICAL FIX: Null-check all dependencies before creating coordinator
-                if (audioRecorder == null || whisperService == null || textInjector == null ||
+                if (audioRecorder == null || transcriptionService == null || textInjector == null ||
                     historyService == null || customShortcutService == null)
                 {
                     throw new InvalidOperationException(
@@ -691,7 +691,7 @@ namespace VoiceLite
             // Update model display (null check for XAML control)
             if (ModelText != null)
             {
-                ModelText.Text = GetModelDisplayName(settings.WhisperModel);
+                ModelText.Text = GetModelDisplayName(settings.TranscriptionModel);
             }
         }
 
@@ -1202,7 +1202,7 @@ namespace VoiceLite
 
             // BUG FIX: Increased from 15s to 120s to match transcription timeout
             // 15s was TOO AGGRESSIVE - normal transcriptions with Small model can take 20-30s
-            // This should only fire if Whisper completely hangs (rare edge case)
+            // This should only fire if transcription completely hangs (rare edge case)
             const int maxProcessingSeconds = 120; // 2 minutes max
 
             stuckStateRecoveryTimer = new System.Windows.Threading.DispatcherTimer
@@ -1390,12 +1390,12 @@ namespace VoiceLite
                 ErrorLogger.LogWarning("OnAudioFileReady: Starting transcription...");
                 try
             {
-                ErrorLogger.LogWarning("OnAudioFileReady: Checking whisperService...");
-                var transcriber = whisperService;
+                ErrorLogger.LogWarning("OnAudioFileReady: Checking transcriptionService...");
+                var transcriber = transcriptionService;
                 if (transcriber == null)
                 {
-                    ErrorLogger.LogWarning("OnAudioFileReady: ERROR - whisperService is NULL!");
-                    throw new InvalidOperationException("Whisper service not initialized");
+                    ErrorLogger.LogWarning("OnAudioFileReady: ERROR - transcriptionService is NULL!");
+                    throw new InvalidOperationException("Transcription service not initialized");
                 }
 
                 ErrorLogger.LogWarning($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
@@ -1423,9 +1423,9 @@ namespace VoiceLite
                         var historyItem = new TranscriptionHistoryItem
                         {
                             Text = processedText,           // Processed text (what user sees)
-                            OriginalText = transcription,   // Original from Whisper (for re-injection)
+                            OriginalText = transcription,   // Original engine output (for re-injection)
                             Timestamp = DateTime.Now,
-                            ModelUsed = settings.WhisperModel
+                            ModelUsed = settings.TranscriptionModel
                         };
                         historyService?.AddToHistory(historyItem);
                         _ = UpdateHistoryUI();
@@ -1640,20 +1640,20 @@ namespace VoiceLite
 
                 // Only recreate if service is null (never had one)
                 // Model switching is handled by the service itself in most cases
-                if (whisperService == null)
+                if (transcriptionService == null)
                 {
-                    // SECURITY FIX (MODEL-GATE-001): Ensure proFeatureService exists before creating whisperService
+                    // SECURITY FIX (MODEL-GATE-001): Ensure proFeatureService exists before creating transcriptionService
                     if (proFeatureService == null)
                     {
                         proFeatureService = new ProFeatureService(settings);
                     }
 
-                    ErrorLogger.LogMessage($"Creating initial Whisper service with model: {settings.WhisperModel}");
-                    whisperService = new PersistentWhisperService(settings, null, proFeatureService);
+                    ErrorLogger.LogMessage($"Creating initial transcription service with model: {settings.TranscriptionModel}");
+                    transcriptionService = new TranscriptionService(settings, null, proFeatureService);
                 }
                 else
                 {
-                    ErrorLogger.LogMessage("Whisper service already exists - skipping recreation for performance");
+                    ErrorLogger.LogMessage("Transcription service already exists - skipping recreation for performance");
                 }
 
                 // CRITICAL FIX: Only change microphone if not currently recording
@@ -1765,11 +1765,11 @@ namespace VoiceLite
         }
 
 
-        private void ValidateWhisperModel()
+        private void ValidateTranscriptionModel()
         {
             try
             {
-                // Model file presence is validated by PersistentWhisperService / ModelResolverService
+                // Model file presence is validated by TranscriptionService / ModelResolverService
                 // on first transcription. This method retains only the license-tamper checks that
                 // have nothing to do with the engine.
 
@@ -1800,7 +1800,7 @@ namespace VoiceLite
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("ValidateWhisperModel", ex);
+                ErrorLogger.LogError("ValidateTranscriptionModel", ex);
             }
         }
 
@@ -1908,8 +1908,8 @@ namespace VoiceLite
                 // Dispose semaphore (SemaphoreSlim implements IDisposable)
                 try { saveSettingsSemaphore?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"CRIT-3 FIX: saveSettingsSemaphore disposal failed: {ex.Message}"); }
 
-                whisperService?.Dispose();
-                whisperService = null;
+                transcriptionService?.Dispose();
+                transcriptionService = null;
 
                 vadService?.Dispose();
                 vadService = null;

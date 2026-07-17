@@ -34,7 +34,7 @@ namespace VoiceLite
             settings = currentSettings ?? new Settings();
             testRecordingCallback = onTestRecording;
             saveSettingsCallback = onSaveSettings; // Store save callback
-            originalModel = settings.WhisperModel;
+            originalModel = settings.TranscriptionModel;
             licenseService = new LicenseService();
             proFeatureService = new ProFeatureService(settings);
 
@@ -261,7 +261,7 @@ namespace VoiceLite
         {
             if (PresetDescriptionText != null)
             {
-                var config = WhisperPresetConfig.GetPresetConfig(preset);
+                var config = TranscriptionPresetConfig.GetPresetConfig(preset);
                 PresetDescriptionText.Text = config.Description;
             }
         }
@@ -443,7 +443,7 @@ namespace VoiceLite
 
             // Custom Dictionary - REMOVED (feature simplified away)
 
-            // Whisper Model is already saved when selected
+            // Model selection is already saved when selected
 
             // Advanced settings removed from UI (still work via settings.json)
 

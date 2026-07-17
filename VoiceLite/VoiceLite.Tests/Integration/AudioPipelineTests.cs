@@ -16,7 +16,7 @@ namespace VoiceLite.Tests.Integration
     public class AudioPipelineTests : IDisposable
     {
         private readonly AudioRecorder _recorder;
-        private readonly PersistentWhisperService _transcriber;
+        private readonly TranscriptionService _transcriber;
         private readonly TextInjector _textInjector;
         private readonly Settings _settings;
         private readonly string _tempDirectory;
@@ -28,7 +28,7 @@ namespace VoiceLite.Tests.Integration
 
             _settings = new Settings
             {
-                WhisperModel = "base",
+                TranscriptionModel = "base",
             };
 
             _recorder = new AudioRecorder();
@@ -36,7 +36,7 @@ namespace VoiceLite.Tests.Integration
             // Only create transcriber if model file exists
             var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
             _transcriber = File.Exists(modelPath)
-                ? new PersistentWhisperService(_settings)
+                ? new TranscriptionService(_settings)
                 : null!;
 
             _textInjector = new TextInjector(_settings);
@@ -169,8 +169,8 @@ namespace VoiceLite.Tests.Integration
                         throw new InvalidOperationException("Simulated pipeline error");
                     }
 
-                    // Simulate a successful transcription without calling actual whisper
-                    // (avoid dependency on whisper model being available)
+                    // Simulate a successful transcription without calling the actual engine
+                    // (avoid dependency on the model being available)
                     await Task.Delay(10); // Simulate async work
 
                     Interlocked.Increment(ref successfulCompletions);

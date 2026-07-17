@@ -26,7 +26,7 @@ namespace VoiceLite.Models
         public string Text { get; set; } = string.Empty;
 
         /// <summary>
-        /// The original transcription from Whisper (BEFORE shortcut processing)
+        /// The original transcription from the ASR engine (BEFORE shortcut processing)
         /// Used for re-injection to avoid double-processing shortcuts
         /// </summary>
         public string? OriginalText { get; set; }
@@ -42,13 +42,13 @@ namespace VoiceLite.Models
         public double DurationSeconds { get; set; }
 
         /// <summary>
-        /// Which Whisper model was used (tiny, base, small, medium, large)
+        /// Which transcription model was used
         /// </summary>
         public string ModelUsed { get; set; } = "tiny";
 
         /// <summary>
-        /// Optional confidence score from Whisper (0.0 to 1.0)
-        /// Future enhancement: Whisper can provide confidence scores
+        /// Optional confidence score from the ASR engine (0.0 to 1.0)
+        /// Future enhancement: the engine can provide confidence scores
         /// </summary>
         public double? ConfidenceScore { get; set; }
 

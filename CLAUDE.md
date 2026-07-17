@@ -30,7 +30,7 @@ The audit in `@docs/audit/` is ground truth (2026-07-17). Start every session th
 
 ## Conventions
 - **No DI.** `App.xaml.cs` runs a 3-stage startup gate, then `MainWindow` directly `new`s every service. MainWindow is the controller.
-- **Names lie:** `PersistentWhisperService`, `WhisperModelInfo`, `settings.WhisperModel` etc. are Parakeet, not Whisper — misnomers kept to limit blast radius. Real pattern example: `VoiceLite/VoiceLite/Services/PersistentWhisperService.cs`.
+- **Names fixed (2026-07-17 rename):** the Whisper-era misnomers are gone — `PersistentWhisperService`→`TranscriptionService`, `WhisperModelInfo`→`TranscriptionModelInfo`, `WhisperPresetConfig`→`TranscriptionPresetConfig`, `Settings.WhisperModel`→`Settings.TranscriptionModel`. **But** settings.json on disk still uses the legacy `"WhisperModel"` key via `[JsonPropertyName("WhisperModel")]` for compat — never rename the serialized key. Real pattern example: `VoiceLite/VoiceLite/Services/TranscriptionService.cs`.
 - **Logging:** `ErrorLogger.LogWarning()`/`LogError()` are Release-visible; `LogMessage()` is Debug-only (Release silent-failure trap).
 - **Settings/state:** `%LOCALAPPDATA%\VoiceLite\` (never Roaming). `license.dat` = DPAPI `key|email`, authoritative for Pro tier.
 - **`OfflineRecognizer.Decode()` is blocking native** — always `await Task.Run(...)` from UI threads.

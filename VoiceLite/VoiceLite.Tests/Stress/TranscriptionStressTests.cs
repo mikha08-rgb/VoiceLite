@@ -32,11 +32,11 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny", // Use tiny model for speed
+                TranscriptionModel = "tiny", // Use tiny model for speed
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             string? testAudioPath = null;
 
             try
@@ -44,7 +44,7 @@ namespace VoiceLite.Tests.Stress
                 // Create test audio file once (reuse for all iterations)
                 testAudioPath = CreateTestAudioFile();
 
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 var successCount = 0;
                 var failureCount = 0;
@@ -57,7 +57,7 @@ namespace VoiceLite.Tests.Stress
 
                     try
                     {
-                        var result = await whisperService.TranscribeAsync(testAudioPath);
+                        var result = await transcriptionService.TranscribeAsync(testAudioPath);
                         successCount++;
 
                         durations.Add(iterationStart.Elapsed.TotalMilliseconds);
@@ -122,7 +122,7 @@ namespace VoiceLite.Tests.Stress
             finally
             {
                 // Cleanup
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 if (testAudioPath != null)
                 {
                     CleanupTestFile(testAudioPath);
@@ -140,17 +140,17 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             string? testAudioPath = null;
 
             try
             {
                 testAudioPath = CreateTestAudioFile();
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 // Act - Launch multiple concurrent transcription tasks
                 var tasks = new System.Collections.Generic.List<Task>();
@@ -166,7 +166,7 @@ namespace VoiceLite.Tests.Stress
                         {
                             try
                             {
-                                await whisperService.TranscribeAsync(testAudioPath);
+                                await transcriptionService.TranscribeAsync(testAudioPath);
                                 lock (successLock)
                                 {
                                     successCount++;
@@ -198,7 +198,7 @@ namespace VoiceLite.Tests.Stress
             }
             finally
             {
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 if (testAudioPath != null)
                 {
                     CleanupTestFile(testAudioPath);
@@ -217,17 +217,17 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             string? testAudioPath = null;
 
             try
             {
                 testAudioPath = CreateTestAudioFile();
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 var totalSuccess = 0;
 
@@ -240,7 +240,7 @@ namespace VoiceLite.Tests.Stress
                     {
                         try
                         {
-                            await whisperService.TranscribeAsync(testAudioPath);
+                            await transcriptionService.TranscribeAsync(testAudioPath);
                             totalSuccess++;
                             UpdatePeakMemory();
                         }
@@ -270,7 +270,7 @@ namespace VoiceLite.Tests.Stress
             }
             finally
             {
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 if (testAudioPath != null)
                 {
                     CleanupTestFile(testAudioPath);

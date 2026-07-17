@@ -16,7 +16,7 @@ namespace VoiceLite.Services
         private readonly string _baseDir;
         private readonly IProFeatureService? _proFeatureService;
 
-        // Canonical model id used by Settings.WhisperModel after migration.
+        // Canonical model id used by Settings.TranscriptionModel after migration.
         public const string ParakeetModelId = "parakeet-tdt-0.6b-v3-int8";
         public const string ParakeetDirName = "parakeet-v3";
 
@@ -31,11 +31,10 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Returns the directory containing encoder.int8.onnx, decoder.int8.onnx,
-        /// joiner.int8.onnx, and tokens.txt. The <paramref name="modelName"/> argument
-        /// is preserved for call-site compatibility but is no longer load-bearing —
-        /// the single-model lineup means the resolver always probes the same locations.
+        /// joiner.int8.onnx, and tokens.txt. The single-model lineup means the
+        /// resolver always probes the same locations.
         /// </summary>
-        public string ResolveModelPath(string modelName)
+        public string ResolveModelPath()
         {
             foreach (var dir in CandidateDirectories())
             {
@@ -49,11 +48,6 @@ namespace VoiceLite.Services
                 string.Join("\n  ", CandidateDirectories()) + "\n\n" +
                 "Please download the model from Settings → AI Models, or reinstall VoiceLite.");
         }
-
-        /// <summary>
-        /// Maps any input (including legacy GGML filenames) to the canonical Parakeet id.
-        /// </summary>
-        public string NormalizeModelName(string modelName) => ParakeetModelId;
 
         /// <summary>
         /// Returns paths to all installed model directories (single-entry list when present).

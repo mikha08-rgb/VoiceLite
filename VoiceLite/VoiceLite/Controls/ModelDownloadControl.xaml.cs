@@ -35,7 +35,7 @@ namespace VoiceLite.Controls
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite", "models", "parakeet-v3");
 
-        // The 4 files the Parakeet tarball expands to. PersistentWhisperService
+        // The 4 files the Parakeet tarball expands to. TranscriptionService
         // requires all four — partial extraction must not look "installed."
         private static readonly string[] RequiredModelFiles = new[]
         {
@@ -59,7 +59,7 @@ namespace VoiceLite.Controls
         }
 
         // First-launch use passes null settings/callback — the control still functions
-        // for the download flow because settings.WhisperModel already defaults to the
+        // for the download flow because settings.TranscriptionModel already defaults to the
         // Parakeet id in Models/Settings.cs.
         public void Initialize(Settings? currentSettings, Action? onSaveSettings = null)
         {
@@ -89,7 +89,7 @@ namespace VoiceLite.Controls
                 model.IsInstalled = AllModelFilesPresent();
                 if (settings != null)
                 {
-                    model.IsSelected = settings.WhisperModel == model.FileName;
+                    model.IsSelected = settings.TranscriptionModel == model.FileName;
                 }
             }
         }
@@ -110,7 +110,7 @@ namespace VoiceLite.Controls
             {
                 if (settings != null)
                 {
-                    settings.WhisperModel = model.FileName;
+                    settings.TranscriptionModel = model.FileName;
                     saveSettingsCallback?.Invoke();
                 }
                 UpdateTip(model);

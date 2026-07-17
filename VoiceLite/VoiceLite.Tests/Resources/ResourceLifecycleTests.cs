@@ -90,9 +90,9 @@ namespace VoiceLite.Tests.Resources
         }
 
         [Fact]
-        public void WhisperService_DisposeReleasesResources()
+        public void TranscriptionService_DisposeReleasesResources()
         {
-            var settings = new Settings { WhisperModel = "base" };
+            var settings = new Settings { TranscriptionModel = "base" };
 
             // Only run if model file exists
             var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
@@ -103,7 +103,7 @@ namespace VoiceLite.Tests.Resources
 
             var initialMemory = GC.GetTotalMemory(true);
 
-            var service = new PersistentWhisperService(settings);
+            var service = new TranscriptionService(settings);
             _disposables.Add(service);
 
             // Allow warmup to load model
@@ -221,7 +221,7 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task FileHandles_ReleasedAfterTranscription()
         {
-            var settings = new Settings { WhisperModel = "base" };
+            var settings = new Settings { TranscriptionModel = "base" };
 
             var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
             if (!File.Exists(modelPath))
@@ -229,7 +229,7 @@ namespace VoiceLite.Tests.Resources
                 return;
             }
 
-            var service = new PersistentWhisperService(settings);
+            var service = new TranscriptionService(settings);
             _disposables.Add(service);
 
             var testFile = Path.Combine(_tempDirectory, "test_audio.wav");

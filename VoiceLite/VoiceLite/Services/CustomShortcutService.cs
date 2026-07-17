@@ -29,7 +29,7 @@ namespace VoiceLite.Services
         /// Uses case-insensitive, whole-word matching to prevent partial word replacements.
         /// Thread-safe: locks on Settings.SyncRoot to prevent concurrent modification.
         /// </summary>
-        /// <param name="text">The text to process (after Whisper transcription and post-processing)</param>
+        /// <param name="text">The text to process (after transcription and post-processing)</param>
         /// <returns>Text with shortcuts replaced</returns>
         public string ProcessShortcuts(string text)
         {
