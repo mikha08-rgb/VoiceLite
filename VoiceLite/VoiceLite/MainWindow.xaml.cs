@@ -524,6 +524,7 @@ namespace VoiceLite
 
                 // Wire up audio recorder events
                 audioRecorder.AudioFileReady += OnAudioFileReady;
+                audioRecorder.RecordingError += OnRecordingError;
 
                 // CRITICAL FIX: Null-check hotkeyManager before subscribing
                 if (hotkeyManager != null)
@@ -1367,6 +1368,19 @@ namespace VoiceLite
         /// <summary>
         /// Handle audio file ready event from AudioRecorder
         /// </summary>
+        // Fired by AudioRecorder when a recording is lost (e.g. disk-write failure in
+        // SaveMemoryBufferToTempFile). Arrives on a non-UI thread while the recorder's
+        // internal lock may still be held — must not block, hence fire-and-forget InvokeAsync.
+        private void OnRecordingError(object? sender, Exception ex)
+        {
+            ErrorLogger.LogError("OnRecordingError: recording lost", ex);
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                UpdateTranscriptionText("Recording failed - audio was not saved", Brushes.Red);
+                UpdateStatus("Recording failed", Brushes.Red);
+            });
+        }
+
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
             ErrorLogger.LogWarning($"OnAudioFileReady: ENTERED with file: {audioFilePath}");
@@ -1440,6 +1454,10 @@ namespace VoiceLite
                             catch (Exception ex)
                             {
                                 ErrorLogger.LogError("Text injection failed", ex);
+                                // The text never reached the target app — tell the user it's
+                                // recoverable from history instead of failing silently.
+                                // (Transcription text stays visible so it can still be copied.)
+                                UpdateStatus("Paste failed - copy text from history", Brushes.Red);
                             }
                         }
                         else
@@ -1455,6 +1473,7 @@ namespace VoiceLite
                             catch (Exception ex)
                             {
                                 ErrorLogger.LogError("Manual-paste clipboard copy failed", ex);
+                                UpdateStatus("Copy failed - copy text from history", Brushes.Red);
                             }
                         }
 
@@ -1653,7 +1672,9 @@ namespace VoiceLite
                 }
                 else
                 {
-                    ErrorLogger.LogMessage("Whisper service already exists - skipping recreation for performance");
+                    // No recreation needed: PersistentWhisperService reloads the recognizer
+                    // lazily on the next transcription when the preset (or model dir) changed.
+                    ErrorLogger.LogMessage("Whisper service already exists - preset/model changes apply on next transcription");
                 }
 
                 // CRITICAL FIX: Only change microphone if not currently recording
@@ -1877,6 +1898,7 @@ namespace VoiceLite
                 if (audioRecorder != null)
                 {
                     audioRecorder.AudioFileReady -= OnAudioFileReady;
+                    audioRecorder.RecordingError -= OnRecordingError;
                 }
 
                 if (hotkeyManager != null)
@@ -2048,6 +2070,7 @@ namespace VoiceLite
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("Re-inject menu item", ex);
+                    UpdateStatus("Paste failed", Brushes.Red);
                 }
             };
             contextMenu.Items.Add(reinjectMenuItem);

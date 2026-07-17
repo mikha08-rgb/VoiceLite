@@ -27,7 +27,14 @@ namespace VoiceLite.Services
 
         private OfflineRecognizer? recognizer;
         private string? currentModelDir;
+        // Preset (Speed/Balanced/Accuracy) is baked into OfflineRecognizer at load time,
+        // so it is part of the reload key — otherwise preset changes are silent no-ops
+        // until restart (single model means modelDir alone never changes).
+        private TranscriptionPreset? currentPreset;
         private readonly object recognizerLock = new();
+
+        // Test observability: how many times a recognizer has been built.
+        internal int RecognizerLoadCount { get; private set; }
 
         private volatile bool isDisposed = false;
         private volatile bool isProcessing = false;
@@ -63,12 +70,14 @@ namespace VoiceLite.Services
         {
             lock (recognizerLock)
             {
-                if (currentModelDir == modelDir && recognizer != null)
+                var preset = settings.TranscriptionPreset;
+
+                if (currentModelDir == modelDir && currentPreset == preset && recognizer != null)
                     return;
 
                 if (recognizer != null)
                 {
-                    ErrorLogger.LogMessage($"Switching Parakeet model from {currentModelDir} to {modelDir}");
+                    ErrorLogger.LogMessage($"Reloading Parakeet recognizer: dir {currentModelDir} -> {modelDir}, preset {currentPreset} -> {preset}");
                     try { recognizer.Dispose(); }
                     catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer disposal failed during switch: {ex.Message}"); }
                     recognizer = null;
@@ -85,7 +94,7 @@ namespace VoiceLite.Services
                         throw new FileNotFoundException($"Parakeet model file missing: {f}");
                 }
 
-                var presetConfig = WhisperPresetConfig.GetPresetConfig(settings.TranscriptionPreset);
+                var presetConfig = WhisperPresetConfig.GetPresetConfig(preset);
 
                 var config = new OfflineRecognizerConfig();
                 config.FeatConfig.SampleRate = 16000;
@@ -103,6 +112,8 @@ namespace VoiceLite.Services
                 ErrorLogger.LogMessage($"Loading Parakeet model: dir={modelDir}, decoding={config.DecodingMethod}, beam={config.MaxActivePaths}");
                 recognizer = new OfflineRecognizer(config);
                 currentModelDir = modelDir;
+                currentPreset = preset;
+                RecognizerLoadCount++;
                 ErrorLogger.LogMessage("Parakeet model loaded successfully");
             }
         }
@@ -360,6 +371,7 @@ namespace VoiceLite.Services
                 catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer dispose failed: {ex.Message}"); }
                 recognizer = null;
                 currentModelDir = null;
+                currentPreset = null;
             }
 
             try { transcriptionSemaphore?.Dispose(); }
