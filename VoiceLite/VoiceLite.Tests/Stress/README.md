@@ -27,8 +27,8 @@ dotnet test --filter "FullyQualifiedName~TranscriptionStressTests"
 # Recording stress tests
 dotnet test --filter "FullyQualifiedName~RecordingStressTests"
 
-# Whisper recovery tests
-dotnet test --filter "FullyQualifiedName~WhisperRecoveryStressTests"
+# Transcription recovery tests
+dotnet test --filter "FullyQualifiedName~TranscriptionRecoveryStressTests"
 ```
 
 ### Run Individual Test
@@ -58,7 +58,7 @@ dotnet test --filter "FullyQualifiedName~StressTest_100ConsecutiveTranscriptions
 **Memory Limit**: 20-30MB growth
 **Success Criteria**: ≥90% success rate, proper disposal
 
-### Whisper Recovery Stress Tests
+### Transcription Recovery Stress Tests
 - **Mixed Success/Failure**: Alternates between good and corrupted audio
 - **Consecutive Failures**: 10 failures followed by 5 successes (recovery test)
 - **Multiple Services Sequential**: 20 service instances (process cleanup test)
@@ -161,7 +161,7 @@ cp "VoiceLite/whisper/ggml-base.bin" "VoiceLite/VoiceLite.Tests/bin/Debug/net8.0
 ### After Major Changes
 - Phase 1-2: Resource management changes → Run all stress tests
 - Audio recording changes → Run Recording stress tests
-- Whisper service changes → Run Transcription + Recovery stress tests
+- Transcription service changes → Run Transcription + Recovery stress tests
 
 ### During Development
 - Optional - stress tests are slow

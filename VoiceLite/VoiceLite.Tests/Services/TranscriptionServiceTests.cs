@@ -10,7 +10,7 @@ using Xunit;
 namespace VoiceLite.Tests.Services
 {
     /// <summary>
-    /// Shares one PersistentWhisperService (and its ~600MB native Parakeet model)
+    /// Shares one TranscriptionService (and its ~600MB native Parakeet model)
     /// across all tests in the class — loading the model per-test would be brutally slow.
     /// </summary>
     public class TranscriptionServiceFixture : IDisposable
@@ -24,11 +24,11 @@ namespace VoiceLite.Tests.Services
                 .All(f => File.Exists(Path.Combine(ModelDir, f)));
 
         public Settings Settings { get; } = new Settings();
-        public PersistentWhisperService Service { get; }
+        public TranscriptionService Service { get; }
 
         public TranscriptionServiceFixture()
         {
-            Service = new PersistentWhisperService(Settings);
+            Service = new TranscriptionService(Settings);
         }
 
         public void Dispose()
@@ -129,7 +129,7 @@ namespace VoiceLite.Tests.Services
             // Dedicated service: mutating the preset on the shared fixture would leak
             // state into the other tests in this class.
             var settings = new Settings { TranscriptionPreset = TranscriptionPreset.Balanced };
-            using var service = new PersistentWhisperService(settings);
+            using var service = new TranscriptionService(settings);
 
             var before = await service.TranscribeAsync(KnownSpeechWav, TranscriptionServiceFixture.ModelDir);
             before.ToLowerInvariant().Should().Contain("fox");
@@ -177,7 +177,7 @@ namespace VoiceLite.Tests.Services
         [Fact]
         public async Task TranscribeAsync_AfterDispose_Throws()
         {
-            using var service = new PersistentWhisperService(new Settings());
+            using var service = new TranscriptionService(new Settings());
             service.Dispose();
 
             var act = () => service.TranscribeAsync(KnownSpeechWav);

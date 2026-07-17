@@ -9,18 +9,18 @@ using VoiceLite.Services;
 namespace VoiceLite.Tests.Stress
 {
     /// <summary>
-    /// PHASE 3 - DAY 5: Stress tests for Whisper process recovery
+    /// PHASE 3 - DAY 5: Stress tests for transcription engine recovery
     ///
-    /// Purpose: Validate that PersistentWhisperService can handle:
+    /// Purpose: Validate that TranscriptionService can handle:
     /// - Multiple consecutive failures without breaking
     /// - Process cleanup after crashes
     /// - Recovery after errors (retry logic from Day 1)
     /// - Mixed success/failure scenarios
     ///
-    /// Critical: Whisper.net loads native DLLs in-process - must handle all edge cases
+    /// Critical: Sherpa-ONNX loads native DLLs in-process - must handle all edge cases
     /// </summary>
     [Trait("Category", "Stress")]
-    public class WhisperRecoveryStressTests : StressTestBase
+    public class TranscriptionRecoveryStressTests : StressTestBase
     {
         [Fact(Skip = "Stress test - run manually with: dotnet test --filter Category=Stress")]
         public async Task StressTest_MixedSuccessAndFailure_RemainsStable()
@@ -31,11 +31,11 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             string? goodAudioPath = null;
             string? badAudioPath = null;
 
@@ -47,7 +47,7 @@ namespace VoiceLite.Tests.Stress
                 badAudioPath = Path.Combine(Path.GetTempPath(), $"bad_audio_{Guid.NewGuid():N}.wav");
                 await File.WriteAllBytesAsync(badAudioPath, new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
 
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 var successCount = 0;
                 var failureCount = 0;
@@ -60,7 +60,7 @@ namespace VoiceLite.Tests.Stress
 
                     try
                     {
-                        await whisperService.TranscribeAsync(audioPath);
+                        await transcriptionService.TranscribeAsync(audioPath);
                         successCount++;
 
                         if (!useGoodAudio)
@@ -106,7 +106,7 @@ namespace VoiceLite.Tests.Stress
             }
             finally
             {
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 if (goodAudioPath != null) CleanupTestFile(goodAudioPath);
                 if (badAudioPath != null) CleanupTestFile(badAudioPath);
             }
@@ -122,18 +122,18 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             string? goodAudioPath = null;
             string? nonExistentPath = Path.Combine(Path.GetTempPath(), "does_not_exist.wav");
 
             try
             {
                 goodAudioPath = CreateTestAudioFile();
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 // Act - Cause multiple consecutive failures
                 Console.WriteLine($"=== Phase 1: {consecutiveFailures} consecutive failures ===");
@@ -143,7 +143,7 @@ namespace VoiceLite.Tests.Stress
                 {
                     try
                     {
-                        await whisperService.TranscribeAsync(nonExistentPath);
+                        await transcriptionService.TranscribeAsync(nonExistentPath);
                         Console.WriteLine($"Iteration {i + 1}: Unexpected success");
                     }
                     catch (FileNotFoundException)
@@ -169,7 +169,7 @@ namespace VoiceLite.Tests.Stress
                 {
                     try
                     {
-                        await whisperService.TranscribeAsync(goodAudioPath);
+                        await transcriptionService.TranscribeAsync(goodAudioPath);
                         successCount++;
                     }
                     catch (Exception ex)
@@ -193,7 +193,7 @@ namespace VoiceLite.Tests.Stress
             }
             finally
             {
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 if (goodAudioPath != null) CleanupTestFile(goodAudioPath);
             }
         }
@@ -202,14 +202,14 @@ namespace VoiceLite.Tests.Stress
         public async Task StressTest_MultipleServicesSequential_NoProcessLeaks()
         {
             // Arrange - Create and dispose multiple service instances
-            // This tests that Dispose() properly cleans up Whisper processes
+            // This tests that Dispose() properly cleans up native recognizer resources
             const int serviceInstances = 20;
             const int transcriptionsPerInstance = 3;
             const double maxMemoryGrowthMB = 40.0;
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
@@ -223,17 +223,17 @@ namespace VoiceLite.Tests.Stress
                 // Act - Create multiple service instances sequentially
                 for (int instance = 0; instance < serviceInstances; instance++)
                 {
-                    PersistentWhisperService? whisperService = null;
+                    TranscriptionService? transcriptionService = null;
 
                     try
                     {
-                        whisperService = new PersistentWhisperService(settings);
+                        transcriptionService = new TranscriptionService(settings);
 
                         for (int i = 0; i < transcriptionsPerInstance; i++)
                         {
                             try
                             {
-                                await whisperService.TranscribeAsync(testAudioPath);
+                                await transcriptionService.TranscribeAsync(testAudioPath);
                                 totalSuccess++;
                             }
                             catch (Exception ex)
@@ -254,7 +254,7 @@ namespace VoiceLite.Tests.Stress
                     finally
                     {
                         // Critical: Dispose each service to test cleanup
-                        whisperService?.Dispose();
+                        transcriptionService?.Dispose();
                     }
 
                     // Brief pause between instances
@@ -287,11 +287,11 @@ namespace VoiceLite.Tests.Stress
 
             var settings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 Language = "en",
             };
 
-            PersistentWhisperService? whisperService = null;
+            TranscriptionService? transcriptionService = null;
             var testFiles = new System.Collections.Generic.List<string>();
 
             try
@@ -310,7 +310,7 @@ namespace VoiceLite.Tests.Stress
                 // 3. Valid audio file
                 testFiles.Add(CreateTestAudioFile());
 
-                whisperService = new PersistentWhisperService(settings);
+                transcriptionService = new TranscriptionService(settings);
 
                 var handledCount = 0;
 
@@ -322,7 +322,7 @@ namespace VoiceLite.Tests.Stress
 
                     try
                     {
-                        var result = await whisperService.TranscribeAsync(testFile);
+                        var result = await transcriptionService.TranscribeAsync(testFile);
                         // Success or empty result is both acceptable
                         handledCount++;
                     }
@@ -352,7 +352,7 @@ namespace VoiceLite.Tests.Stress
             }
             finally
             {
-                whisperService?.Dispose();
+                transcriptionService?.Dispose();
                 foreach (var file in testFiles)
                 {
                     CleanupTestFile(file);

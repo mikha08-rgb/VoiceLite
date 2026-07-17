@@ -29,6 +29,7 @@ A weekend Handy-fork spike (Feb 27–Mar 1) that was never shipped, has no licen
 
 **2. The whole "Whisper/GGML/5-model" vocabulary**
 `PersistentWhisperService`, `WhisperModelInfo`, `settings.WhisperModel`, `WhisperPreset*`, `ModelResolverService.modelName`, `NormalizeModelName`, the Swift/Pro/Elite/Turbo/Ultra lineup — all misnomers for a single-model Parakeet app, kept "to limit blast radius." This is accidental complexity that actively misleads every reader (human and AI). Renaming is valuable but touches many call sites — do it as one deliberate, test-backed session, not piecemeal.
+**Update 2026-07-17:** rename executed — see git.
 
 **3. Phase-E zombie tests (~74 skipped methods)**
 `WhisperServiceTests`, `ModelResolverServiceTests`, `WhisperErrorRecoveryTests`, most of `WhisperModelInfoTests`, and Pro-gating tests assert against the deleted GGML world. They compile but are semantically dead and inflate the green count. Delete outright and replace with Parakeet-era tests (PLAN.md item 1).

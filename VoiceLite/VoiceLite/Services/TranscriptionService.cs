@@ -13,10 +13,9 @@ namespace VoiceLite.Services
 {
     /// <summary>
     /// In-process ASR service backed by Sherpa-ONNX + Parakeet TDT v3.
-    /// Class name kept (was Whisper-backed) to limit blast radius — rename to a
-    /// Parakeet-prefixed name is a follow-up sweep.
+    /// (Named PersistentWhisperService until the 2026-07-17 vocabulary rename.)
     /// </summary>
-    public class PersistentWhisperService : IDisposable
+    public class TranscriptionService : IDisposable
     {
         private readonly Settings settings;
         private readonly string baseDir;
@@ -44,7 +43,7 @@ namespace VoiceLite.Services
         public event EventHandler<Exception>? TranscriptionError;
         public event EventHandler<int>? ProgressChanged;
 
-        public PersistentWhisperService(Settings settings, ModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
+        public TranscriptionService(Settings settings, ModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -56,12 +55,12 @@ namespace VoiceLite.Services
             {
                 try
                 {
-                    var modelDir = this.modelResolver.ResolveModelPath(settings.WhisperModel);
+                    var modelDir = this.modelResolver.ResolveModelPath();
                     EnsureRecognizerLoaded(modelDir);
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogError("PersistentWhisperService.Warmup", ex);
+                    ErrorLogger.LogError("TranscriptionService.Warmup", ex);
                 }
             });
         }
@@ -94,7 +93,7 @@ namespace VoiceLite.Services
                         throw new FileNotFoundException($"Parakeet model file missing: {f}");
                 }
 
-                var presetConfig = WhisperPresetConfig.GetPresetConfig(preset);
+                var presetConfig = TranscriptionPresetConfig.GetPresetConfig(preset);
 
                 var config = new OfflineRecognizerConfig();
                 config.FeatConfig.SampleRate = 16000;
@@ -120,7 +119,7 @@ namespace VoiceLite.Services
 
         public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
         {
-            ErrorLogger.LogMessage($"PersistentWhisperService.TranscribeFromMemoryAsync called with {audioData.Length} bytes");
+            ErrorLogger.LogMessage($"TranscriptionService.TranscribeFromMemoryAsync called with {audioData.Length} bytes");
 
             if (audioData.Length < 100)
             {
@@ -135,7 +134,7 @@ namespace VoiceLite.Services
         // Backward compatibility overload.
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
-            return await TranscribeAsync(audioFilePath, modelResolver.ResolveModelPath(settings.WhisperModel));
+            return await TranscribeAsync(audioFilePath, modelResolver.ResolveModelPath());
         }
 
         public async Task<string> TranscribeAsync(string audioFilePath, string modelDir)
@@ -150,7 +149,7 @@ namespace VoiceLite.Services
         private async Task<string> TranscribeFromStreamAsync(Stream audioStream, string? modelDir = null)
         {
             if (isDisposed)
-                throw new ObjectDisposedException(nameof(PersistentWhisperService));
+                throw new ObjectDisposedException(nameof(TranscriptionService));
 
             bool semaphoreAcquired = false;
             CancellationToken cancellationToken;
@@ -166,7 +165,7 @@ namespace VoiceLite.Services
                 isProcessing = true;
                 var startTime = DateTime.Now;
 
-                var effectiveModelDir = modelDir ?? modelResolver.ResolveModelPath(settings.WhisperModel);
+                var effectiveModelDir = modelDir ?? modelResolver.ResolveModelPath();
                 EnsureRecognizerLoaded(effectiveModelDir);
 
                 ErrorLogger.LogWarning($"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
@@ -257,7 +256,7 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 isProcessing = false;
-                ErrorLogger.LogError("PersistentWhisperService.TranscribeAsync", ex);
+                ErrorLogger.LogError("TranscriptionService.TranscribeAsync", ex);
                 throw;
             }
             finally
@@ -296,7 +295,7 @@ namespace VoiceLite.Services
         private bool ValidateAudioFile(string audioFilePath)
         {
             if (isDisposed)
-                throw new ObjectDisposedException(nameof(PersistentWhisperService));
+                throw new ObjectDisposedException(nameof(TranscriptionService));
 
             if (!File.Exists(audioFilePath))
                 throw new FileNotFoundException($"Audio file not found: {audioFilePath}");
@@ -321,11 +320,11 @@ namespace VoiceLite.Services
             }
         }
 
-        public bool ValidateWhisperSetup()
+        public bool ValidateTranscriptionSetup()
         {
             try
             {
-                var modelDir = modelResolver.ResolveModelPath(settings.WhisperModel);
+                var modelDir = modelResolver.ResolveModelPath();
                 if (string.IsNullOrEmpty(modelDir) || !Directory.Exists(modelDir))
                 {
                     TranscriptionError?.Invoke(this, new DirectoryNotFoundException("Parakeet model directory not found"));
@@ -340,7 +339,7 @@ namespace VoiceLite.Services
             }
         }
 
-        public string GetWhisperVersion()
+        public string GetEngineVersion()
         {
             try
             {

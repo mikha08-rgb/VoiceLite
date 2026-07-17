@@ -13,7 +13,7 @@ namespace VoiceLite.Tests.Resources
     {
         /// <summary>
         /// Verifies that MainWindow.OnClosed() disposes all IDisposable services.
-        /// Services verified: audioRecorder, whisperService, hotkeyManager, recordingCoordinator,
+        /// Services verified: audioRecorder, transcriptionService, hotkeyManager, recordingCoordinator,
         /// systemTrayManager, memoryMonitor, soundService, saveSettingsSemaphore
         /// </summary>
         [Fact]
@@ -29,7 +29,7 @@ namespace VoiceLite.Tests.Resources
             // 4. recordingCoordinator
             // 5. soundService
             // 6. saveSettingsSemaphore
-            // 7. whisperService
+            // 7. transcriptionService
             // 8. audioRecorder
             
             // NOTE: This is a documentation test - MainWindow cannot be instantiated
@@ -43,7 +43,7 @@ namespace VoiceLite.Tests.Resources
                 "recordingCoordinator?.Dispose()",
                 "soundService?.Dispose()",
                 "saveSettingsSemaphore?.Dispose()",
-                "whisperService?.Dispose()",
+                "transcriptionService?.Dispose()",
                 "audioRecorder?.Dispose()"
             };
             

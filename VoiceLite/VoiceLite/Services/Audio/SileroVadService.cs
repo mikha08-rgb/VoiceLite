@@ -11,7 +11,7 @@ namespace VoiceLite.Services.Audio
     /// Silero VAD v5 preprocessing: detects speech segments in audio and trims silence.
     /// Runs ONNX inference on 512-sample windows to classify speech vs silence,
     /// then concatenates speech segments with small gaps between them.
-    /// Pipeline: HPF → NoiseGate → AGC → Silero VAD trim → Whisper
+    /// Pipeline: HPF → NoiseGate → AGC → Silero VAD trim → Parakeet
     /// </summary>
     public class SileroVadService : IDisposable
     {

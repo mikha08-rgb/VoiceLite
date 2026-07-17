@@ -39,7 +39,7 @@ namespace VoiceLite.Core.Interfaces.Features
         bool IsModelAvailable(string modelName);
 
         /// <summary>
-        /// Checks if user can use a specific Whisper model by filename.
+        /// Checks if user can use a specific transcription model by filename.
         /// SECURITY FIX (MODEL-GATE-001): Added for Pro model access control
         /// </summary>
         /// <param name="modelFileName">Model file name (e.g., "ggml-small.bin")</param>

@@ -24,10 +24,10 @@ namespace VoiceLite.Services
             bool changed = false;
 
             // Replace any persisted GGML filename (or null/empty) with the Parakeet id.
-            var current = settings.WhisperModel?.ToLowerInvariant() ?? string.Empty;
+            var current = settings.TranscriptionModel?.ToLowerInvariant() ?? string.Empty;
 
             bool isLegacyGgml = false;
-            foreach (var legacy in WhisperModelInfo.LegacyGgmlFileNames)
+            foreach (var legacy in TranscriptionModelInfo.LegacyGgmlFileNames)
             {
                 if (string.Equals(current, legacy, StringComparison.OrdinalIgnoreCase))
                 {
@@ -38,10 +38,10 @@ namespace VoiceLite.Services
 
             if (string.IsNullOrEmpty(current) || isLegacyGgml)
             {
-                if (settings.WhisperModel != ParakeetModelId)
+                if (settings.TranscriptionModel != ParakeetModelId)
                 {
-                    ErrorLogger.LogWarning($"SettingsMigration: WhisperModel '{settings.WhisperModel}' → '{ParakeetModelId}'");
-                    settings.WhisperModel = ParakeetModelId;
+                    ErrorLogger.LogWarning($"SettingsMigration: TranscriptionModel '{settings.TranscriptionModel}' → '{ParakeetModelId}'");
+                    settings.TranscriptionModel = ParakeetModelId;
                     changed = true;
                 }
             }

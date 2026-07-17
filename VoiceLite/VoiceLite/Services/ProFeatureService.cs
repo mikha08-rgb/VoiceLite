@@ -61,7 +61,7 @@ namespace VoiceLite.Services
 
         /// <summary>
         /// Advanced Settings - Reserved for future Pro feature.
-        /// Visibility infrastructure ready for Whisper parameter fine-tuning (beam size, temperature).
+        /// Visibility infrastructure ready for transcription parameter fine-tuning (beam size, temperature).
         /// </summary>
         public Visibility AdvancedSettingsVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 

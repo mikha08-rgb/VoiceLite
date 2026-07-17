@@ -18,7 +18,7 @@ namespace VoiceLite.Tests.Integration
     {
         private readonly string _testDataPath;
         private readonly AudioRecorder _audioRecorder;
-        private readonly PersistentWhisperService _whisperService;
+        private readonly TranscriptionService _transcriptionService;
         private readonly TextInjector _textInjector;
         private readonly Settings _testSettings;
 
@@ -31,13 +31,13 @@ namespace VoiceLite.Tests.Integration
             // Initialize services with test settings
             _testSettings = new Settings
             {
-                WhisperModel = "tiny",
+                TranscriptionModel = "tiny",
                 RecordHotkey = Key.F8,
                 HotkeyModifiers = ModifierKeys.Alt
             };
 
             _audioRecorder = new AudioRecorder();
-            _whisperService = new PersistentWhisperService(_testSettings);
+            _transcriptionService = new TranscriptionService(_testSettings);
             _textInjector = new TextInjector(_testSettings);
         }
 
@@ -89,13 +89,13 @@ namespace VoiceLite.Tests.Integration
             var audioPath = CreateTestAudioFile();
 
             // Act - Start transcription then immediately dispose
-            var transcriptionTask = _whisperService.TranscribeAsync(audioPath);
+            var transcriptionTask = _transcriptionService.TranscribeAsync(audioPath);
 
             // Give transcription time to start
             await Task.Delay(100);
 
             // Dispose while transcription is potentially running
-            _whisperService.Dispose();
+            _transcriptionService.Dispose();
 
             // Wait for completion or timeout
             var completedTask = await Task.WhenAny(
@@ -154,7 +154,7 @@ namespace VoiceLite.Tests.Integration
             {
                 try
                 {
-                    var result = await _whisperService.TranscribeAsync(audioPath);
+                    var result = await _transcriptionService.TranscribeAsync(audioPath);
                     if (string.IsNullOrEmpty(result))
                     {
                         failures++;
@@ -181,8 +181,8 @@ namespace VoiceLite.Tests.Integration
         {
             // Arrange
             var settingsPath = Path.Combine(_testDataPath, "test-settings.json");
-            var settings1 = new Settings { WhisperModel = "tiny", RecordHotkey = Key.F8 };
-            var settings2 = new Settings { WhisperModel = "base", RecordHotkey = Key.F9 };
+            var settings1 = new Settings { TranscriptionModel = "tiny", RecordHotkey = Key.F8 };
+            var settings2 = new Settings { TranscriptionModel = "base", RecordHotkey = Key.F9 };
 
             // Act - Save multiple times rapidly (simulating race condition)
             var tasks = new[]
@@ -199,7 +199,7 @@ namespace VoiceLite.Tests.Integration
 
             // Assert - Should have valid settings (either one)
             loadedSettings.Should().NotBeNull();
-            loadedSettings.WhisperModel.Should().BeOneOf("tiny", "base");
+            loadedSettings.TranscriptionModel.Should().BeOneOf("tiny", "base");
             loadedSettings.RecordHotkey.Should().BeOneOf(Key.F8, Key.F9);
         }
 
@@ -309,7 +309,7 @@ namespace VoiceLite.Tests.Integration
             try
             {
                 _audioRecorder?.Dispose();
-                _whisperService?.Dispose();
+                _transcriptionService?.Dispose();
                 // TextInjector no longer implements IDisposable after refactoring
 
                 if (Directory.Exists(_testDataPath))
