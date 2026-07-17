@@ -121,6 +121,31 @@ namespace VoiceLite.Tests.Services
                 "concurrent calls must queue on the transcription semaphore, not corrupt native state");
         }
 
+        [Fact]
+        public async Task ChangingTranscriptionPreset_RebuildsRecognizer_AndStillTranscribes()
+        {
+            if (!TranscriptionServiceFixture.ModelPresent) return;
+
+            // Dedicated service: mutating the preset on the shared fixture would leak
+            // state into the other tests in this class.
+            var settings = new Settings { TranscriptionPreset = TranscriptionPreset.Balanced };
+            using var service = new PersistentWhisperService(settings);
+
+            var before = await service.TranscribeAsync(KnownSpeechWav, TranscriptionServiceFixture.ModelDir);
+            before.ToLowerInvariant().Should().Contain("fox");
+            var loadsBefore = service.RecognizerLoadCount;
+
+            settings.TranscriptionPreset = TranscriptionPreset.Speed;
+
+            var after = await service.TranscribeAsync(KnownSpeechWav, TranscriptionServiceFixture.ModelDir);
+
+            service.RecognizerLoadCount.Should().BeGreaterThan(loadsBefore,
+                "changing the preset must rebuild the OfflineRecognizer — before this fix the " +
+                "Speed/Balanced/Accuracy setting was a silent no-op until restart (HEALTH.md #3)");
+            after.ToLowerInvariant().Should().Contain("fox",
+                "transcription must keep working after a preset-triggered recognizer reload");
+        }
+
         // ---- Tests that run everywhere (no model needed) ----
 
         [Fact]

@@ -686,6 +686,18 @@ namespace VoiceLite.Services
                 // MED-8 FIX: Clear stale path reference on error
                 // currentAudioFilePath was set before File.WriteAllBytes - clear it since file may not exist
                 currentAudioFilePath = null;
+
+                // The recording is gone — tell the user, don't just log it.
+                // NOTE: fired while StopRecording holds lockObject; handlers must not block
+                // (MainWindow marshals to the dispatcher with BeginInvoke).
+                try
+                {
+                    RecordingError?.Invoke(this, ex);
+                }
+                catch (Exception handlerEx)
+                {
+                    ErrorLogger.LogWarning($"RecordingError handler threw: {handlerEx.Message}");
+                }
             }
         }
 
