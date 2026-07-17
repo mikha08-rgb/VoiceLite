@@ -1,1 +1,0 @@
-pub const WHISPER_SAMPLE_RATE: u32 = 16000;
