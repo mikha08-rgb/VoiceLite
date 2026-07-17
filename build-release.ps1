@@ -26,6 +26,14 @@ if (Test-Path $outputDir) {
     Remove-Item $outputDir -Recurse -Force
 }
 
+# Stale bin/obj DLLs caused the v2.1.1 type-init crash on launch — a clean
+# publish from scratch is mandatory for release builds (see CLAUDE.md).
+Write-Host "Cleaning bin/obj (stale-DLL footgun)..." -ForegroundColor Yellow
+foreach ($dir in @("VoiceLite\VoiceLite\bin", "VoiceLite\VoiceLite\obj")) {
+    $full = Join-Path $projectDir $dir
+    if (Test-Path $full) { Remove-Item $full -Recurse -Force }
+}
+
 Write-Host "`nBuilding VoiceLite ($Configuration, win-x64, self-contained)..." -ForegroundColor Green
 dotnet publish $voiceLiteProject `
     -c $Configuration `
