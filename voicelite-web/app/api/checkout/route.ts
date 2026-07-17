@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { ipAddress } from '@vercel/edge';
+import { checkoutRateLimit, fallbackCheckoutLimit } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 
 // Lazy initialization of Stripe client
@@ -14,6 +16,30 @@ function getStripeClient() {
 }
 
 export async function POST(request: NextRequest) {
+  // Rate limiting by IP to prevent spammable Stripe session creation
+  // Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
+  const ip = ipAddress(request) || 'unknown';
+
+  // Check rate limit (5/hour per IP)
+  if (checkoutRateLimit) {
+    const { success } = await checkoutRateLimit.limit(ip);
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+  } else {
+    // Fallback to in-memory rate limiter (Upstash not configured)
+    const allowed = await fallbackCheckoutLimit.check(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+  }
+
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {

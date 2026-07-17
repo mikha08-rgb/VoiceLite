@@ -10,7 +10,9 @@ datasource db {
 
 model License {
   id                    String              @id @default(cuid())
-  userId                String
+  // Nullable to match prod: migration 20251025_make_userid_optional dropped NOT NULL
+  // (licenses are created from Stripe webhooks; userId is set today but not guaranteed)
+  userId                String?
   licenseKey            String              @unique
   type                  LicenseType
   status                LicenseStatus       @default(ACTIVE)
@@ -23,7 +25,7 @@ model License {
   updatedAt             DateTime            @default(now()) @updatedAt
   email                 String              @default("")
   lastEmailSentAt       DateTime?           // Track last email send to prevent spam
-  User                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User                  User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   events                LicenseEvent[]
   activations           LicenseActivation[]
 
