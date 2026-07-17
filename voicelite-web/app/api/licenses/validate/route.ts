@@ -15,6 +15,14 @@ import {
 import { recordLicenseActivation, recordLicenseEvent } from '@/lib/licensing';
 import { logger } from '@/lib/logger';
 
+// DEVICE-LIMIT BYPASS FIX: machineId stays optional in the schema because shipped desktop
+// clients v1.0.x-v1.2.0.1 (pre-2025-10-29, before commit 65d53bc added the 3-device limit)
+// call this endpoint with only { licenseKey } — hard-requiring machineId (400) would lock
+// out legitimate paying users on those builds. Instead, requests without a machineId are
+// recorded against a single reserved "no-device-id" activation slot per license, so they
+// still count toward the 3-device cap instead of bypassing device accounting entirely.
+const LEGACY_NO_MACHINE_ID = 'legacy-no-machine-id';
+
 const bodySchema = z.object({
   // Accept both formats:
   // - New: VL-XXXXXX-XXXXXX-XXXXXX (nanoid, may include A-Z0-9_-)
@@ -113,56 +121,58 @@ export async function POST(request: NextRequest) {
     // Previously returned stale count showing "2/3" when actually "3/3"
     let activationsUsed = license.activations.length;
 
-    // If machineId provided, record activation (enforces 3-device limit)
-    if (machineId) {
-      try {
-        await recordLicenseActivation({
+    // DEVICE-LIMIT BYPASS FIX: Always record an activation (enforces 3-device limit).
+    // Requests without a machineId (legacy clients <= v1.2.0.1) share one reserved slot
+    // instead of skipping device accounting entirely.
+    const effectiveMachineId = machineId ?? LEGACY_NO_MACHINE_ID;
+    const effectiveMachineLabel = machineId ? machineLabel : 'Legacy client (no machine ID)';
+    try {
+      await recordLicenseActivation({
+        licenseId: license.id,
+        machineId: effectiveMachineId,
+        machineLabel: effectiveMachineLabel,
+        machineHash,
+      });
+
+      // MED-6 FIX: Query fresh activation count AFTER recording
+      // This ensures the UI shows accurate "X/3 devices" count
+      const freshCount = await prisma.licenseActivation.count({
+        where: {
           licenseId: license.id,
-          machineId,
-          machineLabel,
-          machineHash,
+          status: 'ACTIVE',
+        },
+      });
+      activationsUsed = freshCount;
+    } catch (error: any) {
+      // Check if it's the activation limit error
+      if (error.message && error.message.startsWith('ACTIVATION_LIMIT_REACHED')) {
+        // MED-5 FIX: Audit log activation limit failures for abuse tracking
+        // This allows monitoring for patterns like repeated limit hits from different IPs
+        await recordLicenseEvent(license.id, 'activation_limit_reached', {
+          machineId: effectiveMachineId,
+          machineLabel: effectiveMachineLabel,
+          ip,
+          timestamp: new Date().toISOString(),
+        }).catch(logError => {
+          // Don't fail the request if audit logging fails
+          logger.warn('Failed to record activation limit event', { error: logError });
         });
 
-        // MED-6 FIX: Query fresh activation count AFTER recording
-        // This ensures the UI shows accurate "X/3 devices" count
-        const freshCount = await prisma.licenseActivation.count({
-          where: {
-            licenseId: license.id,
-            status: 'ACTIVE',
-          },
+        logger.warn('Activation limit reached', {
+          licenseId: license.id,
+          machineId: effectiveMachineId,
+          ip,
         });
-        activationsUsed = freshCount;
-      } catch (error: any) {
-        // Check if it's the activation limit error
-        if (error.message && error.message.startsWith('ACTIVATION_LIMIT_REACHED')) {
-          // MED-5 FIX: Audit log activation limit failures for abuse tracking
-          // This allows monitoring for patterns like repeated limit hits from different IPs
-          await recordLicenseEvent(license.id, 'activation_limit_reached', {
-            machineId,
-            machineLabel,
-            ip,
-            timestamp: new Date().toISOString(),
-          }).catch(logError => {
-            // Don't fail the request if audit logging fails
-            logger.warn('Failed to record activation limit event', { error: logError });
-          });
 
-          logger.warn('Activation limit reached', {
-            licenseId: license.id,
-            machineId,
-            ip,
-          });
-
-          return NextResponse.json({
-            valid: false,
-            tier: 'free',
-            error: 'Maximum 3 device activations reached. Deactivate a device in your account to continue.',
-            activationsUsed: 3,
-            maxActivations: 3,
-          }, { status: 403 });
-        }
-        throw error; // Re-throw other errors
+        return NextResponse.json({
+          valid: false,
+          tier: 'free',
+          error: 'Maximum 3 device activations reached. Deactivate a device in your account to continue.',
+          activationsUsed: 3,
+          maxActivations: 3,
+        }, { status: 403 });
       }
+      throw error; // Re-throw other errors
     }
 
     // License is valid!

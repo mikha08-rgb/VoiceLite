@@ -99,6 +99,19 @@ export const emailResendRateLimit = redis
   : null;
 
 /**
+ * Checkout rate limiter: 5 requests per hour per IP
+ * Used for /api/checkout to prevent spammable Stripe session creation
+ */
+export const checkoutRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, '1 h'),
+      analytics: true,
+      prefix: 'ratelimit:checkout',
+    })
+  : null;
+
+/**
  * License validation multi-layer rate limiting (prevents brute force attacks)
  * Layer 1: IP-based (30/hour per IP) - allows retries for typos, NAT/VPN users
  * Layer 2: License key-based (30/hour per key)
@@ -302,6 +315,7 @@ export const fallbackEmailLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); //
 export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
 export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
+export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
 
 // Fallback limiters for license validation
 // LONG-TERM FIX: Higher limits than Redis because in-memory fallback is per-instance and unreliable
@@ -321,6 +335,7 @@ if (!isConfigured) {
       fallbackOtpLimit.cleanup(),
       fallbackLicenseLimit.cleanup(),
       fallbackEmailResendLimit.cleanup(),
+      fallbackCheckoutLimit.cleanup(),
       fallbackLicenseValidationIpLimit.cleanup(),
       fallbackLicenseValidationKeyLimit.cleanup(),
       fallbackLicenseValidationGlobalLimit.cleanup(),
