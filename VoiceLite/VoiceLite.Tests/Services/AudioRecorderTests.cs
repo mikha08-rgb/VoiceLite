@@ -89,6 +89,34 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public async Task StopRecording_FiresAudioFileReady_WithValidWavOnDisk()
+        {
+            // This is the handoff the live pipeline depends on:
+            // StopRecording → preprocessing/VAD → temp WAV → AudioFileReady(path),
+            // and MainWindow feeds that path straight into the transcription service.
+            var fileReady = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _recorder.AudioFileReady += (sender, path) => fileReady.TrySetResult(path);
+
+            _recorder.StartRecording();
+            await Task.Delay(300);
+            _recorder.StopRecording();
+
+            var completed = await Task.WhenAny(fileReady.Task, Task.Delay(5000));
+            completed.Should().Be(fileReady.Task, "AudioFileReady must fire after StopRecording");
+
+            var wavPath = await fileReady.Task;
+            File.Exists(wavPath).Should().BeTrue("the path handed to the transcription service must exist");
+
+            // The transcription service expects 16kHz/16-bit/mono (silence-safe:
+            // if VAD trims everything, AudioRecorder falls back to the raw audio).
+            using var reader = new NAudio.Wave.WaveFileReader(wavPath);
+            reader.WaveFormat.SampleRate.Should().Be(16000);
+            reader.WaveFormat.Channels.Should().Be(1);
+            reader.WaveFormat.BitsPerSample.Should().Be(16);
+            reader.Length.Should().BeGreaterThan(0, "the WAV must contain audio data");
+        }
+
+        [Fact]
         public void StartRecording_WhenAlreadyRecording_DoesNothing()
         {
             _recorder.StartRecording();

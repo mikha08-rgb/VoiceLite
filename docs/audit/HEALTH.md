@@ -14,8 +14,8 @@
 ### 3. Changing the transcription preset does nothing until restart — HIGH (silent, user-facing)
 `PersistentWhisperService.EnsureRecognizerLoaded` keys its reload only on `modelDir`, which never changes (single model). The preset (Speed/Balanced/Accuracy → `DecodingMethod`/`MaxActivePaths`) is baked into `OfflineRecognizer` at load time, and `MainWindow.SettingsButton_Click:1656` explicitly skips recognizer recreation "for performance." So a user who switches accuracy mode in Settings gets **zero runtime effect** and no indication. Either wire a rebuild on preset change, or remove the setting — shipping a knob that does nothing is worse than not having it.
 
-### 4. Core feature (transcription) has ZERO active tests — HIGH (false confidence)
-The whole reason the app exists — `PersistentWhisperService` / the Parakeet `Decode()` path — has **no active unit test**. Every test that once covered it is Phase-E-skipped, and no Parakeet-era replacement was written. The suite's ~255 green tests **do not prove the app can transcribe audio**. Disposal/leak tests are solid, so the native-memory concern is covered — but functional transcription is not.
+### 4. Core feature (transcription) has ZERO active tests — ~~HIGH~~ **RESOLVED 2026-07-17**
+`TranscriptionServiceTests` now covers the Parakeet path functionally: known TTS WAV → asserts the actual spoken words come back; silence → asserts no hallucinated text; in-memory path parity; concurrent-call serialization; missing/tiny-file guards; dispose behavior. `AudioRecorderTests` gained the `StopRecording → VAD → temp WAV → AudioFileReady` handoff test (asserts a valid 16kHz/16-bit/mono WAV on disk). Model-dependent tests gate on the installed Parakeet model but assert real output when present — no early-return-to-green. Still uncovered: the AutoPaste=true injection branch (untestable safely — it fires real Ctrl+V into the focused window).
 
 ## Desktop app (`VoiceLite/`) — overall risk: MEDIUM
 

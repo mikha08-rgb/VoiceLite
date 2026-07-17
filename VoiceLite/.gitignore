@@ -45,3 +45,5 @@ settings.json
 # Backup files
 *.bak
 *~
+# Checked-in test fixture audio (deliberate exception to *.wav)
+!VoiceLite.Tests/TestData/*.wav

@@ -114,3 +114,6 @@ coverage/
 
 # Security audit documents (keep local only)
 SECURITY-AUDIT-*.md
+
+# Checked-in test fixture audio (deliberate exception to *.wav)
+!VoiceLite/VoiceLite.Tests/TestData/*.wav

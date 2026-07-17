@@ -13,7 +13,7 @@ Not a coding session; just stop active bleeding.
 3. **Confirm prod DB migration state** (`prisma migrate status`) matches `schema.prisma`.
 *Value: very high. Risk: low. These are checks + a key rotation, not refactors.*
 
-## Chunk 1 — Test safety net around what users depend on most ⭐ START HERE
+## Chunk 1 — Test safety net around what users depend on most ⭐ ~~START HERE~~ **DONE 2026-07-17** (except AutoPaste characterization — deliberately skipped, it would fire real keystrokes; zombie deletion done same day. Suite: 291 passed / 22 skipped.)
 The core transcription path has **zero active tests** (HEALTH.md #4). Before touching any desktop code, build coverage for the flow users actually pay for.
 - Add a functional test for `PersistentWhisperService`: given a known WAV + the Parakeet model present, assert non-empty transcription (gate on model presence like the old tests, but assert *real output*, not early-return-to-green).
 - Cover the `AudioRecorder → VAD → temp WAV → AudioFileReady` handoff.
