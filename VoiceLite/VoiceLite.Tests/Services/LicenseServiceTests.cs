@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Services;
@@ -6,12 +7,60 @@ using Xunit;
 
 namespace VoiceLite.Tests.Services
 {
-    public class LicenseServiceTests : IDisposable
+    /// <summary>
+    /// LicenseService has no test seam — it always reads/writes the REAL
+    /// %LOCALAPPDATA%\VoiceLite\license.dat. Without this guard, running the test
+    /// suite on a machine with an activated license (a) fails the "no license"
+    /// assertions and (b) DESTROYS the developer's real license by overwriting it
+    /// with test keys. The fixture backs the real file up for the duration of the
+    /// class and restores it afterwards; each test starts from a deleted file.
+    /// </summary>
+    public class LicenseFileGuard : IDisposable
+    {
+        internal static readonly string LicenseFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VoiceLite",
+            "license.dat");
+
+        private readonly string _backupPath;
+        private readonly bool _hadRealFile;
+
+        public LicenseFileGuard()
+        {
+            _backupPath = Path.Combine(Path.GetTempPath(), $"voicelite-license-backup-{Guid.NewGuid():N}.dat");
+            _hadRealFile = File.Exists(LicenseFilePath);
+            if (_hadRealFile)
+            {
+                File.Copy(LicenseFilePath, _backupPath, overwrite: true);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_hadRealFile)
+            {
+                File.Copy(_backupPath, LicenseFilePath, overwrite: true);
+                File.Delete(_backupPath);
+            }
+            else if (File.Exists(LicenseFilePath))
+            {
+                File.Delete(LicenseFilePath);
+            }
+        }
+    }
+
+    public class LicenseServiceTests : IClassFixture<LicenseFileGuard>, IDisposable
     {
         private LicenseService _licenseService;
 
         public LicenseServiceTests()
         {
+            // Clean slate per test: LicenseService loads license.dat in its ctor,
+            // and earlier tests in this class save/remove keys on the real path.
+            if (File.Exists(LicenseFileGuard.LicenseFilePath))
+            {
+                File.Delete(LicenseFileGuard.LicenseFilePath);
+            }
             _licenseService = new LicenseService();
         }
 

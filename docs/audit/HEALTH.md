@@ -50,6 +50,8 @@ The whole reason the app exists — `PersistentWhisperService` / the Parakeet `D
 
 ## Tests & CI — overall risk: MEDIUM (with the HIGH false-confidence flagged above)
 
+> **Update 2026-07-17 (post-audit cleanup):** the Phase-E zombies below were deleted the same day (suite is now 283 passed / 22 legitimately skipped), and a new HIGH footgun was found and fixed: **`LicenseServiceTests` had no file isolation — running `dotnet test` on a machine with an activated license OVERWROTE the real `%LOCALAPPDATA%\VoiceLite\license.dat` with test keys** (and one test failed against the real file). A `LicenseFileGuard` fixture now backs up/restores the real file around the class. The underlying cause — `LicenseService` hardcodes the real path with no test seam — still exists; any future test that news up `LicenseService` and saves must use the same guard.
+
 - **~101 methods skipped, not the "35" the docs claim.** ~74 are Phase-E debt (`WhisperServiceTests`, `ModelResolverServiceTests`, `ProFeatureServiceTests`, `WhisperErrorRecoveryTests`, most of `WhisperModelInfoTests`), the rest stress/WPF/real-audio tests. They compile fine — they're semantically obsolete zombies that pass by early-returning when the (now-absent) GGML file is missing → **false green.**
 - **Well-covered:** LicenseService (39), HotkeyManager (45), TranscriptionHistory (25), CustomShortcut (22), SileroVad (14), AudioRecorder (14), TextPostProcessor (28), disposal/leak suites. These are real.
 - `test-release.yml` fails on every release (planting a red X) and verifies nothing real.

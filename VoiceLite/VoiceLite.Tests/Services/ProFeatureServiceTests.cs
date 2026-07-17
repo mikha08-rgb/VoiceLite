@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using Moq;
 using System.Windows;
 using VoiceLite.Models;
 using VoiceLite.Services;
@@ -8,8 +7,9 @@ using Xunit;
 namespace VoiceLite.Tests.Services
 {
     /// <summary>
-    /// Tests for ProFeatureService - centralized Pro feature gating
-    /// Security-critical: Prevents freemium bypass vulnerabilities (v1.2.0.3 fix)
+    /// Tests for ProFeatureService - centralized Pro feature gating.
+    /// Post-Parakeet (v2.0) the model-gating methods are intentional no-ops (single model),
+    /// so coverage here targets what Pro actually gates today: UI visibility and tier display.
     /// </summary>
     public class ProFeatureServiceTests
     {
@@ -56,88 +56,9 @@ namespace VoiceLite.Tests.Services
 
         #endregion
 
-        #region CanUseModel Tests (Security Critical)
-
-        [Theory(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        [InlineData("ggml-tiny.bin", true)]
-        [InlineData("ggml-base.bin", true)]
-        [InlineData("ggml-small.bin", true)]
-        [InlineData("ggml-medium.bin", true)]
-        [InlineData("ggml-large-v3.bin", true)]
-        public void CanUseModel_ProUser_CanUseAllModels(string modelFileName, bool expected)
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = true };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var result = service.CanUseModel(modelFileName);
-
-            // Assert
-            result.Should().Be(expected);
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void CanUseModel_FreeUser_CanOnlyUseBaseModel()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act & Assert
-            service.CanUseModel("ggml-base.bin").Should().BeTrue("Free users can use Base model");
-            service.CanUseModel("ggml-tiny.bin").Should().BeFalse("Tiny is Pro-only");
-            service.CanUseModel("ggml-small.bin").Should().BeFalse("Small is Pro-only");
-            service.CanUseModel("ggml-medium.bin").Should().BeFalse("Medium is Pro-only");
-            service.CanUseModel("ggml-large-v3.bin").Should().BeFalse("Large is Pro-only");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void CanUseModel_CaseInsensitive_WorksCorrectly()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act & Assert
-            service.CanUseModel("GGML-BASE.BIN").Should().BeTrue("Should be case-insensitive");
-            service.CanUseModel("ggml-BASE.bin").Should().BeTrue("Should be case-insensitive");
-            service.CanUseModel("GGML-SMALL.BIN").Should().BeFalse("Small is Pro-only");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void CanUseModel_NullModelName_ReturnsFalse()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var result = service.CanUseModel(null);
-
-            // Assert
-            result.Should().BeFalse("Null model name should not be allowed");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void CanUseModel_EmptyModelName_ReturnsFalse()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var result = service.CanUseModel(string.Empty);
-
-            // Assert
-            result.Should().BeFalse("Empty model name should not be allowed");
-        }
-
-        #endregion
-
         #region Visibility Tests
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void AIModelsTabVisibility_AlwaysVisible_ForAllUsers()
         {
             // Arrange
@@ -152,7 +73,7 @@ namespace VoiceLite.Tests.Services
             proService.AIModelsTabVisibility.Should().Be(Visibility.Visible, "AI Models tab visible for Pro users");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void VoiceShortcutsTabVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -167,7 +88,7 @@ namespace VoiceLite.Tests.Services
             proService.VoiceShortcutsTabVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void ExportHistoryButtonVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -182,7 +103,7 @@ namespace VoiceLite.Tests.Services
             proService.ExportHistoryButtonVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void CustomDictionaryTabVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -197,7 +118,7 @@ namespace VoiceLite.Tests.Services
             proService.CustomDictionaryTabVisibility.Should().Be(Visibility.Visible, "Visible for Pro users");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void AdvancedSettingsVisibility_OnlyVisibleForProUsers()
         {
             // Arrange
@@ -214,106 +135,9 @@ namespace VoiceLite.Tests.Services
 
         #endregion
 
-        #region IsModelAvailable Tests
-
-        [Theory(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        [InlineData("tiny")]
-        [InlineData("ggml-tiny.bin")]
-        [InlineData("small")]
-        [InlineData("ggml-small.bin")]
-        [InlineData("medium")]
-        [InlineData("large")]
-        public void IsModelAvailable_ProUser_AllModelsAvailable(string modelName)
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = true };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var result = service.IsModelAvailable(modelName);
-
-            // Assert
-            result.Should().BeTrue($"Pro users should have access to {modelName}");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void IsModelAvailable_FreeUser_OnlyBaseModelAvailable()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act & Assert
-            service.IsModelAvailable("base").Should().BeTrue("Base model available for free");
-            service.IsModelAvailable("ggml-base.bin").Should().BeTrue("Base model available for free");
-            service.IsModelAvailable("tiny").Should().BeFalse("Tiny is Pro-only");
-            service.IsModelAvailable("small").Should().BeFalse("Small is Pro-only");
-            service.IsModelAvailable("medium").Should().BeFalse("Medium is Pro-only");
-            service.IsModelAvailable("large").Should().BeFalse("Large is Pro-only");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void IsModelAvailable_NullModelName_ReturnsFalse()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var result = service.IsModelAvailable(null);
-
-            // Assert
-            result.Should().BeFalse();
-        }
-
-        #endregion
-
-        #region GetAvailableModels Tests
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void GetAvailableModels_ProUser_ReturnsAll6Models()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = true };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var models = service.GetAvailableModels();
-
-            // Assert
-            models.Should().HaveCount(6);
-            models.Should().Contain("ggml-tiny.bin");
-            models.Should().Contain("ggml-base.bin");
-            models.Should().Contain("ggml-small.bin");
-            models.Should().Contain("ggml-medium.bin");
-            models.Should().Contain("ggml-large-v3-turbo-q8_0.bin");
-            models.Should().Contain("ggml-large-v3.bin");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void GetAvailableModels_FreeUser_ReturnsOnlyBaseModel()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var models = service.GetAvailableModels();
-
-            // Assert
-            models.Should().HaveCount(1);
-            models.Should().Contain("ggml-base.bin");
-            models.Should().NotContain("ggml-tiny.bin");
-            models.Should().NotContain("ggml-small.bin");
-            models.Should().NotContain("ggml-medium.bin");
-            models.Should().NotContain("ggml-large-v3.bin");
-        }
-
-        #endregion
-
         #region Tier Display Tests
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void TierName_ProUser_ReturnsPro()
         {
             // Arrange
@@ -327,7 +151,7 @@ namespace VoiceLite.Tests.Services
             tierName.Should().Be("Pro ⭐");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void TierName_FreeUser_ReturnsFree()
         {
             // Arrange
@@ -341,42 +165,11 @@ namespace VoiceLite.Tests.Services
             tierName.Should().Be("Free");
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void TierDescription_ProUser_ShowsProBenefits()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = true };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var description = service.TierDescription;
-
-            // Assert
-            description.Should().Contain("Pro tier unlocked");
-            description.Should().Contain("5 AI models");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void TierDescription_FreeUser_ShowsUpgradeBenefits()
-        {
-            // Arrange
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act
-            var description = service.TierDescription;
-
-            // Assert
-            description.Should().Contain("Free tier");
-            description.Should().Contain("Base model");
-            description.Should().Contain("Upgrade to Pro");
-        }
-
         #endregion
 
         #region GetUpgradeMessage Tests
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void GetUpgradeMessage_ReturnsFormattedMessage()
         {
             // Arrange
@@ -395,25 +188,9 @@ namespace VoiceLite.Tests.Services
 
         #endregion
 
-        #region Security Regression Tests (v1.2.0.3)
+        #region Security Regression Tests
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
-        public void SecurityTest_FreeUserCannotBypassProCheck_ByManuallyDownloadingModel()
-        {
-            // Arrange - Simulate user manually downloading Pro model file
-            var settings = new Settings { IsProLicense = false };
-            var service = new ProFeatureService(settings);
-
-            // Act - User tries to use manually downloaded Pro model
-            var canUseSmall = service.CanUseModel("ggml-small.bin");
-            var canUseLarge = service.CanUseModel("ggml-large-v3.bin");
-
-            // Assert - Should be blocked even if file exists on disk
-            canUseSmall.Should().BeFalse("Free users cannot bypass Pro check by manually downloading models");
-            canUseLarge.Should().BeFalse("Free users cannot bypass Pro check by manually downloading models");
-        }
-
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void SecurityTest_FreeUserCannotAccessProFeatures_ViaUIHiding()
         {
             // Arrange
@@ -433,22 +210,22 @@ namespace VoiceLite.Tests.Services
             advancedVisible.Should().Be(Visibility.Collapsed);
         }
 
-        [Fact(Skip = "Phase E debt — Pro gating now no-op (single Parakeet model), see docs/parakeet-migration-plan.md")]
+        [Fact]
         public void SecurityTest_LicenseStatusChange_ReflectsImmediately()
         {
-            // Arrange - Start as free user
+            // Settings is shared by reference; LicenseService mutates IsProLicense directly
+            // on activation, so the service must reflect the new state on the next read.
             var settings = new Settings { IsProLicense = false };
             var service = new ProFeatureService(settings);
 
             service.IsProUser.Should().BeFalse("Initial state: free user");
-            service.CanUseModel("ggml-small.bin").Should().BeFalse("Cannot use Pro models initially");
+            service.VoiceShortcutsTabVisibility.Should().Be(Visibility.Collapsed, "Pro features hidden initially");
 
             // Act - Activate Pro license
             settings.IsProLicense = true;
 
             // Assert - Pro features should be immediately available
             service.IsProUser.Should().BeTrue("License activated");
-            service.CanUseModel("ggml-small.bin").Should().BeTrue("Can now use Pro models");
             service.VoiceShortcutsTabVisibility.Should().Be(Visibility.Visible, "Pro features now visible");
         }
 

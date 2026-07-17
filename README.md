@@ -39,7 +39,7 @@ The model isn't bundled with the installer. On first launch, VoiceLite downloads
 
 **Offline?** Yes, 100%. Voice never leaves your PC.
 
-**Languages?** 99 supported. Change in Settings → Language.
+**Languages?** 25 European languages (Parakeet TDT 0.6B v3). Change in Settings → Language.
 
 **Works in games?** Yes. Use windowed mode if fullscreen blocks hotkey.
 

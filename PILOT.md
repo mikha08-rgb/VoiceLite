@@ -6,7 +6,7 @@ Guidance for deploying VoiceLite in healthcare or other privacy-sensitive contex
 
 VoiceLite is designed to keep voice and transcribed text **on the user's device**.
 
-- **Transcription is in-process.** Whisper.net loads the model into the VoiceLite process via P/Invoke (`WhisperFactory.FromPath()`) and runs inference locally. No audio or text is sent to any external service for transcription.
+- **Transcription is in-process.** Sherpa-ONNX loads the NVIDIA Parakeet model into the VoiceLite process (native library, no subprocess) and runs inference locally on CPU. No audio or text is sent to any external service for transcription.
 - **No telemetry, no analytics, no crash reporter.** The app does not phone home for any reason other than license validation (see below).
 - **Temporary audio files** are written to `%TEMP%\VoiceLite\audio\` during recording, then cleaned on every app startup and via a 30-minute sweep timer while the app is running.
 - **Transcription history** is stored locally in `%LOCALAPPDATA%\VoiceLite\settings.json`, capped at the 250 most recent items (~500KB–1MB at full capacity). For clinical deployments where on-device history is undesirable, set `"EnableHistory": false` in `settings.json` (default: `true`) — transcriptions will never be written to the history list. Alternatively, the settings file can be cleared on logoff via a Windows scheduled task.
@@ -38,13 +38,12 @@ The license server is rate-limited (5 validations/hour/IP) and caches results fo
 
 This is a one-time setup task done in Windows Settings → System → About → Rename this PC.
 
-### Model downloads (user-initiated only)
+### Model download (first launch only)
 
-When a user downloads additional Whisper models from the app, the download is fetched from one of:
-- `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/...`
-- `https://github.com/mikha08-rgb/VoiceLite/releases/download/...`
+The speech model (~640MB) is not bundled with the installer. On first launch, VoiceLite downloads it from:
+- `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/...` (the Sherpa-ONNX project's official model releases on GitHub)
 
-These are anonymous GETs. No user data is sent.
+This is an anonymous GET. No user data is sent. After this one-time download the model lives at `%LOCALAPPDATA%\VoiceLite\models\` and no further model traffic occurs. For fully air-gapped deployment, the model directory can be pre-seeded by IT before first launch.
 
 ## Logging
 
@@ -58,11 +57,16 @@ The app writes diagnostic logs to `%LOCALAPPDATA%\VoiceLite\logs\voicelite.log`.
 
 ## Clipboard behavior
 
-When VoiceLite pastes transcribed text into another application, it briefly places the text on the Windows clipboard. **As of the pilot build, the clipboard is auto-cleared 2 seconds after paste** to prevent transcribed content from lingering on shared workstations. The auto-clear is "match-before-clear" — it only clears the clipboard if the transcribed text is still on it (so if the user copies something else in between, their content is preserved).
+When VoiceLite delivers transcribed text, it places the text on the Windows clipboard. How long it stays there depends on the paste mode:
+
+- **Auto-paste ON (default):** VoiceLite pastes into the active window, then **auto-clears the clipboard 2 seconds after paste**.
+- **Auto-paste OFF (manual paste):** the text is **held on the clipboard for 30 seconds** so the user has time to click into the target field and paste it themselves, then cleared.
+
+In both modes the clear is "match-before-clear" — it only clears the clipboard if the transcribed text is still on it (if the user copies something else in between, their content is preserved). For shared clinical workstations, prefer auto-paste ON for the shorter clipboard exposure.
 
 ## Settings & License Storage
 
-- `%LOCALAPPDATA%\VoiceLite\settings.json` — preferences (hotkey, model selection, UI options). No PII, no license key.
+- `%LOCALAPPDATA%\VoiceLite\settings.json` — preferences (hotkey, language, UI options) and, if history is enabled, recent transcriptions. No license key.
 - `%LOCALAPPDATA%\VoiceLite\license.dat` — DPAPI-encrypted license key + email, tied to the Windows user account. Cannot be read by other users on the same machine.
 
 ## Pilot Onboarding Checklist
@@ -72,7 +76,7 @@ When VoiceLite pastes transcribed text into another application, it briefly plac
 3. **Issue pilot license keys** to each user via the licensing dashboard (`voicelite-web/manual-license.mjs`).
 4. **Install VoiceLite** from the signed installer; first launch should be done by an admin/IT user.
 5. **Activate license** on first launch (one-time, requires internet).
-6. **Verify privacy expectations** with the user: no audio leaves the device, transcription is local, clipboard auto-clears 2s after paste.
+6. **Verify privacy expectations** with the user: no audio leaves the device, transcription is local, clipboard auto-clears after paste (2s in auto-paste mode; 30s hold in manual-paste mode).
 
 ## Support
 

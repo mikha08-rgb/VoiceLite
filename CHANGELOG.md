@@ -4,6 +4,44 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.2] - 2026-05-26
+
+### Fixed
+- AutoPaste-off flow now holds transcription on the clipboard for 30s (match-before-clear) so it can actually be pasted manually.
+
+### Added
+- Installer `[UninstallDelete]` support: uninstall preserves user data by default; pass `/PURGEDATA` to wipe `%LOCALAPPDATA%\VoiceLite`.
+
+## [2.1.1] - 2026-05-25 *(committed, never tagged/released — superseded by 2.1.2 the next day)*
+
+### Added
+- Startup update check (GitHub releases) with tray notification.
+- Uninstall preserves user data by default.
+
+## [2.1.0] - 2026-05-25
+
+### Added
+- **Custom Dictionary** — user-defined text replacements applied post-transcription; first concrete Pro feature (UI tab is Pro-gated).
+
+## [2.0.2] - 2026-05-25
+
+### Changed
+- Settings UI honesty pass — removed/relabeled controls that no longer applied post-migration.
+
+## [2.0.1] - 2026-05-25
+
+### Fixed
+- Code-review fixes from the v2.0.0 migration; removed tracked GGML leftovers.
+
+## [2.0.0] - 2026-05-24 — **Parakeet migration**
+
+### Changed
+- **Speech engine replaced entirely**: Whisper.net + 5 GGML models → Sherpa-ONNX running NVIDIA Parakeet TDT 0.6B v3 (single model, in-process, CPU-only, 25 European languages). Faster than Whisper Large v3 with better WER and no hallucination-on-silence.
+- Model is downloaded on first launch (~640MB) instead of bundled.
+
+### Removed
+- Whisper.net, GGML model lineup (tiny/base/small/medium/large), model-tier Pro gating.
+
 ## [1.4.0.0] - 2026-02-15
 
 ### Added

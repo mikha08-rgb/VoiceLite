@@ -41,38 +41,9 @@ namespace VoiceLite.Tests.Integration
             _textInjector = new TextInjector(_testSettings);
         }
 
-        [Fact(Skip = "Phase E debt — pipeline test wired for Whisper.net; needs Sherpa-ONNX + real Parakeet model files. See docs/parakeet-migration-plan.md.")]
-        public async Task FullTranscriptionPipeline_RecordTranscribeInject_ShouldComplete()
-        {
-            // Arrange
-            string? audioPath = null;
-            string? transcribedText = null;
-            var transcriptionCompleted = new TaskCompletionSource<bool>();
-
-            _audioRecorder.AudioFileReady += (sender, path) => audioPath = path;
-
-            // Act - Record silence for 1 second
-            _audioRecorder.StartRecording();
-            await Task.Delay(1000);
-            _audioRecorder.StopRecording();
-
-            // Wait for audio file to be ready
-            await Task.Delay(500);
-
-            // Verify audio was recorded
-            audioPath.Should().NotBeNullOrEmpty("Audio file should be created");
-            File.Exists(audioPath).Should().BeTrue("Audio file should exist");
-
-            // Transcribe (will return empty or noise for silence)
-            if (!string.IsNullOrEmpty(audioPath))
-            {
-                transcribedText = await _whisperService.TranscribeAsync(audioPath);
-            }
-
-            // Assert - Pipeline completed without errors
-            // (Transcription might be empty for silence, that's okay)
-            _audioRecorder.IsRecording.Should().BeFalse();
-        }
+        // The Whisper-era full-pipeline test was deleted 2026-07-17. A real Parakeet functional
+        // transcription test (known WAV + model present → non-empty text) is the top item in
+        // docs/audit/PLAN.md Chunk 1 — transcription currently has zero active coverage.
 
         [Fact]
         public async Task RapidStartStop_50Times_ShouldNotCrashOrLeak()

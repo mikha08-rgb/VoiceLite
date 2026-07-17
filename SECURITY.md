@@ -26,10 +26,9 @@ If you discover a security vulnerability in VoiceLite, please report it responsi
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.4.0.x | ✅ Yes (Latest)    |
-| 1.3.0.x | ✅ Yes             |
-| 1.2.0.x | ⚠️ Limited         |
-| < 1.2   | ❌ No (Please upgrade) |
+| 2.1.x   | ✅ Yes (Latest)    |
+| 2.0.x   | ⚠️ Limited (please upgrade) |
+| < 2.0   | ❌ No (Whisper-era builds, please upgrade) |
 
 ## Security Measures
 
