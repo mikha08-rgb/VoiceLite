@@ -21,7 +21,7 @@ The core transcription path has **zero active tests** (HEALTH.md #4). Before tou
 - **Delete the ~74 Phase-E zombie tests** (`WhisperServiceTests`, `ModelResolverServiceTests`, `WhisperErrorRecoveryTests`, the GGML parts of `WhisperModelInfoTests`, obsolete `ProFeatureServiceTests`) — they give false green and confuse the count. Web side: keep the strong LicenseService/webhook coverage; add a test that reproduces the webhook-idempotency drop (Chunk 3 depends on it).
 *Value: very high (unlocks safe changes everywhere). Risk: low (adding/removing tests can't break prod).*
 
-## Chunk 2 — Fix the two silent user-facing bugs
+## Chunk 2 — Fix the two silent user-facing bugs — **DONE 2026-07-17** (preset now rebuilds the recognizer lazily + test; lost-audio and failed-paste both surface red status via existing MainWindow mechanism)
 With Chunk 1's net in place:
 1. **Transcription preset no-op** (HEALTH.md #3): either rebuild the `OfflineRecognizer` on preset change, or remove the Speed/Balanced/Accuracy setting entirely. Decide via QUESTIONS.md #8. Add a test proving the chosen behavior.
 2. **Silent failures**: surface a user-visible signal when `SaveMemoryBufferToTempFile` loses audio or `TextInjector` fails to inject (today both are log-only). Small, high-empathy fixes.
@@ -31,7 +31,7 @@ With Chunk 1's net in place:
 Rework `webhook/route.ts` so the `WebhookEvent` idempotency row is committed **only after** successful processing (or is deleted on failure), so Stripe's retries actually reprocess. Reproduce with the Chunk 1 test first, then fix, then confirm the test goes green. Consider folding `fix-stripe-webhooks.ts`'s reconciliation into a scheduled job.
 *Value: high (stops losing paid customers). Risk: medium (payment path — test-first, deploy to preview, watch a real event).*
 
-## Chunk 4 — Harden the licensing edges
+## Chunk 4 — Harden the licensing edges — **DONE 2026-07-17 except item 3** (machineId: legacy clients ≤v1.2.0.1 never sent it, so it stays optional but omission now consumes a reserved "legacy-no-machine-id" activation slot — bypass closed without locking out old builds; checkout rate-limited 5/h/IP; migrations reconciled + schema userId made nullable to match prod. Item 3, offline-Pro revalidation, still open — QUESTIONS #9.)
 1. Make `machineId` required on `validate` (or document why optional) — close the device-limit bypass (QUESTIONS.md #6).
 2. Add rate limiting to `checkout`.
 3. Decide the offline-Pro-revalidation question (QUESTIONS.md #9) and implement.
@@ -57,7 +57,7 @@ The prominent docs describe a product that doesn't exist and are actively danger
 One deliberate, test-backed pass (needs Chunk 1's net). Rename `PersistentWhisperService`→`TranscriptionService`, `WhisperModelInfo`, `settings.WhisperModel`, `WhisperPreset*`, drop dead `modelName`/`NormalizeModelName`. Big diff, mechanical, but touches many call sites and the settings-serialization key (`WhisperModel` in `settings.json` — needs a migration shim so existing users' settings still load).
 *Value: medium (clarity). Risk: medium (settings compat — do carefully, or defer). Protected areas from COMPLEXITY.md must keep their guard code even when renamed.*
 
-## Chunk 8 — Repo hygiene sweep (mostly free)
+## Chunk 8 — Repo hygiene sweep (mostly free) — **mostly DONE 2026-07-17** (disk junk, git gc, 10 dead local branches, .bat pile, dangerous build-installer.ps1, broken hook all gone; build-release.ps1 now cleans bin/obj. Still open: `test-reliability-improvements` branch — 15 unpushed MVVM commits awaiting Misha's keep/kill call — and pruning stale REMOTE branches.)
 - Delete untracked cruft: 42 root installer `.exe`s (12.4 GB), `voicelite-tauri-old/` if not done in Chunk 5, `sandbox-test/`, `coverage/`, `TestResults/`, `bfg.jar`, `voicelite-web-v1.0.72/`, the `~/` dir, the `nul` file. All untracked → deletion is free and zero-risk.
 - Reclaim ~2 GB: back up `.git`, then `git reflog expire --expire=now --all && git gc --prune=now`.
 - Prune the 9 dead local backup/archive branches and stale remotes (keep `master`; verify `test-reliability-improvements`'s 15 commits first — QUESTIONS.md #13).

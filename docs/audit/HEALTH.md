@@ -11,7 +11,7 @@
 ### 2. Webhook idempotency can permanently drop a paid license — HIGH
 `voicelite-web/app/api/webhook/route.ts` writes the `WebhookEvent` idempotency row **before** processing the payment, and never rolls it back on failure. If license creation or the confirmation email throws, the handler returns 500 so Stripe retries — but the retry sees the already-committed row, short-circuits as `{cached:true}`, and **never reprocesses**. Net effect: a transient hiccup means the customer paid and never gets a license, and Stripe's retry can't fix it. The existence of `scripts/fix-stripe-webhooks.ts` (a back-fill reconciler) is evidence this already happens. **This is the most likely thing quietly costing you customers.**
 
-### 3. Changing the transcription preset does nothing until restart — HIGH (silent, user-facing)
+### 3. Changing the transcription preset does nothing until restart — ~~HIGH~~ **RESOLVED 2026-07-17** (preset is now part of the recognizer reload key; rebuilds lazily on next transcription; functional test added)
 `PersistentWhisperService.EnsureRecognizerLoaded` keys its reload only on `modelDir`, which never changes (single model). The preset (Speed/Balanced/Accuracy → `DecodingMethod`/`MaxActivePaths`) is baked into `OfflineRecognizer` at load time, and `MainWindow.SettingsButton_Click:1656` explicitly skips recognizer recreation "for performance." So a user who switches accuracy mode in Settings gets **zero runtime effect** and no indication. Either wire a rebuild on preset change, or remove the setting — shipping a knob that does nothing is worse than not having it.
 
 ### 4. Core feature (transcription) has ZERO active tests — ~~HIGH~~ **RESOLVED 2026-07-17**
