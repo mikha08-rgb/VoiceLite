@@ -148,10 +148,23 @@ export async function POST(request: NextRequest) {
     // Return 500 for transient errors (Stripe will retry)
     // Return 200 for permanent errors (no point retrying)
     if (error instanceof RetriableError) {
+      // BUGFIX: The idempotency row was claimed at line ~104, BEFORE processing.
+      // On a transient failure we must RELEASE that claim, otherwise Stripe's retry
+      // hits the existing WebhookEvent row, short-circuits as { cached: true }, and
+      // NEVER re-runs handleCheckoutCompleted — so the customer pays and never gets a
+      // license. Deleting the row lets the retry re-claim and actually reprocess.
+      try {
+        await prisma.webhookEvent.delete({ where: { eventId: event.id } });
+      } catch (releaseError) {
+        // If we can't release the claim, log loudly — this event will need the
+        // scripts/fix-stripe-webhooks.ts reconciliation to recover.
+        logger.error('Failed to release webhook idempotency claim after transient error', releaseError, { eventId: event.id });
+      }
       return NextResponse.json({ error: error.message, eventId: event.id }, { status: 500 });
     }
 
-    // Permanent failure - don't retry
+    // Permanent failure - don't retry. The claim stays in place intentionally so
+    // Stripe stops resending an event we can never process (e.g. malformed email).
     return NextResponse.json({ error: 'Processing error', eventId: event.id }, { status: 200 });
   }
 
