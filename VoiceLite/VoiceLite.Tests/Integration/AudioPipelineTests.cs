@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Services;
 using Xunit;
 
 namespace VoiceLite.Tests.Integration
@@ -16,7 +17,6 @@ namespace VoiceLite.Tests.Integration
     public class AudioPipelineTests : IDisposable
     {
         private readonly AudioRecorder _recorder;
-        private readonly TranscriptionService _transcriber;
         private readonly TextInjector _textInjector;
         private readonly Settings _settings;
         private readonly string _tempDirectory;
@@ -26,49 +26,44 @@ namespace VoiceLite.Tests.Integration
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
             Directory.CreateDirectory(_tempDirectory);
 
-            _settings = new Settings
-            {
-                TranscriptionModel = "base",
-            };
-
+            _settings = new Settings();
             _recorder = new AudioRecorder();
-
-            // Only create transcriber if model file exists
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            _transcriber = File.Exists(modelPath)
-                ? new TranscriptionService(_settings)
-                : null!;
-
             _textInjector = new TextInjector(_settings);
         }
 
         public void Dispose()
         {
             _recorder?.Dispose();
-            _transcriber?.Dispose();
         }
 
         [Fact]
         public async Task FullPipeline_RecordTranscribeInject_CompletesSuccessfully()
         {
-            if (_transcriber == null)
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
-                // Skip if model not available
                 return;
             }
 
-            var audioDataReceived = false;
-            var transcriptionResult = string.Empty;
+            using var transcriber = new TranscriptionService(_settings);
+
             byte[]? capturedAudio = null;
+            var transcriptionDone = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             // Setup event handler for audio data
             _recorder.AudioDataReady += async (sender, audioData) =>
             {
-                audioDataReceived = true;
                 capturedAudio = audioData;
-
-                // Transcribe the audio
-                transcriptionResult = await _transcriber.TranscribeFromMemoryAsync(audioData);
+                try
+                {
+                    // Transcribe the audio (recorder → transcriber wiring, in-memory path)
+                    transcriptionDone.TrySetResult(await transcriber.TranscribeFromMemoryAsync(audioData));
+                }
+                catch (Exception ex)
+                {
+                    transcriptionDone.TrySetException(ex);
+                }
             };
 
             // Start recording
@@ -82,13 +77,16 @@ namespace VoiceLite.Tests.Integration
             _recorder.StopRecording();
             _recorder.IsRecording.Should().BeFalse();
 
-            // Wait for processing
-            await Task.Delay(1000);
+            // Wait for transcription to finish BEFORE the transcriber is disposed —
+            // disposing mid-decode risks a native access violation. Generous timeout
+            // because the first call also loads the ~600MB model.
+            var completed = await Task.WhenAny(transcriptionDone.Task, Task.Delay(TimeSpan.FromSeconds(90)));
+            completed.Should().Be(transcriptionDone.Task, "transcription should complete");
 
             // Verify pipeline stages
-            audioDataReceived.Should().BeTrue("Audio data should be captured");
-            capturedAudio.Should().NotBeNull();
+            capturedAudio.Should().NotBeNull("Audio data should be captured");
             capturedAudio!.Length.Should().BeGreaterThan(0, "Audio buffer should contain data");
+            var transcriptionResult = await transcriptionDone.Task;
             transcriptionResult.Should().NotBeNull("Transcription should complete");
         }
 

@@ -12,8 +12,24 @@ on:
         type: string
 
 jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Run tests
+      run: dotnet test VoiceLite/VoiceLite.Tests/VoiceLite.Tests.csproj -c Release
+
   build-installer:
     runs-on: windows-latest
+    needs: test
     permissions:
       contents: write
 
@@ -82,8 +98,8 @@ jobs:
             Write-Host $error -ForegroundColor Red
           }
           Write-Host ""
-          Write-Host "HINT: The post-commit git hook should auto-sync versions." -ForegroundColor Yellow
-          Write-Host "If versions are out of sync, update VoiceLite.csproj and commit again." -ForegroundColor Yellow
+          Write-Host "Fix: manually bump <Version> in VoiceLite/VoiceLite/VoiceLite.csproj and" -ForegroundColor Yellow
+          Write-Host "#define MyAppVersion in VoiceLite/Installer/VoiceLiteSetup.iss to match the tag." -ForegroundColor Yellow
           exit 1
         }
 
@@ -139,7 +155,9 @@ jobs:
         # v2.2.0: direct download from jrsoftware.org started returning corrupt
         # files (HTML instead of the exe). Chocolatey is preinstalled on
         # windows-latest runners and installs to the same Program Files path.
-        choco install innosetup --yes --no-progress
+        # Version pinned for reproducibility/supply-chain safety — bump deliberately
+        # (latest on community.chocolatey.org as of 2026-07-17: 6.7.1).
+        choco install innosetup --version=6.7.1 --yes --no-progress
 
         $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
         if (-not (Test-Path $isccPath)) {
