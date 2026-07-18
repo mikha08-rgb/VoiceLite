@@ -34,58 +34,6 @@ const redis = isConfigured
   : null;
 
 /**
- * Email rate limiter: 5 requests per hour per email
- * Used for magic link requests to prevent spam
- */
-export const emailRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(5, '1 h'),
-      analytics: true,
-      prefix: 'ratelimit:email',
-    })
-  : null;
-
-/**
- * OTP rate limiter: 10 attempts per hour per email
- * Used for OTP verification to prevent brute force
- */
-export const otpRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(10, '1 h'),
-      analytics: true,
-      prefix: 'ratelimit:otp',
-    })
-  : null;
-
-/**
- * License operations rate limiter: 30 operations per day per user
- * Used for license issue, activate, renew, deactivate
- */
-export const licenseRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(30, '1 d'),
-      analytics: true,
-      prefix: 'ratelimit:license',
-    })
-  : null;
-
-/**
- * Profile API rate limiter: 100 requests per hour per user
- * Used for /api/me endpoint to prevent abuse
- */
-export const profileRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(100, '1 h'),
-      analytics: true,
-      prefix: 'ratelimit:profile',
-    })
-  : null;
-
-/**
  * Email resend rate limiter: 3 requests per hour per IP
  * Used for /api/licenses/resend-email to prevent enumeration and spam
  */
@@ -311,9 +259,6 @@ export class InMemoryRateLimiter {
 }
 
 // Fallback limiters (in-memory, single-instance only)
-export const fallbackEmailLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
-export const fallbackOtpLimit = new InMemoryRateLimiter(10, 60 * 60 * 1000); // 10/hour
-export const fallbackLicenseLimit = new InMemoryRateLimiter(30, 24 * 60 * 60 * 1000); // 30/day
 export const fallbackEmailResendLimit = new InMemoryRateLimiter(3, 60 * 60 * 1000); // 3/hour
 export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000); // 5/hour
 
@@ -324,22 +269,17 @@ export const fallbackCheckoutLimit = new InMemoryRateLimiter(5, 60 * 60 * 1000);
 export const fallbackLicenseValidationIpLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour per IP (lenient)
 export const fallbackLicenseValidationKeyLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour per key (lenient)
 export const fallbackLicenseValidationGlobalLimit = new InMemoryRateLimiter(5000, 60 * 60 * 1000); // 5000/hour global (lenient)
-export const fallbackProfileLimit = new InMemoryRateLimiter(100, 60 * 60 * 1000); // 100/hour
 
 // Cleanup fallback limiters every 10 minutes
 // HIGH-2 FIX: Updated to use async cleanup methods
 if (!isConfigured) {
   setInterval(async () => {
     await Promise.all([
-      fallbackEmailLimit.cleanup(),
-      fallbackOtpLimit.cleanup(),
-      fallbackLicenseLimit.cleanup(),
       fallbackEmailResendLimit.cleanup(),
       fallbackCheckoutLimit.cleanup(),
       fallbackLicenseValidationIpLimit.cleanup(),
       fallbackLicenseValidationKeyLimit.cleanup(),
       fallbackLicenseValidationGlobalLimit.cleanup(),
-      fallbackProfileLimit.cleanup(),
     ]);
   }, 10 * 60 * 1000);
 }

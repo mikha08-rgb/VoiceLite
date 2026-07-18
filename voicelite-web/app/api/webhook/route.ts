@@ -48,6 +48,23 @@ async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
 // Configure route to receive raw body for Stripe signature verification
 export const dynamic = 'force-dynamic';
 
+// Give processing (Stripe API + DB + email) headroom so we aren't killed mid-flight
+// by the default function timeout, stranding the idempotency claim.
+export const maxDuration = 60;
+
+// Idempotency claim state: WebhookEvent.processedAt is non-nullable in the schema,
+// so we use the Unix epoch as a sentinel meaning "claimed but not yet processed".
+// A real (recent) processedAt means processing completed successfully.
+const UNPROCESSED_SENTINEL = new Date(0);
+
+// If a claim is older than this and still unprocessed, the claiming invocation is
+// presumed dead (Vercel timeout/OOM/deploy kill) and the claim can be taken over.
+const STALE_CLAIM_MS = 5 * 60 * 1000;
+
+function isProcessed(processedAt: Date): boolean {
+  return processedAt.getTime() !== UNPROCESSED_SENTINEL.getTime();
+}
+
 // Lazy initialization of Stripe client to allow builds without env vars
 function getStripeClient() {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
@@ -63,15 +80,6 @@ function getStripeClient() {
 
 export async function POST(request: NextRequest) {
   const stripe = getStripeClient();
-
-  // Verify request origin for additional CSRF protection
-  const origin = request.headers.get('origin');
-  const allowedOrigins = ['https://stripe.com', 'https://dashboard.stripe.com'];
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    logger.warn('Suspicious webhook origin', { origin });
-    // Still allow - Stripe doesn't always set origin, but log for monitoring
-  }
 
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
@@ -97,32 +105,69 @@ export async function POST(request: NextRequest) {
   // The previous upsert approach had a race condition: two simultaneous requests
   // would both create with identical timestamps and both pass the timestamp check.
   // Now we use CREATE with unique constraint - only ONE request can succeed.
+  //
+  // STALE-CLAIM FIX: the claim is created with the UNPROCESSED_SENTINEL and only
+  // stamped with a real processedAt AFTER processing succeeds. Previously the claim
+  // was created already "processed", so a hard crash (timeout/OOM/deploy kill)
+  // between claim and completion stranded the claim forever and every Stripe retry
+  // short-circuited as cached — customer paid, no license. Now a claim that is
+  // still unprocessed after STALE_CLAIM_MS can be taken over atomically by a retry.
   const now = new Date();
-  let isFirstProcessing = false;
 
   try {
     await prisma.webhookEvent.create({
       data: {
         eventId: event.id,
         seenAt: now,
-        processedAt: now,
+        processedAt: UNPROCESSED_SENTINEL,
       },
     });
     // INSERT succeeded - we're the first processor
-    isFirstProcessing = true;
   } catch (error: any) {
     // Check if this is a unique constraint violation (record already exists)
     if (error?.code === 'P2002') {
-      // Record already exists - another request is processing or has processed this event
-      logger.info('Event already claimed, skipping', { eventId: event.id });
-      return NextResponse.json({ received: true, cached: true });
-    }
-    // Unexpected error - re-throw
-    throw error;
-  }
+      const existing = await prisma.webhookEvent.findUnique({
+        where: { eventId: event.id },
+      });
 
-  if (!isFirstProcessing) {
-    return NextResponse.json({ received: true, cached: true });
+      if (!existing || isProcessed(existing.processedAt)) {
+        // Fully processed (or claim vanished between create and read) - genuine duplicate
+        logger.info('Event already processed, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      const staleCutoff = new Date(Date.now() - STALE_CLAIM_MS);
+      if (existing.seenAt >= staleCutoff) {
+        // Another invocation claimed this recently and is presumably still processing
+        logger.info('Event claimed by a live invocation, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      // Stale unprocessed claim from a crashed invocation - take it over ATOMICALLY.
+      // The updateMany's where clause guarantees only one competing retry wins.
+      const takeover = await prisma.webhookEvent.updateMany({
+        where: {
+          eventId: event.id,
+          processedAt: UNPROCESSED_SENTINEL,
+          seenAt: { lt: staleCutoff },
+        },
+        data: { seenAt: new Date() },
+      });
+
+      if (takeover.count !== 1) {
+        logger.info('Lost stale-claim takeover race, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      // We own the stale claim now - fall through and process. Worst case a crashed
+      // invocation got partway through: reprocessing is tolerable because
+      // upsertLicenseFromStripe is keyed on stripePaymentIntentId/subscriptionId
+      // (no duplicate license; at most a duplicate email, rate-limited to 1/5min).
+      logger.warn('Took over stale webhook claim from crashed invocation', { eventId: event.id });
+    } else {
+      // Unexpected error - re-throw
+      throw error;
+    }
   }
 
   try {
@@ -165,8 +210,18 @@ export async function POST(request: NextRequest) {
 
     // Permanent failure - don't retry. The claim stays in place intentionally so
     // Stripe stops resending an event we can never process (e.g. malformed email).
+    // Note: processedAt is still the unprocessed sentinel here, so a MANUAL Stripe
+    // redelivery more than STALE_CLAIM_MS later WILL reprocess it - desirable if
+    // the underlying cause (e.g. bad data) has been fixed by then.
     return NextResponse.json({ error: 'Processing error', eventId: event.id }, { status: 200 });
   }
+
+  // Processing succeeded - stamp the claim as processed so future retries are
+  // recognized as genuine duplicates (and never eligible for stale takeover).
+  await prisma.webhookEvent.update({
+    where: { eventId: event.id },
+    data: { processedAt: new Date() },
+  });
 
   return NextResponse.json({ received: true, eventId: event.id });
 }
