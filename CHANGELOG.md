@@ -4,6 +4,20 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0] - 2026-07-17
+
+### Fixed
+- **Transcription preset (Speed/Balanced/Accuracy) now takes effect immediately** — previously changing it did nothing until app restart (the recognizer is now rebuilt on the next transcription after a change).
+- **Failures are no longer silent**: if a recording can't be saved to disk, or transcribed text can't be pasted into the target app, the status bar now shows a red error (text remains available in History).
+
+### Changed
+- Internal Whisper-era class/property names renamed to match the real Parakeet engine (`TranscriptionService` et al.). No user-facing impact; `settings.json` stays fully compatible.
+- Codebase cleanup: removed the abandoned Tauri experiment, obsolete tests, and stale pre-v2.0 documentation. Core transcription now has functional test coverage.
+
+### Web (deployed separately)
+- Stripe webhook retries now correctly re-process after transient failures (previously a payment could complete without a license being issued until manual reconciliation).
+- Device-activation accounting now also applies to legacy clients that don't send a machine ID; checkout endpoint is rate-limited.
+
 ## [2.1.2] - 2026-05-26
 
 ### Fixed
