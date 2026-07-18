@@ -39,9 +39,7 @@ namespace VoiceLite.Services
         private volatile bool isProcessing = false;
 
         public bool IsProcessing => isProcessing;
-        public event EventHandler<string>? TranscriptionComplete;
         public event EventHandler<Exception>? TranscriptionError;
-        public event EventHandler<int>? ProgressChanged;
 
         public TranscriptionService(Settings settings, ModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
         {
@@ -51,16 +49,47 @@ namespace VoiceLite.Services
 
             // Background-load the model so the first transcription is fast.
             // Errors here are logged but non-fatal — the first transcribe call will retry.
-            _ = Task.Run(() =>
+            // Runs under transcriptionSemaphore: a late-scheduled warm-up must not observe a
+            // changed preset and dispose/rebuild the recognizer while a Decode is in flight.
+            _ = Task.Run(async () =>
             {
+                bool semaphoreAcquired = false;
                 try
                 {
+                    try
+                    {
+                        await transcriptionSemaphore.WaitAsync();
+                        semaphoreAcquired = true;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        return; // Disposed during startup — nothing to warm up.
+                    }
+
+                    if (isDisposed)
+                        return;
+
                     var modelDir = this.modelResolver.ResolveModelPath();
                     EnsureRecognizerLoaded(modelDir);
                 }
                 catch (Exception ex)
                 {
                     ErrorLogger.LogError("TranscriptionService.Warmup", ex);
+                }
+                finally
+                {
+                    if (semaphoreAcquired)
+                    {
+                        try
+                        {
+                            transcriptionSemaphore.Release();
+                        }
+                        catch (ObjectDisposedException) { }
+                        catch (SemaphoreFullException)
+                        {
+                            ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
+                        }
+                    }
                 }
             });
         }
@@ -166,7 +195,11 @@ namespace VoiceLite.Services
                 var startTime = DateTime.Now;
 
                 var effectiveModelDir = modelDir ?? modelResolver.ResolveModelPath();
-                EnsureRecognizerLoaded(effectiveModelDir);
+                // Model load/rebuild is seconds of blocking native work (esp. after a preset
+                // change forces a rebuild) — keep it off the caller's thread, which is the UI
+                // thread via OnAudioFileReady. Still under transcriptionSemaphore, so ordering
+                // relative to Decode/Dispose is unchanged.
+                await Task.Run(() => EnsureRecognizerLoaded(effectiveModelDir), cancellationToken);
 
                 ErrorLogger.LogWarning($"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
 
@@ -177,9 +210,11 @@ namespace VoiceLite.Services
 
                 // Decode WAV → float[] PCM @ 16kHz. AudioRecorder writes 16kHz/16-bit/mono;
                 // ToSampleProvider() handles bit-depth conversion to float.
-                float[] samples;
-                using (var wavReader = new WaveFileReader(audioStream))
+                // Runs in Task.Run — decoding a long recording is CPU work that would
+                // otherwise block the UI thread.
+                float[] samples = await Task.Run(() =>
                 {
+                    using var wavReader = new WaveFileReader(audioStream);
                     if (wavReader.WaveFormat.SampleRate != 16000)
                     {
                         ErrorLogger.LogWarning($"Unexpected sample rate {wavReader.WaveFormat.SampleRate}, Parakeet expects 16000");
@@ -191,8 +226,8 @@ namespace VoiceLite.Services
                         // any external WAVs fed through the legacy TranscribeAsync(filePath) API.
                         provider = new StereoToMonoSampleProvider(provider);
                     }
-                    samples = ReadAllSamples(provider);
-                }
+                    return ReadAllSamples(provider);
+                }, linkedCts.Token);
 
                 linkedCts.Token.ThrowIfCancellationRequested();
 
@@ -362,6 +397,23 @@ namespace VoiceLite.Services
             {
                 try { transcriptionCts.Cancel(); }
                 catch (Exception ex) { ErrorLogger.LogDebug($"CancellationTokenSource.Cancel failed: {ex.Message}"); }
+            }
+
+            // In-flight transcriptions hold transcriptionSemaphore across the native Decode
+            // call (on a captured ref that holds no lock). Wait (bounded) for them to finish
+            // so we don't free the recognizer mid-Decode (native use-after-free). Cancel above
+            // already ran, so pending waiters exit instead of starting new work. No Release —
+            // the semaphore is disposed below.
+            try
+            {
+                if (!transcriptionSemaphore.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    ErrorLogger.LogWarning("Dispose: timed out waiting for in-flight transcription; disposing recognizer anyway");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogDebug($"Dispose: semaphore wait failed: {ex.Message}");
             }
 
             lock (recognizerLock)

@@ -191,7 +191,8 @@ namespace VoiceLite.Services
             }
         }
 
-        private void SetClipboardText(string text)
+        // Static so the static CopyToClipboardWithDelay flow can share the same retry logic.
+        private static void SetClipboardText(string text)
         {
             const int maxAttempts = 5;
 
@@ -319,14 +320,17 @@ namespace VoiceLite.Services
         {
             if (string.IsNullOrEmpty(text)) return;
 
+            // Retry with backoff (shared with the auto-paste flow), and THROW on failure —
+            // the manual-paste flow must surface "Copy failed" to the user, not silently
+            // leave the clipboard unchanged. Callers catch and notify.
             try
             {
-                Clipboard.SetText(text, TextDataFormat.UnicodeText);
+                SetClipboardText(text);
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning($"Clipboard SetText failed: {ex.Message}");
-                return;
+                ErrorLogger.LogWarning($"Clipboard SetText failed after retries: {ex.Message}");
+                throw;
             }
 
             _ = Task.Run(async () =>

@@ -546,6 +546,18 @@ namespace VoiceLite.Services
                             try { audioMemoryStream.Dispose(); } catch (Exception streamEx) { ErrorLogger.LogError("Failed to dispose memory stream in error handler", streamEx); }
                             audioMemoryStream = null;
                         }
+
+                        // The recording is lost — tell the user, don't just log it.
+                        // NOTE: fired while StopRecording holds lockObject; handlers must not block
+                        // (MainWindow marshals to the dispatcher with BeginInvoke).
+                        try
+                        {
+                            RecordingError?.Invoke(this, ex);
+                        }
+                        catch (Exception handlerEx)
+                        {
+                            ErrorLogger.LogWarning($"RecordingError handler threw: {handlerEx.Message}");
+                        }
                     }
                 }
 
