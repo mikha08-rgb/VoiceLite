@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CURRENT_VERSION } from '@/lib/version';
 
 // Validate version format: must be X.X.X or X.X.X.X (e.g., 2.0.1 or 1.2.0.1)
 // v2.0+ uses 3-part versions for the user-facing tag; pre-v2 used 4-part.
 const VERSION_REGEX = /^\d+\.\d+\.\d+(\.\d+)?$/;
 const MAX_VERSION_LENGTH = 20;
-// Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
-// Previously read from NEXT_PUBLIC_CURRENT_VERSION env var, which silently lagged
-// behind code on every ship (the env var lived in Vercel UI and got forgotten).
-const DEFAULT_VERSION = '2.1.2';
+const DEFAULT_VERSION = CURRENT_VERSION;
 
 // Mask IP for privacy (show first octet only)
 function maskIp(ip: string): string {
