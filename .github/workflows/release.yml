@@ -133,18 +133,19 @@ jobs:
         $sizeInMB = [math]::Round((Get-Item $vcRedistPath).Length / 1MB, 2)
         echo "Downloaded VC++ Redistributable ($sizeInMB MB)"
 
-    - name: Download Inno Setup
+    - name: Install Inno Setup
       shell: pwsh
       run: |
-        $innoSetupUrl = "https://jrsoftware.org/download.php/is.exe"
-        $installerPath = "$env:TEMP\innosetup.exe"
+        # v2.2.0: direct download from jrsoftware.org started returning corrupt
+        # files (HTML instead of the exe). Chocolatey is preinstalled on
+        # windows-latest runners and installs to the same Program Files path.
+        choco install innosetup --yes --no-progress
 
-        echo "Downloading Inno Setup..."
-        Invoke-WebRequest -Uri $innoSetupUrl -OutFile $installerPath
-
-        echo "Installing Inno Setup..."
-        Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
-
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $isccPath)) {
+          echo "ERROR: Inno Setup not found at $isccPath after choco install"
+          exit 1
+        }
         echo "Inno Setup installed"
 
     - name: Compile installer
