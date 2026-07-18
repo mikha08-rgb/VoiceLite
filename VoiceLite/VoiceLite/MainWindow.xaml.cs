@@ -14,7 +14,6 @@ using System.Windows.Media.Effects;
 using VoiceLite.Models;
 using VoiceLite.Services;
 using VoiceLite.Utilities;
-using VoiceLite.Helpers;
 using VoiceLite.Presentation.ViewModels;
 using System.Text.Json;
 

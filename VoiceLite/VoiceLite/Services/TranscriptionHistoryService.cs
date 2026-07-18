@@ -37,8 +37,7 @@ namespace VoiceLite.Services
                 throw new ArgumentNullException(nameof(item));
 
             // Clinical-pilot opt-out: skip persisting transcribed text when the user
-            // has disabled history. ItemAdded subscribers in AddTranscription still fire
-            // (UI may want to show the latest result even if it's not persisted).
+            // has disabled history.
             if (!settings.EnableHistory)
                 return;
 
@@ -128,114 +127,6 @@ namespace VoiceLite.Services
             ErrorLogger.LogMessage($"Cleared {count} history items");
         }
 
-
-        /// <summary>
-        /// Gets history statistics for display.
-        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
-        /// </summary>
-        public HistoryStatistics GetStatistics()
-        {
-            lock (settings.SyncRoot)
-            {
-                return new HistoryStatistics
-                {
-                    TotalItems = settings.TranscriptionHistory.Count,
-                    TotalWords = settings.TranscriptionHistory.Sum(x => x.WordCount),
-                    AverageDuration = settings.TranscriptionHistory.Any()
-                        ? settings.TranscriptionHistory.Average(x => x.DurationSeconds)
-                        : 0,
-                    OldestTimestamp = settings.TranscriptionHistory.Any()
-                        ? settings.TranscriptionHistory.Min(x => x.Timestamp)
-                        : DateTime.Now
-                };
-            }
-        }
-
-        #region ITranscriptionHistoryService Implementation
-
-        public int MaxHistoryItems => MAX_HISTORY_ITEMS;
-
-        public event EventHandler<TranscriptionItem>? ItemAdded;
-
-        public void AddTranscription(TranscriptionItem item)
-        {
-            // Convert TranscriptionItem to TranscriptionHistoryItem
-            var historyItem = new TranscriptionHistoryItem
-            {
-                Id = item.Id,
-                Text = item.Text,
-                Timestamp = item.Timestamp,
-                DurationSeconds = item.ProcessingTime,
-                ModelUsed = item.ModelUsed ?? "Unknown",
-                IsPinned = item.IsPinned
-            };
-
-            AddToHistory(historyItem);
-            ItemAdded?.Invoke(this, item);
-        }
-
-        public void AddItem(TranscriptionItem item) => AddTranscription(item);
-
-        /// <summary>
-        /// THREAD-SAFETY FIX: Returns a snapshot copy to prevent enumeration during modification
-        /// </summary>
-        public IEnumerable<TranscriptionItem> GetHistory()
-        {
-            // Convert TranscriptionHistoryItem to TranscriptionItem
-            // THREAD-SAFETY FIX: Take snapshot under lock, ToList() forces immediate evaluation
-            lock (settings.SyncRoot)
-            {
-                return settings.TranscriptionHistory.Select(h => new TranscriptionItem
-                {
-                    Id = h.Id,
-                    Text = h.Text,
-                    Timestamp = h.Timestamp,
-                    ProcessingTime = h.DurationSeconds,
-                    ModelUsed = h.ModelUsed,
-                    IsPinned = h.IsPinned
-                }).ToList();
-            }
-        }
-
-        public IEnumerable<TranscriptionItem> GetHistoryRange(DateTime from, DateTime to)
-        {
-            return GetHistory().Where(h => h.Timestamp >= from && h.Timestamp <= to);
-        }
-
-        public IEnumerable<TranscriptionItem> SearchHistory(string searchText)
-        {
-            if (string.IsNullOrWhiteSpace(searchText))
-                return GetHistory();
-
-            return GetHistory().Where(h => h.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase));
-        }
-
-        /// <summary>
-        /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
-        /// </summary>
-        public void ClearHistory(bool preservePinned)
-        {
-            if (preservePinned)
-            {
-                lock (settings.SyncRoot)
-                {
-                    var pinned = settings.TranscriptionHistory.Where(h => h.IsPinned).ToList();
-                    settings.TranscriptionHistory.Clear();
-                    settings.TranscriptionHistory.AddRange(pinned);
-                }
-            }
-            else
-            {
-                ClearHistory();
-            }
-        }
-
-        public void RemoveItem(Guid itemId) => RemoveFromHistory(itemId.ToString());
-
-        public void RemoveItem(string itemId) => RemoveFromHistory(itemId);
-
-        public void TogglePin(Guid itemId) => TogglePin(itemId.ToString());
-
         /// <summary>
         /// THREAD-SAFETY FIX: All list operations synchronized via Settings.SyncRoot
         /// </summary>
@@ -251,30 +142,12 @@ namespace VoiceLite.Services
             }
         }
 
-        public IEnumerable<TranscriptionItem> GetPinnedItems()
-        {
-            return GetHistory().Where(h => h.IsPinned);
-        }
-
         public async Task ExportHistoryAsync(string filePath, ExportFormat format)
         {
             // Export implementation
             await Task.CompletedTask;
             throw new NotImplementedException("Export functionality not yet implemented");
         }
-
-        #endregion
-    }
-
-    /// <summary>
-    /// Statistics about the transcription history.
-    /// </summary>
-    public class HistoryStatistics
-    {
-        public int TotalItems { get; set; }
-        public int TotalWords { get; set; }
-        public double AverageDuration { get; set; }
-        public DateTime OldestTimestamp { get; set; }
     }
 
     public class TranscriptionItem
@@ -287,7 +160,6 @@ namespace VoiceLite.Services
         public bool IsPinned { get; set; }
         public string? AudioFilePath { get; set; }
         public string? ApplicationContext { get; set; }
-        public int WordCount => Text?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
     }
 
     public enum ExportFormat
