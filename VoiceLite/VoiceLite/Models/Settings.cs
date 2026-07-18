@@ -110,6 +110,7 @@ namespace VoiceLite.Models
         }
 
         public bool MinimizeToTray { get; set; } = true;
+        // Legacy: kept for settings.json compat; UI removed 2026-07-17, Parakeet auto-detects language.
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }

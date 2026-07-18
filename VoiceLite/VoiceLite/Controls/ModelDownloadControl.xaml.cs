@@ -251,9 +251,6 @@ namespace VoiceLite.Controls
 
         // Single-engine post-Parakeet swap — no Pro gating, no lock state.
         public bool CanSelect => IsInstalled;
-        public Visibility VisibilityState => Visibility.Visible;
-        public double Opacity => 1.0;
-        public Visibility ProRequiredMessageVisibility => Visibility.Collapsed;
 
         public bool IsInstalled
         {

@@ -21,8 +21,6 @@ namespace VoiceLite
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             DispatcherUnhandledException += OnDispatcherUnhandledException;
 
-            // CRITICAL: Also handle process exit for forced closures
-            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
             // VC++ runtime probe: Sherpa-ONNX native DLLs link against vcruntime140 /
@@ -166,15 +164,6 @@ namespace VoiceLite
 
             window.ShowDialog();
             return IsParakeetModelInstalled();
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            base.OnExit(e);
-        }
-
-        private void OnProcessExit(object? sender, EventArgs e)
-        {
         }
 
         private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
