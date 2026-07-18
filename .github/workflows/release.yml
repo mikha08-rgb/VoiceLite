@@ -88,6 +88,20 @@ jobs:
           $errors += "❌ Could not find #define MyAppVersion in VoiceLiteSetup.iss"
         }
 
+        # Check voicelite-web/lib/version.ts (the website serves download links from this constant)
+        $webVersionPath = "voicelite-web/lib/version.ts"
+        $webVersionContent = if (Test-Path $webVersionPath) { Get-Content $webVersionPath -Raw } else { "" }
+        if ($webVersionContent -match "CURRENT_VERSION\s*=\s*'([\d\.]+)'") {
+          $webVersion = $matches[1]
+          if ($webVersion -ne $expectedVersion) {
+            $errors += "❌ voicelite-web/lib/version.ts has CURRENT_VERSION $webVersion, expected $expectedVersion — the website serves download links from this constant, so a mismatch means voicelite.app points users at the wrong installer"
+          } else {
+            Write-Host "✓ voicelite-web/lib/version.ts version: $webVersion" -ForegroundColor Green
+          }
+        } else {
+          $errors += "❌ Could not find CURRENT_VERSION in voicelite-web/lib/version.ts — the website serves download links from this constant"
+        }
+
         # Fail if any errors
         if ($errors.Count -gt 0) {
           Write-Host ""
