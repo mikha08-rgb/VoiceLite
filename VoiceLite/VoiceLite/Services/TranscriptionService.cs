@@ -98,6 +98,12 @@ namespace VoiceLite.Services
         {
             lock (recognizerLock)
             {
+                // Re-check under the lock: the background warm-up task can race Dispose().
+                // Without this, warm-up could assign a fresh recognizer AFTER Dispose ran,
+                // leaking the native OfflineRecognizer for the process lifetime.
+                if (isDisposed)
+                    return;
+
                 var preset = settings.TranscriptionPreset;
 
                 if (currentModelDir == modelDir && currentPreset == preset && recognizer != null)
@@ -189,7 +195,11 @@ namespace VoiceLite.Services
 
             try
             {
-                await transcriptionSemaphore.WaitAsync(cancellationToken);
+                // ConfigureAwait(false) on every await in this method: the finally block's
+                // semaphore Release must NOT be a dispatcher continuation, or Dispose()
+                // blocking the dispatcher in Wait() deadlocks against it. This method
+                // touches no UI state — MainWindow re-marshals results itself.
+                await transcriptionSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 semaphoreAcquired = true;
                 isProcessing = true;
                 var startTime = DateTime.Now;
@@ -199,7 +209,7 @@ namespace VoiceLite.Services
                 // change forces a rebuild) — keep it off the caller's thread, which is the UI
                 // thread via OnAudioFileReady. Still under transcriptionSemaphore, so ordering
                 // relative to Decode/Dispose is unchanged.
-                await Task.Run(() => EnsureRecognizerLoaded(effectiveModelDir), cancellationToken);
+                await Task.Run(() => EnsureRecognizerLoaded(effectiveModelDir), cancellationToken).ConfigureAwait(false);
 
                 ErrorLogger.LogWarning($"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
 
@@ -227,7 +237,7 @@ namespace VoiceLite.Services
                         provider = new StereoToMonoSampleProvider(provider);
                     }
                     return ReadAllSamples(provider);
-                }, linkedCts.Token);
+                }, linkedCts.Token).ConfigureAwait(false);
 
                 linkedCts.Token.ThrowIfCancellationRequested();
 
@@ -245,7 +255,7 @@ namespace VoiceLite.Services
                     sherpaStream.AcceptWaveform(16000, samples);
                     rec.Decode(sherpaStream);
                     return sherpaStream.Result.Text ?? string.Empty;
-                }, linkedCts.Token);
+                }, linkedCts.Token).ConfigureAwait(false);
 
                 rawResult = rawResult.Trim();
 

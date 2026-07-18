@@ -57,13 +57,18 @@ namespace VoiceLite.Services
                     // Regex.Escape prevents special regex characters in trigger from being interpreted
                     var pattern = $@"\b{Regex.Escape(shortcut.Trigger)}\b";
 
+                    // The replacement is user text, not a regex substitution pattern:
+                    // escape "$" so e.g. "$500" doesn't inject capture-group references
+                    // ("$5" would expand to capture group 5 → garbage output).
+                    var replacement = (shortcut.Replacement ?? string.Empty).Replace("$", "$$");
+
                     try
                     {
                         // Case-insensitive whole-word replacement
                         result = Regex.Replace(
                             result,
                             pattern,
-                            shortcut.Replacement ?? string.Empty,
+                            replacement,
                             RegexOptions.IgnoreCase,
                             TimeSpan.FromMilliseconds(100) // Timeout to prevent catastrophic backtracking
                         );
