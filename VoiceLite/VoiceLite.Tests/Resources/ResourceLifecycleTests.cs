@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Services;
 using Xunit;
 
 namespace VoiceLite.Tests.Resources
@@ -90,24 +91,25 @@ namespace VoiceLite.Tests.Resources
         }
 
         [Fact]
-        public void TranscriptionService_DisposeReleasesResources()
+        public async Task TranscriptionService_DisposeReleasesResources()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
-
-            // Only run if model file exists
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
                 return;
             }
 
             var initialMemory = GC.GetTotalMemory(true);
 
-            var service = new TranscriptionService(settings);
+            var service = new TranscriptionService(new Settings());
             _disposables.Add(service);
 
-            // Allow warmup to load model
-            Thread.Sleep(500);
+            // Force the model to actually load by transcribing a short silent clip —
+            // otherwise Dispose has nothing real to release and the test proves nothing.
+            var wavPath = Path.Combine(_tempDirectory, "dispose_test.wav");
+            CreateSilentWavFile(wavPath, 1);
+            await service.TranscribeAsync(wavPath, TranscriptionServiceFixture.ModelDir);
 
             service.Dispose();
 
@@ -221,41 +223,30 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task FileHandles_ReleasedAfterTranscription()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
-
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
                 return;
             }
 
-            var service = new TranscriptionService(settings);
+            var service = new TranscriptionService(new Settings());
             _disposables.Add(service);
 
             var testFile = Path.Combine(_tempDirectory, "test_audio.wav");
             CreateSilentWavFile(testFile, 1);
 
-            try
-            {
-                await service.TranscribeAsync(testFile);
+            // A transcription failure here is a real failure — no swallow-all catch.
+            await service.TranscribeAsync(testFile, TranscriptionServiceFixture.ModelDir);
 
-                // File should be deletable immediately after transcription
-                Action deleteFile = () => File.Delete(testFile);
-                deleteFile.Should().NotThrow("File handle should be released");
-            }
-            catch
-            {
-                // Transcription might fail but file should still be releasable
-            }
+            // File should be deletable immediately after transcription
+            Action deleteFile = () => File.Delete(testFile);
+            deleteFile.Should().NotThrow("File handle should be released");
         }
 
-        [Fact]
-        public void SystemTrayManager_CleansUpIconOnDispose()
-        {
-            // SystemTrayManager requires a Window parameter
-            // Skip this test as we can't create a Window in unit tests
-            // This would be better tested in integration tests with a real window
-        }
+        // NOTE: SystemTrayManager_CleansUpIconOnDispose was deleted 2026-07-17 — it had a
+        // completely empty body (permanently green). SystemTrayManager needs a real Window,
+        // which cannot be constructed in this unit-test host.
 
         [Fact]
         public async Task LongRunningOperation_CancellationCleansUpResources()
