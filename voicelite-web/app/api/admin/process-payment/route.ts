@@ -4,6 +4,9 @@ import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { upsertLicenseFromStripe, recordLicenseEvent } from '@/lib/licensing';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
 
+// Same email format validation as the webhook route (CRITICAL-2 FIX there)
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
@@ -19,6 +22,13 @@ export async function POST(request: NextRequest) {
     if (!email || !paymentIntentId) {
       return NextResponse.json(
         { error: 'Missing email or paymentIntentId' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
         { status: 400 }
       );
     }

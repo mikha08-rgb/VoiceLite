@@ -164,6 +164,29 @@ export async function recordLicenseActivation({
         });
 
         if (existing) {
+          // Re-validation path. If the row is still ACTIVE this is a normal
+          // heartbeat - refresh it unconditionally (current behavior unchanged).
+          //
+          // DEACTIVATION-BYPASS FIX: if the row is NOT active (the deactivate
+          // endpoint sets BLOCKED), flipping it back to ACTIVE must pass the same
+          // 3-device cap as a brand-new activation. Previously this path set
+          // ACTIVE unconditionally, so a deactivated machine re-activated itself
+          // on its next revalidation, and deactivate -> activate-new ->
+          // revalidate-old yielded 4+ ACTIVE devices. Explicit reactivation is
+          // still legitimate when a slot is free.
+          if (existing.status !== LicenseActivationStatus.ACTIVE) {
+            const reactivationActiveCount = await tx.licenseActivation.count({
+              where: {
+                licenseId,
+                status: LicenseActivationStatus.ACTIVE,
+              },
+            });
+
+            if (reactivationActiveCount >= 3) {
+              throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
+            }
+          }
+
           // Update existing activation - inside transaction
           return tx.licenseActivation.update({
             where: {

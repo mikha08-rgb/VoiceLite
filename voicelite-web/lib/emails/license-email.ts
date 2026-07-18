@@ -56,7 +56,19 @@ async function delay(attempt: number): Promise<void> {
 }
 
 export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'VoiceLite <basementhustlellc@gmail.com>';
+  // CONFIG FIX: there used to be a fallback to 'VoiceLite <basementhustlellc@gmail.com>'
+  // here, but a gmail address can never be a Resend-verified sender, so every send
+  // through the fallback silently failed. Missing/empty RESEND_FROM_EMAIL is a config
+  // error like a missing RESEND_API_KEY: fail fast before the retry loop (retrying
+  // cannot fix configuration). We return { success: false } rather than throwing so
+  // the caller contract holds - the webhook checks emailResult.success and throws
+  // RetriableError, which keeps Stripe retrying until the env var is fixed.
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  if (!fromEmail || fromEmail.trim() === '') {
+    const configError = new Error('RESEND_FROM_EMAIL must be configured with a Resend-verified sender for email sending');
+    console.error(`❌ ${configError.message}`);
+    return { success: false, error: configError, attempts: 0 };
+  }
 
   const html = `
 <!DOCTYPE html>
@@ -190,6 +202,20 @@ Need help? Just reply to this email.
         text,
       });
 
+      // CRITICAL FIX: the Resend SDK NEVER throws - every failure (validation,
+      // rate limit, even network errors) comes back as { data: null, error }.
+      // Not checking result.error meant every failure was reported as
+      // { success: true, messageId: undefined } and the retry loop was dead code.
+      if (result.error) {
+        lastError = result.error;
+        console.error(`❌ Resend API error on attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts}:`, {
+          email,
+          errorName: result.error.name,
+          errorMessage: result.error.message,
+        });
+        continue; // Next attempt - exponential backoff applies at the top of the loop
+      }
+
       console.log(`✅ Resend API response:`, {
         success: true,
         messageId: result.data?.id,
@@ -205,8 +231,8 @@ Need help? Just reply to this email.
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // Don't retry on configuration errors (API key issues)
-      if (error instanceof Error && error.message.includes('RESEND_API_KEY')) {
+      // Don't retry on configuration errors (API key / from-address issues)
+      if (error instanceof Error && (error.message.includes('RESEND_API_KEY') || error.message.includes('RESEND_FROM_EMAIL'))) {
         console.error('Configuration error - not retrying');
         break;
       }
