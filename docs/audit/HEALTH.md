@@ -2,6 +2,19 @@
 
 *Audit date: 2026-07-17 @ v2.1.2. Blunt by request. Risk = likelihood × blast radius for a paying user or for you operationally.*
 
+> **Update 2026-07-17 (evening) — post-v2.2.0 deep review + fix pass.** A second adversarial review after the rename/v2.2.0 release found and FIXED (5 parallel worktree agents, all merged, suite 274 passed / 22 skipped, tsc clean):
+> - **Esc "cancel" transcribed and auto-pasted anyway** (no cancel gate in `OnAudioFileReady`) — fixed with a discard flag; cancelled audio is deleted, never transcribed.
+> - **Close/tray flow was structurally broken** (re-entrant `Close()` throw → spurious error dialog; one-shot `isClosingHandled` never reset → second X-click exited even with minimize-to-tray on) — restructured; tray Exit now also gets a synchronous settings flush backstop in `OnClosed`.
+> - **Webhook hard-crash could still strand a paid license** (claim row stamped processed before processing; timeout/OOM between claim and completion → Stripe retries short-circuit forever) — now claims with an epoch sentinel, stamps `processedAt` only on success, and stale (>5 min) unprocessed claims are atomically taken over on retry; `maxDuration = 60` added.
+> - **3-device cap was not race-safe** (`$transaction` at default READ COMMITTED despite the CRITICAL-4 comment) — now Serializable with P2034/P2002 retry. **Deactivation endpoint added** (`POST /api/licenses/deactivate`) — the 403's "deactivate a device" instruction was previously a dead end with no endpoint.
+> - **Rate limiters could fail closed/unhandled on a Redis outage** (checkout would 500 on every sale) — all routed through the fail-open fallback wrapper.
+> - **Manual-paste (AutoPaste=off) clipboard failures were silent** (single attempt, swallowed) — now 5-attempt retry then throw, red status at all call sites. **Too-short recordings** now show "Too short" instead of silently dropping. The last unsignalled lost-audio branch (waveFile dispose failure) now fires `RecordingError`.
+> - **Recognizer load/rebuild ran on the UI thread** (seconds-long freeze after a preset change) — moved into `Task.Run`; constructor warm-up and `Dispose` now respect `transcriptionSemaphore` (closes the dispose-mid-Decode native race windows).
+> - **CI: releases published without running tests** — `release.yml` now has a test job gate; Inno Setup pinned 6.7.1; `pr-tests.yml` gets push triggers for `master`/`v*`. One test POSTed garbage keys at prod validate on every run — deleted. Remaining vacuous GGML-gated zombies re-gated on real Parakeet presence. `LicenseFileGuard` is crash-safe (stable backup path + constructor recovery).
+> - **Dead code**: ~1,700 LOC removed (model registry collapsed, Language no-op dropdown removed — Parakeet auto-detects and the old list offered unsupported languages, `Settings.Language` kept for JSON compat; 11 dead web components, `lib/crypto.ts`, broken `/docs` Swagger page + 3 deps, `AsyncHelper`, dead history/tray members).
+>
+> **Still open after this pass:** #1 below (Stripe key — rotation is with Misha); offline-Pro revalidation (QUESTIONS #9); Custom Dictionary gating is cosmetic; `IProFeatureService` seam (its test justification is gone — Misha to decide keep/collapse); 4 orphaned/admin API routes (may be manual ops tools); `UserActivity` Prisma model (needs a migration to drop); dead subscription branches in the webhook (protected, unreachable); no Prisma baseline migration (fresh-DB `migrate deploy` fails — DR landmine); `TelemetryMetric`/`Feedback.userId` schema drift (a future `migrate dev` would generate DROPs); watch the first push-triggered CI run — mic-dependent recorder tests have never run on a bare GitHub runner.
+
 ## 🔴 Act on these first (things silently hurting you right now)
 
 ### 1. Live Stripe secret key sitting on disk — `sk_live_…` — CRITICAL

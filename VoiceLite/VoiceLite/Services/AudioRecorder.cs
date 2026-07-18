@@ -532,6 +532,18 @@ namespace VoiceLite.Services
                             else
                             {
                                 ErrorLogger.LogWarning($"StopRecording: Skipping TINY/EMPTY buffer - only {audioData.Length} bytes!");
+
+                                // The user pressed the hotkey and got nothing — surface it instead of
+                                // silently dropping the recording (same contract as the catch below).
+                                try
+                                {
+                                    RecordingError?.Invoke(this, new InvalidOperationException(
+                                        "Recording too short - no audio was captured. Hold the hotkey while speaking."));
+                                }
+                                catch (Exception handlerEx)
+                                {
+                                    ErrorLogger.LogWarning($"RecordingError handler threw: {handlerEx.Message}");
+                                }
                             }
                         }
                     }

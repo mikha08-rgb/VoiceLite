@@ -27,7 +27,7 @@ With Chunk 1's net in place:
 2. **Silent failures**: surface a user-visible signal when `SaveMemoryBufferToTempFile` loses audio or `TextInjector` fails to inject (today both are log-only). Small, high-empathy fixes.
 *Value: high (real user pain). Risk: medium (touches live desktop paths — hence Chunk 1 first).*
 
-## Chunk 3 — Fix the webhook license-drop
+## Chunk 3 — Fix the webhook license-drop — **DONE 2026-07-17** (retriable-failure claim-release deployed earlier; evening pass added the hard-crash case: epoch-sentinel claims, processedAt stamped only on success, atomic stale-claim takeover after 5 min, maxDuration=60)
 Rework `webhook/route.ts` so the `WebhookEvent` idempotency row is committed **only after** successful processing (or is deleted on failure), so Stripe's retries actually reprocess. Reproduce with the Chunk 1 test first, then fix, then confirm the test goes green. Consider folding `fix-stripe-webhooks.ts`'s reconciliation into a scheduled job.
 *Value: high (stops losing paid customers). Risk: medium (payment path — test-first, deploy to preview, watch a real event).*
 
@@ -65,8 +65,7 @@ One deliberate, test-backed pass (needs Chunk 1's net). Rename `PersistentWhispe
 - Delete the abandoned root `.bat` pile (`DIAGNOSE_BUILD`, `QUICK_TEST`, `RUN_TEST`, `TEST_BUILD`, `TEST_WEEK1`).
 *Value: medium (huge disk win, less confusion). Risk: low. Can be split into "disk" and "branches/CI" sub-sessions.*
 
-## Chunk 9 — Small dead-code collapses (opportunistic)
-`AudioRecorder.AudioDataReady` (no subscribers), `App.OnProcessExit/OnExit` empties, `UserActivity` model, unused web rate limiters, `components/ui/` if confirmed abandoned. Low value, do alongside whatever else touches those files.
+## Chunk 9 — Small dead-code collapses (opportunistic) — **mostly DONE 2026-07-17** (evening sweep: App stubs, unused limiters, components/ui + 11 dead components, lib/crypto, model registry collapsed, Language no-op UI removed, AsyncHelper, dead history/tray members — ~1,700 LOC. Still open: `AudioDataReady` (kept — tests use it), `UserActivity` model (needs migration), `IProFeatureService` + 4 orphaned routes (Misha's call), webhook dead subscription branches (protected).)
 
 ---
 

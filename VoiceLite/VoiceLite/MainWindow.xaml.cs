@@ -1377,10 +1377,30 @@ namespace VoiceLite
         private void OnRecordingError(object? sender, Exception ex)
         {
             ErrorLogger.LogError("OnRecordingError: recording lost", ex);
+
+            // A cancelled recording (Esc / app close) can also trip the too-short path —
+            // the user asked to discard it, so don't overwrite "Cancelled" with an error.
+            if (discardNextAudio)
+            {
+                discardNextAudio = false;
+                ErrorLogger.LogMessage("OnRecordingError: suppressed for cancelled recording");
+                return;
+            }
+
+            // Distinguish "you didn't say anything" from a real save failure.
+            bool tooShort = ex is InvalidOperationException && ex.Message.StartsWith("Recording too short");
             _ = Dispatcher.InvokeAsync(() =>
             {
-                UpdateTranscriptionText("Recording failed - audio was not saved", Brushes.Red);
-                UpdateStatus("Recording failed", Brushes.Red);
+                if (tooShort)
+                {
+                    UpdateStatus("Too short - hold the hotkey while speaking", Brushes.Gray);
+                    UpdateUIForCurrentMode();
+                }
+                else
+                {
+                    UpdateTranscriptionText("Recording failed - audio was not saved", Brushes.Red);
+                    UpdateStatus("Recording failed", Brushes.Red);
+                }
             });
         }
 
