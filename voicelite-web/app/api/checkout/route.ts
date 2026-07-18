@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { ipAddress } from '@vercel/edge';
-import { checkoutRateLimit, fallbackCheckoutLimit } from '@/lib/ratelimit';
+import { checkRateLimit, checkoutRateLimit, fallbackCheckoutLimit } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 
 // Lazy initialization of Stripe client
@@ -20,24 +20,15 @@ export async function POST(request: NextRequest) {
   // Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
   const ip = ipAddress(request) || 'unknown';
 
-  // Check rate limit (5/hour per IP)
-  if (checkoutRateLimit) {
-    const { success } = await checkoutRateLimit.limit(ip);
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
-  } else {
-    // Fallback to in-memory rate limiter (Upstash not configured)
-    const allowed = await fallbackCheckoutLimit.check(ip);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
+  // Check rate limit (5/hour per IP). checkRateLimit degrades to the in-memory
+  // fallback if Upstash is unconfigured OR errors mid-request - a Redis outage
+  // must never 500 the checkout path (that would stop all sales).
+  const rateLimit = await checkRateLimit(ip, checkoutRateLimit, fallbackCheckoutLimit);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   try {

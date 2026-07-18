@@ -133,62 +133,89 @@ export async function recordLicenseActivation({
   machineLabel?: string;
   machineHash?: string;
 }) {
-  // CRITICAL-4 FIX: Move ALL operations inside transaction to prevent race condition
-  // Previously, the findUnique was OUTSIDE the transaction, allowing this race:
-  // 1. Two requests for DIFFERENT machineIds both check findUnique → both get null
-  // 2. Both enter transaction → both see activeCount = 2 → both create
-  // 3. Result: 4 activations (exceeds 3-device limit)
-  return prisma.$transaction(async (tx) => {
-    // Check if this is an existing activation (re-validation) - NOW INSIDE TRANSACTION
-    const existing = await tx.licenseActivation.findUnique({
-      where: {
-        licenseId_machineId: {
-          licenseId,
-          machineId,
-        },
-      },
-    });
+  // CRITICAL-4 FIX (v2): count-then-create must run under SERIALIZABLE isolation.
+  // Merely putting both operations in a transaction was NOT enough: at Postgres's
+  // default READ COMMITTED level, two concurrent NEW machineIds could both count 2,
+  // both create, and end up at 4 activations. Serializable makes one of the two
+  // conflicting transactions fail with P2034 (serialization failure), which we
+  // retry below; the retry then sees the committed count and correctly hits the cap.
+  //
+  // P2002 handling: two concurrent FIRST-EVER validations of the SAME machineId
+  // (including the shared 'legacy-no-machine-id' slot) can both pass findUnique
+  // and race the create; the loser gets a unique-constraint violation. We retry
+  // the whole transaction, which then takes the existing-activation update path
+  // instead of bubbling a 500. (The update can't be issued inside the same
+  // transaction after the violation - Postgres aborts the tx - so retrying is
+  // the correct conversion to the update path.)
+  const MAX_ATTEMPTS = 3;
+  let lastError: unknown;
 
-    if (existing) {
-      // Update existing activation - NOW INSIDE TRANSACTION
-      return tx.licenseActivation.update({
-        where: {
-          licenseId_machineId: {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        // Check if this is an existing activation (re-validation) - inside transaction
+        const existing = await tx.licenseActivation.findUnique({
+          where: {
+            licenseId_machineId: {
+              licenseId,
+              machineId,
+            },
+          },
+        });
+
+        if (existing) {
+          // Update existing activation - inside transaction
+          return tx.licenseActivation.update({
+            where: {
+              licenseId_machineId: {
+                licenseId,
+                machineId,
+              },
+            },
+            data: {
+              machineLabel,
+              machineHash,
+              lastValidatedAt: new Date(),
+              status: LicenseActivationStatus.ACTIVE,
+            },
+          });
+        }
+
+        // New activation - check 3-device limit (inside transaction)
+        const activeCount = await tx.licenseActivation.count({
+          where: {
+            licenseId,
+            status: LicenseActivationStatus.ACTIVE,
+          },
+        });
+
+        if (activeCount >= 3) {
+          throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
+        }
+
+        // Create new activation (inside same transaction)
+        return tx.licenseActivation.create({
+          data: {
             licenseId,
             machineId,
+            machineLabel,
+            machineHash,
           },
-        },
-        data: {
-          machineLabel,
-          machineHash,
-          lastValidatedAt: new Date(),
-          status: LicenseActivationStatus.ACTIVE,
-        },
-      });
+        });
+      }, { isolationLevel: 'Serializable' });
+    } catch (error: any) {
+      // P2034 = serialization/deadlock failure, P2002 = unique constraint race on
+      // the create - both are transient concurrency losses; retry the transaction.
+      if ((error?.code === 'P2034' || error?.code === 'P2002') && attempt < MAX_ATTEMPTS) {
+        lastError = error;
+        continue;
+      }
+      throw error;
     }
+  }
 
-    // New activation - check 3-device limit (inside transaction)
-    const activeCount = await tx.licenseActivation.count({
-      where: {
-        licenseId,
-        status: LicenseActivationStatus.ACTIVE,
-      },
-    });
-
-    if (activeCount >= 3) {
-      throw new Error('ACTIVATION_LIMIT_REACHED: Maximum 3 devices allowed per license. Deactivate a device to continue.');
-    }
-
-    // Create new activation (inside same transaction)
-    return tx.licenseActivation.create({
-      data: {
-        licenseId,
-        machineId,
-        machineLabel,
-        machineHash,
-      },
-    });
-  });
+  // Unreachable (loop either returns or throws), but keeps TypeScript satisfied.
+  throw lastError;
 }
 
 export async function deactivateLicenseActivation({

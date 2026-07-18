@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { prisma } from '@/lib/prisma';
 import { recordLicenseEvent } from '@/lib/licensing';
-import { emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit';
+import { checkRateLimit, emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 
 import { LicenseStatus } from '@prisma/client';
@@ -30,24 +30,14 @@ export async function POST(request: NextRequest) {
   // Use Vercel's trusted IP detection (prevents X-Forwarded-For spoofing)
   const ip = ipAddress(request) || 'unknown';
 
-  // Check rate limit
-  if (emailResendRateLimit) {
-    const { success } = await emailResendRateLimit.limit(ip);
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
-  } else {
-    // Fallback to in-memory rate limiter
-    const allowed = await fallbackEmailResendLimit.check(ip);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429 }
-      );
-    }
+  // Check rate limit (3/hour per IP). checkRateLimit degrades to the in-memory
+  // fallback if Upstash is unconfigured OR errors mid-request (no 500 on Redis outage).
+  const rateLimit = await checkRateLimit(ip, emailResendRateLimit, fallbackEmailResendLimit);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
   }
 
   try {
@@ -113,11 +103,11 @@ export async function POST(request: NextRequest) {
         requestedAt: new Date().toISOString(),
       });
 
+      // Note: deliberately no email/messageId in the response - this endpoint is
+      // keyed by licenseKey too, so echoing the email would leak key→email mapping.
       return NextResponse.json({
         success: true,
         message: 'License email resent successfully',
-        email: license.email,
-        messageId: emailResult.messageId,
       });
     } else {
       // Record the failure
