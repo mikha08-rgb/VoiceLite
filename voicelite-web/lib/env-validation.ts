@@ -3,14 +3,21 @@
  * Ensures all required configuration is present before the app starts
  *
  * Uses Zod for type-safe validation with helpful error messages
+ *
+ * Only truly fatal misconfiguration exits the process (missing/invalid
+ * DATABASE_URL). Format errors on OPTIONAL vars (Stripe/Resend/Upstash/
+ * APP_URL/ADMIN_SECRET_TOKEN) are logged loudly but do NOT exit — a
+ * malformed optional var must not take down every HTML page while the
+ * APIs stay up.
  */
 
 import { z } from 'zod';
 
-const envSchema = z.object({
-  // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// REQUIRED — a failure here is fatal (process.exit at startup)
+// -----------------------------------------------------------------------------
+const requiredSchema = z.object({
   // Database (Supabase Postgres)
-  // -----------------------------------------------------------------------------
   DATABASE_URL: z
     .string()
     .min(1, 'DATABASE_URL is required')
@@ -22,7 +29,12 @@ const envSchema = z.object({
       (val) => !val.includes('PLACEHOLDER') && !val.includes('EXAMPLE'),
       'DATABASE_URL contains a placeholder value - get from https://app.supabase.com'
     ),
+});
 
+// -----------------------------------------------------------------------------
+// OPTIONAL — format errors are logged loudly but are NOT fatal
+// -----------------------------------------------------------------------------
+const optionalSchema = z.object({
   // -----------------------------------------------------------------------------
   // Redis (Upstash - Rate Limiting) - Now OPTIONAL per .env.example
   // -----------------------------------------------------------------------------
@@ -79,18 +91,6 @@ const envSchema = z.object({
   // -----------------------------------------------------------------------------
   // Admin Access
   // -----------------------------------------------------------------------------
-  ADMIN_EMAILS: z
-    .string()
-    .min(1)
-    .refine(
-      (val) => {
-        const emails = val.split(',').map((e) => e.trim());
-        return emails.every((email) => z.string().email().safeParse(email).success);
-      },
-      'ADMIN_EMAILS must be comma-separated valid email addresses'
-    )
-    .optional(),
-
   ADMIN_SECRET_TOKEN: z
     .string()
     .min(20, 'ADMIN_SECRET_TOKEN must be at least 20 characters')
@@ -98,6 +98,19 @@ const envSchema = z.object({
       (val) => !val.includes('placeholder') && !val.includes('PLACEHOLDER'),
       'ADMIN_SECRET_TOKEN contains a placeholder value'
     )
+    .optional(),
+
+  // -----------------------------------------------------------------------------
+  // Diagnostics & Analytics
+  // -----------------------------------------------------------------------------
+  DIAGNOSTIC_TEST_EMAIL: z
+    .string()
+    .email('DIAGNOSTIC_TEST_EMAIL must be a valid email address')
+    .optional(),
+
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: z
+    .string()
+    .regex(/^G-[A-Z0-9]+$/, 'NEXT_PUBLIC_GA_MEASUREMENT_ID must look like G-XXXXXXXXXX')
     .optional(),
 
   // -----------------------------------------------------------------------------
@@ -118,76 +131,88 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
 });
 
+const envSchema = requiredSchema.merge(optionalSchema);
+
 export function validateEnvironment() {
-  const errors: string[] = [];
   const warnings: string[] = [];
 
-  try {
-    // Validate using Zod schema
-    envSchema.parse(process.env);
+  // ---------------------------------------------------------------------------
+  // Required vars — a failure here throws (fatal at startup)
+  // ---------------------------------------------------------------------------
+  const requiredResult = requiredSchema.safeParse(process.env);
+  if (!requiredResult.success) {
+    const errors = requiredResult.error.issues.map(
+      (err) => `${err.path.join('.')}: ${err.message}`
+    );
 
-    // Additional warnings for optional but recommended vars
-    if (!process.env.RESEND_API_KEY) {
-      warnings.push('RESEND_API_KEY not configured - email sending will fail');
-    }
+    const message = [
+      '❌ Critical environment configuration errors:',
+      ...errors.map((error) => `   - ${error}`),
+      '',
+      'Please check your .env.local file and ensure all required variables are set.',
+      'See .env.example for reference.',
+    ].join('\n');
 
-    if (!process.env.STRIPE_SECRET_KEY) {
-      warnings.push('STRIPE_SECRET_KEY not configured - payments will fail');
-    }
+    throw new Error(message);
+  }
 
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      warnings.push('STRIPE_WEBHOOK_SECRET not configured - webhook processing will fail');
-    }
+  // ---------------------------------------------------------------------------
+  // Optional vars — format errors are loud but non-fatal
+  // ---------------------------------------------------------------------------
+  const optionalResult = optionalSchema.safeParse(process.env);
+  if (!optionalResult.success) {
+    const errors = optionalResult.error.issues.map(
+      (err) => `${err.path.join('.')}: ${err.message}`
+    );
 
-    if (!process.env.NEXT_PUBLIC_APP_URL) {
-      warnings.push('NEXT_PUBLIC_APP_URL not set - using fallback localhost:3000');
-    }
-
-    if (!process.env.ADMIN_EMAILS) {
-      warnings.push('ADMIN_EMAILS not set - admin dashboard will be inaccessible');
-    }
-
-    if (!process.env.ADMIN_SECRET_TOKEN) {
-      warnings.push('ADMIN_SECRET_TOKEN not set - admin API endpoints unprotected');
-    }
-
-    if (!process.env.DIRECT_DATABASE_URL) {
-      warnings.push('DIRECT_DATABASE_URL not set - database migrations will fail');
-    }
-
-    if (!process.env.UPSTASH_REDIS_REST_URL) {
-      warnings.push('UPSTASH_REDIS_REST_URL not set - rate limiting disabled (acceptable per .env.example)');
-    }
-
-    // Log warnings
-    if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
-      console.warn('\n⚠️  Environment configuration warnings:');
-      warnings.forEach((warning) => console.warn(`   - ${warning}`));
-      console.warn('');
-    }
-
-    if (process.env.NODE_ENV === 'production') {
-      console.log('✅ Environment validation passed');
-    }
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      error.issues.forEach((err) => {
-        const path = err.path.join('.');
-        errors.push(`${path}: ${err.message}`);
-      });
-
-      const message = [
-        '❌ Critical environment configuration errors:',
+    console.error(
+      [
+        '❌ Environment configuration format errors (non-fatal — the affected feature will fail):',
         ...errors.map((error) => `   - ${error}`),
         '',
-        'Please check your .env.local file and ensure all required variables are set.',
-        'See .env.example for reference.',
-        'Generate signing keys with: npm run keygen',
-      ].join('\n');
+        'Please check your .env.local file. See .env.example for reference.',
+      ].join('\n')
+    );
+  }
 
-      throw new Error(message);
-    }
-    throw error;
+  // Additional warnings for optional but recommended vars
+  if (!process.env.RESEND_API_KEY) {
+    warnings.push('RESEND_API_KEY not configured - email sending will fail');
+  }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    warnings.push('STRIPE_SECRET_KEY not configured - payments will fail');
+  }
+
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    warnings.push('STRIPE_WEBHOOK_SECRET not configured - webhook processing will fail');
+  }
+
+  if (!process.env.NEXT_PUBLIC_APP_URL) {
+    warnings.push('NEXT_PUBLIC_APP_URL not set - using fallback localhost:3000');
+  }
+
+  if (!process.env.ADMIN_SECRET_TOKEN) {
+    warnings.push('ADMIN_SECRET_TOKEN not set - admin API endpoints unprotected');
+  }
+
+  if (!process.env.DIRECT_DATABASE_URL) {
+    warnings.push('DIRECT_DATABASE_URL not set - database migrations will fail');
+  }
+
+  if (!process.env.UPSTASH_REDIS_REST_URL) {
+    warnings.push('UPSTASH_REDIS_REST_URL not set - rate limiting disabled (acceptable per .env.example)');
+  }
+
+  // Log warnings
+  if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
+    console.warn('\n⚠️  Environment configuration warnings:');
+    warnings.forEach((warning) => console.warn(`   - ${warning}`));
+    console.warn('');
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    console.log('✅ Environment validation passed');
   }
 }
 

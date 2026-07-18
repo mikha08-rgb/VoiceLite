@@ -28,10 +28,10 @@ const feedbackSchema = z.object({
   message: z.string().min(10).max(5000),
   email: z.string().email().optional().or(z.literal('')),
   metadata: z.object({
-    appVersion: z.string().optional(),
-    osVersion: z.string().optional(),
-    browser: z.string().optional(),
-    url: z.string().optional(),
+    appVersion: z.string().max(50).optional(),
+    osVersion: z.string().max(100).optional(),
+    browser: z.string().max(300).optional(),
+    url: z.string().max(2000).optional(),
   }).optional(),
 });
 

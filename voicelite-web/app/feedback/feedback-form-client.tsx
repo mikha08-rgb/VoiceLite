@@ -80,7 +80,7 @@ export default function FeedbackFormClient() {
             </p>
             {email && (
               <p className="mb-8 text-sm text-stone-600 dark:text-stone-400">
-                We'll send a confirmation to <strong>{email}</strong> if we need more information.
+                If we need more information, we'll reach out to <strong>{email}</strong>.
               </p>
             )}
             <Link
