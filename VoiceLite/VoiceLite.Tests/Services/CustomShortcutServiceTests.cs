@@ -116,6 +116,26 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void ProcessShortcuts_WithDollarSignInReplacement_TreatsItLiterally()
+        {
+            // Regex.Replace treats "$" in the replacement as a substitution pattern
+            // ("$5" = capture group 5). User replacement text must be escaped so
+            // "$500" comes out literally instead of as capture-group garbage.
+            _settings.CustomShortcuts.Add(new CustomShortcut
+            {
+                Trigger = "the fee",
+                Replacement = "$500",
+                IsEnabled = true
+            });
+
+            // Act
+            var result = _service.ProcessShortcuts("please pay the fee today");
+
+            // Assert
+            result.Should().Be("please pay $500 today");
+        }
+
+        [Fact]
         public void ProcessShortcuts_CaseInsensitive_ReplacesRegardlessOfCase()
         {
             // Arrange

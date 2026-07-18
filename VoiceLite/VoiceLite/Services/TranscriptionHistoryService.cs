@@ -74,8 +74,10 @@ namespace VoiceLite.Services
 
             int itemsToRemoveCount = settings.TranscriptionHistory.Count - MAX_HISTORY_ITEMS;
 
-            // O(n log n): Sort to find oldest items
+            // O(n log n): Sort to find oldest items.
+            // Pinned items are exempt from cap enforcement — only unpinned items age out.
             var itemIdsToRemove = settings.TranscriptionHistory
+                .Where(x => !x.IsPinned)
                 .OrderBy(x => x.Timestamp) // Oldest first
                 .Take(itemsToRemoveCount)
                 .Select(x => x.Id)

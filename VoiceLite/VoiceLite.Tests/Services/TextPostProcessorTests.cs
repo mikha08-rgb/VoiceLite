@@ -22,15 +22,40 @@ namespace VoiceLite.Tests.Services
             result.Should().EndWith(".");
         }
 
+        // NEW CONTRACT (2026-07-17): Parakeet emits its own punctuation. We never strip
+        // or re-guess terminal punctuation — question-word guessing is gone. A period is
+        // appended only when the model produced no terminal punctuation at all.
+
+        [Theory]
+        [InlineData("Has he arrived?")]
+        [InlineData("What time is it?")]
+        [InlineData("Stop right there!")]
+        [InlineData("Note the following:")]
+        [InlineData("First; second.")]
+        public void Process_PreservesModelTerminalPunctuation(string input)
+        {
+            var result = TextPostProcessor.Process(input);
+            result.Should().EndWith(input[input.Length - 1].ToString());
+        }
+
         [Theory]
         [InlineData("what time is it")]
         [InlineData("how are you")]
         [InlineData("can you help me")]
-        [InlineData("are you there")]
-        public void Process_AddsQuestionMark_ToInterrogatives(string input)
+        public void Process_DoesNotGuessQuestionMarks_AppendsPeriodInstead(string input)
         {
+            // Question-word guessing was deliberately removed — without model punctuation
+            // we can't know intonation, so a period is the only honest default.
             var result = TextPostProcessor.Process(input);
-            result.Should().EndWith("?");
+            result.Should().EndWith(".");
+            result.Should().NotEndWith("?");
+        }
+
+        [Fact]
+        public void Process_DropsDanglingTrailingComma_BeforeAppendingPeriod()
+        {
+            var result = TextPostProcessor.Process("hello world,");
+            result.Should().Be("Hello world.");
         }
 
         [Fact]
@@ -45,6 +70,34 @@ namespace VoiceLite.Tests.Services
         {
             var result = TextPostProcessor.Process("yesterday i went home");
             result.Should().Contain(" I ");
+        }
+
+        // NEW CONTRACT (2026-07-17): never lowercase what the model produced. The old
+        // behavior force-lowercased every word outside a ~20-word allowlist, destroying
+        // names, acronyms, and brands that Parakeet capitalizes correctly.
+
+        [Fact]
+        public void Process_PreservesModelCapitalization_NamesAndAcronyms()
+        {
+            var result = TextPostProcessor.Process("the MRI results for Sarah Chen came back clear");
+            result.Should().Contain("MRI");
+            result.Should().Contain("Sarah Chen");
+        }
+
+        [Fact]
+        public void Process_PreservesMidSentenceCapitalization_AfterSentenceBreaks()
+        {
+            var result = TextPostProcessor.Process("see Dr. Adams. Book the CT scan");
+            result.Should().Contain("Adams");
+            result.Should().Contain("CT");
+        }
+
+        [Fact]
+        public void Process_SentenceInitialCapitalization_PreservesRestOfWord()
+        {
+            // CapitalizeFirst must not lowercase the tail of the word.
+            var result = TextPostProcessor.Process("mRNA vaccines work");
+            result.Should().StartWith("MRNA");
         }
 
         [Theory]

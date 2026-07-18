@@ -186,6 +186,37 @@ namespace VoiceLite.Tests.Services
             settings.TranscriptionHistory.Should().HaveCount(50, "All items should remain when below cap");
         }
 
+        [Fact]
+        public void CleanupOldItems_AboveLimit_RemovesOldestUnpinned_ButKeepsPinned()
+        {
+            // Arrange — MAX_HISTORY_ITEMS is hardcoded to 250.
+            var settings = CreateTestSettings();
+            var service = new TranscriptionHistoryService(settings);
+
+            // Oldest item of all is PINNED — it must survive cap enforcement.
+            var pinnedItem = CreateTestItem("Pinned oldest", isPinned: true);
+            pinnedItem.Timestamp = DateTime.Now.AddDays(-30);
+            service.AddToHistory(pinnedItem);
+
+            // Second-oldest is unpinned — it is the one that must age out.
+            var oldestUnpinned = CreateTestItem("Unpinned oldest");
+            oldestUnpinned.Timestamp = DateTime.Now.AddDays(-20);
+            service.AddToHistory(oldestUnpinned);
+
+            // Fill to 251 total (1 over the cap).
+            for (int i = 0; i < 249; i++)
+            {
+                service.AddToHistory(CreateTestItem($"Item {i}"));
+            }
+
+            // Assert — cap enforced, pinned item exempt, oldest UNPINNED removed instead.
+            settings.TranscriptionHistory.Should().HaveCount(250);
+            settings.TranscriptionHistory.Should().Contain(x => x.Id == pinnedItem.Id,
+                "pinned items must be exempt from the 250-item cap");
+            settings.TranscriptionHistory.Should().NotContain(x => x.Id == oldestUnpinned.Id,
+                "the oldest unpinned item should age out in its place");
+        }
+
         #endregion
 
         #region RemoveFromHistory Tests

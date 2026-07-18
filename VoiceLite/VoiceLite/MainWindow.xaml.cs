@@ -314,7 +314,7 @@ namespace VoiceLite
 
                 var sevenDaysAgo = DateTime.Now.AddDays(-7);
                 var itemsToRemove = settings.TranscriptionHistory
-                    .Where(h => h.Timestamp < sevenDaysAgo)
+                    .Where(h => h.Timestamp < sevenDaysAgo && !h.IsPinned) // pinned items are exempt from the 7-day purge
                     .ToList();
 
                 if (itemsToRemove.Count > 0)
@@ -374,7 +374,11 @@ namespace VoiceLite
 
             // TIER 1.4: Use SemaphoreSlim instead of lock for async compatibility
             // MED-11 FIX: Use cancellation token to allow graceful shutdown
-            await saveSettingsSemaphore.WaitAsync(settingsSaveCts.Token);
+            // ConfigureAwait(false) on every await past the UI-state capture above:
+            // the finally block's semaphore Release must not queue behind a busy/blocked
+            // dispatcher, or the exit-flush wait on this semaphore can never succeed
+            // against an in-flight save.
+            await saveSettingsSemaphore.WaitAsync(settingsSaveCts.Token).ConfigureAwait(false);
             try
             {
                 try
@@ -401,18 +405,18 @@ namespace VoiceLite
                         {
                             return JsonSerializer.Serialize(settings, _jsonSerializerOptions);
                         }
-                    });
+                    }).ConfigureAwait(false);
 
                     // TIER 1.4: Use async file I/O to prevent UI thread blocking (was 50ms)
                     // Write to temp file first, then rename (rename is atomic on Windows)
                     string tempPath = settingsPath + ".tmp";
-                    await File.WriteAllTextAsync(tempPath, json);
+                    await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
 
                     // BUG-010 FIX: Verify temp file is valid JSON before replacing original
                     // Prevents data loss if app crashes during serialization
                     try
                     {
-                        var testLoad = JsonSerializer.Deserialize<Settings>(await File.ReadAllTextAsync(tempPath));
+                        var testLoad = JsonSerializer.Deserialize<Settings>(await File.ReadAllTextAsync(tempPath).ConfigureAwait(false));
                         if (testLoad == null)
                         {
                             throw new InvalidDataException("Settings deserialized to null");
@@ -543,7 +547,7 @@ namespace VoiceLite
                 }
 
                 systemTrayManager = new SystemTrayManager();
-                await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this));
+                await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this, GetHotkeyDisplayString()));
 
                 // Load and display existing history
                 await Dispatcher.InvokeAsync(() => _ = UpdateHistoryUI());
@@ -830,6 +834,11 @@ namespace VoiceLite
                 }
 
                 StopStuckStateRecoveryTimer();
+
+                // CANCEL FIX invariant: a new recording must never start with a stale
+                // discard flag (possible if a recorder/MainWindow isRecording desync ever
+                // skips the AudioFileReady that would have consumed it).
+                discardNextAudio = false;
 
                 recordingStartTime = DateTime.Now;
                 isRecording = true;
@@ -1563,11 +1572,22 @@ namespace VoiceLite
             catch (Exception ex)
             {
                 ErrorLogger.LogError("OnAudioFileReady", ex);
+
+                // Surface actionable messages instead of a generic "Transcription error":
+                // ModelResolverService's FileNotFoundException tells the user to download
+                // the model from Settings, and TimeoutException suggests the Speed preset.
+                string errorText =
+                    ex is TimeoutException ||
+                    (ex is FileNotFoundException or DirectoryNotFoundException or InvalidOperationException
+                        && ex.Message.Contains("model", StringComparison.OrdinalIgnoreCase))
+                    ? ex.Message
+                    : "Transcription error";
+
                 await Dispatcher.InvokeAsync(() =>
                 {
                     StopStuckStateRecoveryTimer();
                     // CRITICAL FIX: Use helper method with null protection
-                    UpdateTranscriptionText("Transcription error", Brushes.Red);
+                    UpdateTranscriptionText(errorText, Brushes.Red);
                     UpdateStatus("Error", Brushes.Red);
 
                     _ = Task.Run(async () =>
@@ -1778,6 +1798,7 @@ namespace VoiceLite
                 // Always update UI regardless of service recreation success
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
+                systemTrayManager?.UpdateHotkeyDisplay(GetHotkeyDisplayString());
             }
         }
 
@@ -1879,6 +1900,13 @@ namespace VoiceLite
         // CRITICAL FIX #2: Use int for Interlocked operations (thread-safe)
         private int isClosingHandled = 0;
 
+        // Set immediately before the deferred Close() below. While the settings flush is
+        // still awaiting, a second X-click re-enters OnClosing with isClosingHandled == 1;
+        // without this flag that second entry would be indistinguishable from the deferred
+        // Close() and would shut the window mid-flush (losing settings). Volatile: set on
+        // a dispatcher continuation, read on the dispatcher thread.
+        private volatile bool deferredCloseIssued = false;
+
         // CLOSE FIX: this override used to call Close() re-entrantly from inside WmClose,
         // which throws InvalidOperationException (Window.VerifyNotClosing) on every X-button
         // close, and it burned the one-shot isClosingHandled flag on minimize-to-tray so the
@@ -1888,9 +1916,17 @@ namespace VoiceLite
         // the original close callstack has unwound.
         protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            // Second entry = the deferred Close() below (flag already 1): let it proceed.
             if (Interlocked.CompareExchange(ref isClosingHandled, 1, 0) != 0)
             {
+                if (!deferredCloseIssued)
+                {
+                    // Second X-click while the settings flush below is still awaiting —
+                    // refuse it; the first entry issues the real Close() when done.
+                    e.Cancel = true;
+                    return;
+                }
+
+                // Second entry = the legitimate deferred Close() below: let it proceed.
                 base.OnClosing(e);
                 return;
             }
@@ -1932,6 +1968,7 @@ namespace VoiceLite
                 // Defer Close() until after OnClosing (and WmClose) has returned — calling
                 // it re-entrantly throws InvalidOperationException. On the Application.Shutdown
                 // path the window may already be closed by now; the inner catch absorbs that.
+                deferredCloseIssued = true;
                 await Dispatcher.InvokeAsync(() =>
                 {
                     try { Close(); }
@@ -2168,7 +2205,10 @@ namespace VoiceLite
             {
                 try
                 {
-                    TextInjector.CopyToClipboardWithAutoClear(item.Text);
+                    // 30s clipboard hold: history copy is the documented recovery path for
+                    // failed injection ("copy text from history") — the 2s auto-clear
+                    // variant would wipe the text before the user could paste it.
+                    TextInjector.CopyToClipboardForManualPaste(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
                     var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TimingConstants.StatusRevertDelayMs) };
                     lock (timerLock) { activeStatusTimers.Add(timer); } // TIMER RACE FIX: Use lock for thread safety
@@ -2258,7 +2298,8 @@ namespace VoiceLite
             {
                 try
                 {
-                    TextInjector.CopyToClipboardWithAutoClear(item.Text);
+                    // 30s clipboard hold (not 2s auto-clear) — see CreateHistoryContextMenu.
+                    TextInjector.CopyToClipboardForManualPaste(item.Text);
                     UpdateStatus("Copied to clipboard", new SolidColorBrush(StatusColors.Ready));
 
                     // Revert to "Ready" after 1.5 seconds
