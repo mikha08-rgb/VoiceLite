@@ -48,6 +48,13 @@ namespace VoiceLite
         private bool isHotkeyMode = false;
         private readonly object recordingLock = new object();
 
+        // CANCEL FIX: set when a recording is stopped with cancel:true (Esc key / app close).
+        // AudioRecorder still saves the buffer and raises AudioFileReady from inside
+        // StopRecording(); OnAudioFileReady consumes this flag and discards the audio
+        // instead of transcribing + auto-pasting it into the foreground app.
+        // volatile: written on the UI thread, read on whatever thread raises AudioFileReady.
+        private volatile bool discardNextAudio = false;
+
         // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
         // More reliable than time-based check (works on slow PCs with 10+ second startup)
         private bool isInitializing = true;
@@ -102,7 +109,7 @@ namespace VoiceLite
             // CRITICAL FIX: Run all async initialization on background thread
             // This prevents UI freeze during startup diagnostics and service initialization
             this.Loaded += MainWindow_Loaded;
-            this.Closing += MainWindow_Closing;
+            // NOTE: close/minimize-to-tray handling lives in the OnClosing override (one place).
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
@@ -698,23 +705,16 @@ namespace VoiceLite
 
         private string GetModelDisplayName(string modelPath)
         {
-            if (string.IsNullOrEmpty(modelPath))
-                return "Tiny (Free)";
+            // v2.0: single-model world — the Whisper-era tiny/base/small/medium/large
+            // mappings are gone. SettingsMigration rewrites legacy ids to the Parakeet
+            // canonical id, so anything else is genuinely unknown.
+            if (!string.IsNullOrEmpty(modelPath) &&
+                modelPath.Contains("parakeet", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Parakeet v3";
+            }
 
-            // Extract model name from path
-            string modelName = modelPath.ToLower();
-            if (modelName.Contains("tiny"))
-                return "Tiny (Free)";
-            else if (modelName.Contains("base"))
-                return "Base";
-            else if (modelName.Contains("small"))
-                return "Small";
-            else if (modelName.Contains("medium"))
-                return "Medium";
-            else if (modelName.Contains("large"))
-                return "Large";
-            else
-                return "Base (Free)"; // Default fallback
+            return "Unknown";
         }
 
         private void UpdateUIForCurrentMode()
@@ -890,6 +890,10 @@ namespace VoiceLite
 
             try
             {
+                // CANCEL FIX: AudioFileReady fires synchronously from inside StopRecording(),
+                // so the discard flag must be set BEFORE that call. A non-cancel stop clears
+                // any stale flag so it can't eat a real recording.
+                discardNextAudio = cancel;
                 audioRecorder?.StopRecording();
 
                 if (cancel)
@@ -1387,6 +1391,26 @@ namespace VoiceLite
             // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
             {
+                // CANCEL FIX: recording was cancelled (Esc key / app close) — the recorder
+                // saved the buffer anyway, but this audio must never be transcribed or pasted.
+                if (discardNextAudio)
+                {
+                    discardNextAudio = false;
+                    ErrorLogger.LogWarning($"OnAudioFileReady: Discarding cancelled recording: {audioFilePath}");
+                    try
+                    {
+                        if (File.Exists(audioFilePath))
+                        {
+                            File.Delete(audioFilePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError($"Failed to delete cancelled temp audio file: {audioFilePath}", ex);
+                    }
+                    return;
+                }
+
                 if (isTranscribing)
                 {
                     ErrorLogger.LogWarning("OnAudioFileReady: Already transcribing - ignoring duplicate event");
@@ -1616,15 +1640,9 @@ namespace VoiceLite
 
         #region UI Event Handlers & Settings
 
-        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
-        {
-            if (MinimizeCheckBox.IsChecked == true)
-            {
-                e.Cancel = true;
-                systemTrayManager?.MinimizeToTray();
-            }
-        }
-
+        // CLOSE FIX: the old MainWindow_Closing handler (tray-cancel via the Closing event)
+        // was removed — its minimize-to-tray decision is consolidated into the OnClosing
+        // override so the close flow has exactly one owner (no double-cancel confusion).
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1702,10 +1720,20 @@ namespace VoiceLite
                     try
                     {
                         ErrorLogger.LogMessage("Re-registering hotkey due to change");
-                        hotkeyManager?.Dispose();
+                        // Unsubscribe from the old instance before disposal (mirrors OnClosed)
+                        if (hotkeyManager != null)
+                        {
+                            hotkeyManager.HotkeyPressed -= OnHotkeyPressed;
+                            hotkeyManager.HotkeyReleased -= OnHotkeyReleased;
+                            hotkeyManager.PollingModeActivated -= OnPollingModeActivated;
+                            hotkeyManager.Dispose();
+                        }
                         hotkeyManager = new HotkeyManager();
                         hotkeyManager.HotkeyPressed += OnHotkeyPressed;
                         hotkeyManager.HotkeyReleased += OnHotkeyReleased;
+                        // BUG-006 FIX: re-subscribe polling mode notification too — it was
+                        // silently dropped on every hotkey change (init path subscribes it)
+                        hotkeyManager.PollingModeActivated += OnPollingModeActivated;
                         var helper = new WindowInteropHelper(this);
                         hotkeyManager.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
@@ -1832,33 +1860,121 @@ namespace VoiceLite
         // CRITICAL FIX #2: Use int for Interlocked operations (thread-safe)
         private int isClosingHandled = 0;
 
+        // CLOSE FIX: this override used to call Close() re-entrantly from inside WmClose,
+        // which throws InvalidOperationException (Window.VerifyNotClosing) on every X-button
+        // close, and it burned the one-shot isClosingHandled flag on minimize-to-tray so the
+        // SECOND X-click exited the app. Restructured: the tray decision lives here
+        // (consolidated from the old MainWindow_Closing handler), the one-shot flag only
+        // burns on a real exit, and the actual Close() is deferred via the dispatcher until
+        // the original close callstack has unwound.
         protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            // CRITICAL FIX #2: Thread-safe check-and-set using Interlocked.CompareExchange
-            // Returns 0 if this is the first call, 1 if already handled
-            if (Interlocked.CompareExchange(ref isClosingHandled, 1, 0) == 0)
+            // Second entry = the deferred Close() below (flag already 1): let it proceed.
+            if (Interlocked.CompareExchange(ref isClosingHandled, 1, 0) != 0)
             {
-                e.Cancel = true; // Prevent immediate close
+                base.OnClosing(e);
+                return;
+            }
 
-                // CRITICAL FIX (BUG-002 + v1.0.56): Flush pending settings save BEFORE disposal
-                // NOW ASYNC - no UI thread blocking!
-                if (settingsSaveTimer != null && settingsSaveTimer.IsEnabled)
+            // Minimize-to-tray: hide instead of exiting. Must work on every X-click, so
+            // release the one-shot flag before returning. (On tray Exit WPF is inside
+            // Application.Shutdown and ignores e.Cancel — the window closes anyway and
+            // the synchronous backstop flush in OnClosed saves settings.)
+            if (MinimizeCheckBox.IsChecked == true)
+            {
+                e.Cancel = true;
+                systemTrayManager?.MinimizeToTray();
+                Interlocked.Exchange(ref isClosingHandled, 0);
+                return;
+            }
+
+            // Real exit: cancel THIS close, flush settings without blocking the UI thread,
+            // then re-issue Close() from outside the WmClose callstack.
+            e.Cancel = true;
+
+            try
+            {
+                // CRITICAL FIX (BUG-002 + v1.0.56): flush pending settings BEFORE disposal.
+                // Flush unconditionally — the old code only flushed when the 500ms debounce
+                // timer happened to be running, and its follow-up SaveSettings() call just
+                // restarted a timer that could never fire before close (dead code).
+                settingsSaveTimer?.Stop();
+                await SaveSettingsInternalAsync(); // NO .Wait() - async all the way
+                ErrorLogger.LogMessage("OnClosing: Flushed settings on app close (async, no blocking)");
+            }
+            catch (Exception ex)
+            {
+                // OnClosed's synchronous backstop flush still runs — don't block the exit.
+                ErrorLogger.LogError("OnClosing: settings flush failed", ex);
+            }
+
+            try
+            {
+                // Defer Close() until after OnClosing (and WmClose) has returned — calling
+                // it re-entrantly throws InvalidOperationException. On the Application.Shutdown
+                // path the window may already be closed by now; the inner catch absorbs that.
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    settingsSaveTimer.Stop();
-                    await SaveSettingsInternalAsync(); // NO .Wait() - async all the way
-                    ErrorLogger.LogMessage("v1.0.56 FIX: Flushed pending settings save on app close (async, no blocking)");
+                    try { Close(); }
+                    catch (Exception ex) { ErrorLogger.LogWarning($"OnClosing: deferred Close failed (window may already be closed): {ex.Message}"); }
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("OnClosing: deferred close dispatch failed", ex);
+            }
+        }
+
+        // CLOSE FIX: synchronous, dispatcher-free settings flush for exit paths where async
+        // continuations may never run — the tray Exit menu calls Application.Current.Shutdown()
+        // directly, which ignores e.Cancel and tears the dispatcher down right after the
+        // windows close, so OnClosing's awaited flush can be abandoned mid-flight.
+        // Idempotent with the async flush (semaphore serializes them, both write the same
+        // state); a plain sync write of the settings JSON takes milliseconds — fine at exit.
+        private void FlushSettingsOnExit()
+        {
+            // Short wait only: if an in-flight async save holds the semaphore, its
+            // continuation is queued on this (now blocked) UI thread and can't finish.
+            if (!saveSettingsSemaphore.Wait(TimeSpan.FromSeconds(2)))
+            {
+                ErrorLogger.LogWarning("FlushSettingsOnExit: timed out waiting for in-flight save - skipping backstop flush");
+                return;
+            }
+            try
+            {
+                EnsureAppDataDirectoryExists();
+                string settingsPath = GetSettingsPath();
+
+                string json;
+                lock (settings.SyncRoot)
+                {
+                    settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
+                    json = JsonSerializer.Serialize(settings, _jsonSerializerOptions);
                 }
 
-                SaveSettings(); // Belt-and-suspenders: call debounced save too (will be no-op if timer null)
+                // Same atomic temp-write + rename pattern as SaveSettingsInternalAsync
+                string tempPath = settingsPath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, settingsPath, overwrite: true);
 
-                base.OnClosing(e);
-                Close(); // Now actually close the window
+                ErrorLogger.LogMessage($"FlushSettingsOnExit: settings flushed to {settingsPath}");
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("FlushSettingsOnExit", ex);
+            }
+            finally
+            {
+                saveSettingsSemaphore.Release();
             }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            // Settings save already handled in OnClosing (async pattern)
+            // CLOSE FIX: last-resort settings flush (covers tray Exit / Application.Shutdown,
+            // where OnClosing's async flush may never complete). Redundant-but-harmless on the
+            // normal X-button exit path where OnClosing already flushed.
+            FlushSettingsOnExit();
 
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
@@ -2050,7 +2166,10 @@ namespace VoiceLite
                 }
                 catch (Exception ex)
                 {
+                    // Clipboard copy can fail when another app holds the clipboard open —
+                    // surface the failure instead of silently showing nothing.
                     ErrorLogger.LogError("Copy menu item", ex);
+                    UpdateStatus("Copy failed - clipboard busy", Brushes.Red);
                 }
             };
             contextMenu.Items.Add(copyMenuItem);
@@ -2139,7 +2258,10 @@ namespace VoiceLite
                 }
                 catch (Exception ex)
                 {
+                    // Clipboard copy can fail when another app holds the clipboard open —
+                    // surface the failure instead of lying with "Copied to clipboard".
                     ErrorLogger.LogError("Copy history item", ex);
+                    UpdateStatus("Copy failed - clipboard busy", Brushes.Red);
                 }
             };
 
