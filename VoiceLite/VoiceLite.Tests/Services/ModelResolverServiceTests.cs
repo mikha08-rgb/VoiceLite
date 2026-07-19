@@ -42,7 +42,8 @@ namespace VoiceLite.Tests.Services
             Directory.CreateDirectory(dir);
             foreach (var f in files)
             {
-                File.WriteAllBytes(Path.Combine(dir, f), Array.Empty<byte>());
+                // Non-empty: the resolver treats zero-byte files as a corrupt install.
+                File.WriteAllBytes(Path.Combine(dir, f), new byte[] { 0x01 });
             }
             return dir;
         }
