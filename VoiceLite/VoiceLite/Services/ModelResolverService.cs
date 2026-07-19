@@ -66,10 +66,19 @@ namespace VoiceLite.Services
                 ParakeetDirName);
         }
 
+        // Length > 0 matters: a truncated/interrupted install can leave 0-byte files
+        // that pass a bare File.Exists check, wedging the recognizer on every launch
+        // with no recovery path (the first-launch download gate never re-opens).
         private static bool HasRequiredFiles(string dir) =>
-            File.Exists(Path.Combine(dir, "encoder.int8.onnx"))
-            && File.Exists(Path.Combine(dir, "decoder.int8.onnx"))
-            && File.Exists(Path.Combine(dir, "joiner.int8.onnx"))
-            && File.Exists(Path.Combine(dir, "tokens.txt"));
+            IsNonEmptyFile(Path.Combine(dir, "encoder.int8.onnx"))
+            && IsNonEmptyFile(Path.Combine(dir, "decoder.int8.onnx"))
+            && IsNonEmptyFile(Path.Combine(dir, "joiner.int8.onnx"))
+            && IsNonEmptyFile(Path.Combine(dir, "tokens.txt"));
+
+        private static bool IsNonEmptyFile(string path)
+        {
+            var info = new FileInfo(path);
+            return info.Exists && info.Length > 0;
+        }
     }
 }

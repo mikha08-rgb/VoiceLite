@@ -268,5 +268,130 @@ namespace VoiceLite.Tests.Services
 
             segments.Count.Should().Be(0);
         }
+
+        // ------------------------------------------------------------------
+        // WAV header parsing (no ONNX session needed — ExtractSamples only reads
+        // bytes, and the constructor only checks the model file exists, so a dummy
+        // file lets these run even when the real VAD model isn't present).
+        // ------------------------------------------------------------------
+
+        private static void WithHeaderParseOnlyService(Action<SileroVadService> test)
+        {
+            var dummyModel = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            File.WriteAllBytes(dummyModel, new byte[] { 1 });
+            try
+            {
+                using var parseService = new SileroVadService(dummyModel);
+                test(parseService);
+            }
+            finally
+            {
+                try { File.Delete(dummyModel); } catch { }
+            }
+        }
+
+        // NAudio's WaveFileWriter (used by AudioRecorder) emits an 18-byte fmt chunk
+        // (cbSize field present) — a 46-byte header, not 44.
+        private static byte[] CreateNAudioStyleWav(float[] samples)
+        {
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+
+            int dataSize = samples.Length * 2;
+            int fileSize = 46 + dataSize - 8;
+
+            writer.Write(new[] { 'R', 'I', 'F', 'F' });
+            writer.Write(fileSize);
+            writer.Write(new[] { 'W', 'A', 'V', 'E' });
+            writer.Write(new[] { 'f', 'm', 't', ' ' });
+            writer.Write(18);            // fmt chunk size: 16 + 2-byte cbSize
+            writer.Write((short)1);      // PCM
+            writer.Write((short)1);      // mono
+            writer.Write(16000);
+            writer.Write(16000 * 2);
+            writer.Write((short)2);      // block align
+            writer.Write((short)16);     // bits per sample
+            writer.Write((short)0);      // cbSize = 0 (the extra 2 bytes)
+            writer.Write(new[] { 'd', 'a', 't', 'a' });
+            writer.Write(dataSize);
+
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float clamped = Math.Clamp(samples[i], -1f, 1f);
+                writer.Write((short)(clamped * 32767f));
+            }
+
+            writer.Flush();
+            return ms.ToArray();
+        }
+
+        [Fact]
+        public void ExtractSamples_NAudio46ByteHeader_NoGarbageSampleAndNoShift()
+        {
+            WithHeaderParseOnlyService(svc =>
+            {
+                var original = GenerateSineWave(1000);
+                var wav = CreateNAudioStyleWav(original);
+                wav.Length.Should().Be(46 + 1000 * 2);
+
+                var extracted = svc.ExtractSamples(wav);
+
+                // The old fixed 44-byte skip returned 1001 samples: one garbage sample
+                // (last 2 bytes of the data-chunk size) followed by a 1-sample shift.
+                extracted.Length.Should().Be(1000);
+                for (int i = 0; i < original.Length; i++)
+                    Math.Abs(original[i] - extracted[i]).Should().BeLessThan(0.001f);
+            });
+        }
+
+        [Fact]
+        public void ExtractSamples_Classic44ByteHeader_UnchangedBehavior()
+        {
+            WithHeaderParseOnlyService(svc =>
+            {
+                var original = GenerateSineWave(1000);
+                var wav = CreateWav(original);
+
+                var extracted = svc.ExtractSamples(wav);
+
+                extracted.Length.Should().Be(1000);
+                for (int i = 0; i < original.Length; i++)
+                    Math.Abs(original[i] - extracted[i]).Should().BeLessThan(0.001f);
+            });
+        }
+
+        [Fact]
+        public void ExtractSamples_UnparseableHeader_FallsBackToLegacySkip()
+        {
+            WithHeaderParseOnlyService(svc =>
+            {
+                // 44 bytes of non-RIFF garbage + 100 samples' worth of payload:
+                // the chunk walker can't parse it, so the legacy fixed 44-byte skip applies.
+                var garbage = new byte[44 + 200];
+                new Random(7).NextBytes(garbage);
+                garbage[0] = (byte)'X'; // ensure not 'RIFF'
+
+                var extracted = svc.ExtractSamples(garbage);
+
+                extracted.Length.Should().Be(100);
+            });
+        }
+
+        [Fact]
+        public void ExtractSamples_TruncatedDataChunk_ClampsToBuffer()
+        {
+            WithHeaderParseOnlyService(svc =>
+            {
+                var original = GenerateSineWave(1000);
+                var wav = CreateNAudioStyleWav(original);
+
+                // Simulate a truncated file: cut off the last 100 samples' bytes.
+                var truncated = wav.AsSpan(0, wav.Length - 200).ToArray();
+
+                var extracted = svc.ExtractSamples(truncated);
+
+                extracted.Length.Should().Be(900);
+            });
+        }
     }
 }
