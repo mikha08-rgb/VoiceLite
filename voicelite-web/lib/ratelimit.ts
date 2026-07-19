@@ -87,7 +87,7 @@ export const profileRateLimit = redis
 
 /**
  * Email resend rate limiter: 3 requests per hour per IP
- * Used for /api/licenses/resend-email to prevent enumeration and spam
+ * Used for /api/licenses/retrieve to prevent enumeration and spam
  */
 export const emailResendRateLimit = redis
   ? new Ratelimit({

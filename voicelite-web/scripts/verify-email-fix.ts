@@ -136,8 +136,7 @@ async function verifyEmailFix() {
       console.log('\n🎉 All systems operational! No issues detected.');
     } else {
       console.log('\n⚠️  Action needed: Resend emails for failed cases.');
-      console.log('   You can use the /api/licenses/resend-email endpoint');
-      console.log('   or contact customers to manually resend their licenses.');
+      console.log('   Contact customers to manually resend their licenses.');
     }
 
   } catch (error) {

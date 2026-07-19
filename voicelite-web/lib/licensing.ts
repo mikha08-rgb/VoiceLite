@@ -191,26 +191,6 @@ export async function recordLicenseActivation({
   });
 }
 
-export async function deactivateLicenseActivation({
-  licenseId,
-  machineId,
-}: {
-  licenseId: string;
-  machineId: string;
-}) {
-  return prisma.licenseActivation.update({
-    where: {
-      licenseId_machineId: {
-        licenseId,
-        machineId,
-      },
-    },
-    data: {
-      status: LicenseActivationStatus.BLOCKED,
-    },
-  });
-}
-
 /**
  * Record a license event (issued, renewed, revoked, etc.)
  */
