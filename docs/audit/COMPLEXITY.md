@@ -36,6 +36,7 @@ A weekend Handy-fork spike (Feb 27–Mar 1) that was never shipped, has no licen
 
 **4. Model-gating machinery that always returns true**
 `ProFeatureService.CanUseModel`/`IsModelAvailable`/`GetAvailableModels` and the `IProFeatureService` seam threaded through two constructors exist for gating that no longer happens. The seam is *cheap* to keep (one interface, used by a mock in tests) — low priority — but the always-true model methods and their stale "See all 5 models" comments are pure noise.
+**Update 2026-07-18:** seam collapsed — `IProFeatureService` deleted, call sites take the concrete `ProFeatureService`. Its mock-seam justification died with the deleted zombie tests.
 
 **5. `lib/openapi.ts` fiction + unused rate limiters**
 ~13 documented-but-nonexistent routes and an entire Ed25519/CRL/OTP-auth security model that was never built (or was ripped out). Unused `otpRateLimit`/`emailRateLimit`/`licenseRateLimit`/`profileRateLimit`. Delete — it's worse than no docs because it's served publicly as truth.
@@ -51,6 +52,6 @@ Root `ARCHITECTURE.md`, `PILOT.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING
 
 ## Judgement calls (essential-ish, don't rush)
 
-- **The `IProFeatureService` seam** — keep for now. It's the only surviving interface, it's a genuine DI/testing seam, and future Pro features may use it. Cheap to keep, disproportionately annoying to re-add.
+- ~~**The `IProFeatureService` seam** — keep for now. It's the only surviving interface, it's a genuine DI/testing seam, and future Pro features may use it. Cheap to keep, disproportionately annoying to re-add.~~ **Superseded 2026-07-18:** collapsed to the concrete `ProFeatureService` — the mocks that justified the seam were deleted with the zombie tests, leaving it a pure pass-through.
 - **`SettingsMigration` (GGML→Parakeet)** — keep until you're confident no user is upgrading from a pre-v2 install. It's a one-way migration that runs once; low cost, real safety.
 - **Polly retry policies / `RetryPolicies.cs`** — essential for the flaky-network license call. Keep.
