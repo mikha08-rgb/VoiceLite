@@ -1,6 +1,12 @@
 name: PR Tests
 
 on:
+  push:
+    branches: [ master, 'v*' ]
+    paths:
+      - 'VoiceLite/**'
+      - 'voicelite-web/**'
+      - '.github/workflows/**'
   pull_request:
     branches: [ master ]
     paths:

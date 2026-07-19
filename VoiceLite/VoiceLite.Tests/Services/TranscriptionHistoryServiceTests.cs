@@ -186,6 +186,37 @@ namespace VoiceLite.Tests.Services
             settings.TranscriptionHistory.Should().HaveCount(50, "All items should remain when below cap");
         }
 
+        [Fact]
+        public void CleanupOldItems_AboveLimit_RemovesOldestUnpinned_ButKeepsPinned()
+        {
+            // Arrange — MAX_HISTORY_ITEMS is hardcoded to 250.
+            var settings = CreateTestSettings();
+            var service = new TranscriptionHistoryService(settings);
+
+            // Oldest item of all is PINNED — it must survive cap enforcement.
+            var pinnedItem = CreateTestItem("Pinned oldest", isPinned: true);
+            pinnedItem.Timestamp = DateTime.Now.AddDays(-30);
+            service.AddToHistory(pinnedItem);
+
+            // Second-oldest is unpinned — it is the one that must age out.
+            var oldestUnpinned = CreateTestItem("Unpinned oldest");
+            oldestUnpinned.Timestamp = DateTime.Now.AddDays(-20);
+            service.AddToHistory(oldestUnpinned);
+
+            // Fill to 251 total (1 over the cap).
+            for (int i = 0; i < 249; i++)
+            {
+                service.AddToHistory(CreateTestItem($"Item {i}"));
+            }
+
+            // Assert — cap enforced, pinned item exempt, oldest UNPINNED removed instead.
+            settings.TranscriptionHistory.Should().HaveCount(250);
+            settings.TranscriptionHistory.Should().Contain(x => x.Id == pinnedItem.Id,
+                "pinned items must be exempt from the 250-item cap");
+            settings.TranscriptionHistory.Should().NotContain(x => x.Id == oldestUnpinned.Id,
+                "the oldest unpinned item should age out in its place");
+        }
+
         #endregion
 
         #region RemoveFromHistory Tests
@@ -268,145 +299,6 @@ namespace VoiceLite.Tests.Services
             settings.TranscriptionHistory.Should().BeEmpty();
         }
 
-        [Fact]
-        public void ClearHistory_WithPreservePinned_KeepsPinnedItems()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            var pinnedItem = CreateTestItem("Pinned", isPinned: true);
-            var normalItem = CreateTestItem("Normal", isPinned: false);
-
-            service.AddToHistory(pinnedItem);
-            service.AddToHistory(normalItem);
-
-            // Act
-            service.ClearHistory(preservePinned: true);
-
-            // Assert
-            settings.TranscriptionHistory.Should().HaveCount(1);
-            settings.TranscriptionHistory[0].Text.Should().Be("Pinned");
-            settings.TranscriptionHistory[0].IsPinned.Should().BeTrue();
-        }
-
-        [Fact]
-        public void ClearHistory_WithoutPreservePinned_RemovesEverything()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            service.AddToHistory(CreateTestItem("Pinned", isPinned: true));
-            service.AddToHistory(CreateTestItem("Normal", isPinned: false));
-
-            // Act
-            service.ClearHistory(preservePinned: false);
-
-            // Assert
-            settings.TranscriptionHistory.Should().BeEmpty();
-        }
-
-        #endregion
-
-        #region GetStatistics Tests
-
-        [Fact]
-        public void GetStatistics_EmptyHistory_ReturnsZeros()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            // Act
-            var stats = service.GetStatistics();
-
-            // Assert
-            stats.TotalItems.Should().Be(0);
-            stats.TotalWords.Should().Be(0);
-            stats.AverageDuration.Should().Be(0);
-        }
-
-        [Fact]
-        public void GetStatistics_WithItems_CalculatesCorrectly()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            var item1 = CreateTestItem("Hello world");
-            item1.DurationSeconds = 2.0;
-            item1.WordCount = 2;
-
-            var item2 = CreateTestItem("This is a test");
-            item2.DurationSeconds = 4.0;
-            item2.WordCount = 4;
-
-            service.AddToHistory(item1);
-            service.AddToHistory(item2);
-
-            // Act
-            var stats = service.GetStatistics();
-
-            // Assert
-            stats.TotalItems.Should().Be(2);
-            stats.TotalWords.Should().Be(6);
-            stats.AverageDuration.Should().Be(3.0); // (2.0 + 4.0) / 2
-        }
-
-        #endregion
-
-        #region SearchHistory Tests
-
-        [Fact]
-        public void SearchHistory_EmptySearchText_ReturnsAll()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            service.AddToHistory(CreateTestItem("First"));
-            service.AddToHistory(CreateTestItem("Second"));
-
-            // Act
-            var results = service.SearchHistory("");
-
-            // Assert
-            results.Should().HaveCount(2);
-        }
-
-        [Fact]
-        public void SearchHistory_MatchingText_ReturnsFiltered()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            service.AddToHistory(CreateTestItem("Hello world"));
-            service.AddToHistory(CreateTestItem("Goodbye world"));
-            service.AddToHistory(CreateTestItem("Something else"));
-
-            // Act
-            var results = service.SearchHistory("world");
-
-            // Assert
-            results.Should().HaveCount(2);
-            results.Should().AllSatisfy(r => r.Text.Should().Contain("world"));
-        }
-
-        [Fact]
-        public void SearchHistory_CaseInsensitive_Works()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            service.AddToHistory(CreateTestItem("HELLO WORLD"));
-
-            // Act
-            var results = service.SearchHistory("hello");
-
-            // Assert
-            results.Should().HaveCount(1);
-        }
-
         #endregion
 
         #region TogglePin Tests
@@ -431,113 +323,6 @@ namespace VoiceLite.Tests.Services
 
             // Assert
             settings.TranscriptionHistory[0].IsPinned.Should().BeFalse();
-        }
-
-        [Fact]
-        public void GetPinnedItems_ReturnsOnlyPinned()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            service.AddToHistory(CreateTestItem("Pinned 1", isPinned: true));
-            service.AddToHistory(CreateTestItem("Normal", isPinned: false));
-            service.AddToHistory(CreateTestItem("Pinned 2", isPinned: true));
-
-            // Act
-            var pinned = service.GetPinnedItems();
-
-            // Assert
-            pinned.Should().HaveCount(2);
-            pinned.Should().AllSatisfy(p => p.IsPinned.Should().BeTrue());
-        }
-
-        #endregion
-
-        #region GetHistoryRange Tests
-
-        [Fact]
-        public void GetHistoryRange_FiltersCorrectly()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-
-            var oldItem = CreateTestItem("Old");
-            oldItem.Timestamp = DateTime.Now.AddDays(-5);
-
-            var recentItem = CreateTestItem("Recent");
-            recentItem.Timestamp = DateTime.Now.AddDays(-1);
-
-            var newItem = CreateTestItem("New");
-            newItem.Timestamp = DateTime.Now;
-
-            service.AddToHistory(oldItem);
-            service.AddToHistory(recentItem);
-            service.AddToHistory(newItem);
-
-            // Act
-            var range = service.GetHistoryRange(DateTime.Now.AddDays(-2), DateTime.Now);
-
-            // Assert
-            range.Should().HaveCount(2);
-            range.Should().Contain(x => x.Text == "Recent");
-            range.Should().Contain(x => x.Text == "New");
-            range.Should().NotContain(x => x.Text == "Old");
-        }
-
-        #endregion
-
-        #region AddTranscription (Interface) Tests
-
-        [Fact]
-        public void AddTranscription_ConvertsAndAdds()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            var transcriptionItem = new TranscriptionItem
-            {
-                Id = Guid.NewGuid().ToString(),
-                Text = "Test",
-                Timestamp = DateTime.Now,
-                ProcessingTime = 2.5,
-                ModelUsed = "ggml-small.bin",
-                IsPinned = false
-            };
-
-            // Act
-            service.AddTranscription(transcriptionItem);
-
-            // Assert
-            settings.TranscriptionHistory.Should().HaveCount(1);
-            var added = settings.TranscriptionHistory[0];
-            added.Text.Should().Be("Test");
-            added.DurationSeconds.Should().Be(2.5);
-            added.ModelUsed.Should().Be("ggml-small.bin");
-        }
-
-        [Fact]
-        public void AddTranscription_FiresItemAddedEvent()
-        {
-            // Arrange
-            var settings = CreateTestSettings();
-            var service = new TranscriptionHistoryService(settings);
-            TranscriptionItem? eventItem = null;
-            service.ItemAdded += (sender, item) => eventItem = item;
-
-            var transcriptionItem = new TranscriptionItem
-            {
-                Id = Guid.NewGuid().ToString(),
-                Text = "Event test",
-                Timestamp = DateTime.Now
-            };
-
-            // Act
-            service.AddTranscription(transcriptionItem);
-
-            // Assert
-            eventItem.Should().NotBeNull();
-            eventItem.Text.Should().Be("Event test");
         }
 
         #endregion

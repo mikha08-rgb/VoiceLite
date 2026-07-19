@@ -5,70 +5,73 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Services;
+using VoiceLite.Tests.TestUtilities;
 using Xunit;
 
 namespace VoiceLite.Tests.Integration
 {
     /// <summary>
     /// Integration tests for the complete audio recording → transcription → text injection pipeline
-    /// These are high-ROI tests that catch regressions in the core workflow
+    /// These are high-ROI tests that catch regressions in the core workflow.
+    /// Shares the class-level TranscriptionServiceFixture (same pattern as
+    /// TranscriptionServiceTests) so the ~600MB Parakeet model loads once for the class,
+    /// not once per test — this class itself is still constructed per-test (xUnit default).
     /// </summary>
-    public class AudioPipelineTests : IDisposable
+    public class AudioPipelineTests : IClassFixture<TranscriptionServiceFixture>, IDisposable
     {
+        private readonly TranscriptionServiceFixture _fx;
         private readonly AudioRecorder _recorder;
-        private readonly TranscriptionService _transcriber;
         private readonly TextInjector _textInjector;
         private readonly Settings _settings;
         private readonly string _tempDirectory;
 
-        public AudioPipelineTests()
+        public AudioPipelineTests(TranscriptionServiceFixture fx)
         {
+            _fx = fx;
+
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
             Directory.CreateDirectory(_tempDirectory);
 
-            _settings = new Settings
-            {
-                TranscriptionModel = "base",
-            };
-
+            _settings = new Settings();
             _recorder = new AudioRecorder();
-
-            // Only create transcriber if model file exists
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            _transcriber = File.Exists(modelPath)
-                ? new TranscriptionService(_settings)
-                : null!;
-
             _textInjector = new TextInjector(_settings);
         }
 
         public void Dispose()
         {
             _recorder?.Dispose();
-            _transcriber?.Dispose();
         }
 
         [Fact]
         public async Task FullPipeline_RecordTranscribeInject_CompletesSuccessfully()
         {
-            if (_transcriber == null)
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
-                // Skip if model not available
                 return;
             }
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
 
-            var audioDataReceived = false;
-            var transcriptionResult = string.Empty;
+            var transcriber = _fx.Service; // shared fixture — model loads once per class
+
             byte[]? capturedAudio = null;
+            var transcriptionDone = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             // Setup event handler for audio data
             _recorder.AudioDataReady += async (sender, audioData) =>
             {
-                audioDataReceived = true;
                 capturedAudio = audioData;
-
-                // Transcribe the audio
-                transcriptionResult = await _transcriber.TranscribeFromMemoryAsync(audioData);
+                try
+                {
+                    // Transcribe the audio (recorder → transcriber wiring, in-memory path)
+                    transcriptionDone.TrySetResult(await transcriber.TranscribeFromMemoryAsync(audioData));
+                }
+                catch (Exception ex)
+                {
+                    transcriptionDone.TrySetException(ex);
+                }
             };
 
             // Start recording
@@ -82,19 +85,35 @@ namespace VoiceLite.Tests.Integration
             _recorder.StopRecording();
             _recorder.IsRecording.Should().BeFalse();
 
-            // Wait for processing
-            await Task.Delay(1000);
+            // Wait for transcription to finish BEFORE the test ends — the fixture must
+            // not be disposed mid-decode (native access violation risk). Generous timeout
+            // because the first call in the class also loads the ~600MB model.
+            var completed = await Task.WhenAny(transcriptionDone.Task, Task.Delay(TimeSpan.FromSeconds(90)));
+            completed.Should().Be(transcriptionDone.Task, "transcription should complete");
 
             // Verify pipeline stages
-            audioDataReceived.Should().BeTrue("Audio data should be captured");
-            capturedAudio.Should().NotBeNull();
+            capturedAudio.Should().NotBeNull("Audio data should be captured");
             capturedAudio!.Length.Should().BeGreaterThan(0, "Audio buffer should contain data");
+            var transcriptionResult = await transcriptionDone.Task;
             transcriptionResult.Should().NotBeNull("Transcription should complete");
+
+            // If the captured buffer is above TranscriptionService's ~100-byte floor the
+            // decode is guaranteed to run, so the recognizer must have loaded — guards
+            // against this test regressing to a silent no-decode false green. (A mic that
+            // captures pure silence can be VAD-trimmed below the floor; that's correct
+            // product behavior, so only assert when the decode must have happened.)
+            if (capturedAudio!.Length > 100)
+            {
+                transcriber.RecognizerLoadCount.Should().BeGreaterThan(0,
+                    "recorded audio above the size floor must reach the Parakeet decode path");
+            }
         }
 
         [Fact]
         public async Task Pipeline_MultipleRecordingCycles_MaintainsStability()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             const int cycles = 3;
             var cyclesCompleted = 0;
 
@@ -120,6 +139,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_ConcurrentOperations_HandledSafely()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var tasks = new Task[3];
 
             // Start multiple recording sessions concurrently
@@ -150,6 +171,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_ErrorRecovery_ContinuesAfterFailure()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var successfulCompletions = 0;
             var errors = 0;
             var eventFiredCount = 0;
@@ -220,6 +243,8 @@ namespace VoiceLite.Tests.Integration
         [InlineData(RecordMode.PushToTalk)]
         public async Task Pipeline_DifferentRecordModes_WorkCorrectly(RecordMode mode)
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recordingStateChanges = 0;
 
             // Simulate mode-specific behavior
@@ -256,6 +281,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_MemoryBufferMode_AvoidsDiskIO()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var memoryBufferUsed = false;
 
             _recorder.AudioDataReady += (sender, audioData) =>
@@ -276,6 +303,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_LongRecording_HandlesLargeBuffer()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             byte[]? largeBuffer = null;
 
             _recorder.AudioDataReady += (sender, audioData) =>
@@ -296,6 +325,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_RapidStartStop_NoDataCorruption()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var dataIntegrity = true;
 
             _recorder.AudioDataReady += (sender, audioData) =>

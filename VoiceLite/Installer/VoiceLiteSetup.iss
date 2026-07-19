@@ -58,8 +58,16 @@ Name: "{autoprograms}\VoiceLite"; Filename: "{app}\VoiceLite.exe"
 Name: "{autodesktop}\VoiceLite"; Filename: "{app}\VoiceLite.exe"; Tasks: desktopicon
 
 [Run]
-; Install VC++ Redistributable silently (no restart needed)
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waituntilterminated
+; Install VC++ Redistributable silently (no restart needed).
+; KNOWN LIMITATION: under the default per-user install (PrivilegesRequired=lowest),
+; vc_redist.x64.exe requires elevation it doesn't have and fails silently (it is a
+; machine-wide MSI installer). `skipifdoesntexist` + the absence of an exit-code
+; check make this explicitly non-fatal by design: the app itself probes for the
+; VC++ runtime at startup (App.xaml.cs Sherpa-ONNX DLL probe) and shows the user a
+; download link if it's missing — that probe is the real backstop. On elevated
+; (admin/all-users) installs this line works as intended. Exit code 1638 ("newer
+; version already installed") is also a success case, another reason not to hard-fail.
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg: "Installing Visual C++ Runtime..."; Flags: waituntilterminated skipifdoesntexist
 
 ; Launch VoiceLite after installation
 Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
@@ -74,16 +82,37 @@ Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Fl
 Type: filesandordirs; Name: "{app}\temp"
 
 [Code]
+// 'VoiceLite_SingleInstance' is the EXACT name of the mutex App.xaml.cs creates
+// (session-local, held for the process lifetime). Keep the two in sync — the
+// app-side comment points back here.
+const
+  AppMutexName = 'VoiceLite_SingleInstance';
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   // Check if VoiceLite is currently running
-  if CheckForMutexes('VoiceLite_SingleInstance') then
+  if CheckForMutexes(AppMutexName) then
   begin
     Result := 'VoiceLite is currently running. Please close it before continuing.';
   end
   else
   begin
     Result := '';
+  end;
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  // Same running-check on uninstall: removing files while VoiceLite holds them
+  // locked leaves a partially-deleted install (exe gone, DLLs behind, or vice
+  // versa). Abort cleanly instead.
+  Result := True;
+  if CheckForMutexes(AppMutexName) then
+  begin
+    MsgBox('VoiceLite is currently running.'#13#10#13#10 +
+           'Please close it (check the system tray), then run the uninstaller again.',
+           mbError, MB_OK);
+    Result := False;
   end;
 end;
 

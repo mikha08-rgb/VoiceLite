@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.Services;
+using VoiceLite.Tests.TestUtilities;
 using Xunit;
 
 namespace VoiceLite.Tests.Resources
@@ -46,6 +48,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public void AudioRecorder_DisposePreventsResourceLeaks()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
@@ -67,6 +71,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task AudioRecorder_MultipleInstancesNoCrossContamination()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder1 = new AudioRecorder();
             var recorder2 = new AudioRecorder();
             _disposables.Add(recorder1);
@@ -90,24 +96,25 @@ namespace VoiceLite.Tests.Resources
         }
 
         [Fact]
-        public void TranscriptionService_DisposeReleasesResources()
+        public async Task TranscriptionService_DisposeReleasesResources()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
-
-            // Only run if model file exists
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
                 return;
             }
 
             var initialMemory = GC.GetTotalMemory(true);
 
-            var service = new TranscriptionService(settings);
+            var service = new TranscriptionService(new Settings());
             _disposables.Add(service);
 
-            // Allow warmup to load model
-            Thread.Sleep(500);
+            // Force the model to actually load by transcribing a short silent clip —
+            // otherwise Dispose has nothing real to release and the test proves nothing.
+            var wavPath = Path.Combine(_tempDirectory, "dispose_test.wav");
+            CreateSilentWavFile(wavPath, 1);
+            await service.TranscribeAsync(wavPath, TranscriptionServiceFixture.ModelDir);
 
             service.Dispose();
 
@@ -126,10 +133,13 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task TempFileCleanup_RemovesStaleFiles()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
-            var tempDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
+            // AudioRecorder's real temp directory (created by its constructor)
+            var tempDir = Path.Combine(Path.GetTempPath(), "VoiceLite", "audio");
 
             // Create some old test files
             for (int i = 0; i < 5; i++)
@@ -156,6 +166,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task MemoryStream_ProperlyDisposedAfterUse()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
@@ -199,6 +211,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task ConcurrentDisposal_ThreadSafe()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
 
             // Start recording
@@ -221,45 +235,36 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task FileHandles_ReleasedAfterTranscription()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
-
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
+            // Gate on the real Parakeet model being installed (same pattern as
+            // TranscriptionServiceTests) — bare CI has no model, dev machines do.
+            if (!TranscriptionServiceFixture.ModelPresent)
             {
                 return;
             }
 
-            var service = new TranscriptionService(settings);
+            var service = new TranscriptionService(new Settings());
             _disposables.Add(service);
 
             var testFile = Path.Combine(_tempDirectory, "test_audio.wav");
             CreateSilentWavFile(testFile, 1);
 
-            try
-            {
-                await service.TranscribeAsync(testFile);
+            // A transcription failure here is a real failure — no swallow-all catch.
+            await service.TranscribeAsync(testFile, TranscriptionServiceFixture.ModelDir);
 
-                // File should be deletable immediately after transcription
-                Action deleteFile = () => File.Delete(testFile);
-                deleteFile.Should().NotThrow("File handle should be released");
-            }
-            catch
-            {
-                // Transcription might fail but file should still be releasable
-            }
+            // File should be deletable immediately after transcription
+            Action deleteFile = () => File.Delete(testFile);
+            deleteFile.Should().NotThrow("File handle should be released");
         }
 
-        [Fact]
-        public void SystemTrayManager_CleansUpIconOnDispose()
-        {
-            // SystemTrayManager requires a Window parameter
-            // Skip this test as we can't create a Window in unit tests
-            // This would be better tested in integration tests with a real window
-        }
+        // NOTE: SystemTrayManager_CleansUpIconOnDispose was deleted 2026-07-17 — it had a
+        // completely empty body (permanently green). SystemTrayManager needs a real Window,
+        // which cannot be constructed in this unit-test host.
 
         [Fact]
         public async Task LongRunningOperation_CancellationCleansUpResources()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 

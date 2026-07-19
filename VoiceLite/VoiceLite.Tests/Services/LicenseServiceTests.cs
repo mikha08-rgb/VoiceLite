@@ -22,16 +22,37 @@ namespace VoiceLite.Tests.Services
             "VoiceLite",
             "license.dat");
 
-        private readonly string _backupPath;
+        // STABLE path (no per-run GUID): if the test host crashes mid-class (a documented
+        // occurrence in this repo during native DLL unload), Dispose never runs and the
+        // backup is stranded. A stable name lets the NEXT run find and restore it instead
+        // of leaving the developer's real license destroyed.
+        internal static readonly string BackupPath = Path.Combine(
+            Path.GetTempPath(), "voicelite-license-backup.dat");
+
         private readonly bool _hadRealFile;
 
         public LicenseFileGuard()
         {
-            _backupPath = Path.Combine(Path.GetTempPath(), $"voicelite-license-backup-{Guid.NewGuid():N}.dat");
+            // Crash recovery: a stranded backup means a previous run died before Dispose.
+            // If the real file is gone, restore it before doing anything else. (If the real
+            // file exists alongside a stranded backup, keep the real file — it may be a
+            // legitimately re-activated license — and let the fresh backup below replace
+            // the stale one.)
+            if (File.Exists(BackupPath) && !File.Exists(LicenseFilePath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LicenseFilePath)!);
+                File.Copy(BackupPath, LicenseFilePath, overwrite: true);
+            }
+
             _hadRealFile = File.Exists(LicenseFilePath);
             if (_hadRealFile)
             {
-                File.Copy(LicenseFilePath, _backupPath, overwrite: true);
+                File.Copy(LicenseFilePath, BackupPath, overwrite: true);
+            }
+            else if (File.Exists(BackupPath))
+            {
+                // No real file to protect — a leftover backup here is stale noise.
+                File.Delete(BackupPath);
             }
         }
 
@@ -39,8 +60,8 @@ namespace VoiceLite.Tests.Services
         {
             if (_hadRealFile)
             {
-                File.Copy(_backupPath, LicenseFilePath, overwrite: true);
-                File.Delete(_backupPath);
+                File.Copy(BackupPath, LicenseFilePath, overwrite: true);
+                File.Delete(BackupPath);
             }
             else if (File.Exists(LicenseFilePath))
             {

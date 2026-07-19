@@ -219,7 +219,7 @@ namespace VoiceLite.Services
                         return new LicenseValidationResult
                         {
                             IsValid = false,
-                            ErrorMessage = errorResult?.Error ?? "Maximum device activations reached (3 devices). Please deactivate a device to continue."
+                            ErrorMessage = errorResult?.Error ?? "Maximum device activations reached (3 devices). To free up a device, reply to your license email or contact support@voicelite.app."
                         };
                     }
 

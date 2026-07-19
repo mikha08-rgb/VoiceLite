@@ -11,8 +11,13 @@ import {
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
-// MED-5 FIX: Rate limit email sending (1 per 5 minutes per license)
-const EMAIL_RATE_LIMIT_MINUTES = 5;
+// MED-5 FIX: Rate limit email sending (1 per 15 minutes per license).
+// The window is 15 minutes (not 5) so it can actually dedupe the email a
+// stale-claim TAKEOVER re-sends: a takeover only happens when the claim is at
+// least STALE_CLAIM_MS (5 min) old, so a 5-minute window had always expired by
+// the time the takeover reprocessed the event - the dedupe could never fire.
+// Keep this comfortably larger than STALE_CLAIM_MS.
+const EMAIL_RATE_LIMIT_MINUTES = 15;
 
 // CRITICAL-2 FIX: Email format validation regex
 // Validates email format before processing to prevent data integrity issues
@@ -48,6 +53,23 @@ async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
 // Configure route to receive raw body for Stripe signature verification
 export const dynamic = 'force-dynamic';
 
+// Give processing (Stripe API + DB + email) headroom so we aren't killed mid-flight
+// by the default function timeout, stranding the idempotency claim.
+export const maxDuration = 60;
+
+// Idempotency claim state: WebhookEvent.processedAt is non-nullable in the schema,
+// so we use the Unix epoch as a sentinel meaning "claimed but not yet processed".
+// A real (recent) processedAt means processing completed successfully.
+const UNPROCESSED_SENTINEL = new Date(0);
+
+// If a claim is older than this and still unprocessed, the claiming invocation is
+// presumed dead (Vercel timeout/OOM/deploy kill) and the claim can be taken over.
+const STALE_CLAIM_MS = 5 * 60 * 1000;
+
+function isProcessed(processedAt: Date): boolean {
+  return processedAt.getTime() !== UNPROCESSED_SENTINEL.getTime();
+}
+
 // Lazy initialization of Stripe client to allow builds without env vars
 function getStripeClient() {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
@@ -63,15 +85,6 @@ function getStripeClient() {
 
 export async function POST(request: NextRequest) {
   const stripe = getStripeClient();
-
-  // Verify request origin for additional CSRF protection
-  const origin = request.headers.get('origin');
-  const allowedOrigins = ['https://stripe.com', 'https://dashboard.stripe.com'];
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    logger.warn('Suspicious webhook origin', { origin });
-    // Still allow - Stripe doesn't always set origin, but log for monitoring
-  }
 
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
@@ -97,32 +110,70 @@ export async function POST(request: NextRequest) {
   // The previous upsert approach had a race condition: two simultaneous requests
   // would both create with identical timestamps and both pass the timestamp check.
   // Now we use CREATE with unique constraint - only ONE request can succeed.
+  //
+  // STALE-CLAIM FIX: the claim is created with the UNPROCESSED_SENTINEL and only
+  // stamped with a real processedAt AFTER processing succeeds. Previously the claim
+  // was created already "processed", so a hard crash (timeout/OOM/deploy kill)
+  // between claim and completion stranded the claim forever and every Stripe retry
+  // short-circuited as cached — customer paid, no license. Now a claim that is
+  // still unprocessed after STALE_CLAIM_MS can be taken over atomically by a retry.
   const now = new Date();
-  let isFirstProcessing = false;
 
   try {
     await prisma.webhookEvent.create({
       data: {
         eventId: event.id,
         seenAt: now,
-        processedAt: now,
+        processedAt: UNPROCESSED_SENTINEL,
       },
     });
     // INSERT succeeded - we're the first processor
-    isFirstProcessing = true;
   } catch (error: any) {
     // Check if this is a unique constraint violation (record already exists)
     if (error?.code === 'P2002') {
-      // Record already exists - another request is processing or has processed this event
-      logger.info('Event already claimed, skipping', { eventId: event.id });
-      return NextResponse.json({ received: true, cached: true });
-    }
-    // Unexpected error - re-throw
-    throw error;
-  }
+      const existing = await prisma.webhookEvent.findUnique({
+        where: { eventId: event.id },
+      });
 
-  if (!isFirstProcessing) {
-    return NextResponse.json({ received: true, cached: true });
+      if (!existing || isProcessed(existing.processedAt)) {
+        // Fully processed (or claim vanished between create and read) - genuine duplicate
+        logger.info('Event already processed, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      const staleCutoff = new Date(Date.now() - STALE_CLAIM_MS);
+      if (existing.seenAt >= staleCutoff) {
+        // Another invocation claimed this recently and is presumably still processing
+        logger.info('Event claimed by a live invocation, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      // Stale unprocessed claim from a crashed invocation - take it over ATOMICALLY.
+      // The updateMany's where clause guarantees only one competing retry wins.
+      const takeover = await prisma.webhookEvent.updateMany({
+        where: {
+          eventId: event.id,
+          processedAt: UNPROCESSED_SENTINEL,
+          seenAt: { lt: staleCutoff },
+        },
+        data: { seenAt: new Date() },
+      });
+
+      if (takeover.count !== 1) {
+        logger.info('Lost stale-claim takeover race, skipping', { eventId: event.id });
+        return NextResponse.json({ received: true, cached: true });
+      }
+
+      // We own the stale claim now - fall through and process. Worst case a crashed
+      // invocation got partway through: reprocessing is tolerable because
+      // upsertLicenseFromStripe is keyed on stripePaymentIntentId/subscriptionId
+      // (no duplicate license; at most a duplicate email, rate-limited to 1/15min
+      // by canSendLicenseEmail - the window deliberately exceeds STALE_CLAIM_MS).
+      logger.warn('Took over stale webhook claim from crashed invocation', { eventId: event.id });
+    } else {
+      // Unexpected error - re-throw
+      throw error;
+    }
   }
 
   try {
@@ -165,7 +216,28 @@ export async function POST(request: NextRequest) {
 
     // Permanent failure - don't retry. The claim stays in place intentionally so
     // Stripe stops resending an event we can never process (e.g. malformed email).
+    // Note: processedAt is still the unprocessed sentinel here, so a MANUAL Stripe
+    // redelivery more than STALE_CLAIM_MS later WILL reprocess it - desirable if
+    // the underlying cause (e.g. bad data) has been fixed by then.
     return NextResponse.json({ error: 'Processing error', eventId: event.id }, { status: 200 });
+  }
+
+  // Processing succeeded - stamp the claim as processed so future retries are
+  // recognized as genuine duplicates (and never eligible for stale takeover).
+  //
+  // STAMP-FAILURE FIX: a failed stamp must NOT bubble into a 500 - processing
+  // already succeeded, and a 500 would make Stripe redeliver and fully reprocess
+  // (duplicate email). Log loudly and still return 200. The claim then stays at
+  // the unprocessed sentinel; the worst case is a redelivery >= STALE_CLAIM_MS
+  // later taking it over, which is tolerable (license upsert is idempotent and
+  // the email is deduped by canSendLicenseEmail's 15-minute window).
+  try {
+    await prisma.webhookEvent.update({
+      where: { eventId: event.id },
+      data: { processedAt: new Date() },
+    });
+  } catch (stampError) {
+    logger.error('Failed to stamp webhook claim as processed AFTER successful processing - returning 200 anyway', stampError, { eventId: event.id });
   }
 
   return NextResponse.json({ received: true, eventId: event.id });
@@ -257,7 +329,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       // Log that email was skipped due to rate limit
       await recordLicenseEvent(license.id, 'email_skipped_rate_limit', {
         email: email,
-        reason: 'Rate limit: email already sent within 5 minutes',
+        reason: `Rate limit: email already sent within ${EMAIL_RATE_LIMIT_MINUTES} minutes`,
       });
     }
   } else {
@@ -268,9 +340,22 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
     logger.debug('Payment intent', { paymentIntentId });
 
+    // PROMO FIX: a 100%-off promotion code (checkout enables allow_promotion_codes)
+    // produces a zero-total payment-mode session that has NO PaymentIntent at all.
+    // That used to throw a plain (permanent) Error - the customer got nothing,
+    // silently, forever. Instead, key the license on session.id: it is unique and
+    // stable across Stripe redeliveries, so the upsert keyed on
+    // stripePaymentIntentId still dedupes correctly.
+    if (!paymentIntentId && session.amount_total !== 0) {
+      // No PaymentIntent on a PAID session is transient Stripe weirdness -
+      // retry loudly instead of dropping the purchase permanently.
+      logger.error(`Missing payment intent for paid lifetime plan (session ${session.id}, amount_total ${session.amount_total})`);
+      throw new RetriableError(`Missing payment intent for paid lifetime plan (session ${session.id})`);
+    }
+
+    const paymentRef = paymentIntentId ?? session.id;
     if (!paymentIntentId) {
-      logger.error('Missing payment intent for lifetime plan');
-      throw new Error('Missing payment intent for lifetime plan');
+      logger.info('Zero-total checkout session (100% promo) - keying license on session id', { sessionId: session.id });
     }
 
     logger.debug('Creating license in database');
@@ -281,7 +366,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
         email,
         type: LicenseType.LIFETIME,
         stripeCustomerId,
-        stripePaymentIntentId: paymentIntentId,
+        stripePaymentIntentId: paymentRef,
       });
       logger.info('License created', { licenseKey: license.licenseKey, licenseId: license.id });
     } catch (dbError) {
@@ -317,11 +402,16 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       // Log that email was skipped due to rate limit
       await recordLicenseEvent(license.id, 'email_skipped_rate_limit', {
         email: email,
-        reason: 'Rate limit: email already sent within 5 minutes',
+        reason: `Rate limit: email already sent within ${EMAIL_RATE_LIMIT_MINUTES} minutes`,
       });
     }
   }
 }
+
+// TRANSIENT-ERROR FIX (non-checkout handlers): DB errors used to escape these
+// handlers as plain errors -> caught by POST -> 200 -> Stripe never retried.
+// For charge.refunded that meant a refunded customer kept Pro forever. All
+// unexpected errors are now rethrown as RetriableError (500 -> Stripe retries).
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   // Type assertion needed due to Stripe API version differences
@@ -330,30 +420,40 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     ? new Date(sub.current_period_end * 1000)
     : undefined;
 
-  await updateLicenseStatusBySubscriptionId(subscription.id, subscription.status, periodEnd);
+  try {
+    await updateLicenseStatusBySubscriptionId(subscription.id, subscription.status, periodEnd);
 
-  // Record event
-  const license = await prisma.license.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
-  });
-  if (license) {
-    await recordLicenseEvent(license.id, 'subscription_updated', {
-      status: subscription.status,
-      periodEnd: periodEnd?.toISOString(),
+    // Record event
+    const license = await prisma.license.findUnique({
+      where: { stripeSubscriptionId: subscription.id },
     });
+    if (license) {
+      await recordLicenseEvent(license.id, 'subscription_updated', {
+        status: subscription.status,
+        periodEnd: periodEnd?.toISOString(),
+      });
+    }
+  } catch (dbError) {
+    logger.error('Database error handling subscription update', dbError, { subscriptionId: subscription.id });
+    throw new RetriableError(`Database error handling subscription update for ${subscription.id}`);
   }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  await updateLicenseStatusBySubscriptionId(subscription.id, 'canceled');
+  try {
+    await updateLicenseStatusBySubscriptionId(subscription.id, 'canceled');
 
-  const license = await prisma.license.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
-  });
-  if (license) {
-    await recordLicenseEvent(license.id, 'subscription_deleted', {
-      deletedAt: new Date().toISOString(),
+    const license = await prisma.license.findUnique({
+      where: { stripeSubscriptionId: subscription.id },
     });
+    if (license) {
+      await recordLicenseEvent(license.id, 'subscription_deleted', {
+        deletedAt: new Date().toISOString(),
+      });
+    }
+  } catch (dbError) {
+    logger.error('Database error handling subscription deletion', dbError, { subscriptionId: subscription.id });
+    throw new RetriableError(`Database error handling subscription deletion for ${subscription.id}`);
   }
 }
 
@@ -367,12 +467,29 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     return;
   }
 
-  const license = await prisma.license.findFirst({
-    where: { stripePaymentIntentId: paymentIntentId },
-  });
-
-  if (license) {
-    await revokeLicense(license.id, 'charge_refunded');
-    logger.warn('License revoked due to charge refund', { licenseId: license.id });
+  let license;
+  try {
+    license = await prisma.license.findFirst({
+      where: { stripePaymentIntentId: paymentIntentId },
+    });
+  } catch (dbError) {
+    logger.error('Database error looking up license for refund', dbError, { paymentIntentId });
+    throw new RetriableError(`Database error looking up license for refunded payment intent ${paymentIntentId}`);
   }
+
+  if (!license) {
+    // Not-found may be event ordering (refund delivered before the checkout
+    // event finished creating the license). Retriable so the revocation isn't
+    // silently dropped; Stripe's retry schedule caps how long this can loop.
+    logger.warn('Refund received but no matching license found - requesting Stripe retry', { paymentIntentId });
+    throw new RetriableError(`No license found for refunded payment intent ${paymentIntentId} (possible event ordering)`);
+  }
+
+  try {
+    await revokeLicense(license.id, 'charge_refunded');
+  } catch (dbError) {
+    logger.error('Database error revoking refunded license', dbError, { licenseId: license.id });
+    throw new RetriableError(`Database error revoking license ${license.id} after refund`);
+  }
+  logger.warn('License revoked due to charge refund', { licenseId: license.id });
 }

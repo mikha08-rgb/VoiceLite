@@ -12,6 +12,9 @@ namespace VoiceLite.Services
         private System.Drawing.Icon? customIcon;
         private Window? mainWindow;
         private string? pendingUpdateUrl;
+        // Configured hotkey display string (e.g. "Ctrl+Alt+Space"), passed in by
+        // MainWindow so tooltips/balloons never claim a hardcoded hotkey.
+        private string hotkeyDisplay = "the hotkey";
 
         public SystemTrayManager()
         {
@@ -30,7 +33,7 @@ namespace VoiceLite.Services
             trayIcon = new TaskbarIcon
             {
                 Icon = customIcon ?? System.Drawing.SystemIcons.Application,
-                ToolTipText = "VoiceLite - Hold Alt to dictate"
+                ToolTipText = IdleTooltip
             };
 
             trayIcon.TrayMouseDoubleClick += (s, e) =>
@@ -63,12 +66,6 @@ namespace VoiceLite.Services
             };
             showItem.Click += (s, e) => ShowMainWindow();
 
-            var settingsItem = new System.Windows.Controls.MenuItem
-            {
-                Header = "Settings",
-                IsEnabled = false
-            };
-
             var separator = new System.Windows.Controls.Separator();
 
             var exitItem = new System.Windows.Controls.MenuItem
@@ -81,15 +78,19 @@ namespace VoiceLite.Services
             };
 
             contextMenu.Items.Add(showItem);
-            contextMenu.Items.Add(settingsItem);
             contextMenu.Items.Add(separator);
             contextMenu.Items.Add(exitItem);
 
             trayIcon.ContextMenu = contextMenu;
         }
 
+        private string IdleTooltip => $"VoiceLite - Press {hotkeyDisplay} to dictate";
+
         public void ShowBalloonTip(string title, string message)
         {
+            // A non-update balloon replaces any pending update balloon; clear the stashed
+            // URL so clicking this unrelated balloon doesn't open the update download.
+            pendingUpdateUrl = null;
             trayIcon?.ShowBalloonTip(title, message, BalloonIcon.Info);
         }
 
@@ -116,61 +117,32 @@ namespace VoiceLite.Services
         public void MinimizeToTray()
         {
             mainWindow?.Hide();
-            ShowBalloonTip("VoiceLite", "Running in background. Hold Alt to dictate.");
+            ShowBalloonTip("VoiceLite", $"Running in background. Press {hotkeyDisplay} to dictate.");
         }
 
-        #region ISystemTrayManager Implementation
-
-        public void Initialize(Window window)
+        public void Initialize(Window window, string hotkeyDisplayText)
         {
             mainWindow = window;
+            if (!string.IsNullOrWhiteSpace(hotkeyDisplayText))
+            {
+                hotkeyDisplay = hotkeyDisplayText;
+            }
             InitializeTrayIcon();
         }
 
-        public void SetTrayIconVisible(bool visible)
+        /// <summary>
+        /// Call when the user changes the hotkey so tooltips stay accurate.
+        /// </summary>
+        public void UpdateHotkeyDisplay(string hotkeyDisplayText)
         {
+            if (string.IsNullOrWhiteSpace(hotkeyDisplayText))
+                return;
+
+            hotkeyDisplay = hotkeyDisplayText;
             if (trayIcon != null)
             {
-                trayIcon.Visibility = visible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+                trayIcon.ToolTipText = IdleTooltip;
             }
-        }
-
-        public void RestoreFromTray()
-        {
-            ShowMainWindow();
-        }
-
-        public void UpdateTooltip(string text)
-        {
-            if (trayIcon != null)
-            {
-                trayIcon.ToolTipText = text;
-            }
-        }
-
-        public void ShowNotification(string title, string message, int durationMs = 3000)
-        {
-            ShowBalloonTip(title, message);
-        }
-
-        public void SetRecordingStatus(bool isRecording)
-        {
-            if (trayIcon != null)
-            {
-                trayIcon.ToolTipText = isRecording
-                    ? "VoiceLite - Recording..."
-                    : "VoiceLite - Hold Alt to dictate";
-
-                // Could also change icon color/state here if we had multiple icons
-            }
-        }
-
-        #endregion
-
-        public void ShowBalloonTip(string title, string message, int durationMs = 3000)
-        {
-            // Alias for ShowNotification to maintain compatibility
-            ShowNotification(title, message, durationMs);
         }
 
         public void Dispose()

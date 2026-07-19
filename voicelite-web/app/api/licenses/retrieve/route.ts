@@ -21,20 +21,12 @@ export async function POST(request: NextRequest) {
     const { email } = bodySchema.parse(body);
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Rate limit by IP (3 requests/hour)
+    // Rate limit by IP (3 requests/hour). Passing the fallback limiter makes a
+    // Redis outage degrade to in-memory limiting instead of failing closed
+    // (checkRateLimit with no fallback blocks ALL requests on Redis failure).
     const ip = ipAddress(request) || 'unknown';
-    const rateLimit = await checkRateLimit(ip, emailResendRateLimit);
-
-    // Fallback to in-memory if Upstash not configured
-    if (!emailResendRateLimit) {
-      const allowed = await fallbackEmailResendLimit.check(ip);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          { status: 429 }
-        );
-      }
-    } else if (!rateLimit.allowed) {
+    const rateLimit = await checkRateLimit(ip, emailResendRateLimit, fallbackEmailResendLimit);
+    if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429 }

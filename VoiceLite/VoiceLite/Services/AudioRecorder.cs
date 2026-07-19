@@ -532,6 +532,18 @@ namespace VoiceLite.Services
                             else
                             {
                                 ErrorLogger.LogWarning($"StopRecording: Skipping TINY/EMPTY buffer - only {audioData.Length} bytes!");
+
+                                // The user pressed the hotkey and got nothing — surface it instead of
+                                // silently dropping the recording (same contract as the catch below).
+                                try
+                                {
+                                    RecordingError?.Invoke(this, new InvalidOperationException(
+                                        "Recording too short - no audio was captured. Hold the hotkey while speaking."));
+                                }
+                                catch (Exception handlerEx)
+                                {
+                                    ErrorLogger.LogWarning($"RecordingError handler threw: {handlerEx.Message}");
+                                }
                             }
                         }
                     }
@@ -545,6 +557,18 @@ namespace VoiceLite.Services
                         {
                             try { audioMemoryStream.Dispose(); } catch (Exception streamEx) { ErrorLogger.LogError("Failed to dispose memory stream in error handler", streamEx); }
                             audioMemoryStream = null;
+                        }
+
+                        // The recording is lost — tell the user, don't just log it.
+                        // NOTE: fired while StopRecording holds lockObject; handlers must not block
+                        // (MainWindow marshals to the dispatcher with BeginInvoke).
+                        try
+                        {
+                            RecordingError?.Invoke(this, ex);
+                        }
+                        catch (Exception handlerEx)
+                        {
+                            ErrorLogger.LogWarning($"RecordingError handler threw: {handlerEx.Message}");
                         }
                     }
                 }

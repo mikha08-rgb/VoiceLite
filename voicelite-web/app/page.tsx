@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { Download, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
-
-// Hardcoded — bump alongside csproj <Version> and iss MyAppVersion on each release.
-// Previously read from NEXT_PUBLIC_CURRENT_VERSION env var; the env var got baked
-// into the client bundle at build time and silently lagged behind code on every ship.
-const CURRENT_VERSION = '2.1.2';
+import { CURRENT_VERSION } from '@/lib/version';
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -19,7 +15,7 @@ const jsonLd = {
   "applicationCategory": "ProductivityApplication",
   "applicationSubCategory": "Speech-to-Text Software",
   "downloadUrl": "https://voicelite.app/api/download",
-  "softwareVersion": "2.1.2",
+  "softwareVersion": CURRENT_VERSION,
   "offers": [
     {
       "@type": "Offer",
@@ -91,7 +87,7 @@ const faqJsonLd = {
       "name": "What languages does VoiceLite support?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "VoiceLite supports 99 languages including English, Spanish, French, German, Chinese, Japanese, and many more. All work 100% offline."
+        "text": "VoiceLite supports 25 European languages including English, Spanish, French, German, Italian, and Portuguese. All work 100% offline."
       }
     },
     {
@@ -99,7 +95,7 @@ const faqJsonLd = {
       "name": "Will VoiceLite slow down my computer?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. VoiceLite uses less than 100MB RAM when idle and less than 300MB when transcribing. It only uses CPU/GPU when you hold the hotkey. Minimal performance impact."
+        "text": "No. VoiceLite uses less than 100MB RAM when idle and less than 300MB when transcribing. It only uses CPU when you hold the hotkey. Minimal performance impact."
       }
     },
     {
@@ -133,9 +129,10 @@ export default function HomePage() {
       }
 
       const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!data.url) {
+        throw new Error('Checkout session missing redirect URL');
       }
+      window.location.href = data.url;
     } catch (error) {
       console.error('Checkout error:', error);
       alert('Failed to start checkout. Please try again.');
@@ -282,12 +279,12 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Column - Video */}
+            {/* Right Column - Illustration */}
             <div className="space-y-4">
               <div className="relative aspect-video overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-2xl shadow-blue-600/10 dark:border-stone-800 dark:from-blue-950/50 dark:to-indigo-950/50">
-                <div className="flex h-full items-center justify-center text-7xl">▶️</div>
+                <div className="flex h-full items-center justify-center text-7xl">🎤</div>
               </div>
-              <p className="text-center text-sm text-stone-500 dark:text-stone-400">Watch 60-second demo</p>
+              <p className="text-center text-sm text-stone-500 dark:text-stone-400">Hold a hotkey, speak — text appears in any Windows app</p>
             </div>
           </div>
         </div>
@@ -318,7 +315,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">Lightning Fast</h3>
               <p className="leading-relaxed text-stone-600 dark:text-stone-400">
-                &lt;200ms latency after speech. Optimized AI models run locally on GPU. No network delays, no waiting.
+                &lt;200ms latency after speech. Optimized AI models run locally on your CPU — no GPU required. No network delays, no waiting.
               </p>
             </div>
 
@@ -371,7 +368,7 @@ export default function HomePage() {
                 1
               </div>
               <h3 className="text-xl font-semibold text-stone-900 dark:text-stone-50">Download & Install</h3>
-              <p className="leading-relaxed text-stone-600 dark:text-stone-400">98MB download, 2-minute setup, no sign-up required</p>
+              <p className="leading-relaxed text-stone-600 dark:text-stone-400">~83MB installer (+640MB model on first launch), 2-minute setup, no sign-up required</p>
             </div>
 
             <div className="space-y-6 text-center">
@@ -503,7 +500,7 @@ export default function HomePage() {
 
               <div className="space-y-2 text-center">
                 <h3 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Pro</h3>
-                <p className="text-stone-600 dark:text-stone-400">Best accuracy & all features</p>
+                <p className="text-stone-600 dark:text-stone-400">Early access to Pro features & supports development</p>
               </div>
 
               <div className="text-center">
@@ -598,11 +595,11 @@ export default function HomePage() {
               },
               {
                 q: 'What languages does VoiceLite support?',
-                a: 'VoiceLite supports 99 languages including English, Spanish, French, German, Chinese, Japanese, and many more. All work 100% offline.',
+                a: 'VoiceLite supports 25 European languages including English, Spanish, French, German, Italian, and Portuguese. All work 100% offline.',
               },
               {
                 q: 'Will this slow down my computer?',
-                a: 'No. VoiceLite uses <100MB RAM when idle and <300MB when transcribing. It only uses CPU/GPU when you hold the hotkey. Minimal performance impact.',
+                a: 'No. VoiceLite uses <100MB RAM when idle and <300MB when transcribing. It only uses CPU when you hold the hotkey. Minimal performance impact.',
               },
               {
                 q: "What's your refund policy?",
@@ -691,9 +688,6 @@ export default function HomePage() {
                 <a href="#faq" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
                   FAQ
                 </a>
-                <a href="/docs" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
-                  Documentation
-                </a>
               </div>
             </div>
 
@@ -705,6 +699,9 @@ export default function HomePage() {
                 </Link>
                 <Link href="/terms" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
                   Terms of Service
+                </Link>
+                <Link href="/retrieve" className="text-stone-600 transition-colors hover:text-blue-600 dark:text-stone-400 dark:hover:text-blue-400">
+                  Lost your license key?
                 </Link>
               </div>
             </div>

@@ -11,8 +11,14 @@ namespace VoiceLite.Services
         /// containing encoder.int8.onnx, decoder.int8.onnx, joiner.int8.onnx, tokens.txt.
         /// </summary>
         /// <remarks>
-        /// Mirror this on the VoiceLite GitHub Releases before a public launch to avoid
-        /// k2-fsa being hit with our launch-day traffic.
+        /// TODO(launch-blocker): mirror this tarball on VoiceLite-controlled hosting
+        /// (e.g. our own GitHub Releases) and point this constant at the mirror.
+        /// RISK: every new customer's first-launch onboarding downloads from this
+        /// k2-fsa GitHub Releases asset — a third party we don't control. If they
+        /// rename/delete the asset, retag the release, or GitHub throttles the asset
+        /// under our launch-day traffic, onboarding breaks for 100% of new installs
+        /// (the app ships without the model and cannot transcribe until this URL works).
+        /// Mirroring also insulates k2-fsa from our bandwidth.
         /// </remarks>
         public const string ParakeetV3Int8 =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2";

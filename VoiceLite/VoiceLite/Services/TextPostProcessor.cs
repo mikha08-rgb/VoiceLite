@@ -31,20 +31,6 @@ namespace VoiceLite.Services
             @"[^\w]",
             RegexOptions.Compiled);
 
-        // Common sentence-ending phrases that should get periods
-        private static readonly HashSet<string> SentenceEnders = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "thanks", "thank you", "goodbye", "bye", "okay", "ok", "alright", "right",
-            "yes", "no", "sure", "exactly", "correct", "understood", "got it"
-        };
-
-        // Question words that indicate interrogative sentences
-        private static readonly HashSet<string> QuestionWords = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "what", "when", "where", "who", "whom", "whose", "why", "which", "how",
-            "is", "are", "can", "could", "would", "should", "will", "do", "does", "did"
-        };
-
         // Words that should always be capitalized (common proper nouns in tech context)
         private static readonly HashSet<string> AlwaysCapitalized = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -188,22 +174,24 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Adds punctuation to text based on linguistic patterns.
+        /// Ensures the text ends with terminal punctuation.
+        /// Parakeet emits its own punctuation — if the model already ended the utterance
+        /// with . ! ? : or ; we leave it untouched. We only append a period when there is
+        /// none. (The old behavior stripped the model's punctuation and re-guessed
+        /// question marks from the first word, turning "Has he arrived?" into
+        /// "has he arrived." — deliberately removed.)
         /// </summary>
         private static string AddPunctuation(string text)
         {
-            // Remove existing punctuation at the end (will be re-added correctly)
-            text = text.TrimEnd('.', '!', '?', ',', ';', ':');
+            // A dangling comma is never a valid utterance ending — drop it before
+            // deciding whether terminal punctuation is needed.
+            text = text.TrimEnd(',').TrimEnd();
 
-            // Check if text is a question
-            bool isQuestion = IsQuestion(text);
+            if (text.Length == 0)
+                return text;
 
-            // Add ending punctuation
-            if (isQuestion)
-            {
-                text += "?";
-            }
-            else
+            char last = text[text.Length - 1];
+            if (last is not ('.' or '!' or '?' or ':' or ';'))
             {
                 text += ".";
             }
@@ -212,45 +200,6 @@ namespace VoiceLite.Services
             text = AddCommas(text);
 
             return text;
-        }
-
-        /// <summary>
-        /// Determines if a sentence is a question based on linguistic patterns.
-        /// </summary>
-        private static bool IsQuestion(string text)
-        {
-            // Split into words
-            var words = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length == 0)
-                return false;
-
-            // Check if starts with question word
-            string firstWord = words[0].ToLowerInvariant();
-            if (QuestionWords.Contains(firstWord))
-            {
-                // Additional check: "is this", "are you", "can you", "do you" patterns
-                if (words.Length >= 2)
-                {
-                    string secondWord = words[1].ToLowerInvariant();
-                    if (firstWord is "is" or "are" or "can" or "could" or "would" or "should" or "will" or "do" or "does" or "did")
-                    {
-                        // These are likely questions if followed by pronouns or "this/that"
-                        if (secondWord is "you" or "i" or "we" or "they" or "he" or "she" or "it" or "this" or "that" or "there")
-                            return true;
-                    }
-                    else
-                    {
-                        // "what", "when", "where", "who", "why", "which", "how" are almost always questions
-                        return true;
-                    }
-                }
-            }
-
-            // Check for rising intonation patterns (voice-to-text sometimes captures these)
-            if (text.Contains("right?") || text.Contains("yeah?") || text.Contains("okay?"))
-                return true;
-
-            return false;
         }
 
         /// <summary>
@@ -269,7 +218,11 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Fixes capitalization to follow English grammar rules.
+        /// Fixes capitalization: uppercases sentence-initial letters and the allowlisted
+        /// terms, and otherwise leaves every word EXACTLY as the model produced it.
+        /// Parakeet emits capitalization — the old behavior force-lowercased everything
+        /// not in the ~20-word allowlist, destroying names, acronyms ("MRI"), and brands.
+        /// Deliberately removed: NEVER lowercase.
         /// </summary>
         private static string FixCapitalization(string text)
         {
@@ -290,7 +243,7 @@ namespace VoiceLite.Services
                     // Always capitalize first word
                     result.Add(CapitalizeFirst(word));
                 }
-                else if (i > 0 && words[i - 1].EndsWith('.') || words[i - 1].EndsWith('!') || words[i - 1].EndsWith('?'))
+                else if (words[i - 1].EndsWith('.') || words[i - 1].EndsWith('!') || words[i - 1].EndsWith('?'))
                 {
                     // Capitalize after sentence-ending punctuation
                     result.Add(CapitalizeFirst(word));
@@ -302,8 +255,8 @@ namespace VoiceLite.Services
                 }
                 else
                 {
-                    // Keep lowercase
-                    result.Add(word.ToLowerInvariant());
+                    // Leave the word exactly as the model produced it.
+                    result.Add(word);
                 }
             }
 
@@ -311,19 +264,20 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
-        /// Capitalizes the first character of a word, preserving punctuation.
+        /// Capitalizes the first letter of a word, preserving punctuation and the
+        /// rest of the word's casing (e.g. "mRI" → "MRI" stays intact, never lowercased).
         /// </summary>
         private static string CapitalizeFirst(string word)
         {
             if (string.IsNullOrEmpty(word))
                 return word;
 
-            // Find first letter and capitalize it
+            // Find first letter and capitalize it; preserve the tail as-is
             for (int i = 0; i < word.Length; i++)
             {
                 if (char.IsLetter(word[i]))
                 {
-                    return word.Substring(0, i) + char.ToUpperInvariant(word[i]) + word.Substring(i + 1).ToLowerInvariant();
+                    return word.Substring(0, i) + char.ToUpperInvariant(word[i]) + word.Substring(i + 1);
                 }
             }
 

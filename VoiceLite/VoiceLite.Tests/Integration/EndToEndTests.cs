@@ -7,6 +7,7 @@ using Xunit;
 using AwesomeAssertions;
 using VoiceLite.Services;
 using VoiceLite.Models;
+using VoiceLite.Tests.TestUtilities;
 
 namespace VoiceLite.Tests.Integration
 {
@@ -41,13 +42,15 @@ namespace VoiceLite.Tests.Integration
             _textInjector = new TextInjector(_testSettings);
         }
 
-        // The Whisper-era full-pipeline test was deleted 2026-07-17. A real Parakeet functional
-        // transcription test (known WAV + model present → non-empty text) is the top item in
-        // docs/audit/PLAN.md Chunk 1 — transcription currently has zero active coverage.
+        // The Whisper-era full-pipeline test was deleted 2026-07-17. Functional Parakeet
+        // transcription coverage (known WAV + model present → real text assertions) lives in
+        // Services/TranscriptionServiceTests.cs.
 
         [Fact]
         public async Task RapidStartStop_50Times_ShouldNotCrashOrLeak()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             // Arrange
             var initialMemory = GC.GetTotalMemory(true) / 1_000_000; // MB
             var exceptions = 0;
@@ -106,34 +109,10 @@ namespace VoiceLite.Tests.Integration
             completedTask.Should().Be(transcriptionTask, "Transcription should complete or cancel, not deadlock");
         }
 
-        [Fact]
-        public async Task LicenseService_MultipleValidations_ShouldShareHttpClient()
-        {
-            // Arrange
-            var services = new List<LicenseService>();
-            var tasks = new List<Task<LicenseValidationResult>>();
-
-            // Act - Create multiple services and validate concurrently
-            for (int i = 0; i < 5; i++)
-            {
-                var service = new LicenseService();
-                services.Add(service);
-                tasks.Add(service.ValidateLicenseAsync($"test-key-{i}"));
-            }
-
-            // Wait for all validations
-            var results = await Task.WhenAll(tasks);
-
-            // Clean up
-            foreach (var service in services)
-            {
-                service.Dispose();
-            }
-
-            // Assert - All should complete (even if invalid)
-            results.Should().HaveCount(5);
-            results.Should().OnlyContain(r => r != null);
-        }
+        // NOTE: LicenseService_MultipleValidations_ShouldShareHttpClient was deleted 2026-07-17:
+        // it fired 5 concurrent garbage-key POSTs at the PRODUCTION validation endpoint on every
+        // test run. The shared-static-HttpClient assertion is covered network-free (reflection)
+        // in Resources/ResourceLeakTests.cs.
 
         [Fact]
         public async Task StressTest_100ConsecutiveTranscriptions_ShouldSucceed()

@@ -44,11 +44,17 @@ const bodySchema = z.object({
     .transform(s => s.replace(/<[^>]*>/g, '')) // Strip all HTML tags
     .optional(),
 
-  // Base64 encoded SHA256 hash (exactly 43-44 chars for proper SHA256)
+  // Base64 encoded SHA256 hash (exactly 43-44 chars for proper SHA256).
+  // EMPTY-HASH FIX: the shipped C# client sends machineHash: "" when WMI fails
+  // (HardwareIdService.GetMachineHash returns string.Empty on error). Rejecting
+  // that with a 400 blocked those users from activating at all - treat empty
+  // string as "not provided". (machineId/machineLabel have non-empty fallbacks
+  // client-side, so only machineHash needs this.)
   machineHash: z.string()
     .regex(/^[a-zA-Z0-9+/=]{43,44}$/,
       "Invalid machine hash format")
-    .optional(),
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 
 export async function POST(request: NextRequest) {
@@ -167,7 +173,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           valid: false,
           tier: 'free',
-          error: 'Maximum 3 device activations reached. Deactivate a device in your account to continue.',
+          // There is no account UI to deactivate devices from - point users at
+          // support instead (same contact used on the site and in license emails).
+          error: 'Maximum 3 device activations reached. Reply to your license email or contact basementhustlellc@gmail.com to free up a device.',
           activationsUsed: 3,
           maxActivations: 3,
         }, { status: 403 });

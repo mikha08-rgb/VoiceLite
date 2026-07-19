@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Xunit;
 using AwesomeAssertions;
 using VoiceLite.Services;
+using VoiceLite.Tests.TestUtilities;
 using System.Net.Http;
 using System.Reflection;
 
@@ -113,6 +114,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task AudioRecorder_RapidStartStop_ShouldNotLeakMemory()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             // Arrange
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);

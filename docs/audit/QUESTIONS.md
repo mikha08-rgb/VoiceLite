@@ -7,7 +7,7 @@
 1. **Is `voicelite-tauri/` truly abandoned, or a paused plan B?** Code says dead (frozen Mar 1, no licensing, still on Handy's CDN, MIT/free — incompatible with the paid product). But someone invested a weekend and wrote a `release-tauri.yml`. Is there any intent to revive it, or can the whole tree + `voicelite-tauri-old/` be deleted? *(This gates ~19 GB of cleanup and a big COMPLEXITY decision.)*
    **A (2026-07-17):** Dead for good — Misha confirmed. Tree deleted from repo (recoverable via tag `graveyard/tauri-spike`), `voicelite-tauri-old/` wiped from disk, `release-tauri.yml` deleted.
 
-2. **What is the Pro tier actually selling today?** Model-gating is a no-op (all users get Parakeet). The only "Pro" feature is Custom Dictionary, and even that is applied to free users at processing time (only the UI tab is hidden). So what does a paying customer get that a free user doesn't, functionally? Is Pro currently selling a promise ("features coming") more than a capability?
+2. **What is the Pro tier actually selling today?** Model-gating is a no-op (all users get Parakeet). The only "Pro" feature is Custom Dictionary — *(UPDATE 2026-07-18: now genuinely gated at processing time, no longer applied to free users)* — so the functional answer today is: Custom Dictionary, and that alone. Is Pro currently selling a promise ("features coming") more than a capability?
 
 3. **Are there active paying subscribers, or only LIFETIME buyers?** `checkout` only creates one-time (`mode:'payment'`) sessions, but the webhook and schema carry full SUBSCRIPTION/quarterly handling. Is the subscription path (a) legacy to support existing subs, (b) planned, or (c) dead code that can go?
 
@@ -23,7 +23,7 @@
 
 ## Desktop behavior & intent
 
-8. **The transcription-preset setting (Speed/Balanced/Accuracy) does nothing at runtime (HEALTH.md #3). Was it ever wired?** Did it work in the Whisper era and silently break in the Parakeet migration, or was it never functional post-v2.0? Determines fix-vs-remove.
+8. ~~**The transcription-preset setting (Speed/Balanced/Accuracy) does nothing at runtime (HEALTH.md #3). Was it ever wired?**~~ **RESOLVED 2026-07-17: fixed, not removed** — the preset is now part of the recognizer reload key and rebuilds the `OfflineRecognizer` lazily on the next transcription; functional test covers it. (Historical half of the question — whether it ever worked in the Whisper era — remains unanswered but is now moot.)
 
 9. **Should the offline Pro check re-validate tier/revocation, or is "once Pro, always Pro offline" the intended generosity?** A user who activated Pro once keeps it offline forever. Deliberate (goodwill / offline-friendly) or a security gap to close?
 

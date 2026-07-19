@@ -60,8 +60,11 @@ namespace VoiceLite.Models
         public readonly object SyncRoot = new object();
 
         private RecordMode _mode = RecordMode.Toggle;
-        private Key _recordHotkey = Key.Z;
-        private ModifierKeys _hotkeyModifiers = ModifierKeys.Shift;
+        // Default hotkey: Ctrl+Alt+Space. The old default (Shift+Z) swallowed every
+        // capital Z typed anywhere on the system while in Toggle mode. New installs
+        // only — existing settings.json values are untouched by design.
+        private Key _recordHotkey = Key.Space;
+        private ModifierKeys _hotkeyModifiers = ModifierKeys.Control | ModifierKeys.Alt;
         private string _transcriptionModel = "parakeet-tdt-0.6b-v3-int8";
         private TranscriptionPreset _transcriptionPreset = TranscriptionPreset.Balanced;
         private bool _enableVAD = true;
@@ -75,7 +78,7 @@ namespace VoiceLite.Models
         public Key RecordHotkey
         {
             get => _recordHotkey;
-            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.Z;
+            set => _recordHotkey = Enum.IsDefined(typeof(Key), value) ? value : Key.Space;
         }
 
         public ModifierKeys HotkeyModifiers
@@ -110,6 +113,7 @@ namespace VoiceLite.Models
         }
 
         public bool MinimizeToTray { get; set; } = true;
+        // Legacy: kept for settings.json compat; UI removed 2026-07-17, Parakeet auto-detects language.
         public string Language { get; set; } = "en";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }

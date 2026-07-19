@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,16 +15,35 @@ namespace VoiceLite
 {
     public partial class App : Application
     {
+        // Single-instance guard. Held for the process lifetime; the installer's
+        // CheckForMutexes (VoiceLiteSetup.iss) checks this EXACT name to block
+        // upgrades over a running app. Session-local (no Global\ prefix) to match
+        // the per-user install; Inno's CheckForMutexes probes both namespaces.
+        private static Mutex? singleInstanceMutex;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Must be acquired BEFORE any startup gate: it also prevents a second
+            // instance from double-injecting text into the foreground app.
+            singleInstanceMutex = new Mutex(initiallyOwned: true, "VoiceLite_SingleInstance", out bool createdNew);
+            if (!createdNew)
+            {
+                // We don't own the mutex — just drop the handle, never ReleaseMutex it.
+                singleInstanceMutex.Dispose();
+                singleInstanceMutex = null;
+                MessageBox.Show(
+                    "VoiceLite is already running — check the system tray.",
+                    "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown(0);
+                return;
+            }
 
             // Catch unhandled exceptions
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             DispatcherUnhandledException += OnDispatcherUnhandledException;
 
-            // CRITICAL: Also handle process exit for forced closures
-            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
             // VC++ runtime probe: Sherpa-ONNX native DLLs link against vcruntime140 /
@@ -126,7 +147,16 @@ namespace VoiceLite
             try
             {
                 var resolver = new ModelResolverService(AppDomain.CurrentDomain.BaseDirectory);
-                return resolver.GetAvailableModelPaths().Any();
+                // Exists-only checks let a 0-byte/truncated model (interrupted download,
+                // full disk) pass this gate forever and wedge the app on first transcription.
+                // Require every model file to be non-empty.
+                return resolver.GetAvailableModelPaths().Any(dir =>
+                    new[] { "encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt" }
+                        .All(f =>
+                        {
+                            var info = new FileInfo(Path.Combine(dir, f));
+                            return info.Exists && info.Length > 0;
+                        }));
             }
             catch (Exception ex)
             {
@@ -168,13 +198,26 @@ namespace VoiceLite
             return IsParakeetModelInstalled();
         }
 
+        // Minimal OnExit, re-added solely to release the single-instance mutex on
+        // normal shutdown (the previous OnExit/OnProcessExit overrides were deleted
+        // as dead code). On abnormal termination the OS abandons the mutex, which
+        // the installer's CheckForMutexes treats the same as released.
         protected override void OnExit(ExitEventArgs e)
         {
+            ReleaseSingleInstanceMutex();
             base.OnExit(e);
         }
 
-        private void OnProcessExit(object? sender, EventArgs e)
+        private static void ReleaseSingleInstanceMutex()
         {
+            var mutex = Interlocked.Exchange(ref singleInstanceMutex, null);
+            if (mutex == null)
+                return;
+
+            try { mutex.ReleaseMutex(); }
+            catch (Exception ex) { ErrorLogger.LogDebug($"Single-instance mutex release failed: {ex.Message}"); }
+            try { mutex.Dispose(); }
+            catch (Exception ex) { ErrorLogger.LogDebug($"Single-instance mutex dispose failed: {ex.Message}"); }
         }
 
         private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
@@ -189,7 +232,7 @@ namespace VoiceLite
             if (ex != null)
             {
                 ErrorLogger.LogError("UnhandledException", ex);
-                MessageBox.Show($"Fatal error: {ex.Message}\n\nCheck voicelite_error.log for details.",
+                MessageBox.Show($"Fatal error: {ex.Message}\n\nCheck the log at %LOCALAPPDATA%\\VoiceLite\\logs\\voicelite.log for details.",
                     "VoiceLite Crash", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

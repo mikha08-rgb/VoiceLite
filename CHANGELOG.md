@@ -4,6 +4,22 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Cancelled recordings no longer paste text — cancelling now discards the audio instead of transcribing and injecting it.
+- "Minimize to system tray" works again.
+- Second app launch no longer starts a duplicate instance (single-instance guard; the existing window is brought forward).
+- Post-processing no longer lowercases proper names.
+- Pinned history items are now actually preserved — exempt from both the 250-item cap and the 7-day startup purge.
+- Recordings too short to transcribe now show feedback instead of failing silently.
+- First-launch model download can be cancelled and recovers from interrupted/partial downloads.
+
+### Web (deployed separately)
+- Device deactivation endpoint — a license seat can now be freed without contacting support.
+- License email delivery hardened (fewer silently lost license emails after purchase).
+- Site download version and copy corrected to match the actual release.
+
 ## [2.2.0] - 2026-07-17
 
 ### Fixed

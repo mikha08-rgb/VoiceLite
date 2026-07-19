@@ -3,9 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-
-// Hardcoded — bump alongside csproj <Version> on each release.
-const CURRENT_VERSION = '2.1.2';
+import { CURRENT_VERSION } from '@/lib/version';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -58,7 +56,7 @@ function SuccessContent() {
             </li>
             <li className="flex items-start gap-3">
               <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">4</span>
-              <span><strong>Enjoy all Pro features!</strong> 🚀</span>
+              <span><strong>You're all set!</strong> Your license unlocks Pro features (early access) as they ship — and supports continued development. 🚀</span>
             </li>
           </ol>
         </div>
@@ -70,6 +68,12 @@ function SuccessContent() {
             <Link href="/retrieve" className="underline hover:no-underline font-semibold">
               retrieve your license key here
             </Link>
+          </p>
+          <p className="mt-2 text-sm text-yellow-800 dark:text-yellow-200">
+            <strong>Need help?</strong> Email{' '}
+            <a href="mailto:basementhustlellc@gmail.com" className="underline hover:no-underline font-semibold">
+              basementhustlellc@gmail.com
+            </a>
           </p>
         </div>
 

@@ -2,6 +2,28 @@
 
 *Audit date: 2026-07-17 @ v2.1.2. Blunt by request. Risk = likelihood × blast radius for a paying user or for you operationally.*
 
+> **Update 2026-07-17 (evening) — post-v2.2.0 deep review + fix pass.** A second adversarial review after the rename/v2.2.0 release found and FIXED (5 parallel worktree agents, all merged, suite 274 passed / 22 skipped, tsc clean):
+> - **Esc "cancel" transcribed and auto-pasted anyway** (no cancel gate in `OnAudioFileReady`) — fixed with a discard flag; cancelled audio is deleted, never transcribed.
+> - **Close/tray flow was structurally broken** (re-entrant `Close()` throw → spurious error dialog; one-shot `isClosingHandled` never reset → second X-click exited even with minimize-to-tray on) — restructured; tray Exit now also gets a synchronous settings flush backstop in `OnClosed`.
+> - **Webhook hard-crash could still strand a paid license** (claim row stamped processed before processing; timeout/OOM between claim and completion → Stripe retries short-circuit forever) — now claims with an epoch sentinel, stamps `processedAt` only on success, and stale (>5 min) unprocessed claims are atomically taken over on retry; `maxDuration = 60` added.
+> - **3-device cap was not race-safe** (`$transaction` at default READ COMMITTED despite the CRITICAL-4 comment) — now Serializable with P2034/P2002 retry. **Deactivation endpoint added** (`POST /api/licenses/deactivate`) — the 403's "deactivate a device" instruction was previously a dead end with no endpoint.
+> - **Rate limiters could fail closed/unhandled on a Redis outage** (checkout would 500 on every sale) — all routed through the fail-open fallback wrapper.
+> - **Manual-paste (AutoPaste=off) clipboard failures were silent** (single attempt, swallowed) — now 5-attempt retry then throw, red status at all call sites. **Too-short recordings** now show "Too short" instead of silently dropping. The last unsignalled lost-audio branch (waveFile dispose failure) now fires `RecordingError`.
+> - **Recognizer load/rebuild ran on the UI thread** (seconds-long freeze after a preset change) — moved into `Task.Run`; constructor warm-up and `Dispose` now respect `transcriptionSemaphore` (closes the dispose-mid-Decode native race windows).
+> - **CI: releases published without running tests** — `release.yml` now has a test job gate; Inno Setup pinned 6.7.1; `pr-tests.yml` gets push triggers for `master`/`v*`. One test POSTed garbage keys at prod validate on every run — deleted. Remaining vacuous GGML-gated zombies re-gated on real Parakeet presence. `LicenseFileGuard` is crash-safe (stable backup path + constructor recovery).
+> - **Dead code**: ~1,700 LOC removed (model registry collapsed, Language no-op dropdown removed — Parakeet auto-detects and the old list offered unsupported languages, `Settings.Language` kept for JSON compat; 11 dead web components, `lib/crypto.ts`, broken `/docs` Swagger page + 3 deps, `AsyncHelper`, dead history/tray members).
+>
+> **Still open after this pass:** #1 below (Stripe key — rotation is with Misha); offline-Pro revalidation (QUESTIONS #9); Custom Dictionary gating is cosmetic (**RESOLVED 2026-07-18** — now gated at processing time, see below); `IProFeatureService` seam (its test justification is gone — Misha to decide keep/collapse); 4 orphaned/admin API routes (may be manual ops tools); `UserActivity` Prisma model (needs a migration to drop); dead subscription branches in the webhook (protected, unreachable); no Prisma baseline migration (fresh-DB `migrate deploy` fails — DR landmine); `TelemetryMetric`/`Feedback.userId` schema drift (a future `migrate dev` would generate DROPs); watch the first push-triggered CI run — mic-dependent recorder tests have never run on a bare GitHub runner (**RESOLVED 2026-07-18** — mic/model guards added, first push-triggered run is green).
+
+> **Update 2026-07-18 — onboarding/installer/DSP fix pass + real transcription coverage.** Landed on this branch (`3e480a7..56c640e` plus the AudioPipelineTests revival), suite 316 passed / 0 failed / 22 skipped:
+> - **First-run model install made atomic and survivable.** `ModelDownloadControl` now extracts to a sibling tmp dir, verifies all 4 model files non-empty, then atomically swaps into the live dir; the download is cancellable (`CancelDownload()` + host-window close), preflights ~1.5 GB free disk with clear numbers, and replaces the flat HttpClient timeout with a 60 s per-read stall detector (slow links no longer die at 100%); startup sweeps stray tarballs/half-extracted tmp dirs from killed runs. `ModelResolverService.HasRequiredFiles` now rejects **0-byte model files** — a truncated install used to pass the `File.Exists` gate and wedge every launch.
+> - **DSP capture path O(n)→O(1) per sample.** `AutomaticGainControl`/`SimpleNoiseGate` re-summed their whole window on every sample; now incremental running sums (double accumulator + periodic exact re-sum guard). Pure perf — output equivalence locked by naive-reference tests (`DspWindowSumTests`, 8 tests).
+> - **Silero VAD was fed one garbage sample and a shifted stream:** `SileroVadService` assumed a 44-byte WAV header but NAudio writes 46 bytes. Now parses RIFF chunk headers (legacy fallback for unparseable input; 4 new tests).
+> - **Uninstall-while-running aborts cleanly:** the installer's `VoiceLite_SingleInstance` mutex check now also runs in `InitializeUninstall` (was partially deleting locked files).
+> - **Transcription coverage is real now** (see #4 below — the "zero active tests" claim is dead): `TranscriptionServiceTests` +17 active tests including real Parakeet decodes (known speech, noise, silence-no-hallucination, corrupt-WAV recovery, concurrency serialization, preset-rebuild, dispose paths); new `ModelResolverServiceTests` (9 cases) replacing the deleted Phase-E zombie suite; `AudioPipelineTests`' end-to-end record→transcribe test revived — it now shares the class-level model fixture and asserts the recorded audio actually reached the decode path (was gated on a deleted GGML file, permanently false-green).
+> - **Custom Dictionary is actually Pro-gated at processing time** (was cosmetic: Settings tab gated, dictionary applied to ALL users): `TranscriptionService` passes it to `TextPostProcessor.Process` only when `ProFeatureService.IsProUser`. Unit + functional tests cover Free-vs-Pro behavior.
+> - **CI on bare runners:** mic-dependent tests guard on `AudioTestEnvironment.HasMicrophone`, model-dependent tests gate on the installed Parakeet model; the first push-triggered CI run is **green** — it earned its keep immediately by catching a missing `@react-email/render` dependency that broke the web build (local typecheck never ran the Turbopack build). Fixed.
+
 ## 🔴 Act on these first (things silently hurting you right now)
 
 ### 1. Live Stripe secret key sitting on disk — `sk_live_…` — CRITICAL
@@ -26,12 +48,12 @@
 - Only 4 empty catch blocks, all defensible (can't-log-the-logger; swallow `ObjectDisposedException` on semaphore release).
 
 **Fragile / buggy:**
-- **Preset no-op bug** (see #3 above).
+- ~~**Preset no-op bug**~~ (see #3 above — **RESOLVED 2026-07-17**, preset now rebuilds the recognizer lazily; functional test covers it).
 - **Dispose-during-Decode is not actually synchronized.** `Decode()` runs in `Task.Run` on a local ref; the constructor warm-up calls `EnsureRecognizerLoaded` *outside* `transcriptionSemaphore`. Safe today only because the single-model invariant makes reload a no-op early-return — the safety is incidental, not enforced. CLAUDE.md claims a lock protects this; it doesn't.
 - **Silent audio loss:** `SaveMemoryBufferToTempFile` on disk-write failure loses the recording and logs it as "expected behavior" — no user signal.
 - **Silent injection failure:** if `TextInjector` fails, text lands in history but never reaches the target app, logged only. A clinician mid-dictation sees nothing happen.
 - **Offline Pro state trusts a stale bool:** `IsProUser` trusts `settings.IsProLicense` + presence of *any* stored key; it never re-checks tier/revocation offline (only the 14-day online re-validation does). A once-Pro user stays Pro offline indefinitely.
-- **Custom Dictionary "Pro feature" isn't gated:** the tab is UI-hidden for free users, but `TextPostProcessor` applies `settings.CustomDictionary` for everyone. Gating is cosmetic.
+- ~~**Custom Dictionary "Pro feature" isn't gated**~~ **RESOLVED 2026-07-18**: `TranscriptionService` now passes the dictionary to `TextPostProcessor.Process` only when `ProFeatureService.IsProUser` (same tier check the Settings tab uses); Free tier gets no dictionary application. Covered by unit + functional tests in `TranscriptionServiceTests`.
 
 **Dead code:** `WhisperModelInfo.cs` 5-model GGML constants (only `LegacyGgmlFileNames` is live), `ModelResolverService.ResolveModelPath(modelName)` dead param, `App.OnProcessExit/OnExit` empty bodies, `AudioRecorder.AudioDataReady` event fired with no subscribers (still copies the byte[]).
 
@@ -48,7 +70,9 @@
 
 **Dead code:** `lib/openapi.ts` documents ~13 routes that don't exist (`/auth/otp`, `/licenses/activate`, `/licenses/crl`, `/me`, Ed25519/CRL security model) — served publicly at `/api/docs`, actively misleading. Unused rate limiters (`otpRateLimit`, `emailRateLimit`, …) from a never-built auth system. `components/ui/` (glow-card, gradient-text) imported nowhere. Dead subscription/"quarterly" branches in webhook while `checkout` only does one-time payment.
 
-## Tests & CI — overall risk: MEDIUM (with the HIGH false-confidence flagged above)
+## Tests & CI — overall risk: MEDIUM ~~(with the HIGH false-confidence flagged above)~~ (false-confidence RESOLVED — see 2026-07-18 note)
+
+> **Update 2026-07-18:** the transcription false-confidence is gone — `TranscriptionServiceTests` now actively decodes real audio through the Parakeet model (+17 tests), `AudioPipelineTests`' record→transcribe half actually runs (was dead-gated on a deleted GGML file), and mic-/model-dependent tests carry explicit environment guards (`AudioTestEnvironment.HasMicrophone` / Parakeet-model gates) so bare CI runners stay honest instead of silently green. First push-triggered CI run: green. Suite: **316 passed / 0 failed / 22 skipped**.
 
 > **Update 2026-07-17 (post-audit cleanup):** the Phase-E zombies below were deleted the same day (suite is now 283 passed / 22 legitimately skipped), and a new HIGH footgun was found and fixed: **`LicenseServiceTests` had no file isolation — running `dotnet test` on a machine with an activated license OVERWROTE the real `%LOCALAPPDATA%\VoiceLite\license.dat` with test keys** (and one test failed against the real file). A `LicenseFileGuard` fixture now backs up/restores the real file around the class. The underlying cause — `LicenseService` hardcodes the real path with no test seam — still exists; any future test that news up `LicenseService` and saves must use the same guard.
 
