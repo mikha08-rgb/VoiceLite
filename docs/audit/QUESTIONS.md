@@ -14,18 +14,19 @@
 ## Licensing & payments
 
 4. **Has the webhook-drop bug (HEALTH.md #2) actually lost customers?** `fix-stripe-webhooks.ts` exists to back-fill missing licenses — how often have you had to run it? That tells us the real severity.
+   **A (2026-07-18, partial):** the DB shows no damage in the recent window — a Stripe MCP + read-only prod DB cross-check found every recent charge has a matching license, webhook events processed within seconds, no stranded events. Sole anomaly: one customer double-purchased on 2026-05-19 (softtaildh@aol.com, two $20 charges 19 min apart, both licensed — Misha chose not to refund). Historical run-frequency of the reconciler remains unknown but is now moot.
 
 5. **Is Upstash rate-limiting actually configured in production?** If not, `validate`/`retrieve`/`resend-email` have effectively no rate limit on Vercel. Need to confirm the env vars are set in the Vercel project.
 
 6. **Is the `machineId`-optional device-limit bypass intentional?** Was `machineId` made optional to support some client (older desktop build? VM/headless?) that couldn't produce one, or is it just an oversight? Determines whether we can make it required.
 
-7. **Migration drift: what's the real state of prod's `_prisma_migrations`?** The `20251031` migration is untracked, and there's a duplicate `20251025` pair. Does prod match `schema.prisma`? A `prisma migrate status` against prod would answer this — I can't from the repo alone.
+7. ~~**Migration drift: what's the real state of prod's `_prisma_migrations`?**~~ **ANSWERED 2026-07-18 — worse than feared, now fixed.** Prod had **no `_prisma_migrations` table at all** — the DB evolved via `db push`/manual SQL; none of the 5 repo migrations were ever applied. Also: prod `License.userId` is **NOT NULL** (the 2026-07-17 "made nullable to match prod" fix was backwards — `schema.prisma` corrected back to required), and `UserActivity` existed in prod with 0 rows. Fix: repo migrations replaced by a `0_init` baseline (marked applied on prod via `prisma migrate resolve`) plus a `drop_user_activity` migration applied via `migrate deploy`; the phantom `TelemetryMetric` migration was deleted with the rest.
 
 ## Desktop behavior & intent
 
 8. ~~**The transcription-preset setting (Speed/Balanced/Accuracy) does nothing at runtime (HEALTH.md #3). Was it ever wired?**~~ **RESOLVED 2026-07-17: fixed, not removed** — the preset is now part of the recognizer reload key and rebuilds the `OfflineRecognizer` lazily on the next transcription; functional test covers it. (Historical half of the question — whether it ever worked in the Whisper era — remains unanswered but is now moot.)
 
-9. **Should the offline Pro check re-validate tier/revocation, or is "once Pro, always Pro offline" the intended generosity?** A user who activated Pro once keeps it offline forever. Deliberate (goodwill / offline-friendly) or a security gap to close?
+9. ~~**Should the offline Pro check re-validate tier/revocation, or is "once Pro, always Pro offline" the intended generosity?**~~ **ANSWERED 2026-07-18: deliberate — status quo stands.** Misha decided once-Pro-always-Pro offline is intended goodwill: licenses are lifetime, and healthcare pilot users may be offline for long stretches; revocation only matters for refunds/chargebacks. No code change.
 
 10. **VAD threshold is hardcoded at `0.35` with no setting.** MEMORY.md claims a `VADThreshold` setting exists — it doesn't. Was the setting removed on purpose (too footgunny for users) or lost in migration? Should it be exposed again?
 

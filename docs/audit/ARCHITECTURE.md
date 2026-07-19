@@ -80,7 +80,6 @@ Local state (all under `%LOCALAPPDATA%\VoiceLite\`, never Roaming): `settings.js
 | `webhook` | POST | Stripe events (checkout.completed, subscription.*, charge.refunded). | Signature verify + `WebhookEvent` idempotency (**buggy — see HEALTH.md**). |
 | `licenses/validate` | POST | Desktop validation + device activation (3-device cap). | Zod + Upstash rate limit **only if Upstash env configured**. |
 | `licenses/retrieve` | POST | Self-service resend to email. | IP 3/hr, enumeration-safe. |
-| `licenses/resend-email` | POST | Support resend by email/key. | IP 3/hr. |
 | `admin/process-payment` | POST | Manually mint a LIFETIME license. | `x-admin-token`, constant-time compare. |
 | `admin/get-license` | POST | Look up by email. | `x-admin-token`. |
 | `diagnostic` | GET | Env/DB/email health. | `x-admin-token`. |
@@ -88,7 +87,9 @@ Local state (all under `%LOCALAPPDATA%\VoiceLite\`, never Roaming): `settings.js
 | `docs` | GET | Serves OpenAPI JSON. | Public — **but the OpenAPI is fiction** (see HEALTH.md). |
 | `feedback/submit` | POST | Store feedback. | Upstash 5/hr. |
 
-**Data model (`prisma/schema.prisma`):** `License` (opaque `VL-xxxxxx-xxxxxx-xxxxxx` keys, DB-lookup only — no crypto signing despite OpenAPI claims), `LicenseActivation` (`@@unique([licenseId, machineId])` makes the 3-device cap race-safe), `LicenseEvent` (audit), `WebhookEvent` (idempotency), `User`, `UserActivity` (defined but never written to), `Feedback`.
+*2026-07-18 route cleanup:* `licenses/resend-email` and the short-lived `licenses/deactivate` were deleted — zero callers (the desktop only calls `validate`; the site calls `checkout`/`download`/`retrieve`/`feedback/submit`). The `admin/*` routes (used by `scripts/mint-gratis-keys.sh`) and `diagnostic` are kept deliberately as manual ops tools.
+
+**Data model (`prisma/schema.prisma`):** `License` (opaque `VL-xxxxxx-xxxxxx-xxxxxx` keys, DB-lookup only — no crypto signing despite OpenAPI claims), `LicenseActivation` (`@@unique([licenseId, machineId])` makes the 3-device cap race-safe), `LicenseEvent` (audit), `WebhookEvent` (idempotency), `User`, `Feedback`. *(`UserActivity` — defined but never written to — was dropped 2026-07-18 via the `drop_user_activity` migration; prod had 0 rows.)*
 
 **Licensing flow:** Stripe `checkout.completed` → webhook → `upsertLicenseFromStripe()` (transactional) → license row + confirmation email. Desktop calls `/api/licenses/validate` → DB lookup → device activation → DPAPI-cached locally. Revocation = flip `status` column.
 

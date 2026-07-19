@@ -10,9 +10,9 @@
 
 ## Chunk 0 — Immediate ops (not really cleanup, do today, ~30 min)
 Not a coding session; just stop active bleeding.
-1. **Rotate the live Stripe key** (HEALTH.md #1), then delete/env-ify `voicelite-web/check-stripe-webhooks.mjs`.
+1. **Rotate the live Stripe key** (HEALTH.md #1), then delete/env-ify `voicelite-web/check-stripe-webhooks.mjs`. **DONE 2026-07-18** — key rotated by Misha, script deleted (plus the other one-off license-check scripts; Stripe MCP + ad-hoc read-only Prisma scripts replace them).
 2. **Confirm Upstash env vars are set in the Vercel prod project** (HEALTH.md — rate limiting silently disappears without them).
-3. **Confirm prod DB migration state** (`prisma migrate status`) matches `schema.prisma`.
+3. **Confirm prod DB migration state** (`prisma migrate status`) matches `schema.prisma`. **DONE 2026-07-18** — it didn't, badly: prod had no `_prisma_migrations` table at all. Baselined with `0_init` + `drop_user_activity` (see Chunk 4 item 4 / HEALTH.md migration item).
 *Value: very high. Risk: low. These are checks + a key rotation, not refactors.*
 
 ## Chunk 1 — Test safety net around what users depend on most ⭐ ~~START HERE~~ **DONE 2026-07-17** (except AutoPaste characterization — deliberately skipped, it would fire real keystrokes; zombie deletion done same day. Suite: 291 passed / 22 skipped.) **Completed 2026-07-18:** the functional-coverage bullet fully landed — `TranscriptionServiceTests` +17 active tests with real Parakeet decodes, new `ModelResolverServiceTests` (9), `AudioPipelineTests`' record→transcribe half revived off its dead GGML gate onto the shared model fixture, mic/model environment guards for bare CI runners, and the first push-triggered CI run is green. Suite: 316 passed / 0 failed / 22 skipped.
@@ -33,11 +33,11 @@ With Chunk 1's net in place:
 Rework `webhook/route.ts` so the `WebhookEvent` idempotency row is committed **only after** successful processing (or is deleted on failure), so Stripe's retries actually reprocess. Reproduce with the Chunk 1 test first, then fix, then confirm the test goes green. Consider folding `fix-stripe-webhooks.ts`'s reconciliation into a scheduled job.
 *Value: high (stops losing paid customers). Risk: medium (payment path — test-first, deploy to preview, watch a real event).*
 
-## Chunk 4 — Harden the licensing edges — **DONE 2026-07-17 except item 3** (machineId: legacy clients ≤v1.2.0.1 never sent it, so it stays optional but omission now consumes a reserved "legacy-no-machine-id" activation slot — bypass closed without locking out old builds; checkout rate-limited 5/h/IP; migrations reconciled + schema userId made nullable to match prod. Item 3, offline-Pro revalidation, still open — QUESTIONS #9.)
+## Chunk 4 — Harden the licensing edges — **DONE 2026-07-17, closed out 2026-07-18** (machineId: legacy clients ≤v1.2.0.1 never sent it, so it stays optional but omission now consumes a reserved "legacy-no-machine-id" activation slot — bypass closed without locking out old builds; checkout rate-limited 5/h/IP; ~~migrations reconciled + schema userId made nullable to match prod~~ that reconciliation was backwards — redone 2026-07-18, see item 4. ~~Item 3, offline-Pro revalidation, still open — QUESTIONS #9.~~ Item 3 closed 2026-07-18: deliberate policy, no code change.)
 1. Make `machineId` required on `validate` (or document why optional) — close the device-limit bypass (QUESTIONS.md #6).
 2. Add rate limiting to `checkout`.
-3. Decide the offline-Pro-revalidation question (QUESTIONS.md #9) and implement.
-4. Resolve the migration drift: commit the `20251031` migration, delete the duplicate empty `20251025` dir, reconcile `schema.prisma` `userId` nullability.
+3. Decide the offline-Pro-revalidation question (QUESTIONS.md #9) and implement. **RESOLVED 2026-07-18 — no implementation:** Misha decided status quo is deliberate; once-Pro-always-Pro offline is intended goodwill (lifetime licenses, healthcare pilot users offline for long stretches; revocation only matters for refunds/chargebacks). Documented in HEALTH.md + QUESTIONS.md #9.
+4. Resolve the migration drift: commit the `20251031` migration, delete the duplicate empty `20251025` dir, reconcile `schema.prisma` `userId` nullability. **Re-done properly 2026-07-18:** prod had **no `_prisma_migrations` table at all** (evolved via `db push`/manual SQL — none of the 5 repo migrations ever applied) and prod `userId` is NOT NULL (`schema.prisma` corrected back to required). Repo migrations replaced by a `0_init` baseline (marked applied on prod via `prisma migrate resolve`) + `drop_user_activity` applied via `migrate deploy`; phantom `TelemetryMetric` migration deleted.
 *Value: medium-high. Risk: medium.*
 
 ## Chunk 5 — Decide the Tauri question, then delete
@@ -67,7 +67,7 @@ One deliberate, test-backed pass (needs Chunk 1's net). Rename `PersistentWhispe
 - Delete the abandoned root `.bat` pile (`DIAGNOSE_BUILD`, `QUICK_TEST`, `RUN_TEST`, `TEST_BUILD`, `TEST_WEEK1`).
 *Value: medium (huge disk win, less confusion). Risk: low. Can be split into "disk" and "branches/CI" sub-sessions.*
 
-## Chunk 9 — Small dead-code collapses (opportunistic) — **mostly DONE 2026-07-17** (evening sweep: App stubs, unused limiters, components/ui + 11 dead components, lib/crypto, model registry collapsed, Language no-op UI removed, AsyncHelper, dead history/tray members — ~1,700 LOC. Still open: `AudioDataReady` (kept — tests use it), `UserActivity` model (needs migration), `IProFeatureService` + 4 orphaned routes (Misha's call), webhook dead subscription branches (protected).)
+## Chunk 9 — Small dead-code collapses (opportunistic) — **mostly DONE 2026-07-17, remainder decided 2026-07-18** (evening sweep: App stubs, unused limiters, components/ui + 11 dead components, lib/crypto, model registry collapsed, Language no-op UI removed, AsyncHelper, dead history/tray members — ~1,700 LOC. Closed 2026-07-18: `UserActivity` model dropped via `drop_user_activity` migration (prod had 0 rows); `IProFeatureService` collapsed to concrete `ProFeatureService` (its mock-seam justification died with the deleted zombie tests); orphaned routes decided — `licenses/deactivate` + `licenses/resend-email` DELETED (zero callers: desktop only calls `validate`; site calls checkout/download/retrieve/feedback-submit), `admin/process-payment` + `admin/get-license` (used by `scripts/mint-gratis-keys.sh`) + `diagnostic` KEPT deliberately as manual ops tools. Still open: `AudioDataReady` (kept — tests use it), webhook dead subscription branches (protected).)
 
 ---
 
