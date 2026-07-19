@@ -92,14 +92,11 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public void TranscriptionService_DisposeReleasesResources()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
+            // Gate on the real Parakeet model (this test was permanently false-green
+            // before 2026-07-18: it gated on the deleted GGML file, so its body never ran).
+            if (!VoiceLite.Tests.Services.TranscriptionServiceFixture.ModelPresent) return;
 
-            // Only run if model file exists
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
-            {
-                return;
-            }
+            var settings = new Settings();
 
             var initialMemory = GC.GetTotalMemory(true);
 
@@ -221,13 +218,11 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task FileHandles_ReleasedAfterTranscription()
         {
-            var settings = new Settings { TranscriptionModel = "base" };
+            // Gate on the real Parakeet model (this test was permanently false-green
+            // before 2026-07-18: it gated on the deleted GGML file, so its body never ran).
+            if (!VoiceLite.Tests.Services.TranscriptionServiceFixture.ModelPresent) return;
 
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whisper", "ggml-base.bin");
-            if (!File.Exists(modelPath))
-            {
-                return;
-            }
+            var settings = new Settings();
 
             var service = new TranscriptionService(settings);
             _disposables.Add(service);
