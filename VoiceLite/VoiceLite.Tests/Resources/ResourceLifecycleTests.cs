@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.TestUtilities;
 using Xunit;
 
 namespace VoiceLite.Tests.Resources
@@ -46,6 +47,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public void AudioRecorder_DisposePreventsResourceLeaks()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
@@ -67,6 +70,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task AudioRecorder_MultipleInstancesNoCrossContamination()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder1 = new AudioRecorder();
             var recorder2 = new AudioRecorder();
             _disposables.Add(recorder1);
@@ -126,10 +131,13 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task TempFileCleanup_RemovesStaleFiles()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
-            var tempDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
+            // AudioRecorder's real temp directory (created by its constructor)
+            var tempDir = Path.Combine(Path.GetTempPath(), "VoiceLite", "audio");
 
             // Create some old test files
             for (int i = 0; i < 5; i++)
@@ -156,6 +164,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task MemoryStream_ProperlyDisposedAfterUse()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 
@@ -199,6 +209,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task ConcurrentDisposal_ThreadSafe()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
 
             // Start recording
@@ -260,6 +272,8 @@ namespace VoiceLite.Tests.Resources
         [Fact]
         public async Task LongRunningOperation_CancellationCleansUpResources()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recorder = new AudioRecorder();
             _disposables.Add(recorder);
 

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Tests.TestUtilities;
 using Xunit;
 
 namespace VoiceLite.Tests.Integration
@@ -56,6 +57,7 @@ namespace VoiceLite.Tests.Integration
                 // Skip if model not available
                 return;
             }
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
 
             var audioDataReceived = false;
             var transcriptionResult = string.Empty;
@@ -95,6 +97,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_MultipleRecordingCycles_MaintainsStability()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             const int cycles = 3;
             var cyclesCompleted = 0;
 
@@ -120,6 +124,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_ConcurrentOperations_HandledSafely()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var tasks = new Task[3];
 
             // Start multiple recording sessions concurrently
@@ -150,6 +156,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_ErrorRecovery_ContinuesAfterFailure()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var successfulCompletions = 0;
             var errors = 0;
             var eventFiredCount = 0;
@@ -220,6 +228,8 @@ namespace VoiceLite.Tests.Integration
         [InlineData(RecordMode.PushToTalk)]
         public async Task Pipeline_DifferentRecordModes_WorkCorrectly(RecordMode mode)
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var recordingStateChanges = 0;
 
             // Simulate mode-specific behavior
@@ -256,6 +266,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_MemoryBufferMode_AvoidsDiskIO()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var memoryBufferUsed = false;
 
             _recorder.AudioDataReady += (sender, audioData) =>
@@ -276,6 +288,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_LongRecording_HandlesLargeBuffer()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             byte[]? largeBuffer = null;
 
             _recorder.AudioDataReady += (sender, audioData) =>
@@ -296,6 +310,8 @@ namespace VoiceLite.Tests.Integration
         [Fact]
         public async Task Pipeline_RapidStartStop_NoDataCorruption()
         {
+            if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
+
             var dataIntegrity = true;
 
             _recorder.AudioDataReady += (sender, audioData) =>
