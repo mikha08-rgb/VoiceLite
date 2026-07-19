@@ -19,7 +19,7 @@ namespace VoiceLite.Services
         private readonly Settings settings;
         private readonly string baseDir;
         private readonly ModelResolverService modelResolver;
-        private readonly IProFeatureService proFeatureService;
+        private readonly ProFeatureService proFeatureService;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private CancellationTokenSource transcriptionCts = new();
         private readonly object ctsLock = new();
