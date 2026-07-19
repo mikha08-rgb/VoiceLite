@@ -4,7 +4,7 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [2.3.0] - 2026-07-18
 
 ### Fixed
 - Cancelled recordings no longer paste text — cancelling now discards the audio instead of transcribing and injecting it.
@@ -13,7 +13,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Post-processing no longer lowercases proper names.
 - Pinned history items are now actually preserved — exempt from both the 250-item cap and the 7-day startup purge.
 - Recordings too short to transcribe now show feedback instead of failing silently.
-- First-launch model download can be cancelled and recovers from interrupted/partial downloads.
+- First-launch model install hardened: download is cancellable, checks free disk space up front, survives slow connections (stall detection instead of a flat timeout), and installs atomically — an interrupted or truncated download can no longer leave the app unable to start.
+- No more seconds-long freeze after changing settings — the speech engine reloads in the background.
+- More accurate speech detection: fixed a WAV-header parsing bug that fed the voice-activity detector misaligned audio.
+- Uninstalling while VoiceLite is running now aborts cleanly instead of half-removing files.
+
+### Changed
+- Custom Dictionary is now correctly Pro-only (it was previously applied for all users despite being a Pro feature).
+- Faster audio capture processing (noise gate and gain control are now constant-time per sample).
 
 ### Web (deployed separately)
 - Device deactivation endpoint — a license seat can now be freed without contacting support.
