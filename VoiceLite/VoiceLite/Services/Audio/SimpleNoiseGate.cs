@@ -23,6 +23,15 @@ namespace VoiceLite.Services.Audio
         private int rmsBufferIndex = 0;
         private readonly int rmsWindowSize;
 
+        // Incremental running sum of rmsBuffer (see Read). double, not float, so the
+        // add/subtract updates don't accumulate rounding error sample-over-sample.
+        private double rmsRunningSum = 0.0;
+
+        // Periodically recompute the exact sum to bound any residual floating-point
+        // drift on very long runs. ~every 4s of audio at 16kHz — cost is negligible.
+        private int samplesSinceResync = 0;
+        private const int RESYNC_INTERVAL_SAMPLES = 65536;
+
         // Current gate state
         private float currentGain = 1.0f;
         private readonly float attackCoefficient;
@@ -69,20 +78,33 @@ namespace VoiceLite.Services.Audio
             {
                 float sample = buffer[offset + i];
 
-                // Update RMS buffer
-                rmsBuffer[rmsBufferIndex] = sample * sample;
+                // Update RMS buffer with an incremental running sum: subtract the
+                // squared sample leaving the window, add the one entering. This is a
+                // pure performance optimization (O(1) per sample instead of re-summing
+                // the whole window per sample — the loop runs on the capture path);
+                // same window, same formula, output identical to the naive per-sample
+                // recompute up to floating-point accumulation order.
+                float squared = sample * sample;
+                rmsRunningSum += (double)squared - rmsBuffer[rmsBufferIndex];
+                rmsBuffer[rmsBufferIndex] = squared;
                 rmsBufferIndex = (rmsBufferIndex + 1) % rmsWindowSize;
 
-                // Calculate RMS every N samples (optimization)
+                // Periodic exact re-sum guards against long-run drift of the running sum.
+                if (++samplesSinceResync >= RESYNC_INTERVAL_SAMPLES)
+                {
+                    samplesSinceResync = 0;
+                    double exactSum = 0.0;
+                    for (int j = 0; j < rmsWindowSize; j++)
+                        exactSum += rmsBuffer[j];
+                    rmsRunningSum = exactSum;
+                }
+
+                // Per-frame gain update (for mono — the only real capture format —
+                // this branch is taken every sample; kept for multi-channel safety).
                 if (i % channels == 0)
                 {
-                    // Calculate current RMS level
-                    float sumSquares = 0;
-                    for (int j = 0; j < rmsWindowSize; j++)
-                    {
-                        sumSquares += rmsBuffer[j];
-                    }
-                    float rms = (float)Math.Sqrt(sumSquares / rmsWindowSize);
+                    // Current RMS over the window (clamp: drift could dip epsilon below 0)
+                    float rms = (float)Math.Sqrt(Math.Max(rmsRunningSum, 0.0) / rmsWindowSize);
 
                     // Determine target gain: full gain if above threshold, reduced if below
                     float targetGain = rms > threshold ? 1.0f : reductionFactor;

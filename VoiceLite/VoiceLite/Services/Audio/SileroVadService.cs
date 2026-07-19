@@ -82,12 +82,24 @@ namespace VoiceLite.Services.Audio
 
         internal float[] ExtractSamples(byte[] wavData)
         {
-            // Skip WAV header (44 bytes) and convert 16-bit PCM to float
-            int dataStart = WAV_HEADER_SIZE;
-            if (wavData.Length <= dataStart)
+            // Locate the 'data' chunk by walking RIFF chunk headers instead of assuming
+            // a fixed 44-byte header. NAudio's WaveFileWriter (which produces the WAVs
+            // this service receives from AudioRecorder) writes an 18-byte fmt chunk —
+            // a 46-byte header — so the old fixed 44-byte skip prepended one garbage
+            // sample and shifted the whole stream by one sample. Our own EncodeWav
+            // writes the classic 44-byte header; both parse correctly here.
+            int dataStart = FindDataChunkOffset(wavData, out int dataLength);
+            if (dataStart < 0)
+            {
+                // Malformed/unrecognized header: fall back to the legacy fixed skip.
+                dataStart = WAV_HEADER_SIZE;
+                dataLength = wavData.Length - dataStart;
+            }
+
+            if (dataLength <= 0 || wavData.Length <= dataStart)
                 return Array.Empty<float>();
 
-            int sampleCount = (wavData.Length - dataStart) / 2; // 16-bit = 2 bytes per sample
+            int sampleCount = Math.Min(dataLength, wavData.Length - dataStart) / 2; // 16-bit = 2 bytes per sample
             var samples = new float[sampleCount];
 
             for (int i = 0; i < sampleCount; i++)
@@ -101,6 +113,44 @@ namespace VoiceLite.Services.Audio
             }
 
             return samples;
+        }
+
+        /// <summary>
+        /// Walks RIFF chunk headers to find the 'data' chunk. Returns the byte offset
+        /// of the PCM payload and its declared length, or -1 if the buffer is not a
+        /// parseable RIFF/WAVE file.
+        /// </summary>
+        private static int FindDataChunkOffset(byte[] wav, out int dataLength)
+        {
+            dataLength = -1;
+
+            if (wav.Length < 12 ||
+                wav[0] != 'R' || wav[1] != 'I' || wav[2] != 'F' || wav[3] != 'F' ||
+                wav[8] != 'W' || wav[9] != 'A' || wav[10] != 'V' || wav[11] != 'E')
+            {
+                return -1;
+            }
+
+            int pos = 12;
+            while (pos + 8 <= wav.Length)
+            {
+                uint chunkSize = BitConverter.ToUInt32(wav, pos + 4);
+                if (wav[pos] == 'd' && wav[pos + 1] == 'a' && wav[pos + 2] == 't' && wav[pos + 3] == 'a')
+                {
+                    // Clamp to the actual buffer in case the declared size overruns it
+                    // (e.g. a streamed/truncated file).
+                    dataLength = (int)Math.Min(chunkSize, (uint)(wav.Length - pos - 8));
+                    return pos + 8;
+                }
+
+                // Chunks are word-aligned: odd-sized chunks carry one pad byte.
+                long next = (long)pos + 8 + chunkSize + (chunkSize % 2);
+                if (next <= pos || next > int.MaxValue)
+                    return -1;
+                pos = (int)next;
+            }
+
+            return -1;
         }
 
         internal float[] RunInference(float[] samples)
