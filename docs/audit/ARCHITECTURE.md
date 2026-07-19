@@ -58,7 +58,7 @@ Hotkey (HotkeyManager: RegisterHotKey / GetAsyncKeyState)
   → MainWindow.OnAudioFileReady
   → PersistentWhisperService.TranscribeAsync(path)
        └ WaveFileReader.ToSampleProvider() → float[] → OfflineRecognizer.Decode()  [blocking native, wrapped in Task.Run]
-  → TextPostProcessor.Process()  [punctuation, dev-terms, custom dictionary — applied to ALL users]
+  → TextPostProcessor.Process()  [punctuation, dev-terms, custom dictionary — dictionary Pro-gated since 2026-07-18]
   → CustomShortcutService.ProcessShortcuts()
   → if settings.AutoPaste:  TextInjector.InjectText()            [clipboard + Ctrl+V, 2 s auto-clear]
     else:                   TextInjector.CopyToClipboardForManualPaste()  [clipboard only, 30 s hold]
