@@ -7,7 +7,6 @@ using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using SherpaOnnx;
 using VoiceLite.Models;
-using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
@@ -20,7 +19,7 @@ namespace VoiceLite.Services
         private readonly Settings settings;
         private readonly string baseDir;
         private readonly ModelResolverService modelResolver;
-        private readonly IProFeatureService proFeatureService;
+        private readonly ProFeatureService proFeatureService;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private CancellationTokenSource transcriptionCts = new();
         private readonly object ctsLock = new();
@@ -50,7 +49,7 @@ namespace VoiceLite.Services
         public bool IsProcessing => isProcessing;
         public event EventHandler<Exception>? TranscriptionError;
 
-        public TranscriptionService(Settings settings, ModelResolverService? modelResolver = null, IProFeatureService? proFeatureService = null)
+        public TranscriptionService(Settings settings, ModelResolverService? modelResolver = null, ProFeatureService? proFeatureService = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
