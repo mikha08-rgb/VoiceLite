@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -146,7 +147,72 @@ namespace VoiceLite.Tests.Services
                 "transcription must keep working after a preset-triggered recognizer reload");
         }
 
+        [Fact]
+        public async Task CustomDictionary_AppliedForProUsers_NotForFreeUsers()
+        {
+            if (!TranscriptionServiceFixture.ModelPresent) return;
+
+            // Dedicated service: mutating tier/dictionary on the shared fixture would
+            // leak state into the other tests in this class.
+            var settings = new Settings
+            {
+                IsProLicense = false,
+                CustomDictionary = new List<CustomDictionaryEntry>
+                {
+                    new CustomDictionaryEntry { Spoken = "fox", Written = "FOXTROT" },
+                },
+            };
+            using var service = new TranscriptionService(settings);
+
+            var freeResult = await service.TranscribeAsync(KnownSpeechWav, TranscriptionServiceFixture.ModelDir);
+            freeResult.ToLowerInvariant().Should().Contain("fox",
+                "the base transcription must still work for Free users");
+            freeResult.Should().NotContain("FOXTROT",
+                "Custom Dictionary is a Pro feature — Free users must not get it applied " +
+                "(before this fix the gate was cosmetic: tab hidden, entries applied anyway)");
+
+            // Tier flips live: LicenseService mutates the same shared Settings instance on activation.
+            settings.IsProLicense = true;
+
+            var proResult = await service.TranscribeAsync(KnownSpeechWav, TranscriptionServiceFixture.ModelDir);
+            proResult.Should().Contain("FOXTROT",
+                "Pro users' dictionary entries must be applied at transcription time");
+        }
+
         // ---- Tests that run everywhere (no model needed) ----
+
+        [Fact]
+        public void EffectiveCustomDictionary_FreeUser_IsNull_EvenWithEntriesConfigured()
+        {
+            var settings = new Settings
+            {
+                IsProLicense = false,
+                CustomDictionary = new List<CustomDictionaryEntry>
+                {
+                    new CustomDictionaryEntry { Spoken = "medicare", Written = "Medicare" },
+                },
+            };
+            using var service = new TranscriptionService(settings);
+
+            service.EffectiveCustomDictionary.Should().BeNull(
+                "Free tier must not have the Pro Custom Dictionary applied");
+        }
+
+        [Fact]
+        public void EffectiveCustomDictionary_ProUser_ReturnsTheConfiguredEntries()
+        {
+            var settings = new Settings
+            {
+                IsProLicense = true,
+                CustomDictionary = new List<CustomDictionaryEntry>
+                {
+                    new CustomDictionaryEntry { Spoken = "medicare", Written = "Medicare" },
+                },
+            };
+            using var service = new TranscriptionService(settings);
+
+            service.EffectiveCustomDictionary.Should().BeSameAs(settings.CustomDictionary);
+        }
 
         [Fact]
         public async Task TranscribeAsync_MissingFile_ThrowsFileNotFound()

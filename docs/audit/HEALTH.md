@@ -31,7 +31,7 @@
 - **Silent audio loss:** `SaveMemoryBufferToTempFile` on disk-write failure loses the recording and logs it as "expected behavior" — no user signal.
 - **Silent injection failure:** if `TextInjector` fails, text lands in history but never reaches the target app, logged only. A clinician mid-dictation sees nothing happen.
 - **Offline Pro state trusts a stale bool:** `IsProUser` trusts `settings.IsProLicense` + presence of *any* stored key; it never re-checks tier/revocation offline (only the 14-day online re-validation does). A once-Pro user stays Pro offline indefinitely.
-- **Custom Dictionary "Pro feature" isn't gated:** the tab is UI-hidden for free users, but `TextPostProcessor` applies `settings.CustomDictionary` for everyone. Gating is cosmetic.
+- ~~**Custom Dictionary "Pro feature" isn't gated**~~ **RESOLVED 2026-07-18**: `TranscriptionService` now passes the dictionary to `TextPostProcessor.Process` only when `ProFeatureService.IsProUser` (same tier check the Settings tab uses); Free tier gets no dictionary application. Covered by unit + functional tests in `TranscriptionServiceTests`.
 
 **Dead code:** `WhisperModelInfo.cs` 5-model GGML constants (only `LegacyGgmlFileNames` is live), `ModelResolverService.ResolveModelPath(modelName)` dead param, `App.OnProcessExit/OnExit` empty bodies, `AudioRecorder.AudioDataReady` event fired with no subscribers (still copies the byte[]).
 

@@ -20,6 +20,7 @@ namespace VoiceLite.Services
         private readonly Settings settings;
         private readonly string baseDir;
         private readonly ModelResolverService modelResolver;
+        private readonly IProFeatureService proFeatureService;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private CancellationTokenSource transcriptionCts = new();
         private readonly object ctsLock = new();
@@ -35,6 +36,14 @@ namespace VoiceLite.Services
         // Test observability: how many times a recognizer has been built.
         internal int RecognizerLoadCount { get; private set; }
 
+        // Custom Dictionary is the first real Pro feature: the Settings tab is Pro-gated,
+        // and application at transcription time must match — Free tier gets NO dictionary.
+        // (Before 2026-07-18 the gate was cosmetic: the tab was hidden but entries were
+        // applied for everyone — HEALTH.md "Custom Dictionary 'Pro feature' isn't gated".)
+        // Internal for test observability; the tier check itself lives in ProFeatureService.
+        internal IReadOnlyList<CustomDictionaryEntry>? EffectiveCustomDictionary =>
+            proFeatureService.IsProUser ? settings.CustomDictionary : null;
+
         private volatile bool isDisposed = false;
         private volatile bool isProcessing = false;
 
@@ -48,6 +57,9 @@ namespace VoiceLite.Services
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
             this.modelResolver = modelResolver ?? new ModelResolverService(baseDir, proFeatureService);
+            // Same tier check the Settings UI uses to show/hide the Custom Dictionary tab
+            // (ProFeatureService.IsProUser reads settings.IsProLicense).
+            this.proFeatureService = proFeatureService ?? new ProFeatureService(settings);
 
             // Background-load the model so the first transcription is fast.
             // Errors here are logged but non-fatal — the first transcribe call will retry.
@@ -222,7 +234,7 @@ namespace VoiceLite.Services
                         finalResult = TextPostProcessor.Process(rawResult,
                             enablePunctuation: true,
                             enableCapitalization: true,
-                            customDictionary: settings.CustomDictionary);
+                            customDictionary: EffectiveCustomDictionary);
 
                         if (finalResult != rawResult)
                         {
