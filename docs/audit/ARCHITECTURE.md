@@ -87,7 +87,7 @@ Local state (all under `%LOCALAPPDATA%\VoiceLite\`, never Roaming): `settings.js
 | `docs` | GET | Serves OpenAPI JSON. | Public — **but the OpenAPI is fiction** (see HEALTH.md). |
 | `feedback/submit` | POST | Store feedback. | Upstash 5/hr. |
 
-*2026-07-18 route cleanup:* `licenses/resend-email` and the short-lived `licenses/deactivate` were deleted — zero callers (the desktop only calls `validate`; the site calls `checkout`/`download`/`retrieve`/`feedback/submit`). The `admin/*` routes (used by `scripts/mint-gratis-keys.sh`) and `diagnostic` are kept deliberately as manual ops tools.
+*2026-07-18 route cleanup:* `licenses/resend-email` was deleted — zero callers (the desktop only calls `validate`; the site calls `checkout`/`download`/`retrieve`/`feedback/submit`). `licenses/deactivate` was kept: no caller yet, but it backs the device-cap 403's "deactivate a device" instruction (added 2026-07-17). The `admin/*` routes (used by `scripts/mint-gratis-keys.sh`) and `diagnostic` are kept deliberately as manual ops tools.
 
 **Data model (`prisma/schema.prisma`):** `License` (opaque `VL-xxxxxx-xxxxxx-xxxxxx` keys, DB-lookup only — no crypto signing despite OpenAPI claims), `LicenseActivation` (`@@unique([licenseId, machineId])` makes the 3-device cap race-safe), `LicenseEvent` (audit), `WebhookEvent` (idempotency), `User`, `Feedback`. *(`UserActivity` — defined but never written to — was dropped 2026-07-18 via the `drop_user_activity` migration; prod had 0 rows.)*
 
