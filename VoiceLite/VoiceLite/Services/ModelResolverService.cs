@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using VoiceLite.Core.Interfaces.Features;
 using VoiceLite.Models;
 
 namespace VoiceLite.Services
@@ -14,13 +13,13 @@ namespace VoiceLite.Services
     public class ModelResolverService
     {
         private readonly string _baseDir;
-        private readonly IProFeatureService? _proFeatureService;
+        private readonly ProFeatureService? _proFeatureService;
 
         // Canonical model id used by Settings.TranscriptionModel after migration.
         public const string ParakeetModelId = "parakeet-tdt-0.6b-v3-int8";
         public const string ParakeetDirName = "parakeet-v3";
 
-        public ModelResolverService(string baseDirectory, IProFeatureService? proFeatureService = null)
+        public ModelResolverService(string baseDirectory, ProFeatureService? proFeatureService = null)
         {
             if (string.IsNullOrWhiteSpace(baseDirectory))
                 throw new ArgumentNullException(nameof(baseDirectory));

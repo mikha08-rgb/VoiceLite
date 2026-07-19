@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using VoiceLite.Models;
-using VoiceLite.Core.Interfaces.Features;
 
 namespace VoiceLite.Services
 {
@@ -9,7 +8,7 @@ namespace VoiceLite.Services
     /// Centralized service for managing Pro feature access and visibility.
     /// Adding new Pro features: Just add one property here + bind in XAML.
     /// </summary>
-    public class ProFeatureService : IProFeatureService, IDisposable
+    public class ProFeatureService : IDisposable
     {
         private readonly Settings _settings;
 
@@ -95,7 +94,7 @@ namespace VoiceLite.Services
             ? "Pro license active. Your license is preserved for upcoming Pro features."
             : "Free tier includes the full Parakeet v3 engine. Pro features coming soon.";
 
-        #region IProFeatureService Methods
+        #region Pro Feature Methods
 
         /// <summary>
         /// No-op gating post-Parakeet swap — single model lineup.
