@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
+    "@react-email/render": "^2.1.0",
     "@upstash/ratelimit": "^2.0.6",
     "@upstash/redis": "^1.35.4",
     "@vercel/edge": "^1.2.2",
