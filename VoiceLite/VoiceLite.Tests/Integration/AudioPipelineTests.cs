@@ -13,17 +13,23 @@ namespace VoiceLite.Tests.Integration
 {
     /// <summary>
     /// Integration tests for the complete audio recording → transcription → text injection pipeline
-    /// These are high-ROI tests that catch regressions in the core workflow
+    /// These are high-ROI tests that catch regressions in the core workflow.
+    /// Shares the class-level TranscriptionServiceFixture (same pattern as
+    /// TranscriptionServiceTests) so the ~600MB Parakeet model loads once for the class,
+    /// not once per test — this class itself is still constructed per-test (xUnit default).
     /// </summary>
-    public class AudioPipelineTests : IDisposable
+    public class AudioPipelineTests : IClassFixture<TranscriptionServiceFixture>, IDisposable
     {
+        private readonly TranscriptionServiceFixture _fx;
         private readonly AudioRecorder _recorder;
         private readonly TextInjector _textInjector;
         private readonly Settings _settings;
         private readonly string _tempDirectory;
 
-        public AudioPipelineTests()
+        public AudioPipelineTests(TranscriptionServiceFixture fx)
         {
+            _fx = fx;
+
             _tempDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
             Directory.CreateDirectory(_tempDirectory);
 
@@ -48,7 +54,7 @@ namespace VoiceLite.Tests.Integration
             }
             if (!AudioTestEnvironment.HasMicrophone) return; // no audio device (CI runner)
 
-            using var transcriber = new TranscriptionService(_settings);
+            var transcriber = _fx.Service; // shared fixture — model loads once per class
 
             byte[]? capturedAudio = null;
             var transcriptionDone = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -79,9 +85,9 @@ namespace VoiceLite.Tests.Integration
             _recorder.StopRecording();
             _recorder.IsRecording.Should().BeFalse();
 
-            // Wait for transcription to finish BEFORE the transcriber is disposed —
-            // disposing mid-decode risks a native access violation. Generous timeout
-            // because the first call also loads the ~600MB model.
+            // Wait for transcription to finish BEFORE the test ends — the fixture must
+            // not be disposed mid-decode (native access violation risk). Generous timeout
+            // because the first call in the class also loads the ~600MB model.
             var completed = await Task.WhenAny(transcriptionDone.Task, Task.Delay(TimeSpan.FromSeconds(90)));
             completed.Should().Be(transcriptionDone.Task, "transcription should complete");
 
@@ -90,6 +96,17 @@ namespace VoiceLite.Tests.Integration
             capturedAudio!.Length.Should().BeGreaterThan(0, "Audio buffer should contain data");
             var transcriptionResult = await transcriptionDone.Task;
             transcriptionResult.Should().NotBeNull("Transcription should complete");
+
+            // If the captured buffer is above TranscriptionService's ~100-byte floor the
+            // decode is guaranteed to run, so the recognizer must have loaded — guards
+            // against this test regressing to a silent no-decode false green. (A mic that
+            // captures pure silence can be VAD-trimmed below the floor; that's correct
+            // product behavior, so only assert when the decode must have happened.)
+            if (capturedAudio!.Length > 100)
+            {
+                transcriber.RecognizerLoadCount.Should().BeGreaterThan(0,
+                    "recorded audio above the size floor must reach the Parakeet decode path");
+            }
         }
 
         [Fact]

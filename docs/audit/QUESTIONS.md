@@ -23,7 +23,7 @@
 
 ## Desktop behavior & intent
 
-8. **The transcription-preset setting (Speed/Balanced/Accuracy) does nothing at runtime (HEALTH.md #3). Was it ever wired?** Did it work in the Whisper era and silently break in the Parakeet migration, or was it never functional post-v2.0? Determines fix-vs-remove.
+8. ~~**The transcription-preset setting (Speed/Balanced/Accuracy) does nothing at runtime (HEALTH.md #3). Was it ever wired?**~~ **RESOLVED 2026-07-17: fixed, not removed** — the preset is now part of the recognizer reload key and rebuilds the `OfflineRecognizer` lazily on the next transcription; functional test covers it. (Historical half of the question — whether it ever worked in the Whisper era — remains unanswered but is now moot.)
 
 9. **Should the offline Pro check re-validate tier/revocation, or is "once Pro, always Pro offline" the intended generosity?** A user who activated Pro once keeps it offline forever. Deliberate (goodwill / offline-friendly) or a security gap to close?
 

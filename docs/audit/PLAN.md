@@ -2,6 +2,8 @@
 
 *Audit date: 2026-07-17. Ranked by risk × value. Each chunk is scoped to one focused session. Do them roughly in order — early items de-risk later ones. Nothing here is started; this is the menu.*
 
+*Status updates through 2026-07-18. The 2026-07-18 session also landed off-menu work found by review, not listed as a chunk: atomic model extract+swap with zero-byte-install detection, cancellable/stall-aware model download with disk preflight, O(1) DSP window sums (equivalence-tested), the Silero 46-byte-WAV-header fix, and an uninstall running-app check — see HEALTH.md's 2026-07-18 block.*
+
 **Golden rule for every chunk below:** the app has paying users. Behavior must not change unless a chunk explicitly says so. Build a way to *observe* the behavior before you change it.
 
 ---
@@ -13,8 +15,8 @@ Not a coding session; just stop active bleeding.
 3. **Confirm prod DB migration state** (`prisma migrate status`) matches `schema.prisma`.
 *Value: very high. Risk: low. These are checks + a key rotation, not refactors.*
 
-## Chunk 1 — Test safety net around what users depend on most ⭐ ~~START HERE~~ **DONE 2026-07-17** (except AutoPaste characterization — deliberately skipped, it would fire real keystrokes; zombie deletion done same day. Suite: 291 passed / 22 skipped.)
-The core transcription path has **zero active tests** (HEALTH.md #4). Before touching any desktop code, build coverage for the flow users actually pay for.
+## Chunk 1 — Test safety net around what users depend on most ⭐ ~~START HERE~~ **DONE 2026-07-17** (except AutoPaste characterization — deliberately skipped, it would fire real keystrokes; zombie deletion done same day. Suite: 291 passed / 22 skipped.) **Completed 2026-07-18:** the functional-coverage bullet fully landed — `TranscriptionServiceTests` +17 active tests with real Parakeet decodes, new `ModelResolverServiceTests` (9), `AudioPipelineTests`' record→transcribe half revived off its dead GGML gate onto the shared model fixture, mic/model environment guards for bare CI runners, and the first push-triggered CI run is green. Suite: 316 passed / 0 failed / 22 skipped.
+The core transcription path ~~has~~ had **zero active tests** (HEALTH.md #4 — **now false**, resolved 2026-07-17/18). Before touching any desktop code, build coverage for the flow users actually pay for.
 - Add a functional test for `PersistentWhisperService`: given a known WAV + the Parakeet model present, assert non-empty transcription (gate on model presence like the old tests, but assert *real output*, not early-return-to-green).
 - Cover the `AudioRecorder → VAD → temp WAV → AudioFileReady` handoff.
 - Characterize the `AutoPaste` true/false branch in `TextInjector` (the GPHealth-critical path) with a fake injection target.
