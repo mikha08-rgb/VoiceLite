@@ -10,9 +10,8 @@ datasource db {
 
 model License {
   id                    String              @id @default(cuid())
-  // Nullable to match prod: migration 20251025_make_userid_optional dropped NOT NULL
-  // (licenses are created from Stripe webhooks; userId is set today but not guaranteed)
-  userId                String?
+  // Prod column is NOT NULL and code always sets userId when creating a License.
+  userId                String
   licenseKey            String              @unique
   type                  LicenseType
   status                LicenseStatus       @default(ACTIVE)
@@ -25,7 +24,7 @@ model License {
   updatedAt             DateTime            @default(now()) @updatedAt
   email                 String              @default("")
   lastEmailSentAt       DateTime?           // Track last email send to prevent spam
-  User                  User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   events                LicenseEvent[]
   activations           LicenseActivation[]
 
@@ -86,28 +85,11 @@ model WebhookEvent {
 }
 
 model User {
-  id           String         @id
-  email        String         @unique
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @default(now())
-  License      License[]
-  UserActivity UserActivity[]
-}
-
-model UserActivity {
-  id           String       @id
-  userId       String?
-  activityType ActivityType
-  metadata     String?
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime     @default(now())
-  User         User?        @relation(fields: [userId], references: [id])
-
-  @@index([activityType])
-  @@index([createdAt])
-  @@index([userId])
-  @@index([userId, activityType])
+  id        String    @id
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now())
+  License   License[]
 }
 
 enum LicenseType {
@@ -124,19 +106,6 @@ enum LicenseStatus {
 enum LicenseActivationStatus {
   ACTIVE
   BLOCKED
-}
-
-enum ActivityType {
-  USER_REGISTERED
-  USER_LOGIN
-  USER_LOGOUT
-  CHECKOUT_STARTED
-  CHECKOUT_COMPLETED
-  LICENSE_ISSUED
-  LICENSE_ACTIVATED
-  LICENSE_DEACTIVATED
-  LICENSE_RENEWED
-  FEEDBACK_SUBMITTED
 }
 
 // Feedback submission enums
