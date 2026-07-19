@@ -12,8 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "test:email": "tsx scripts/test-email.ts",
-    "check:licenses": "tsx scripts/check-recent-licenses.ts"
+    "test:email": "tsx scripts/test-email.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
