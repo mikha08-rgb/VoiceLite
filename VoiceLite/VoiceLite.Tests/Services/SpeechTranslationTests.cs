@@ -74,6 +74,33 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void EffectiveTranslateToEnglish_FreeUser_IsFalse_EvenWhenEnabledInSettings()
+        {
+            var settings = new Settings
+            {
+                IsProLicense = false,
+                TranslateToEnglish = true
+            };
+            using var service = new TranscriptionService(settings);
+
+            service.EffectiveTranslateToEnglish.Should().BeFalse(
+                "Free tier must fall back to normal Parakeet transcription");
+        }
+
+        [Fact]
+        public void EffectiveTranslateToEnglish_ProUser_ReflectsTheSetting()
+        {
+            var settings = new Settings
+            {
+                IsProLicense = true,
+                TranslateToEnglish = true
+            };
+            using var service = new TranscriptionService(settings);
+
+            service.EffectiveTranslateToEnglish.Should().BeTrue();
+        }
+
+        [Fact]
         public void DownloadEndpoint_ResolvesTranslationModelBundle()
         {
             DownloadEndpoints.GetUrlForFileName(TranslationModelResolverService.ModelId)
@@ -131,6 +158,7 @@ namespace VoiceLite.Tests.Services
 
             var settings = new Settings
             {
+                IsProLicense = true, // Translation is Pro-gated
                 TranslateToEnglish = true,
                 TranslationSourceLanguage = sourceLanguage
             };

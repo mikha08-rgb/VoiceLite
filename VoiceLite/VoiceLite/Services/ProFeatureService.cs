@@ -59,6 +59,13 @@ namespace VoiceLite.Services
         public Visibility CustomDictionaryTabVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
 
         /// <summary>
+        /// Translate to English (Canary add-on model) — Pro feature. The runtime gate
+        /// lives in TranscriptionService.EffectiveTranslateToEnglish; this only controls
+        /// the Settings UI.
+        /// </summary>
+        public Visibility SpeechTranslationVisibility => IsProUser ? Visibility.Visible : Visibility.Collapsed;
+
+        /// <summary>
         /// Advanced Settings - Reserved for future Pro feature.
         /// Visibility infrastructure ready for transcription parameter fine-tuning (beam size, temperature).
         /// </summary>

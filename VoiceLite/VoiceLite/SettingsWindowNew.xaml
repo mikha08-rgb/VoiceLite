@@ -123,8 +123,8 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <!-- Optional offline speech translation -->
-                        <GroupBox Header="Translate to English" Margin="0,0,0,15">
+                        <!-- Optional offline speech translation (Pro) -->
+                        <GroupBox Name="TranslationGroupBox" Header="Translate to English (Pro)" Margin="0,0,0,15">
                             <StackPanel Margin="10">
                                 <CheckBox Name="TranslateToEnglishCheckBox"
                                           Content="Translate my speech to English"

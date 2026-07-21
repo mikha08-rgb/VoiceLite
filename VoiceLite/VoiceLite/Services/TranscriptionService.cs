@@ -49,6 +49,12 @@ namespace VoiceLite.Services
         internal IReadOnlyList<CustomDictionaryEntry>? EffectiveCustomDictionary =>
             proFeatureService.IsProUser ? settings.CustomDictionary : null;
 
+        // Translate-to-English is Pro-gated the same way: the Settings toggle is hidden
+        // for Free tier, and this runtime check makes a hand-edited settings.json fall
+        // back to normal Parakeet transcription instead of unlocking translation.
+        internal bool EffectiveTranslateToEnglish =>
+            proFeatureService.IsProUser && settings.TranslateToEnglish;
+
         private volatile bool isDisposed = false;
         private volatile bool isProcessing = false;
 
@@ -92,7 +98,7 @@ namespace VoiceLite.Services
                     if (isDisposed)
                         return;
 
-                    var translateToEnglish = settings.TranslateToEnglish;
+                    var translateToEnglish = EffectiveTranslateToEnglish;
                     var modelDir = translateToEnglish
                         ? this.translationModelResolver.ResolveModelPath()
                         : this.modelResolver.ResolveModelPath();
@@ -271,7 +277,7 @@ namespace VoiceLite.Services
             using var stream = new MemoryStream(audioData);
             return await TranscribeFromStreamAsync(
                 stream,
-                translateToEnglish: settings.TranslateToEnglish,
+                translateToEnglish: EffectiveTranslateToEnglish,
                 translationSourceLanguage: settings.TranslationSourceLanguage);
         }
 
@@ -281,7 +287,7 @@ namespace VoiceLite.Services
             if (!ValidateAudioFile(audioFilePath))
                 return string.Empty;
 
-            var translateToEnglish = settings.TranslateToEnglish;
+            var translateToEnglish = EffectiveTranslateToEnglish;
             var modelDir = translateToEnglish
                 ? translationModelResolver.ResolveModelPath()
                 : modelResolver.ResolveModelPath();
@@ -513,13 +519,13 @@ namespace VoiceLite.Services
         {
             try
             {
-                var modelDir = settings.TranslateToEnglish
+                var modelDir = EffectiveTranslateToEnglish
                     ? translationModelResolver.ResolveModelPath()
                     : modelResolver.ResolveModelPath();
                 if (string.IsNullOrEmpty(modelDir) || !Directory.Exists(modelDir))
                 {
                     TranscriptionError?.Invoke(this, new DirectoryNotFoundException(
-                        settings.TranslateToEnglish
+                        EffectiveTranslateToEnglish
                             ? "Translation model directory not found"
                             : "Parakeet model directory not found"));
                     return false;
@@ -537,7 +543,7 @@ namespace VoiceLite.Services
         {
             try
             {
-                var engine = settings.TranslateToEnglish
+                var engine = EffectiveTranslateToEnglish
                     ? "Canary 180M Flash Translation"
                     : "Parakeet TDT v3";
                 return $"Sherpa-ONNX {typeof(OfflineRecognizer).Assembly.GetName().Version} ({engine})";

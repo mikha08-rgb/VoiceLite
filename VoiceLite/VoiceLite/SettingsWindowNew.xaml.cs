@@ -91,7 +91,7 @@ namespace VoiceLite
                 ModelDownloadControl?.Initialize(
                     settings,
                     () => saveSettingsCallback?.Invoke(),
-                    includeTranslationModel: true);
+                    includeTranslationModel: proFeatureService?.IsProUser == true);
 
                 // Load Custom Shortcuts
                 LoadShortcuts();
@@ -144,6 +144,9 @@ namespace VoiceLite
 
             // Custom Dictionary tab — Pro-only feature
             CustomDictionaryTab.Visibility = proFeatureService.CustomDictionaryTabVisibility;
+
+            // Translate to English — Pro-only feature (runtime gate in TranscriptionService)
+            TranslationGroupBox.Visibility = proFeatureService.SpeechTranslationVisibility;
 
             // Future: Add more Pro feature visibility controls here
             // Example:
@@ -473,6 +476,11 @@ namespace VoiceLite
 
         private bool CanSaveTranslationSettings()
         {
+            // Free tier: the toggle is hidden and the runtime gate ignores the setting,
+            // so never block saving (a hand-edited settings.json could leave it checked).
+            if (proFeatureService?.IsProUser != true)
+                return true;
+
             if (TranslateToEnglishCheckBox.IsChecked != true ||
                 new TranslationModelResolverService().IsModelInstalled())
             {
@@ -520,7 +528,7 @@ namespace VoiceLite
             ModelDownloadControl?.Initialize(
                 settings,
                 () => saveSettingsCallback?.Invoke(),
-                includeTranslationModel: true);
+                includeTranslationModel: proFeatureService?.IsProUser == true);
         }
 
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
@@ -593,7 +601,7 @@ namespace VoiceLite
                     ModelDownloadControl?.Initialize(
                         settings,
                         () => saveSettingsCallback?.Invoke(),
-                        includeTranslationModel: true);
+                        includeTranslationModel: proFeatureService?.IsProUser == true);
 
                     // Show success message
                     MessageBox.Show(

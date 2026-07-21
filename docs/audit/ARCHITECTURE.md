@@ -31,7 +31,7 @@ No DI container. `App.xaml.cs` runs a 3-stage startup gate, then `new MainWindow
 
 | Service | Role | Note |
 |---|---|---|
-| `TranscriptionService` | In-process speech recognition via Parakeet, or opt-in speech-to-English translation via Canary 180M Flash. | Both paths use Sherpa-ONNX `OfflineRecognizer`; translation is off by default. |
+| `TranscriptionService` | In-process speech recognition via Parakeet, or opt-in speech-to-English translation via Canary 180M Flash. | Both paths use Sherpa-ONNX `OfflineRecognizer`; translation is off by default and Pro-gated (`EffectiveTranslateToEnglish`). |
 | `ModelResolverService` | Probes 3 dirs for the 4 Parakeet ONNX files. | `modelName` param is dead. |
 | `TranslationModelResolverService` | Probes for the optional 3-file Canary int8 model. | Spanish/French/German → English; downloaded only when enabled. |
 | `AudioRecorder` | NAudio 16k/mono capture → memory buffer → preprocessing + VAD → temp WAV. | Preprocessing/VAD live **here**, not in the whisper service. |

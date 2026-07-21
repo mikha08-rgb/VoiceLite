@@ -28,7 +28,7 @@ VoiceLite v2.0 uses **Parakeet TDT 0.6B v3** (~640MB), an NVIDIA transducer mode
 
 The model isn't bundled with the installer. On first launch, VoiceLite downloads it from GitHub Releases and extracts it to `%LocalAppData%\VoiceLite\models\parakeet-v3\`.
 
-Settings also includes an opt-in **Translate to English** mode. It uses NVIDIA Canary 180M Flash to translate Spanish, French, or German speech directly to English on-device. Its separate ~154MB int8 model downloads only when requested.
+Settings also includes an opt-in **Translate to English** mode (Pro). It uses NVIDIA Canary 180M Flash to translate Spanish, French, or German speech directly to English on-device. Its separate ~154MB int8 model downloads only when requested.
 
 ## Features
 
@@ -41,7 +41,7 @@ Settings also includes an opt-in **Translate to English** mode. It uses NVIDIA C
 
 **Offline?** Yes, 100%. Voice never leaves your PC.
 
-**Languages?** Parakeet automatically recognizes 25 European languages. The optional Translate to English mode currently accepts Spanish, French, or German speech.
+**Languages?** Parakeet automatically recognizes 25 European languages. The optional Translate to English mode (Pro) currently accepts Spanish, French, or German speech.
 
 **Works in games?** Yes. Use windowed mode if fullscreen blocks hotkey.
 

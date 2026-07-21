@@ -1491,7 +1491,7 @@ namespace VoiceLite
                             Text = processedText,           // Processed text (what user sees)
                             OriginalText = transcription,   // Original engine output (for re-injection)
                             Timestamp = DateTime.Now,
-                            ModelUsed = settings.TranslateToEnglish
+                            ModelUsed = transcriptionService?.EffectiveTranslateToEnglish == true
                                 ? TranslationModelResolverService.ModelId
                                 : settings.TranscriptionModel
                         };
@@ -1583,7 +1583,7 @@ namespace VoiceLite
                     (ex is FileNotFoundException or DirectoryNotFoundException or InvalidOperationException
                         && ex.Message.Contains("model", StringComparison.OrdinalIgnoreCase))
                     ? ex.Message
-                    : settings.TranslateToEnglish
+                    : transcriptionService?.EffectiveTranslateToEnglish == true
                         ? "Translation error"
                         : "Transcription error";
 
