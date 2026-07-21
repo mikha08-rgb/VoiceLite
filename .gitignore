@@ -28,9 +28,12 @@ nul
 whisper/*.exe
 whisper/*.dll
 
-# Tooling artifacts
+# Tooling artifacts (agent scratch dirs/instructions; tracked .claude files predate this rule)
 VoiceLite/.claude/
 .serena/
+.claude/
+.codex/
+AGENTS.md
 
 # Sensitive files - NEVER commit these!
 license-keys.txt
