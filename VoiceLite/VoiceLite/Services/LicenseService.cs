@@ -114,11 +114,15 @@ namespace VoiceLite.Services
         // HIGH-5 FIX: Add entropy for stronger DPAPI encryption
         private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("VoiceLite-License-v1");
 
-        private static readonly string LicenseFilePath = Path.Combine(
+        private static string DefaultAppDataDirectory => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "VoiceLite",
-            "license.dat"
+            "VoiceLite"
         );
+
+        // Instance paths so tests can point a LicenseService at an isolated directory
+        // (see internal ctor below). Production always uses DefaultAppDataDirectory.
+        private readonly string _licenseFilePath;
+        private readonly string _settingsFilePath;
 
         public event EventHandler<bool>? LicenseStatusChanged;
 
@@ -128,9 +132,21 @@ namespace VoiceLite.Services
             _httpClient.BaseAddress = new Uri("https://voicelite.app/");
         }
 
-        public LicenseService()
+        public LicenseService() : this(DefaultAppDataDirectory)
+        {
+        }
+
+        /// <summary>
+        /// TEST SEAM: the entitlement cold-start regression tests pass an isolated
+        /// directory so they never read or destroy the developer's real
+        /// %LOCALAPPDATA%\VoiceLite\license.dat (see LicenseFileGuard history).
+        /// Production code must only use the parameterless ctor.
+        /// </summary>
+        internal LicenseService(string appDataDirectory)
         {
             _apiBaseUrl = "https://voicelite.app";
+            _licenseFilePath = Path.Combine(appDataDirectory, "license.dat");
+            _settingsFilePath = Path.Combine(appDataDirectory, "settings.json");
 
             // SECURITY FIX (LICENSE-ENC-001): Auto-load encrypted license key on startup
             LoadLicenseKey();
@@ -422,14 +438,14 @@ namespace VoiceLite.Services
                 );
 
                 // Ensure directory exists
-                string? directory = Path.GetDirectoryName(LicenseFilePath);
+                string? directory = Path.GetDirectoryName(_licenseFilePath);
                 if (!string.IsNullOrEmpty(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
 
                 // Write encrypted bytes to file
-                File.WriteAllBytes(LicenseFilePath, encryptedBytes);
+                File.WriteAllBytes(_licenseFilePath, encryptedBytes);
 
                 ErrorLogger.LogMessage($"License key saved securely (encrypted with DPAPI, email={!string.IsNullOrEmpty(email)})");
             }
@@ -454,9 +470,9 @@ namespace VoiceLite.Services
             try
             {
                 // If encrypted license file exists, load it
-                if (File.Exists(LicenseFilePath))
+                if (File.Exists(_licenseFilePath))
                 {
-                    byte[] encryptedBytes = File.ReadAllBytes(LicenseFilePath);
+                    byte[] encryptedBytes = File.ReadAllBytes(_licenseFilePath);
                     byte[] plaintextBytes;
 
                     // HIGH-5 FIX: Try new entropy first, fall back to old (null) for migration
@@ -503,11 +519,7 @@ namespace VoiceLite.Services
                 {
                     // MIGRATION PATH: Check if plaintext license exists in settings.json
                     // This handles upgrade from v1.2.0 (no encryption) to v1.2.1 (DPAPI encryption)
-                    var settingsPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "VoiceLite",
-                        "settings.json"
-                    );
+                    var settingsPath = _settingsFilePath;
 
                     if (File.Exists(settingsPath))
                     {
@@ -573,9 +585,9 @@ namespace VoiceLite.Services
             // SECURITY FIX (LICENSE-ENC-001): Delete encrypted license file
             try
             {
-                if (File.Exists(LicenseFilePath))
+                if (File.Exists(_licenseFilePath))
                 {
-                    File.Delete(LicenseFilePath);
+                    File.Delete(_licenseFilePath);
                     ErrorLogger.LogMessage("Encrypted license file deleted");
                 }
             }

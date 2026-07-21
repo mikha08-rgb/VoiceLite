@@ -58,8 +58,48 @@ namespace VoiceLite.Services
         private volatile bool isDisposed = false;
         private volatile bool isProcessing = false;
 
+        // LIFECYCLE FIX: OfflineRecognizer.Decode is blocking native code and cannot be
+        // interrupted once it starts — a cancellation token only prevents work that hasn't
+        // begun. A dictation the UI already gave up on (stuck-state timeout, shutdown, a
+        // newer dictation) can therefore still complete minutes later. Each dictation is
+        // stamped with a session id; expiring the sessions makes every outstanding id
+        // stale so the caller can discard the late result instead of injecting it.
+        private long dictationSessionCounter;
+
+        // Coordinates Dispose() with an in-flight decode that outlives the bounded wait:
+        // when set, the semaphore holder — not Dispose — frees the native resources after
+        // its decode completes. Both the deferral decision and the semaphore release
+        // happen under this lock so the handoff cannot be missed.
+        private readonly object disposalCoordinationLock = new();
+        private bool recognizerDisposalDeferred; // guarded by disposalCoordinationLock
+
+        // Test seams: the 5s production wait would make the deferred-disposal tests crawl,
+        // and tests must be able to drain the warm-up task (it contends for the
+        // transcription slot) before manipulating the slot themselves.
+        internal TimeSpan DisposeWaitTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        internal Task WarmupTask { get; }
+        internal bool IsRecognizerDisposalDeferred
+        {
+            get { lock (disposalCoordinationLock) { return recognizerDisposalDeferred; } }
+        }
+
         public bool IsProcessing => isProcessing;
         public event EventHandler<Exception>? TranscriptionError;
+
+        /// <summary>
+        /// Starts a new dictation session and returns its id. Implicitly expires every
+        /// earlier session: only the newest dictation's result may be consumed.
+        /// </summary>
+        public long BeginDictationSession() => Interlocked.Increment(ref dictationSessionCounter);
+
+        /// <summary>
+        /// Expires all outstanding dictation sessions (stuck-state timeout, shutdown).
+        /// Results carrying an expired id must be discarded by the caller.
+        /// </summary>
+        public void ExpireDictationSessions() => Interlocked.Increment(ref dictationSessionCounter);
+
+        public bool IsDictationSessionCurrent(long sessionId) =>
+            Interlocked.Read(ref dictationSessionCounter) == sessionId;
 
         public TranscriptionService(
             Settings settings,
@@ -80,7 +120,7 @@ namespace VoiceLite.Services
             // Errors here are logged but non-fatal — the first transcribe call will retry.
             // Runs under transcriptionSemaphore: a late-scheduled warm-up must not observe a
             // changed preset and dispose/rebuild the recognizer while a Decode is in flight.
-            _ = Task.Run(async () =>
+            WarmupTask = Task.Run(async () =>
             {
                 bool semaphoreAcquired = false;
                 try
@@ -115,19 +155,54 @@ namespace VoiceLite.Services
                 {
                     if (semaphoreAcquired)
                     {
-                        try
-                        {
-                            transcriptionSemaphore.Release();
-                        }
-                        catch (ObjectDisposedException) { }
-                        catch (SemaphoreFullException)
-                        {
-                            ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
-                        }
+                        ReleaseTranscriptionSlot();
                     }
                 }
             });
         }
+
+        /// <summary>
+        /// Releases the transcription semaphore — or, when Dispose() timed out waiting for
+        /// this holder and deferred disposal, frees the native resources instead. The
+        /// decision and the release are atomic under disposalCoordinationLock so the
+        /// handoff with Dispose() cannot fall through the gap (which would leak the
+        /// native recognizer for the process lifetime).
+        /// </summary>
+        private void ReleaseTranscriptionSlot()
+        {
+            bool completeDeferredDisposal = false;
+            lock (disposalCoordinationLock)
+            {
+                if (recognizerDisposalDeferred)
+                {
+                    recognizerDisposalDeferred = false;
+                    completeDeferredDisposal = true;
+                }
+                else
+                {
+                    try
+                    {
+                        transcriptionSemaphore.Release();
+                    }
+                    catch (ObjectDisposedException) { }
+                    catch (SemaphoreFullException)
+                    {
+                        ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
+                    }
+                }
+            }
+
+            if (completeDeferredDisposal)
+            {
+                ErrorLogger.LogWarning("Deferred disposal: in-flight decode finished after Dispose - freeing native resources now");
+                DisposeNativeResources();
+            }
+        }
+
+        // Test seams for the deferred-disposal handoff: simulate an in-flight decode
+        // holding the semaphore without needing the native model loaded.
+        internal void AcquireTranscriptionSlotForTest() => transcriptionSemaphore.Wait();
+        internal void ReleaseTranscriptionSlotForTest() => ReleaseTranscriptionSlot();
 
         private void EnsureRecognizerLoaded(
             string modelDir,
@@ -395,6 +470,11 @@ namespace VoiceLite.Services
 
                 // OfflineRecognizer.Decode is blocking native code — wrap in Task.Run
                 // so the UI thread (which calls us via async void OnAudioFileReady) doesn't freeze.
+                // NON-CANCELLABLE: the token only prevents the decode from STARTING after the
+                // timeout; once Decode is running nothing can interrupt it, so this await holds
+                // the semaphore until the native call actually returns (never abandon the task —
+                // the recognizer must not be disposed under a live Decode). A result that arrives
+                // after the UI gave up is discarded via the dictation session id in MainWindow.
                 string rawResult = await Task.Run(() =>
                 {
                     using var sherpaStream = rec.CreateStream();
@@ -458,15 +538,7 @@ namespace VoiceLite.Services
             {
                 if (semaphoreAcquired)
                 {
-                    try
-                    {
-                        transcriptionSemaphore.Release();
-                    }
-                    catch (ObjectDisposedException) { }
-                    catch (SemaphoreFullException)
-                    {
-                        ErrorLogger.LogWarning("Attempted to release semaphore that wasn't acquired");
-                    }
+                    ReleaseTranscriptionSlot();
                 }
             }
         }
@@ -561,6 +633,10 @@ namespace VoiceLite.Services
 
             isDisposed = true;
 
+            // Any dictation whose result has not been consumed yet is now stale — a decode
+            // finishing during/after shutdown must never be injected.
+            ExpireDictationSessions();
+
             lock (ctsLock)
             {
                 try { transcriptionCts.Cancel(); }
@@ -571,19 +647,50 @@ namespace VoiceLite.Services
             // call (on a captured ref that holds no lock). Wait (bounded) for them to finish
             // so we don't free the recognizer mid-Decode (native use-after-free). Cancel above
             // already ran, so pending waiters exit instead of starting new work. No Release —
-            // the semaphore is disposed below.
+            // the semaphore is disposed in DisposeNativeResources.
+            bool decodeSlotAcquired = false;
             try
             {
-                if (!transcriptionSemaphore.Wait(TimeSpan.FromSeconds(5)))
-                {
-                    ErrorLogger.LogWarning("Dispose: timed out waiting for in-flight transcription; disposing recognizer anyway");
-                }
+                decodeSlotAcquired = transcriptionSemaphore.Wait(DisposeWaitTimeout);
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogDebug($"Dispose: semaphore wait failed: {ex.Message}");
             }
 
+            if (!decodeSlotAcquired)
+            {
+                lock (disposalCoordinationLock)
+                {
+                    // Retry under the lock: ReleaseTranscriptionSlot releases under this same
+                    // lock, so a decode that finished between the timed wait above and here
+                    // cannot slip past — either we acquire now, or the deferral flag is
+                    // guaranteed to be seen by the holder's release.
+                    try { decodeSlotAcquired = transcriptionSemaphore.Wait(TimeSpan.Zero); }
+                    catch (Exception ex) { ErrorLogger.LogDebug($"Dispose: semaphore retry failed: {ex.Message}"); }
+
+                    if (!decodeSlotAcquired)
+                    {
+                        recognizerDisposalDeferred = true;
+                    }
+                }
+            }
+
+            if (!decodeSlotAcquired)
+            {
+                // NATIVE SAFETY: never dispose OfflineRecognizer while Decode may still be
+                // running on it — that is a native use-after-free (hard crash, no managed
+                // exception). The in-flight holder frees everything in ReleaseTranscriptionSlot
+                // when its decode completes; isDisposed already blocks new transcriptions.
+                ErrorLogger.LogWarning("Dispose: decode still in flight after bounded wait - deferring native disposal until it completes");
+                return;
+            }
+
+            DisposeNativeResources();
+        }
+
+        private void DisposeNativeResources()
+        {
             lock (recognizerLock)
             {
                 try { recognizer?.Dispose(); }

@@ -66,8 +66,11 @@ jobs:
     - name: Check TypeScript types
       run: npm run build
 
+    - name: Run webhook tests
+      run: npm test
+
     - name: Lint code
       run: npm run lint --if-present || echo "No lint script found, skipping..."
 
     - name: Security audit
-      run: npm audit --audit-level=high || echo "Audit found high severity vulnerabilities - review required"
+      run: npm audit --omit=dev --audit-level=high

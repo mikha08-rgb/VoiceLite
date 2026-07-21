@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ipAddress } from '@vercel/edge';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit, emailResendRateLimit, fallbackEmailResendLimit } from '@/lib/ratelimit';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { recordLicenseEvent } from '@/lib/licensing';
+import { logger } from '@/lib/logger';
 
 const bodySchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -16,6 +18,8 @@ const bodySchema = z.object({
  * Rate limited to prevent enumeration and spam.
  */
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') ?? randomUUID();
+
   try {
     const body = await request.json();
     const { email } = bodySchema.parse(body);
@@ -53,7 +57,7 @@ export async function POST(request: NextRequest) {
     const successMessage = 'If a license exists for this email, you will receive it shortly. Please check your spam folder.';
 
     if (!license) {
-      console.log(`📧 License retrieval: No license found for ${normalizedEmail}`);
+      logger.info('License retrieval found no matching license', { requestId });
       // Don't reveal that no license exists
       return NextResponse.json({ success: true, message: successMessage });
     }
@@ -62,10 +66,16 @@ export async function POST(request: NextRequest) {
     const emailResult = await sendLicenseEmail({
       email: license.email,
       licenseKey: license.licenseKey,
+      licenseId: license.id,
+      requestId,
     });
 
     if (emailResult.success) {
-      console.log(`✅ License retrieved and sent to ${normalizedEmail}`);
+      logger.info('License retrieval email sent', {
+        requestId,
+        licenseId: license.id,
+        messageId: emailResult.messageId,
+      });
       await recordLicenseEvent(license.id, 'email_resent', {
         email: license.email,
         messageId: emailResult.messageId,
@@ -73,7 +83,10 @@ export async function POST(request: NextRequest) {
         ip,
       });
     } else {
-      console.error(`❌ Failed to send license retrieval email to ${normalizedEmail}:`, emailResult.error);
+      logger.error('Failed to send license retrieval email', emailResult.error, {
+        requestId,
+        licenseId: license.id,
+      });
       await recordLicenseEvent(license.id, 'email_failed', {
         email: license.email,
         error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
@@ -88,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    console.error('License retrieval failed:', error);
+    logger.error('License retrieval failed', error, { requestId });
     return NextResponse.json({ error: 'Unable to process request' }, { status: 500 });
   }
 }

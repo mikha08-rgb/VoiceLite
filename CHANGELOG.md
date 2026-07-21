@@ -4,6 +4,17 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.4.1] - 2026-07-21
+
+### Fixed
+- **Pro license no longer resets to Free on a cold start** — settings loaded before the stored license was read, so a fresh launch wiped the Pro tier and could permanently destroy a legacy license key.
+- Payment webhook: failed license fulfillment is retried instead of silently dropped, and a partial refund no longer revokes the license (only a full refund does).
+- A dictation that timed out can no longer paste its text minutes later into whatever window happens to be focused.
+- Fixed a shutdown crash when the app closed mid-transcription.
+- Settings Cancel actually cancels — the dialog edits a draft and applies changes only on Save/Apply.
+- Speech model downloads are verified and installed atomically, so an interrupted download can't corrupt the active model.
+- Device fingerprint fallback is persisted when WMI fails, so repeat launches no longer burn the 3-device activation limit.
+
 ## [2.4.0] - 2026-07-20
 
 ### Added
