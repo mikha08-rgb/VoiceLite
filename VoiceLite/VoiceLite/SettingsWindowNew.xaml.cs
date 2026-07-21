@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,7 +17,17 @@ namespace VoiceLite
 {
     public partial class SettingsWindowNew : Window
     {
-        private Settings settings;
+        // DRAFT FIX: `settings` is a CLONE edited by every control in this window; the
+        // live instance (shared with every running service) changes only when Save/Apply
+        // commits the draft. Before this, hotkey edits were written to the live instance
+        // on focus loss — the in-memory setting changed while the registered hotkey kept
+        // the old combination until restart, and Cancel didn't cancel anything.
+        // Explicitly immediate actions bypass the draft on purpose: model installation
+        // (ModelDownloadControl writes the live instance and persists at once) and
+        // license activation (the DPAPI key is already written when it succeeds).
+        private readonly Settings liveSettings;
+        private Settings settings; // draft
+        private bool changesCommitted; // true once any Apply/Save copied the draft to live
         private bool isCapturingHotkey = false;
         private Key capturedKey = Key.None;
         private ModifierKeys capturedModifiers = ModifierKeys.None;
@@ -26,12 +37,20 @@ namespace VoiceLite
         private LicenseService? licenseService;
         private ProFeatureService? proFeatureService;
 
-        public Settings Settings => settings;
+        // The live instance — after Save/Apply it carries the committed values, so
+        // MainWindow's post-dialog handling (validate, persist, re-register hotkey)
+        // keeps working on the same object every service already references.
+        public Settings Settings => liveSettings;
+
+        // Lets MainWindow apply committed changes even when the dialog is closed via
+        // Cancel/X after an Apply (DialogResult alone would discard them).
+        public bool ChangesCommitted => changesCommitted;
 
         public SettingsWindowNew(Settings currentSettings, Action? onTestRecording = null, Action? onSaveSettings = null)
         {
             InitializeComponent();
-            settings = currentSettings ?? new Settings();
+            liveSettings = currentSettings ?? new Settings();
+            settings = CloneForDraft(liveSettings);
             testRecordingCallback = onTestRecording;
             saveSettingsCallback = onSaveSettings; // Store save callback
             originalModel = settings.TranscriptionModel;
@@ -40,6 +59,65 @@ namespace VoiceLite
 
             LoadSettings();
             LoadVersionInfo();
+        }
+
+        /// <summary>
+        /// Snapshot of the live settings for this dialog to edit. JSON round-trip: same
+        /// serialization the app persists with, so every saved field is covered and the
+        /// clone owns independent collection instances (and its own SyncRoot).
+        /// Internal static for the draft-semantics regression tests.
+        /// </summary>
+        internal static Settings CloneForDraft(Settings source)
+        {
+            lock (source.SyncRoot)
+            {
+                var json = JsonSerializer.Serialize(source);
+                return JsonSerializer.Deserialize<Settings>(json) ?? new Settings();
+            }
+        }
+
+        /// <summary>
+        /// Copies ONLY the fields this window edits from the draft to the live instance.
+        /// A whitelist, not a full overwrite: state mutated outside the dialog while it is
+        /// open must survive — TranscriptionHistory grows when the user dictates over the
+        /// dialog (global hotkey), and TranscriptionModel is written by the immediate-mode
+        /// model installer. Collections are deep-copied because the draft stays editable
+        /// after an Apply. Internal static for the draft-semantics regression tests.
+        /// </summary>
+        internal static void CommitDraft(Settings draft, Settings live)
+        {
+            lock (live.SyncRoot)
+            {
+                live.RecordHotkey = draft.RecordHotkey;
+                live.HotkeyModifiers = draft.HotkeyModifiers;
+                live.Mode = draft.Mode;
+                live.MinimizeToTray = draft.MinimizeToTray;
+                live.CheckForUpdates = draft.CheckForUpdates;
+                live.TranscriptionPreset = draft.TranscriptionPreset;
+                live.EnableVAD = draft.EnableVAD;
+                live.TranslateToEnglish = draft.TranslateToEnglish;
+                live.TranslationSourceLanguage = draft.TranslationSourceLanguage;
+                live.AutoPaste = draft.AutoPaste;
+                live.SelectedMicrophoneIndex = draft.SelectedMicrophoneIndex;
+                live.SelectedMicrophoneName = draft.SelectedMicrophoneName;
+                live.CustomShortcuts = draft.CustomShortcuts
+                    .Select(s => new CustomShortcut
+                    {
+                        Id = s.Id,
+                        Trigger = s.Trigger,
+                        Replacement = s.Replacement,
+                        IsEnabled = s.IsEnabled,
+                        CreatedAt = s.CreatedAt,
+                    })
+                    .ToList();
+                live.CustomDictionary = draft.CustomDictionary
+                    .Select(e => new CustomDictionaryEntry
+                    {
+                        Spoken = e.Spoken,
+                        Written = e.Written,
+                    })
+                    .ToList();
+            }
         }
 
         private void LoadSettings()
@@ -88,8 +166,11 @@ namespace VoiceLite
 
                 // Initialize Model Download Control (applies Pro gating for both free and Pro users)
                 // CRITICAL FIX: Must initialize for ALL users to apply visibility gating
+                // DRAFT FIX: model installation is explicitly immediate — it goes through the
+                // headless ModelInstaller, writes the LIVE settings, and persists at once, so
+                // an install performed while this dialog is open survives Cancel.
                 ModelDownloadControl?.Initialize(
-                    settings,
+                    liveSettings,
                     () => saveSettingsCallback?.Invoke(),
                     includeTranslationModel: proFeatureService?.IsProUser == true);
 
@@ -352,7 +433,9 @@ namespace VoiceLite
             if (!CanSaveTranslationSettings())
                 return;
 
-            SaveSettings();
+            SaveSettings();                      // UI → draft
+            CommitDraft(settings, liveSettings); // draft → live (DRAFT FIX)
+            changesCommitted = true;
             saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
             StatusText.Text = "Settings applied successfully";
         }
@@ -362,7 +445,9 @@ namespace VoiceLite
             if (!CanSaveTranslationSettings())
                 return;
 
-            SaveSettings();
+            SaveSettings();                      // UI → draft
+            CommitDraft(settings, liveSettings); // draft → live (DRAFT FIX)
+            changesCommitted = true;
             saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
 
             // Track analytics if enabled
@@ -374,6 +459,9 @@ namespace VoiceLite
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
+            // DRAFT FIX: nothing to undo — the draft is simply discarded. Live settings
+            // (and the registered hotkey) were never touched unless Apply/Save committed;
+            // MainWindow checks ChangesCommitted for the Apply-then-Cancel case.
             DialogResult = false;
             Close();
         }
@@ -525,8 +613,9 @@ namespace VoiceLite
 
             window.ShowDialog();
             UpdateTranslationControls();
+            // DRAFT FIX: immediate-mode — see the Initialize call in LoadSettings.
             ModelDownloadControl?.Initialize(
-                settings,
+                liveSettings,
                 () => saveSettingsCallback?.Invoke(),
                 includeTranslationModel: proFeatureService?.IsProUser == true);
         }
@@ -586,7 +675,14 @@ namespace VoiceLite
                     // Activate license — DPAPI-encrypted license.dat is the only key store.
                     // settings.IsProLicense persists the user's tier; the key itself lives in DPAPI.
                     licenseService?.SaveLicenseKey(key);
+                    // DRAFT FIX: activation is explicitly immediate (the DPAPI key is already
+                    // written) — it must survive Cancel, so write the LIVE settings and persist
+                    // now. The draft copy keeps this dialog's Pro gating in sync.
                     settings.IsProLicense = true;
+                    lock (liveSettings.SyncRoot)
+                    {
+                        liveSettings.IsProLicense = true;
+                    }
 
                     // Save settings immediately
                     saveSettingsCallback?.Invoke();
@@ -598,8 +694,9 @@ namespace VoiceLite
                     UpdateProFeatureVisibility();
 
                     // CRIT-4 FIX: Initialize Model Download Control with null check (consistent with line 93)
+                    // DRAFT FIX: immediate-mode — live settings, same as the other Initialize sites.
                     ModelDownloadControl?.Initialize(
-                        settings,
+                        liveSettings,
                         () => saveSettingsCallback?.Invoke(),
                         includeTranslationModel: proFeatureService?.IsProUser == true);
 
@@ -758,9 +855,10 @@ namespace VoiceLite
                     var dialog = new ShortcutEditDialog(settings.CustomShortcuts);
                     if (dialog.ShowDialog() == true)
                     {
+                        // DRAFT FIX: edits the draft; committed to live + disk on Save/Apply,
+                        // discarded on Cancel.
                         settings.CustomShortcuts.Add(dialog.Shortcut);
                         RefreshShortcutsList();
-                        saveSettingsCallback?.Invoke(); // Persist to disk
                     }
                 }
             }
@@ -784,8 +882,8 @@ namespace VoiceLite
                         var dialog = new ShortcutEditDialog(selectedShortcut, settings.CustomShortcuts);
                         if (dialog.ShowDialog() == true)
                         {
+                            // DRAFT FIX: edits the draft; committed on Save/Apply.
                             RefreshShortcutsList();
-                            saveSettingsCallback?.Invoke(); // Persist to disk
                         }
                     }
                 }
@@ -815,9 +913,9 @@ namespace VoiceLite
                         // Thread-safe: lock while modifying shortcuts list
                         lock (settings.SyncRoot)
                         {
+                            // DRAFT FIX: edits the draft; committed on Save/Apply.
                             settings.CustomShortcuts.Remove(selectedShortcut);
                             RefreshShortcutsList();
-                            saveSettingsCallback?.Invoke(); // Persist to disk
                         }
                     }
                 }
