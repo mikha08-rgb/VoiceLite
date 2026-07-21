@@ -1764,17 +1764,22 @@ namespace VoiceLite
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;
 
-            currentSettingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
-            currentSettingsWindow.Owner = this;
+            // Local capture: if the app exits while the dialog is open (tray Exit, Windows
+            // logoff), OnClosed runs inside ShowDialog's nested pump and nulls the
+            // currentSettingsWindow FIELD before ShowDialog returns — re-reading the field
+            // after the pump would NRE mid-shutdown.
+            var settingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+            currentSettingsWindow = settingsWindow;
+            settingsWindow.Owner = this;
 
             // DRAFT FIX: the window edits a cloned draft; live settings change only when
             // Save/Apply commits it. ChangesCommitted covers Apply-then-Cancel/X — those
             // commits are already live and persisted, so hotkey re-registration and UI
             // refresh below must still run. A pure Cancel leaves live settings untouched.
-            var dialogSaved = currentSettingsWindow.ShowDialog() == true;
-            if (dialogSaved || currentSettingsWindow.ChangesCommitted)
+            var dialogSaved = settingsWindow.ShowDialog() == true;
+            if (dialogSaved || settingsWindow.ChangesCommitted)
             {
-                settings = SettingsValidator.ValidateAndRepair(currentSettingsWindow.Settings);
+                settings = SettingsValidator.ValidateAndRepair(settingsWindow.Settings);
                 MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
                 SaveSettings();
 

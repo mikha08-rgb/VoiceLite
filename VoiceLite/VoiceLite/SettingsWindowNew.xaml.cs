@@ -694,8 +694,9 @@ namespace VoiceLite
                     UpdateProFeatureVisibility();
 
                     // CRIT-4 FIX: Initialize Model Download Control with null check (consistent with line 93)
+                    // DRAFT FIX: immediate-mode — live settings, same as the other Initialize sites.
                     ModelDownloadControl?.Initialize(
-                        settings,
+                        liveSettings,
                         () => saveSettingsCallback?.Invoke(),
                         includeTranslationModel: proFeatureService?.IsProUser == true);
 
