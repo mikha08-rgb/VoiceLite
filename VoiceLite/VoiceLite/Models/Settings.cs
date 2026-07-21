@@ -115,6 +115,11 @@ namespace VoiceLite.Models
         public bool MinimizeToTray { get; set; } = true;
         // Legacy: kept for settings.json compat; UI removed 2026-07-17, Parakeet auto-detects language.
         public string Language { get; set; } = "en";
+        // Optional local speech translation. Off by default so upgrades preserve the
+        // existing multilingual transcription behavior. Canary requires an explicit
+        // source language; the first supported set is Spanish, French, and German.
+        public bool TranslateToEnglish { get; set; } = false;
+        public string TranslationSourceLanguage { get; set; } = "es";
         public int SelectedMicrophoneIndex { get; set; } = -1; // -1 = default device
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true;
@@ -158,6 +163,15 @@ namespace VoiceLite.Models
             if (!validLanguages.Contains(settings.Language))
             {
                 settings.Language = "en";
+            }
+
+            var validTranslationLanguages = new HashSet<string>
+            {
+                "es", "fr", "de"
+            };
+            if (!validTranslationLanguages.Contains(settings.TranslationSourceLanguage))
+            {
+                settings.TranslationSourceLanguage = "es";
             }
 
             // Validate microphone index

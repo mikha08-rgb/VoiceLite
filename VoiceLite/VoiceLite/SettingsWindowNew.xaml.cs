@@ -67,6 +67,9 @@ namespace VoiceLite
                 // Transcription Preset
                 LoadTranscriptionPreset();
 
+                // Optional offline speech translation
+                LoadTranslationSettings();
+
                 // Audio Settings
                 LoadMicrophones();
                 if (AutoPasteCheckBox != null)
@@ -85,7 +88,10 @@ namespace VoiceLite
 
                 // Initialize Model Download Control (applies Pro gating for both free and Pro users)
                 // CRITICAL FIX: Must initialize for ALL users to apply visibility gating
-                ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
+                ModelDownloadControl?.Initialize(
+                    settings,
+                    () => saveSettingsCallback?.Invoke(),
+                    includeTranslationModel: true);
 
                 // Load Custom Shortcuts
                 LoadShortcuts();
@@ -340,6 +346,9 @@ namespace VoiceLite
 
         private void ApplyButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanSaveTranslationSettings())
+                return;
+
             SaveSettings();
             saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
             StatusText.Text = "Settings applied successfully";
@@ -347,6 +356,9 @@ namespace VoiceLite
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanSaveTranslationSettings())
+                return;
+
             SaveSettings();
             saveSettingsCallback?.Invoke(); // CRITICAL FIX: Persist settings to disk immediately
 
@@ -389,6 +401,14 @@ namespace VoiceLite
             // VAD Settings
             settings.EnableVAD = EnableVADCheckBox.IsChecked ?? true;
 
+            // Optional offline speech translation
+            settings.TranslateToEnglish = TranslateToEnglishCheckBox.IsChecked ?? false;
+            if (TranslationSourceLanguageComboBox.SelectedItem is ComboBoxItem selectedLanguage &&
+                selectedLanguage.Tag is string sourceLanguage)
+            {
+                settings.TranslationSourceLanguage = sourceLanguage;
+            }
+
             // Audio Settings
             settings.AutoPaste = AutoPasteCheckBox.IsChecked ?? true;
 
@@ -407,6 +427,100 @@ namespace VoiceLite
             // Audio Enhancement - already saved via event handlers, no need to duplicate
 
             // Hotkey (already saved on change)
+        }
+
+        private void LoadTranslationSettings()
+        {
+            TranslateToEnglishCheckBox.IsChecked = settings.TranslateToEnglish;
+
+            foreach (var item in TranslationSourceLanguageComboBox.Items.OfType<ComboBoxItem>())
+            {
+                if (string.Equals(
+                    item.Tag?.ToString(),
+                    settings.TranslationSourceLanguage,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    TranslationSourceLanguageComboBox.SelectedItem = item;
+                    break;
+                }
+            }
+
+            UpdateTranslationControls();
+        }
+
+        private void TranslateToEnglishCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateTranslationControls();
+        }
+
+        private void UpdateTranslationControls()
+        {
+            if (TranslationOptionsPanel == null)
+                return;
+
+            var enabled = TranslateToEnglishCheckBox?.IsChecked == true;
+            TranslationOptionsPanel.IsEnabled = enabled;
+
+            var installed = new TranslationModelResolverService().IsModelInstalled();
+            TranslationModelStatusText.Text = installed ? "✓ Installed" : "Not installed";
+            TranslationModelStatusText.Foreground = installed
+                ? System.Windows.Media.Brushes.Green
+                : System.Windows.Media.Brushes.DarkOrange;
+            InstallTranslationModelButton.Visibility = installed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
+        private bool CanSaveTranslationSettings()
+        {
+            if (TranslateToEnglishCheckBox.IsChecked != true ||
+                new TranslationModelResolverService().IsModelInstalled())
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                "Install the translation model before enabling Translate to English.",
+                "Translation Model Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        private void InstallTranslationModelButton_Click(object sender, RoutedEventArgs e)
+        {
+            var control = new Controls.ModelDownloadControl();
+            control.ShowTranslationModelOnly();
+
+            var window = new Window
+            {
+                Title = "VoiceLite — Translation Model",
+                Width = 720,
+                Height = 430,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Content = new ScrollViewer
+                {
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Padding = new Thickness(20),
+                    Content = control
+                }
+            };
+
+            control.InstallCompleted += (_, _) =>
+            {
+                window.DialogResult = true;
+                window.Close();
+            };
+
+            window.ShowDialog();
+            UpdateTranslationControls();
+            ModelDownloadControl?.Initialize(
+                settings,
+                () => saveSettingsCallback?.Invoke(),
+                includeTranslationModel: true);
         }
 
         private async Task TrackAnalyticsChangesAsync() { await Task.CompletedTask; }
@@ -476,7 +590,10 @@ namespace VoiceLite
                     UpdateProFeatureVisibility();
 
                     // CRIT-4 FIX: Initialize Model Download Control with null check (consistent with line 93)
-                    ModelDownloadControl?.Initialize(settings, () => saveSettingsCallback?.Invoke());
+                    ModelDownloadControl?.Initialize(
+                        settings,
+                        () => saveSettingsCallback?.Invoke(),
+                        includeTranslationModel: true);
 
                     // Show success message
                     MessageBox.Show(

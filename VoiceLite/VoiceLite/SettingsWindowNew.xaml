@@ -123,6 +123,48 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- Optional offline speech translation -->
+                        <GroupBox Header="Translate to English" Margin="0,0,0,15">
+                            <StackPanel Margin="10">
+                                <CheckBox Name="TranslateToEnglishCheckBox"
+                                          Content="Translate my speech to English"
+                                          Margin="0,0,0,8"
+                                          Checked="TranslateToEnglishCheckBox_Changed"
+                                          Unchecked="TranslateToEnglishCheckBox_Changed"
+                                          ToolTip="Uses a separate local translation model. Audio stays on this computer."/>
+
+                                <StackPanel Name="TranslationOptionsPanel" IsEnabled="False" Margin="20,0,0,0">
+                                    <TextBlock Text="Spoken language:" Margin="0,0,0,5"/>
+                                    <ComboBox Name="TranslationSourceLanguageComboBox"
+                                              MaxWidth="260"
+                                              HorizontalAlignment="Left"
+                                              Margin="0,0,0,8">
+                                        <ComboBoxItem Content="Spanish" Tag="es" IsSelected="True"/>
+                                        <ComboBoxItem Content="French" Tag="fr"/>
+                                        <ComboBoxItem Content="German" Tag="de"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="VoiceLite will insert the English translation instead of the original-language transcript. Translation runs locally and requires an optional ~154MB model."
+                                               TextWrapping="Wrap"
+                                               Foreground="Gray"
+                                               FontSize="11"
+                                               Margin="0,0,0,8"/>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Name="InstallTranslationModelButton"
+                                                Content="Install translation model"
+                                                Width="175"
+                                                Margin="0,0,10,0"
+                                                Click="InstallTranslationModelButton_Click"/>
+                                        <TextBlock Name="TranslationModelStatusText"
+                                                   Text="Checking model..."
+                                                   VerticalAlignment="Center"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
                         <!-- Audio Settings -->
                         <GroupBox Header="Audio Settings" Margin="0,0,0,15">
                             <StackPanel Margin="10">
@@ -257,7 +299,7 @@
                                    Margin="0,0,0,20"
                                    FontSize="12">
                             <Run Text="VoiceLite v2.0 uses NVIDIA Parakeet TDT 0.6B v3 via Sherpa-ONNX — a single multilingual model that runs locally on your CPU. "/>
-                            <Run Text="The model (~640MB) downloads on first launch and is shared across all users on this machine. Use the controls below to re-download or verify the model files."/>
+                            <Run Text="The main model (~640MB) downloads on first launch and is shared across all users on this machine. The optional Canary add-on enables local Spanish, French, or German speech translation to English. Use the controls below to install or verify model files."/>
                         </TextBlock>
 
                         <!-- Model Download Control -->

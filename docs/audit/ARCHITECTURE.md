@@ -2,6 +2,8 @@
 
 *Audit date: 2026-07-17. Reflects HEAD `09af732` (v2.1.2), branch `v2.0.0-parakeet-migration` which is byte-identical to `master`. Trust this over the root `ARCHITECTURE.md` and `PILOT.md`, both of which describe the deleted pre-v2.0 Whisper.net architecture.*
 
+*Updated 2026-07-20 for the optional local Canary speech-to-English translation path.*
+
 ## What actually ships
 
 **One product: the .NET 8 WPF desktop app** in `VoiceLite/VoiceLite/`, plus a Next.js licensing backend in `voicelite-web/`. Everything else in the repo is dead weight (see HEALTH.md / COMPLEXITY.md):
@@ -29,8 +31,9 @@ No DI container. `App.xaml.cs` runs a 3-stage startup gate, then `new MainWindow
 
 | Service | Role | Note |
 |---|---|---|
-| `PersistentWhisperService` | In-process ASR via Sherpa-ONNX `OfflineRecognizer` (Parakeet). | **Name is a lie — no Whisper anywhere.** |
+| `TranscriptionService` | In-process speech recognition via Parakeet, or opt-in speech-to-English translation via Canary 180M Flash. | Both paths use Sherpa-ONNX `OfflineRecognizer`; translation is off by default. |
 | `ModelResolverService` | Probes 3 dirs for the 4 Parakeet ONNX files. | `modelName` param is dead. |
+| `TranslationModelResolverService` | Probes for the optional 3-file Canary int8 model. | Spanish/French/German → English; downloaded only when enabled. |
 | `AudioRecorder` | NAudio 16k/mono capture → memory buffer → preprocessing + VAD → temp WAV. | Preprocessing/VAD live **here**, not in the whisper service. |
 | `TextInjector` | Clipboard write + simulated Ctrl+V on an STA worker thread; auto-clear timers. | Raw Win32 — no InputSimulator dependency (contra old docs). |
 | `LicenseService` | HTTP validation vs voicelite.app + DPAPI storage of `key\|email`. | Static HttpClient, intentionally not disposed. |
@@ -56,7 +59,9 @@ Hotkey (HotkeyManager: RegisterHotKey / GetAsyncKeyState)
        └ SaveMemoryBufferToTempFile(): HighPassFilter → NoiseGate → AGC → Silero VAD trim (threshold 0.35, HARDCODED)
          → temp WAV → fires AudioFileReady
   → MainWindow.OnAudioFileReady
-  → PersistentWhisperService.TranscribeAsync(path)
+  → TranscriptionService.TranscribeAsync(path)
+       ├ default: Parakeet v3 multilingual transcription
+       └ TranslateToEnglish: Canary 180M Flash (selected es/fr/de source → English)
        └ WaveFileReader.ToSampleProvider() → float[] → OfflineRecognizer.Decode()  [blocking native, wrapped in Task.Run]
   → TextPostProcessor.Process()  [punctuation, dev-terms, custom dictionary — dictionary Pro-gated since 2026-07-18]
   → CustomShortcutService.ProcessShortcuts()
@@ -64,9 +69,9 @@ Hotkey (HotkeyManager: RegisterHotKey / GetAsyncKeyState)
     else:                   TextInjector.CopyToClipboardForManualPaste()  [clipboard only, 30 s hold]
 ```
 
-Model resolution: `PersistentWhisperService` → `ModelResolverService` probes `models/parakeet-v3`, `whisper/parakeet-v3`, `%LocalAppData%/VoiceLite/models/parakeet-v3` for `encoder/decoder/joiner.int8.onnx` + `tokens.txt`.
+Model resolution: `TranscriptionService` → `ModelResolverService` probes `models/parakeet-v3`, `whisper/parakeet-v3`, `%LocalAppData%/VoiceLite/models/parakeet-v3` for `encoder/decoder/joiner.int8.onnx` + `tokens.txt`. When translation is enabled, `TranslationModelResolverService` instead resolves `models/canary-translation` containing `encoder/decoder.int8.onnx` + `tokens.txt`.
 
-Local state (all under `%LOCALAPPDATA%\VoiceLite\`, never Roaming): `settings.json` (prefs + history), `license.dat` (DPAPI `key|email`), `logs\`, `models\parakeet-v3\`.
+Local state (all under `%LOCALAPPDATA%\VoiceLite\`, never Roaming): `settings.json` (prefs + history), `license.dat` (DPAPI `key|email`), `logs\`, `models\parakeet-v3\`, and optional `models\canary-translation\`.
 
 ## Web backend: components
 

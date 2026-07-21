@@ -19,6 +19,7 @@ namespace VoiceLite.Services
         private readonly Settings settings;
         private readonly string baseDir;
         private readonly ModelResolverService modelResolver;
+        private readonly TranslationModelResolverService translationModelResolver;
         private readonly ProFeatureService proFeatureService;
         private readonly SemaphoreSlim transcriptionSemaphore = new(1, 1);
         private CancellationTokenSource transcriptionCts = new();
@@ -30,7 +31,12 @@ namespace VoiceLite.Services
         // so it is part of the reload key — otherwise preset changes are silent no-ops
         // until restart (single model means modelDir alone never changes).
         private TranscriptionPreset? currentPreset;
+        private bool? currentTranslationMode;
+        private string? currentTranslationSourceLanguage;
         private readonly object recognizerLock = new();
+
+        private static readonly HashSet<string> SupportedTranslationLanguages =
+            new(StringComparer.OrdinalIgnoreCase) { "es", "fr", "de" };
 
         // Test observability: how many times a recognizer has been built.
         internal int RecognizerLoadCount { get; private set; }
@@ -49,11 +55,17 @@ namespace VoiceLite.Services
         public bool IsProcessing => isProcessing;
         public event EventHandler<Exception>? TranscriptionError;
 
-        public TranscriptionService(Settings settings, ModelResolverService? modelResolver = null, ProFeatureService? proFeatureService = null)
+        public TranscriptionService(
+            Settings settings,
+            ModelResolverService? modelResolver = null,
+            ProFeatureService? proFeatureService = null,
+            TranslationModelResolverService? translationModelResolver = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             baseDir = AppDomain.CurrentDomain.BaseDirectory;
             this.modelResolver = modelResolver ?? new ModelResolverService(baseDir, proFeatureService);
+            this.translationModelResolver = translationModelResolver ??
+                new TranslationModelResolverService(baseDir);
             // Same tier check the Settings UI uses to show/hide the Custom Dictionary tab
             // (ProFeatureService.IsProUser reads settings.IsProLicense).
             this.proFeatureService = proFeatureService ?? new ProFeatureService(settings);
@@ -80,8 +92,14 @@ namespace VoiceLite.Services
                     if (isDisposed)
                         return;
 
-                    var modelDir = this.modelResolver.ResolveModelPath();
-                    EnsureRecognizerLoaded(modelDir);
+                    var translateToEnglish = settings.TranslateToEnglish;
+                    var modelDir = translateToEnglish
+                        ? this.translationModelResolver.ResolveModelPath()
+                        : this.modelResolver.ResolveModelPath();
+                    EnsureRecognizerLoaded(
+                        modelDir,
+                        translateToEnglish,
+                        settings.TranslationSourceLanguage);
                 }
                 catch (Exception ex)
                 {
@@ -105,7 +123,10 @@ namespace VoiceLite.Services
             });
         }
 
-        private void EnsureRecognizerLoaded(string modelDir)
+        private void EnsureRecognizerLoaded(
+            string modelDir,
+            bool translateToEnglish,
+            string translationSourceLanguage)
         {
             lock (recognizerLock)
             {
@@ -115,52 +136,126 @@ namespace VoiceLite.Services
                 if (isDisposed)
                     return;
 
-                var preset = settings.TranscriptionPreset;
+                TranscriptionPreset? preset = translateToEnglish
+                    ? null
+                    : settings.TranscriptionPreset;
 
-                if (currentModelDir == modelDir && currentPreset == preset && recognizer != null)
+                if (currentModelDir == modelDir &&
+                    currentPreset == preset &&
+                    currentTranslationMode == translateToEnglish &&
+                    string.Equals(
+                        currentTranslationSourceLanguage,
+                        translateToEnglish ? translationSourceLanguage : null,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    recognizer != null)
                     return;
 
                 if (recognizer != null)
                 {
-                    ErrorLogger.LogMessage($"Reloading Parakeet recognizer: dir {currentModelDir} -> {modelDir}, preset {currentPreset} -> {preset}");
+                    ErrorLogger.LogMessage(
+                        $"Reloading speech recognizer: dir {currentModelDir} -> {modelDir}, " +
+                        $"translation {currentTranslationMode} -> {translateToEnglish}, " +
+                        $"source {currentTranslationSourceLanguage} -> {translationSourceLanguage}, " +
+                        $"preset {currentPreset} -> {preset}");
                     try { recognizer.Dispose(); }
                     catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer disposal failed during switch: {ex.Message}"); }
                     recognizer = null;
                 }
 
-                var encoder = Path.Combine(modelDir, "encoder.int8.onnx");
-                var decoder = Path.Combine(modelDir, "decoder.int8.onnx");
-                var joiner = Path.Combine(modelDir, "joiner.int8.onnx");
-                var tokens = Path.Combine(modelDir, "tokens.txt");
-
-                foreach (var f in new[] { encoder, decoder, joiner, tokens })
+                OfflineRecognizerConfig config;
+                if (translateToEnglish)
                 {
-                    if (!File.Exists(f))
-                        throw new FileNotFoundException($"Parakeet model file missing: {f}");
+                    config = CreateCanaryRecognizerConfig(modelDir, translationSourceLanguage);
+                    ErrorLogger.LogMessage(
+                        $"Loading Canary translation model: dir={modelDir}, " +
+                        $"source={translationSourceLanguage}, target=en");
+                }
+                else
+                {
+                    var encoder = Path.Combine(modelDir, "encoder.int8.onnx");
+                    var decoder = Path.Combine(modelDir, "decoder.int8.onnx");
+                    var joiner = Path.Combine(modelDir, "joiner.int8.onnx");
+                    var tokens = Path.Combine(modelDir, "tokens.txt");
+
+                    foreach (var f in new[] { encoder, decoder, joiner, tokens })
+                    {
+                        if (!File.Exists(f))
+                            throw new FileNotFoundException($"Parakeet model file missing: {f}");
+                    }
+
+                    var presetConfig = TranscriptionPresetConfig.GetPresetConfig(preset!.Value);
+
+                    config = new OfflineRecognizerConfig();
+                    config.FeatConfig.SampleRate = 16000;
+                    config.FeatConfig.FeatureDim = 80;
+                    config.ModelConfig.Tokens = tokens;
+                    config.ModelConfig.Transducer.Encoder = encoder;
+                    config.ModelConfig.Transducer.Decoder = decoder;
+                    config.ModelConfig.Transducer.Joiner = joiner;
+                    config.ModelConfig.NumThreads = 4;
+                    config.ModelConfig.Provider = "cpu";
+                    config.ModelConfig.Debug = 0;
+                    config.DecodingMethod = presetConfig.DecodingMethod;
+                    config.MaxActivePaths = presetConfig.MaxActivePaths;
+
+                    ErrorLogger.LogMessage($"Loading Parakeet model: dir={modelDir}, decoding={config.DecodingMethod}, beam={config.MaxActivePaths}");
                 }
 
-                var presetConfig = TranscriptionPresetConfig.GetPresetConfig(preset);
-
-                var config = new OfflineRecognizerConfig();
-                config.FeatConfig.SampleRate = 16000;
-                config.FeatConfig.FeatureDim = 80;
-                config.ModelConfig.Tokens = tokens;
-                config.ModelConfig.Transducer.Encoder = encoder;
-                config.ModelConfig.Transducer.Decoder = decoder;
-                config.ModelConfig.Transducer.Joiner = joiner;
-                config.ModelConfig.NumThreads = 4;
-                config.ModelConfig.Provider = "cpu";
-                config.ModelConfig.Debug = 0;
-                config.DecodingMethod = presetConfig.DecodingMethod;
-                config.MaxActivePaths = presetConfig.MaxActivePaths;
-
-                ErrorLogger.LogMessage($"Loading Parakeet model: dir={modelDir}, decoding={config.DecodingMethod}, beam={config.MaxActivePaths}");
                 recognizer = new OfflineRecognizer(config);
                 currentModelDir = modelDir;
                 currentPreset = preset;
+                currentTranslationMode = translateToEnglish;
+                currentTranslationSourceLanguage = translateToEnglish
+                    ? translationSourceLanguage
+                    : null;
                 RecognizerLoadCount++;
-                ErrorLogger.LogMessage("Parakeet model loaded successfully");
+                ErrorLogger.LogMessage(translateToEnglish
+                    ? "Canary translation model loaded successfully"
+                    : "Parakeet model loaded successfully");
             }
+        }
+
+        internal static OfflineRecognizerConfig CreateCanaryRecognizerConfig(
+            string modelDir,
+            string sourceLanguage)
+        {
+            if (!SupportedTranslationLanguages.Contains(sourceLanguage))
+            {
+                throw new ArgumentException(
+                    $"Unsupported translation source language: {sourceLanguage}. " +
+                    "Supported languages are Spanish (es), French (fr), and German (de).",
+                    nameof(sourceLanguage));
+            }
+
+            // Canary task tokens are lowercase even though validation is intentionally
+            // case-insensitive for settings loaded from hand-edited JSON.
+            sourceLanguage = sourceLanguage.ToLowerInvariant();
+
+            var encoder = Path.Combine(modelDir, "encoder.int8.onnx");
+            var decoder = Path.Combine(modelDir, "decoder.int8.onnx");
+            var tokens = Path.Combine(modelDir, "tokens.txt");
+
+            foreach (var file in new[] { encoder, decoder, tokens })
+            {
+                if (!File.Exists(file))
+                    throw new FileNotFoundException($"Canary translation model file missing: {file}");
+            }
+
+            var config = new OfflineRecognizerConfig();
+            config.FeatConfig.SampleRate = 16000;
+            config.FeatConfig.FeatureDim = 80;
+            config.ModelConfig.Tokens = tokens;
+            config.ModelConfig.Canary.Encoder = encoder;
+            config.ModelConfig.Canary.Decoder = decoder;
+            config.ModelConfig.Canary.SrcLang = sourceLanguage;
+            config.ModelConfig.Canary.TgtLang = "en";
+            config.ModelConfig.Canary.UsePnc = 1;
+            config.ModelConfig.NumThreads = 4;
+            config.ModelConfig.Provider = "cpu";
+            config.ModelConfig.Debug = 0;
+            config.DecodingMethod = "greedy_search";
+            config.MaxActivePaths = 1;
+            return config;
         }
 
         public async Task<string> TranscribeFromMemoryAsync(byte[] audioData)
@@ -174,13 +269,29 @@ namespace VoiceLite.Services
             }
 
             using var stream = new MemoryStream(audioData);
-            return await TranscribeFromStreamAsync(stream);
+            return await TranscribeFromStreamAsync(
+                stream,
+                translateToEnglish: settings.TranslateToEnglish,
+                translationSourceLanguage: settings.TranslationSourceLanguage);
         }
 
         // Backward compatibility overload.
         public async Task<string> TranscribeAsync(string audioFilePath)
         {
-            return await TranscribeAsync(audioFilePath, modelResolver.ResolveModelPath());
+            if (!ValidateAudioFile(audioFilePath))
+                return string.Empty;
+
+            var translateToEnglish = settings.TranslateToEnglish;
+            var modelDir = translateToEnglish
+                ? translationModelResolver.ResolveModelPath()
+                : modelResolver.ResolveModelPath();
+
+            using var fileStream = File.OpenRead(audioFilePath);
+            return await TranscribeFromStreamAsync(
+                fileStream,
+                modelDir,
+                translateToEnglish,
+                settings.TranslationSourceLanguage);
         }
 
         public async Task<string> TranscribeAsync(string audioFilePath, string modelDir)
@@ -189,10 +300,18 @@ namespace VoiceLite.Services
                 return string.Empty;
 
             using var fileStream = File.OpenRead(audioFilePath);
-            return await TranscribeFromStreamAsync(fileStream, modelDir);
+            return await TranscribeFromStreamAsync(
+                fileStream,
+                modelDir,
+                translateToEnglish: false,
+                translationSourceLanguage: settings.TranslationSourceLanguage);
         }
 
-        private async Task<string> TranscribeFromStreamAsync(Stream audioStream, string? modelDir = null)
+        private async Task<string> TranscribeFromStreamAsync(
+            Stream audioStream,
+            string? modelDir = null,
+            bool translateToEnglish = false,
+            string translationSourceLanguage = "es")
         {
             if (isDisposed)
                 throw new ObjectDisposedException(nameof(TranscriptionService));
@@ -215,14 +334,21 @@ namespace VoiceLite.Services
                 isProcessing = true;
                 var startTime = DateTime.Now;
 
-                var effectiveModelDir = modelDir ?? modelResolver.ResolveModelPath();
+                var effectiveModelDir = modelDir ?? (translateToEnglish
+                    ? translationModelResolver.ResolveModelPath()
+                    : modelResolver.ResolveModelPath());
                 // Model load/rebuild is seconds of blocking native work (esp. after a preset
                 // change forces a rebuild) — keep it off the caller's thread, which is the UI
                 // thread via OnAudioFileReady. Still under transcriptionSemaphore, so ordering
                 // relative to Decode/Dispose is unchanged.
-                await Task.Run(() => EnsureRecognizerLoaded(effectiveModelDir), cancellationToken).ConfigureAwait(false);
+                await Task.Run(() => EnsureRecognizerLoaded(
+                    effectiveModelDir,
+                    translateToEnglish,
+                    translationSourceLanguage), cancellationToken).ConfigureAwait(false);
 
-                ErrorLogger.LogWarning($"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
+                ErrorLogger.LogWarning(translateToEnglish
+                    ? $"Canary translation: source={translationSourceLanguage}, target=en, dir={Path.GetFileName(effectiveModelDir)}"
+                    : $"Parakeet: dir={Path.GetFileName(effectiveModelDir)}");
 
                 // 120s timeout — generous for long-form on slow CPUs.
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
@@ -238,7 +364,7 @@ namespace VoiceLite.Services
                     using var wavReader = new WaveFileReader(audioStream);
                     if (wavReader.WaveFormat.SampleRate != 16000)
                     {
-                        ErrorLogger.LogWarning($"Unexpected sample rate {wavReader.WaveFormat.SampleRate}, Parakeet expects 16000");
+                        ErrorLogger.LogWarning($"Unexpected sample rate {wavReader.WaveFormat.SampleRate}, speech model expects 16000");
                     }
                     ISampleProvider provider = wavReader.ToSampleProvider();
                     if (wavReader.WaveFormat.Channels > 1)
@@ -255,7 +381,10 @@ namespace VoiceLite.Services
                 OfflineRecognizer rec;
                 lock (recognizerLock)
                 {
-                    rec = recognizer ?? throw new InvalidOperationException("Parakeet recognizer not loaded");
+                    rec = recognizer ?? throw new InvalidOperationException(
+                        translateToEnglish
+                            ? "Translation recognizer not loaded"
+                            : "Parakeet recognizer not loaded");
                 }
 
                 // OfflineRecognizer.Decode is blocking native code — wrap in Task.Run
@@ -293,7 +422,9 @@ namespace VoiceLite.Services
                 }
 
                 var totalTime = DateTime.Now - startTime;
-                ErrorLogger.LogWarning($"Transcription completed in {totalTime.TotalMilliseconds:F0}ms, result length: {finalResult.Length} chars");
+                ErrorLogger.LogWarning(
+                    $"{(translateToEnglish ? "Translation" : "Transcription")} completed in " +
+                    $"{totalTime.TotalMilliseconds:F0}ms, result length: {finalResult.Length} chars");
 
                 isProcessing = false;
                 return finalResult;
@@ -302,7 +433,9 @@ namespace VoiceLite.Services
             {
                 isProcessing = false;
                 throw new TimeoutException(
-                    "Transcription timed out after 120 seconds. Try speaking less or switching to the Speed preset.");
+                    translateToEnglish
+                        ? "Translation timed out after 120 seconds. Try a shorter recording."
+                        : "Transcription timed out after 120 seconds. Try speaking less or switching to the Speed preset.");
             }
             catch (OperationCanceledException)
             {
@@ -380,10 +513,15 @@ namespace VoiceLite.Services
         {
             try
             {
-                var modelDir = modelResolver.ResolveModelPath();
+                var modelDir = settings.TranslateToEnglish
+                    ? translationModelResolver.ResolveModelPath()
+                    : modelResolver.ResolveModelPath();
                 if (string.IsNullOrEmpty(modelDir) || !Directory.Exists(modelDir))
                 {
-                    TranscriptionError?.Invoke(this, new DirectoryNotFoundException("Parakeet model directory not found"));
+                    TranscriptionError?.Invoke(this, new DirectoryNotFoundException(
+                        settings.TranslateToEnglish
+                            ? "Translation model directory not found"
+                            : "Parakeet model directory not found"));
                     return false;
                 }
                 return true;
@@ -399,7 +537,10 @@ namespace VoiceLite.Services
         {
             try
             {
-                return $"Sherpa-ONNX {typeof(OfflineRecognizer).Assembly.GetName().Version} (Parakeet TDT v3)";
+                var engine = settings.TranslateToEnglish
+                    ? "Canary 180M Flash Translation"
+                    : "Parakeet TDT v3";
+                return $"Sherpa-ONNX {typeof(OfflineRecognizer).Assembly.GetName().Version} ({engine})";
             }
             catch
             {
@@ -444,6 +585,8 @@ namespace VoiceLite.Services
                 recognizer = null;
                 currentModelDir = null;
                 currentPreset = null;
+                currentTranslationMode = null;
+                currentTranslationSourceLanguage = null;
             }
 
             try { transcriptionSemaphore?.Dispose(); }

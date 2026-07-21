@@ -1,0 +1,15 @@
+NVIDIA Canary 180M Flash
+========================
+
+VoiceLite optionally downloads and uses NVIDIA's Canary 180M Flash model for
+offline speech translation from Spanish, French, or German to English.
+
+Original model: https://huggingface.co/nvidia/canary-180m-flash
+Sherpa-ONNX conversion: https://github.com/k2-fsa/sherpa-onnx
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License text: CC-BY-4.0.txt in this directory
+
+The downloaded bundle contains an int8 ONNX conversion prepared by the
+sherpa-onnx project. VoiceLite does not modify those model weights.
+
+Canary 180M Flash was created by NVIDIA Corporation.

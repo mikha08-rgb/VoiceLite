@@ -1,7 +1,7 @@
 namespace VoiceLite.Services
 {
     /// <summary>
-    /// Centralized download URL for the Parakeet TDT v3 model bundle (Sherpa-ONNX format).
+    /// Centralized download URLs for VoiceLite's Sherpa-ONNX model bundles.
     /// Hosting changes or integrity audits only need to touch this file.
     /// </summary>
     public static class DownloadEndpoints
@@ -24,11 +24,23 @@ namespace VoiceLite.Services
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2";
 
         /// <summary>
+        /// Optional local speech-translation model. The int8 bundle is about 154MB
+        /// and translates Spanish, French, or German speech directly to English.
+        /// </summary>
+        /// <remarks>
+        /// TODO: mirror this bundle on VoiceLite-controlled hosting for the same
+        /// availability reason documented on <see cref="ParakeetV3Int8"/>.
+        /// </remarks>
+        public const string CanaryTranslationInt8 =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8.tar.bz2";
+
+        /// <summary>
         /// Resolves a canonical model id to its download URL, or null if unsupported.
         /// </summary>
         public static string? GetUrlForFileName(string fileName) => fileName switch
         {
             "parakeet-tdt-0.6b-v3-int8" => ParakeetV3Int8,
+            TranslationModelResolverService.ModelId => CanaryTranslationInt8,
             _ => null,
         };
     }

@@ -1491,7 +1491,9 @@ namespace VoiceLite
                             Text = processedText,           // Processed text (what user sees)
                             OriginalText = transcription,   // Original engine output (for re-injection)
                             Timestamp = DateTime.Now,
-                            ModelUsed = settings.TranscriptionModel
+                            ModelUsed = settings.TranslateToEnglish
+                                ? TranslationModelResolverService.ModelId
+                                : settings.TranscriptionModel
                         };
                         historyService?.AddToHistory(historyItem);
                         _ = UpdateHistoryUI();
@@ -1581,7 +1583,9 @@ namespace VoiceLite
                     (ex is FileNotFoundException or DirectoryNotFoundException or InvalidOperationException
                         && ex.Message.Contains("model", StringComparison.OrdinalIgnoreCase))
                     ? ex.Message
-                    : "Transcription error";
+                    : settings.TranslateToEnglish
+                        ? "Translation error"
+                        : "Transcription error";
 
                 await Dispatcher.InvokeAsync(() =>
                 {

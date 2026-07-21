@@ -38,13 +38,8 @@ namespace VoiceLite.Controls
         // download fails with an actionable message instead of hanging forever.
         private const int StallTimeoutSeconds = 60;
 
-        // Disk-space preflight: tarball (~640MB) and extracted model (~700MB) coexist
-        // briefly during install, so require headroom for both plus a safety margin.
-        private const long TarballBytesRequired = 700_000_000;
-        private const long ExtractedBytesRequired = 800_000_000;
-
         // ModelResolverService probes this path (alongside bin/models for dev installs).
-        private static readonly string ModelDir = Path.Combine(
+        private static readonly string ParakeetModelDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VoiceLite", "models", "parakeet-v3");
 
@@ -89,17 +84,32 @@ namespace VoiceLite.Controls
         {
             try
             {
-                foreach (var file in Directory.EnumerateFiles(Path.GetTempPath(), "parakeet-*.tar.bz2"))
+                var tempPatterns = new[]
                 {
-                    try { File.Delete(file); }
-                    catch { /* locked by a concurrent download — leave it */ }
+                    "parakeet-*.tar.bz2",
+                    "canary-translation-*.tar.bz2"
+                };
+                foreach (var pattern in tempPatterns)
+                {
+                    foreach (var file in Directory.EnumerateFiles(Path.GetTempPath(), pattern))
+                    {
+                        try { File.Delete(file); }
+                        catch { /* locked by a concurrent download — leave it */ }
+                    }
                 }
 
-                var parentDir = Path.GetDirectoryName(ModelDir);
-                if (parentDir != null && Directory.Exists(parentDir))
+                foreach (var modelDir in new[]
                 {
+                    ParakeetModelDir,
+                    TranslationModelResolverService.DefaultModelDirectory
+                })
+                {
+                    var parentDir = Path.GetDirectoryName(modelDir);
+                    if (parentDir == null || !Directory.Exists(parentDir))
+                        continue;
+
                     foreach (var dir in Directory.EnumerateDirectories(
-                                 parentDir, Path.GetFileName(ModelDir) + ".tmp-*"))
+                                 parentDir, Path.GetFileName(modelDir) + ".tmp-*"))
                     {
                         try { Directory.Delete(dir, recursive: true); }
                         catch { /* in use — leave it */ }
@@ -115,14 +125,50 @@ namespace VoiceLite.Controls
         // First-launch use passes null settings/callback — the control still functions
         // for the download flow because settings.TranscriptionModel already defaults to the
         // Parakeet id in Models/Settings.cs.
-        public void Initialize(Settings? currentSettings, Action? onSaveSettings = null)
+        public void Initialize(
+            Settings? currentSettings,
+            Action? onSaveSettings = null,
+            bool includeTranslationModel = false)
         {
             settings = currentSettings;
             saveSettingsCallback = onSaveSettings;
+            if (includeTranslationModel && models.All(m => m.FileName != TranslationModelResolverService.ModelId))
+            {
+                models.Add(CreateTranslationModelInfo());
+            }
+            if (includeTranslationModel)
+            {
+                EngineHeaderText.Text = "Local Speech Models";
+                EngineDescriptionText.Text =
+                    "Parakeet handles normal multilingual transcription. The optional Canary add-on translates Spanish, French, or German speech to English. Both run locally after download.";
+            }
             RefreshModelStates();
         }
 
-        public bool IsModelInstalled => AllModelFilesPresent();
+        /// <summary>
+        /// Reconfigures the control for the small modal launched by the translation
+        /// setting. First-launch setup keeps using the default Parakeet-only view.
+        /// </summary>
+        public void ShowTranslationModelOnly()
+        {
+            models.Clear();
+            models.Add(CreateTranslationModelInfo());
+            RefreshModelStates();
+            EngineHeaderText.Text = "English Translation Add-on";
+            EngineDescriptionText.Text =
+                "Canary translates Spanish, French, or German speech directly to English. The model is stored locally and audio never leaves this computer.";
+            TipText.Text = "Install this optional model to translate Spanish, French, or German speech to English without sending audio online.";
+        }
+
+        public bool IsModelInstalled
+        {
+            get
+            {
+                var parakeet = models.FirstOrDefault(
+                    m => m.FileName == "parakeet-tdt-0.6b-v3-int8");
+                return parakeet != null && AllModelFilesPresent(parakeet);
+            }
+        }
 
         private void InitializeModels()
         {
@@ -132,28 +178,50 @@ namespace VoiceLite.Controls
                 DisplayName = "Parakeet v3 (int8)",
                 Description = "Multilingual (25 EU languages), transducer architecture — no silence hallucinations. ~640MB download.",
                 FileSizeMB = 640,
-                DownloadUrl = DownloadEndpoints.ParakeetV3Int8
+                DownloadUrl = DownloadEndpoints.ParakeetV3Int8,
+                ModelDirectory = ParakeetModelDir,
+                RequiredFiles = RequiredModelFiles,
+                TempFilePrefix = "parakeet",
+                TarballBytesRequired = 700_000_000,
+                ExtractedBytesRequired = 800_000_000,
+                IsSelectable = true
             });
         }
+
+        private static ModelInfo CreateTranslationModelInfo() => new ModelInfo
+        {
+            FileName = TranslationModelResolverService.ModelId,
+            DisplayName = "English Translation Add-on (Canary int8)",
+            Description = "Offline Spanish, French, and German speech → English. Optional ~154MB download.",
+            FileSizeMB = 154,
+            DownloadUrl = DownloadEndpoints.CanaryTranslationInt8,
+            ModelDirectory = TranslationModelResolverService.DefaultModelDirectory,
+            RequiredFiles = TranslationModelResolverService.RequiredModelFiles,
+            TempFilePrefix = "canary-translation",
+            TarballBytesRequired = 200_000_000,
+            ExtractedBytesRequired = 250_000_000,
+            IsSelectable = false
+        };
 
         private void RefreshModelStates()
         {
             foreach (var model in models)
             {
-                model.IsInstalled = AllModelFilesPresent();
-                if (settings != null)
+                model.IsInstalled = AllModelFilesPresent(model);
+                if (settings != null && model.IsSelectable)
                 {
                     model.IsSelected = settings.TranscriptionModel == model.FileName;
                 }
             }
         }
 
-        private static bool AllModelFilesPresent() => AllModelFilesPresentIn(ModelDir);
+        private static bool AllModelFilesPresent(ModelInfo model) =>
+            AllModelFilesPresentIn(model.ModelDirectory, model.RequiredFiles);
 
-        private static bool AllModelFilesPresentIn(string dir)
+        private static bool AllModelFilesPresentIn(string dir, IReadOnlyCollection<string> requiredFiles)
         {
             if (!Directory.Exists(dir)) return false;
-            return RequiredModelFiles.All(f =>
+            return requiredFiles.All(f =>
             {
                 var path = Path.Combine(dir, f);
                 return File.Exists(path) && new FileInfo(path).Length > 0;
@@ -221,11 +289,15 @@ namespace VoiceLite.Controls
                 model.IsDownloading = true;
                 model.DownloadProgress = 0;
 
-                var parentDir = Path.GetDirectoryName(ModelDir)!;
+                var parentDir = Path.GetDirectoryName(model.ModelDirectory)!;
                 Directory.CreateDirectory(parentDir);
-                tempTarPath = Path.Combine(Path.GetTempPath(), $"parakeet-{Guid.NewGuid():N}.tar.bz2");
+                tempTarPath = Path.Combine(Path.GetTempPath(), $"{model.TempFilePrefix}-{Guid.NewGuid():N}.tar.bz2");
 
-                EnsureSufficientDiskSpace(tempTarPath, parentDir);
+                EnsureSufficientDiskSpace(
+                    tempTarPath,
+                    parentDir,
+                    model.TarballBytesRequired,
+                    model.ExtractedBytesRequired);
 
                 // Stall detector: stallCts trips if a single connect/read makes no
                 // progress for StallTimeoutSeconds. The HttpClient itself has an
@@ -269,12 +341,13 @@ namespace VoiceLite.Controls
                 // loss / disk full: partial files made the dir look "installed" and
                 // wedged every subsequent launch.
                 tempExtractDir = Path.Combine(
-                    parentDir, $"{Path.GetFileName(ModelDir)}.tmp-{Guid.NewGuid():N}");
+                    parentDir, $"{Path.GetFileName(model.ModelDirectory)}.tmp-{Guid.NewGuid():N}");
                 var extractDir = tempExtractDir;
-                await Task.Run(() => ExtractRequiredFiles(tempTarPath, extractDir), cts.Token);
+                await Task.Run(() => ExtractRequiredFiles(
+                    tempTarPath, extractDir, model.RequiredFiles), cts.Token);
                 cts.Token.ThrowIfCancellationRequested();
 
-                if (!AllModelFilesPresentIn(tempExtractDir))
+                if (!AllModelFilesPresentIn(tempExtractDir, model.RequiredFiles))
                 {
                     throw new InvalidOperationException(
                         $"Extraction completed but required files are missing or empty in {tempExtractDir}");
@@ -283,15 +356,15 @@ namespace VoiceLite.Controls
                 // Swap: remove any previous (possibly corrupt) live dir, then move the
                 // fully-verified temp dir into place. Same-volume Directory.Move means a
                 // crash leaves either the old state or the complete new state, never a mix.
-                if (Directory.Exists(ModelDir))
-                    Directory.Delete(ModelDir, recursive: true);
-                Directory.Move(tempExtractDir, ModelDir);
+                if (Directory.Exists(model.ModelDirectory))
+                    Directory.Delete(model.ModelDirectory, recursive: true);
+                Directory.Move(tempExtractDir, model.ModelDirectory);
                 tempExtractDir = null; // swapped into place — nothing to clean up
 
-                if (!AllModelFilesPresent())
+                if (!AllModelFilesPresent(model))
                 {
                     throw new InvalidOperationException(
-                        $"Model install verification failed after swap in {ModelDir}");
+                        $"Model install verification failed after swap in {model.ModelDirectory}");
                 }
 
                 model.DownloadProgress = 100;
@@ -309,12 +382,12 @@ namespace VoiceLite.Controls
                 // User closed the window / cancelled: stop cleanly, no error dialog.
                 model.IsDownloading = false;
                 model.DownloadProgress = 0;
-                ErrorLogger.LogDebug("Parakeet download cancelled");
+                ErrorLogger.LogDebug($"{model.DisplayName} download cancelled");
             }
             catch (Exception ex)
             {
                 model.IsDownloading = false;
-                ErrorLogger.LogError("Parakeet download/extract failed", ex);
+                ErrorLogger.LogError($"{model.DisplayName} download/extract failed", ex);
                 MessageBox.Show(
                     $"Failed to install {model.DisplayName}:\n{ex.Message}\n\nClick Download to retry.",
                     "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -358,7 +431,11 @@ namespace VoiceLite.Controls
         // Preflight so a full disk produces a clear message with numbers instead of a
         // raw IOException at 99%. Tarball lands on the temp drive; extraction and the
         // final swap happen on the model drive — usually the same drive (C:).
-        private static void EnsureSufficientDiskSpace(string tempFilePath, string targetDir)
+        private static void EnsureSufficientDiskSpace(
+            string tempFilePath,
+            string targetDir,
+            long tarballBytesRequired,
+            long extractedBytesRequired)
         {
             try
             {
@@ -369,12 +446,12 @@ namespace VoiceLite.Controls
 
                 var requirements = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)
                 {
-                    [tempRoot] = TarballBytesRequired
+                    [tempRoot] = tarballBytesRequired
                 };
                 if (requirements.ContainsKey(targetRoot))
-                    requirements[targetRoot] += ExtractedBytesRequired;
+                    requirements[targetRoot] += extractedBytesRequired;
                 else
-                    requirements[targetRoot] = ExtractedBytesRequired;
+                    requirements[targetRoot] = extractedBytesRequired;
 
                 foreach (var (root, requiredBytes) in requirements)
                 {
@@ -411,12 +488,16 @@ namespace VoiceLite.Controls
             }
         }
 
-        // Tarball nests the 4 files under "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/".
-        // We match by filename only so a folder-naming change upstream doesn't break us.
-        private static void ExtractRequiredFiles(string tarBz2Path, string targetDir)
+        // Both upstream bundles nest their files under a model-specific directory.
+        // Match only the required filenames so upstream folder-name changes do not
+        // break either the Parakeet or Canary installer.
+        private static void ExtractRequiredFiles(
+            string tarBz2Path,
+            string targetDir,
+            IReadOnlyCollection<string> requiredFiles)
         {
             Directory.CreateDirectory(targetDir);
-            var wanted = new HashSet<string>(RequiredModelFiles, StringComparer.OrdinalIgnoreCase);
+            var wanted = new HashSet<string>(requiredFiles, StringComparer.OrdinalIgnoreCase);
 
             using var archive = ArchiveFactory.OpenArchive(tarBz2Path, new SharpCompress.Readers.ReaderOptions());
             foreach (var entry in archive.Entries)
@@ -444,9 +525,16 @@ namespace VoiceLite.Controls
         public string Description { get; set; } = string.Empty;
         public int FileSizeMB { get; set; }
         public string? DownloadUrl { get; set; }
+        public string ModelDirectory { get; set; } = string.Empty;
+        public IReadOnlyCollection<string> RequiredFiles { get; set; } = Array.Empty<string>();
+        public string TempFilePrefix { get; set; } = "model";
+        public long TarballBytesRequired { get; set; }
+        public long ExtractedBytesRequired { get; set; }
+        public bool IsSelectable { get; set; } = true;
 
         // Single-engine post-Parakeet swap — no Pro gating, no lock state.
-        public bool CanSelect => IsInstalled;
+        public bool CanSelect => IsSelectable && IsInstalled;
+        public Visibility SelectionVisibility => IsSelectable ? Visibility.Visible : Visibility.Collapsed;
 
         public bool IsInstalled
         {

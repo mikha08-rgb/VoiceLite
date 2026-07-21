@@ -1,6 +1,6 @@
 # VoiceLite
 
-Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) running NVIDIA's [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) model.
+Windows speech-to-text app. Hold a key, speak, release — text appears wherever your cursor is. 100% offline, powered by [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) running NVIDIA speech models.
 
 [![Download](https://img.shields.io/github/v/release/mikha08-rgb/VoiceLite)](https://github.com/mikha08-rgb/VoiceLite/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -28,6 +28,8 @@ VoiceLite v2.0 uses **Parakeet TDT 0.6B v3** (~640MB), an NVIDIA transducer mode
 
 The model isn't bundled with the installer. On first launch, VoiceLite downloads it from GitHub Releases and extracts it to `%LocalAppData%\VoiceLite\models\parakeet-v3\`.
 
+Settings also includes an opt-in **Translate to English** mode. It uses NVIDIA Canary 180M Flash to translate Spanish, French, or German speech directly to English on-device. Its separate ~154MB int8 model downloads only when requested.
+
 ## Features
 
 - Works in any Windows application
@@ -39,7 +41,7 @@ The model isn't bundled with the installer. On first launch, VoiceLite downloads
 
 **Offline?** Yes, 100%. Voice never leaves your PC.
 
-**Languages?** 25 European languages (Parakeet TDT 0.6B v3). Change in Settings → Language.
+**Languages?** Parakeet automatically recognizes 25 European languages. The optional Translate to English mode currently accepts Spanish, French, or German speech.
 
 **Works in games?** Yes. Use windowed mode if fullscreen blocks hotkey.
 
@@ -75,12 +77,13 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 - .NET 8 / WPF
 - [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (speech recognition runtime, in-process via P/Invoke)
 - [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (NVIDIA, CC-BY-4.0) — speech model
+- [Canary 180M Flash](https://huggingface.co/nvidia/canary-180m-flash) (NVIDIA, CC-BY-4.0) — optional speech-translation model
 - [Silero VAD](https://github.com/snakers4/silero-vad) (voice activity detection, ONNX)
 - [NAudio](https://github.com/naudio/NAudio) (audio capture)
 
 ## Credits & Attribution
 
-VoiceLite ships the **Parakeet TDT 0.6B v3** model from NVIDIA, used unmodified under the [Creative Commons Attribution 4.0 International (CC-BY-4.0)](https://creativecommons.org/licenses/by/4.0/) license. The full license text and our usage notice are included in the `LICENSES/` directory of the installation. See [model card](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) for model details.
+VoiceLite uses NVIDIA's **Parakeet TDT 0.6B v3** and optional **Canary 180M Flash** models under the [Creative Commons Attribution 4.0 International (CC-BY-4.0)](https://creativecommons.org/licenses/by/4.0/) license. The full license text and usage notices are included in the `LICENSES/` directory of the installation.
 
 ## Contributing
 
