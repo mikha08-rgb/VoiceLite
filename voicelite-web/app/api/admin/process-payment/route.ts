@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { LicenseType } from '@prisma/client';
 import { sendLicenseEmail } from '@/lib/emails/license-email';
 import { upsertLicenseFromStripe, recordLicenseEvent } from '@/lib/licensing';
 import { isAdminAuthenticated } from '@/lib/admin-auth';
+import { logger } from '@/lib/logger';
 
 // Same email format validation as the webhook route (CRITICAL-2 FIX there)
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -10,6 +12,8 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') ?? randomUUID();
+
   // Authenticate admin request
   if (!isAdminAuthenticated(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,7 +37,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔧 MANUAL: Creating license for ${email}, Payment Intent: ${paymentIntentId}`);
+    logger.info('Manual license creation requested', {
+      requestId,
+      paymentIntentId,
+    });
 
     // Create license in database
     const license = await upsertLicenseFromStripe({
@@ -43,16 +50,25 @@ export async function POST(request: NextRequest) {
       stripePaymentIntentId: paymentIntentId,
     });
 
-    console.log(`✅ License created: ${license.licenseKey}`);
+    logger.info('Manual license created', {
+      requestId,
+      licenseId: license.id,
+    });
 
     // Send email
     const emailResult = await sendLicenseEmail({
       email,
       licenseKey: license.licenseKey,
+      licenseId: license.id,
+      requestId,
     });
 
     if (emailResult.success) {
-      console.log(`✅ Email sent to ${email}`);
+      logger.info('Manual license email sent', {
+        requestId,
+        licenseId: license.id,
+        messageId: emailResult.messageId,
+      });
       await recordLicenseEvent(license.id, 'email_sent', {
         messageId: emailResult.messageId,
         email: email,
@@ -72,7 +88,10 @@ export async function POST(request: NextRequest) {
         },
       });
     } else {
-      console.error(`❌ Email failed for ${email}`);
+      logger.error('Manual license email failed', emailResult.error, {
+        requestId,
+        licenseId: license.id,
+      });
       await recordLicenseEvent(license.id, 'email_failed', {
         error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
         email: email,
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error: any) {
-    console.error('❌ Manual license creation failed:', error);
+    logger.error('Manual license creation failed', error, { requestId });
     // HIGH-11 FIX: Sanitize error message to prevent leaking Prisma constraint details
     const sanitizedError = process.env.NODE_ENV === 'development'
       ? error.message

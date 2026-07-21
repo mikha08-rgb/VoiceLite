@@ -6,6 +6,14 @@ namespace VoiceLite.Services
     /// </summary>
     public static class DownloadEndpoints
     {
+        private static readonly string[] ParakeetRequiredFiles =
+        {
+            "encoder.int8.onnx",
+            "decoder.int8.onnx",
+            "joiner.int8.onnx",
+            "tokens.txt"
+        };
+
         /// <summary>
         /// Upstream URL hosted by k2-fsa on GitHub Releases. Roughly 640MB tarball
         /// containing encoder.int8.onnx, decoder.int8.onnx, joiner.int8.onnx, tokens.txt.
@@ -34,14 +42,58 @@ namespace VoiceLite.Services
         public const string CanaryTranslationInt8 =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8.tar.bz2";
 
+        // Exact GitHub release-asset metadata. If upstream intentionally replaces an
+        // archive, review the new contents first, then update size and hash together.
+        internal const long ParakeetV3Int8ArchiveSize = 487_170_055;
+        internal const string ParakeetV3Int8Sha256 =
+            "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf";
+        internal const long CanaryTranslationInt8ArchiveSize = 153_692_328;
+        internal const string CanaryTranslationInt8Sha256 =
+            "7a38ed8b13f014ad632b09ff8d22e0c6f1359dd046af9235d281dfae841b9ab9";
+
         /// <summary>
         /// Resolves a canonical model id to its download URL, or null if unsupported.
         /// </summary>
         public static string? GetUrlForFileName(string fileName) => fileName switch
         {
-            "parakeet-tdt-0.6b-v3-int8" => ParakeetV3Int8,
+            ModelResolverService.ParakeetModelId => ParakeetV3Int8,
             TranslationModelResolverService.ModelId => CanaryTranslationInt8,
             _ => null,
+        };
+
+        /// <summary>
+        /// Selects the complete integrity/install manifest for a supported model.
+        /// Disk allowances intentionally retain the existing conservative preflight
+        /// margins rather than using the smaller exact archive sizes.
+        /// </summary>
+        internal static ModelManifest GetManifestForFileName(
+            string fileName,
+            string modelDirectory) => fileName switch
+        {
+            ModelResolverService.ParakeetModelId => new ModelManifest(
+                ModelResolverService.ParakeetModelId,
+                new System.Uri(ParakeetV3Int8),
+                modelDirectory,
+                ParakeetRequiredFiles,
+                "parakeet",
+                ParakeetV3Int8ArchiveSize,
+                ParakeetV3Int8Sha256,
+                ArchiveDiskSpaceBytes: 700_000_000,
+                ExtractedDiskSpaceBytes: 800_000_000),
+
+            TranslationModelResolverService.ModelId => new ModelManifest(
+                TranslationModelResolverService.ModelId,
+                new System.Uri(CanaryTranslationInt8),
+                modelDirectory,
+                TranslationModelResolverService.RequiredModelFiles,
+                "canary-translation",
+                CanaryTranslationInt8ArchiveSize,
+                CanaryTranslationInt8Sha256,
+                ArchiveDiskSpaceBytes: 200_000_000,
+                ExtractedDiskSpaceBytes: 250_000_000),
+
+            _ => throw new System.ArgumentOutOfRangeException(
+                nameof(fileName), fileName, "Unsupported model id")
         };
     }
 }

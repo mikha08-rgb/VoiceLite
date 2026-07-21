@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using AwesomeAssertions;
 using VoiceLite.Services;
 using Xunit;
@@ -60,6 +62,59 @@ namespace VoiceLite.Tests.Services
             var id = HardwareIdService.GetMachineId();
             id.Should().NotContain("BFEBFBFF"); // common Intel CPUID prefix
             id.Should().NotContain("To Be Filled"); // common motherboard default
+        }
+
+        [Theory]
+        [InlineData("UNKNOWN_CPU", "UNKNOWN_MB")]
+        [InlineData("UNKNOWN_CPU", "REAL_MOTHERBOARD_SERIAL")]
+        [InlineData("REAL_CPU_ID", "UNKNOWN_MB")]
+        [InlineData("To Be Filled By O.E.M.", "Default string")]
+        [InlineData("0000000000000000", "FFFFFFFFFFFFFFFF")]
+        public void GetMachineId_WhenWmiIdentifiersAreUnavailable_UsesStablePersistentFallback(
+            string cpuId,
+            string motherboardSerial)
+        {
+            var testDirectory = Path.Combine(
+                Path.GetTempPath(),
+                "VoiceLite-HardwareIdTests",
+                Guid.NewGuid().ToString("N"));
+            var fallbackPath = Path.Combine(testDirectory, "machine_id.dat");
+            var provider = new StubHardwareInfoProvider(cpuId, motherboardSerial);
+
+            try
+            {
+                var first = HardwareIdService.GetMachineId(provider, fallbackPath);
+                var second = HardwareIdService.GetMachineId(provider, fallbackPath);
+
+                first.Should().HaveLength(32);
+                second.Should().Be(first);
+                File.Exists(fallbackPath).Should().BeTrue();
+            }
+            finally
+            {
+                if (Directory.Exists(testDirectory))
+                {
+                    Directory.Delete(testDirectory, recursive: true);
+                }
+            }
+        }
+
+        private sealed class StubHardwareInfoProvider : IHardwareInfoProvider
+        {
+            private readonly string _cpuId;
+            private readonly string _motherboardSerial;
+
+            public StubHardwareInfoProvider(string cpuId, string motherboardSerial)
+            {
+                _cpuId = cpuId;
+                _motherboardSerial = motherboardSerial;
+            }
+
+            public string GetCpuId() => _cpuId;
+
+            public string GetMotherboardSerial() => _motherboardSerial;
+
+            public string GetBiosSerial() => "TEST_BIOS_SERIAL";
         }
     }
 }

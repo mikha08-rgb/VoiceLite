@@ -1,4 +1,6 @@
 import { Resend } from 'resend';
+import { randomUUID } from 'node:crypto';
+import { logger } from '@/lib/logger';
 
 // Singleton Resend client - lazy initialized for serverless compatibility
 let resendClient: Resend | null = null;
@@ -12,19 +14,21 @@ function getResendClient(): Resend {
   const key = process.env.RESEND_API_KEY;
   if (!key || key === 're_placeholder') {
     // Log detailed error for debugging in production
-    console.error('RESEND_API_KEY missing or placeholder. Email sending will fail.');
+    logger.error('RESEND_API_KEY missing or placeholder; email sending will fail');
     throw new Error('RESEND_API_KEY must be configured for email sending');
   }
 
   // Create and cache client
   resendClient = new Resend(key);
-  console.log('📧 Resend client initialized');
+  logger.debug('Resend client initialized');
   return resendClient;
 }
 
 export interface LicenseEmailData {
   email: string;
   licenseKey: string;
+  licenseId?: string;
+  requestId?: string;
 }
 
 export interface LicenseEmailResult {
@@ -55,7 +59,16 @@ async function delay(attempt: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
-export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData): Promise<LicenseEmailResult> {
+export async function sendLicenseEmail({
+  email,
+  licenseKey,
+  licenseId,
+  requestId,
+}: LicenseEmailData): Promise<LicenseEmailResult> {
+  const correlation = licenseId
+    ? { licenseId, requestId }
+    : { requestId: requestId ?? randomUUID() };
+
   // CONFIG FIX: there used to be a fallback to 'VoiceLite <basementhustlellc@gmail.com>'
   // here, but a gmail address can never be a Resend-verified sender, so every send
   // through the fallback silently failed. Missing/empty RESEND_FROM_EMAIL is a config
@@ -66,7 +79,7 @@ export async function sendLicenseEmail({ email, licenseKey }: LicenseEmailData):
   const fromEmail = process.env.RESEND_FROM_EMAIL;
   if (!fromEmail || fromEmail.trim() === '') {
     const configError = new Error('RESEND_FROM_EMAIL must be configured with a Resend-verified sender for email sending');
-    console.error(`❌ ${configError.message}`);
+    logger.error('License email sender is not configured', configError, correlation);
     return { success: false, error: configError, attempts: 0 };
   }
 
@@ -187,10 +200,14 @@ Need help? Just reply to this email.
   for (let attempt = 0; attempt < RETRY_CONFIG.maxAttempts; attempt++) {
     try {
       if (attempt > 0) {
-        console.log(`📧 Resend API: Retry attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} for ${email}`);
+        logger.info('Retrying license email delivery', {
+          ...correlation,
+          attempt: attempt + 1,
+          maxAttempts: RETRY_CONFIG.maxAttempts,
+        });
         await delay(attempt); // Exponential backoff before retry
       } else {
-        console.log(`📧 Resend API: Sending email to ${email} from ${fromEmail}`);
+        logger.info('Sending license email', correlation);
       }
 
       const resend = getResendClient();
@@ -208,43 +225,41 @@ Need help? Just reply to this email.
       // { success: true, messageId: undefined } and the retry loop was dead code.
       if (result.error) {
         lastError = result.error;
-        console.error(`❌ Resend API error on attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts}:`, {
-          email,
-          errorName: result.error.name,
-          errorMessage: result.error.message,
+        logger.error('Resend API rejected license email', result.error, {
+          ...correlation,
+          attempt: attempt + 1,
+          maxAttempts: RETRY_CONFIG.maxAttempts,
         });
         continue; // Next attempt - exponential backoff applies at the top of the loop
       }
 
-      console.log(`✅ Resend API response:`, {
-        success: true,
+      logger.info('Resend API accepted license email', {
+        ...correlation,
         messageId: result.data?.id,
-        email: email,
         attempt: attempt + 1,
       });
 
       return { success: true, messageId: result.data?.id, attempts: attempt + 1 };
     } catch (error) {
       lastError = error;
-      console.error(`❌ Email attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} failed:`, {
-        email,
-        error: error instanceof Error ? error.message : String(error),
+      logger.error('License email attempt failed', error, {
+        ...correlation,
+        attempt: attempt + 1,
+        maxAttempts: RETRY_CONFIG.maxAttempts,
       });
 
       // Don't retry on configuration errors (API key / from-address issues)
       if (error instanceof Error && (error.message.includes('RESEND_API_KEY') || error.message.includes('RESEND_FROM_EMAIL'))) {
-        console.error('Configuration error - not retrying');
+        logger.error('License email configuration error; not retrying', error, correlation);
         break;
       }
     }
   }
 
   // All retries exhausted
-  console.error('❌ Failed to send license email after all retries:', {
-    email,
+  logger.error('Failed to send license email after all retries', lastError, {
+    ...correlation,
     attempts: RETRY_CONFIG.maxAttempts,
-    error: lastError instanceof Error ? lastError.message : String(lastError),
-    errorDetails: lastError,
   });
   return { success: false, error: lastError, attempts: RETRY_CONFIG.maxAttempts };
 }

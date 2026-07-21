@@ -8,12 +8,108 @@ using System.Threading;
 
 namespace VoiceLite.Services
 {
+    internal interface IHardwareInfoProvider
+    {
+        string GetCpuId();
+        string GetMotherboardSerial();
+        string GetBiosSerial();
+    }
+
+    internal sealed class WmiHardwareInfoProvider : IHardwareInfoProvider
+    {
+        public string GetCpuId()
+        {
+            try
+            {
+                using (var searcher = new ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor"))
+                using (var collection = searcher.Get())
+                {
+                    foreach (ManagementObject obj in collection)
+                    {
+                        using (obj)
+                        {
+                            var processorId = obj["ProcessorId"]?.ToString();
+                            if (!string.IsNullOrEmpty(processorId))
+                            {
+                                return processorId;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to get CPU ID: {ex.Message}");
+            }
+
+            return "UNKNOWN_CPU";
+        }
+
+        public string GetMotherboardSerial()
+        {
+            try
+            {
+                using (var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard"))
+                using (var collection = searcher.Get())
+                {
+                    foreach (ManagementObject obj in collection)
+                    {
+                        using (obj)
+                        {
+                            var serial = obj["SerialNumber"]?.ToString();
+                            if (!string.IsNullOrEmpty(serial))
+                            {
+                                return serial;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to get motherboard serial: {ex.Message}");
+            }
+
+            return "UNKNOWN_MB";
+        }
+
+        public string GetBiosSerial()
+        {
+            try
+            {
+                using (var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BIOS"))
+                using (var collection = searcher.Get())
+                {
+                    foreach (ManagementObject obj in collection)
+                    {
+                        using (obj)
+                        {
+                            var serial = obj["SerialNumber"]?.ToString();
+                            if (!string.IsNullOrEmpty(serial))
+                            {
+                                return serial;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Failed to get BIOS serial: {ex.Message}");
+            }
+
+            return "UNKNOWN_BIOS";
+        }
+    }
+
     /// <summary>
     /// Generates unique hardware-based identifiers for device activation tracking.
     /// Uses CPU ID and motherboard serial number for stable identification.
     /// </summary>
     public static class HardwareIdService
     {
+        private static readonly IHardwareInfoProvider HardwareInfoProvider = new WmiHardwareInfoProvider();
+
         // HIGH-6 FIX: Path to store fallback machine ID (persistent across restarts)
         private static readonly string FallbackIdFilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -40,10 +136,24 @@ namespace VoiceLite.Services
         /// </summary>
         public static string GetMachineId()
         {
+            return GetMachineId(HardwareInfoProvider, FallbackIdFilePath);
+        }
+
+        internal static string GetMachineId(
+            IHardwareInfoProvider hardwareInfoProvider,
+            string fallbackIdFilePath)
+        {
             try
             {
-                var cpuId = GetCpuId();
-                var mbSerial = GetMotherboardSerial();
+                var cpuId = hardwareInfoProvider.GetCpuId();
+                var mbSerial = hardwareInfoProvider.GetMotherboardSerial();
+
+                if (!IsUsableHardwareIdentifier(cpuId) || !IsUsableHardwareIdentifier(mbSerial))
+                {
+                    ErrorLogger.LogWarning("Hardware identifiers unavailable; using persistent fallback machine ID");
+                    return GetOrCreatePersistentFallbackId(fallbackIdFilePath);
+                }
+
                 var combined = $"{cpuId}:{mbSerial}";
 
                 using (var sha256 = SHA256.Create())
@@ -57,8 +167,7 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 ErrorLogger.LogError("Failed to generate machine ID", ex);
-                // Fallback to computer name hash if hardware IDs fail
-                return GetFallbackMachineId();
+                return GetOrCreatePersistentFallbackId(fallbackIdFilePath);
             }
         }
 
@@ -85,9 +194,9 @@ namespace VoiceLite.Services
         {
             try
             {
-                var cpuId = GetCpuId();
-                var mbSerial = GetMotherboardSerial();
-                var biosSerial = GetBiosSerial();
+                var cpuId = HardwareInfoProvider.GetCpuId();
+                var mbSerial = HardwareInfoProvider.GetMotherboardSerial();
+                var biosSerial = HardwareInfoProvider.GetBiosSerial();
                 var combined = $"{cpuId}:{mbSerial}:{biosSerial}";
 
                 using (var sha256 = SHA256.Create())
@@ -103,109 +212,45 @@ namespace VoiceLite.Services
             }
         }
 
-        private static string GetCpuId()
+        private static bool IsUsableHardwareIdentifier(string? identifier)
         {
-            try
+            if (string.IsNullOrWhiteSpace(identifier))
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor"))
-                using (var collection = searcher.Get())
-                {
-                    foreach (ManagementObject obj in collection)
-                    {
-                        using (obj)  // WMI resource leak fix: ManagementObject must be disposed
-                        {
-                            var processorId = obj["ProcessorId"]?.ToString();
-                            if (!string.IsNullOrEmpty(processorId))
-                            {
-                                return processorId;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Failed to get CPU ID: {ex.Message}");
+                return false;
             }
 
-            return "UNKNOWN_CPU";
-        }
+            var normalized = identifier.Trim();
+            var genericIdentifiers = new[]
+            {
+                "UNKNOWN_CPU",
+                "UNKNOWN_MB",
+                "UNKNOWN_BIOS",
+                "UNKNOWN",
+                "NONE",
+                "N/A",
+                "NA",
+                "NOT AVAILABLE",
+                "NOT APPLICABLE",
+                "NOT SPECIFIED",
+                "TO BE FILLED BY O.E.M.",
+                "TO BE FILLED BY OEM",
+                "DEFAULT STRING",
+                "SYSTEM SERIAL NUMBER",
+                "BASE BOARD SERIAL NUMBER",
+                "OEM"
+            };
 
-        private static string GetMotherboardSerial()
-        {
-            try
+            if (genericIdentifiers.Contains(normalized, StringComparer.OrdinalIgnoreCase))
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard"))
-                using (var collection = searcher.Get())
-                {
-                    foreach (ManagementObject obj in collection)
-                    {
-                        using (obj)  // WMI resource leak fix: ManagementObject must be disposed
-                        {
-                            var serial = obj["SerialNumber"]?.ToString();
-                            if (!string.IsNullOrEmpty(serial) && serial != "None")
-                            {
-                                return serial;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Failed to get motherboard serial: {ex.Message}");
+                return false;
             }
 
-            return "UNKNOWN_MB";
-        }
-
-        private static string GetBiosSerial()
-        {
-            try
+            if (normalized.All(c => c == '0') || normalized.All(c => c == 'F' || c == 'f'))
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BIOS"))
-                using (var collection = searcher.Get())
-                {
-                    foreach (ManagementObject obj in collection)
-                    {
-                        using (obj)  // WMI resource leak fix: ManagementObject must be disposed
-                        {
-                            var serial = obj["SerialNumber"]?.ToString();
-                            if (!string.IsNullOrEmpty(serial))
-                            {
-                                return serial;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning($"Failed to get BIOS serial: {ex.Message}");
+                return false;
             }
 
-            return "UNKNOWN_BIOS";
-        }
-
-        private static string GetFallbackMachineId()
-        {
-            try
-            {
-                // Use computer name + user domain as fallback
-                var identifier = $"{Environment.MachineName}:{Environment.UserDomainName}";
-                using (var sha256 = SHA256.Create())
-                {
-                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identifier));
-                    var base64 = Convert.ToBase64String(hash);
-                    return base64.Substring(0, Math.Min(32, base64.Length));
-                }
-            }
-            catch
-            {
-                // HIGH-6 FIX: Last resort - use PERSISTENT random GUID (saved to disk)
-                // Previously generated a new GUID every call, causing license bypass on VMs
-                return GetOrCreatePersistentFallbackId();
-            }
+            return true;
         }
 
         /// <summary>
@@ -215,7 +260,7 @@ namespace VoiceLite.Services
         /// Stores a random GUID in %LOCALAPPDATA%\VoiceLite\machine_id.dat (encrypted)
         /// This prevents users on VMs/headless systems from bypassing the 3-device limit
         /// </summary>
-        private static string GetOrCreatePersistentFallbackId()
+        private static string GetOrCreatePersistentFallbackId(string fallbackIdFilePath)
         {
             // THREAD-SAFETY FIX (MED-3): Use named mutex for atomic file check-and-create
             // Prevents race condition where two threads see file missing, both generate GUID, both write
@@ -243,9 +288,9 @@ namespace VoiceLite.Services
                     try
                     {
                         // Check if we have a saved fallback ID (now inside mutex)
-                        if (File.Exists(FallbackIdFilePath))
+                        if (File.Exists(fallbackIdFilePath))
                         {
-                            var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+                            var fileBytes = File.ReadAllBytes(fallbackIdFilePath);
 
                             // HIGH-4 FIX: Try to decrypt with DPAPI first (new format)
                             try
@@ -270,7 +315,7 @@ namespace VoiceLite.Services
                                 {
                                     // Migrate to encrypted format
                                     ErrorLogger.LogMessage("Migrating machine ID to encrypted format...");
-                                    SaveEncryptedMachineId(savedId);
+                                    SaveEncryptedMachineId(savedId, fallbackIdFilePath);
                                     return savedId;
                                 }
                             }
@@ -278,7 +323,7 @@ namespace VoiceLite.Services
 
                         // Generate and save a new persistent ID (encrypted)
                         var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
-                        SaveEncryptedMachineId(newId);
+                        SaveEncryptedMachineId(newId, fallbackIdFilePath);
                         ErrorLogger.LogWarning($"Created persistent fallback machine ID (hardware detection failed)");
 
                         return newId;
@@ -298,11 +343,11 @@ namespace VoiceLite.Services
                     // from an unsynchronized block of code")
 
                     // Re-check file inside mutex (recursive call would deadlock, so inline the check)
-                    if (File.Exists(FallbackIdFilePath))
+                    if (File.Exists(fallbackIdFilePath))
                     {
                         try
                         {
-                            var fileBytes = File.ReadAllBytes(FallbackIdFilePath);
+                            var fileBytes = File.ReadAllBytes(fallbackIdFilePath);
                             var decryptedBytes = ProtectedData.Unprotect(fileBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
                             var savedId = Encoding.UTF8.GetString(decryptedBytes).Trim();
                             if (!string.IsNullOrEmpty(savedId) && savedId.Length == 32)
@@ -313,7 +358,7 @@ namespace VoiceLite.Services
                         catch { /* Fall through to generate new */ }
                     }
                     var newId = Guid.NewGuid().ToString("N").Substring(0, 32);
-                    SaveEncryptedMachineId(newId);
+                    SaveEncryptedMachineId(newId, fallbackIdFilePath);
                     return newId; // using block handles mutex release
                 }
                 catch (Exception ex)
@@ -328,7 +373,7 @@ namespace VoiceLite.Services
         /// <summary>
         /// HIGH-4 FIX: Saves machine ID with DPAPI encryption
         /// </summary>
-        private static void SaveEncryptedMachineId(string machineId)
+        private static void SaveEncryptedMachineId(string machineId, string fallbackIdFilePath)
         {
             var plaintextBytes = Encoding.UTF8.GetBytes(machineId);
             var encryptedBytes = ProtectedData.Protect(
@@ -338,13 +383,13 @@ namespace VoiceLite.Services
             );
 
             // Ensure directory exists
-            var directory = Path.GetDirectoryName(FallbackIdFilePath);
+            var directory = Path.GetDirectoryName(fallbackIdFilePath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllBytes(FallbackIdFilePath, encryptedBytes);
+            File.WriteAllBytes(fallbackIdFilePath, encryptedBytes);
         }
     }
 }
