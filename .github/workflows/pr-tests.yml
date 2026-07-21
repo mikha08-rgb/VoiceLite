@@ -66,6 +66,9 @@ jobs:
     - name: Check TypeScript types
       run: npm run build
 
+    - name: Run webhook tests
+      run: npm test
+
     - name: Lint code
       run: npm run lint --if-present || echo "No lint script found, skipping..."
 

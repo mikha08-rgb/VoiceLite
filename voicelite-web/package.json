@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "test": "tsx --test \"app/**/*.test.ts\"",
     "test:email": "tsx scripts/test-email.ts"
   },
   "prisma": {
