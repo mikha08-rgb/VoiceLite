@@ -97,6 +97,16 @@ namespace VoiceLite
         public MainWindow()
         {
             InitializeComponent();
+
+            // LICENSE STARTUP FIX: LicenseService MUST be constructed before LoadSettings().
+            // Its ctor migrates any legacy plaintext key from settings.json into DPAPI
+            // license.dat and loads the authoritative DPAPI state, so the entitlement check
+            // inside LoadSettings() → ValidateTranscriptionModel() sees real license state.
+            // When it was constructed later (InitializeServicesAsync), the check ran against
+            // a null service on every cold start: Pro users were reset to Free and the
+            // legacy plaintext key was wiped before migration could consume it.
+            licenseService = new LicenseService();
+
             LoadSettings();
 
             statusViewModel = new StatusViewModel();
@@ -511,9 +521,9 @@ namespace VoiceLite
                 // SECURITY FIX (MODEL-GATE-001): Required for Pro model access control
                 proFeatureService = new ProFeatureService(settings);
 
-                // LicenseService backs the DPAPI tamper check in ValidateTranscriptionModel.
-                // Static HttpClient pattern means no MainWindow-level disposal needed (lives for process lifetime).
-                licenseService = new LicenseService();
+                // LicenseService is constructed in the MainWindow ctor, BEFORE LoadSettings(),
+                // so the DPAPI tamper check in ValidateTranscriptionModel sees real license
+                // state during startup. Do not construct a second instance here.
 
                 // Initialize ASR service (in-process via Sherpa-ONNX + Parakeet v3)
                 transcriptionService = new TranscriptionService(settings, null, proFeatureService);
@@ -1866,27 +1876,7 @@ namespace VoiceLite
                 // on first transcription. This method retains only the license-tamper checks that
                 // have nothing to do with the engine.
 
-                bool needsSettingsSave = false;
-
-                // SECURITY: Verify settings.IsProLicense is backed by a DPAPI-stored license.
-                // DPAPI encrypts the license to the Windows user account, so an attacker who
-                // edits settings.json to set IsProLicense=true won't have a matching license.dat.
-                if (settings.IsProLicense && string.IsNullOrWhiteSpace(licenseService?.GetStoredLicenseKey()))
-                {
-                    ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no DPAPI license found - possible manual edit, resetting to free");
-                    settings.IsProLicense = false;
-                    needsSettingsSave = true;
-                }
-
-                // Legacy cleanup: older builds wrote the license key plaintext to settings.json.
-                // The DPAPI-encrypted license.dat is now the only authoritative store.
-                if (!string.IsNullOrEmpty(settings.LicenseKey))
-                {
-                    settings.LicenseKey = string.Empty;
-                    needsSettingsSave = true;
-                }
-
-                if (needsSettingsSave)
+                if (ApplyStartupEntitlementCheck(settings, licenseService))
                 {
                     _ = SaveSettingsInternalAsync();
                 }
@@ -1895,6 +1885,46 @@ namespace VoiceLite
             {
                 ErrorLogger.LogError("ValidateTranscriptionModel", ex);
             }
+        }
+
+        /// <summary>
+        /// Startup entitlement check; returns true when settings changed and need saving.
+        /// LICENSE STARTUP FIX: requires a constructed LicenseService — entitlement is never
+        /// cleared or saved based on a null (not-yet-constructed) service, because "no service"
+        /// is indistinguishable from "no license". internal static so the cold-start regression
+        /// suite (EntitlementColdStartTests) exercises the exact production logic.
+        /// </summary>
+        internal static bool ApplyStartupEntitlementCheck(Settings settings, LicenseService? licenseService)
+        {
+            if (licenseService == null)
+            {
+                // Without the service we cannot know the real license state - touch nothing.
+                ErrorLogger.LogWarning("Startup entitlement check skipped - LicenseService not constructed");
+                return false;
+            }
+
+            bool needsSettingsSave = false;
+
+            // SECURITY: Verify settings.IsProLicense is backed by a DPAPI-stored license.
+            // DPAPI encrypts the license to the Windows user account, so an attacker who
+            // edits settings.json to set IsProLicense=true won't have a matching license.dat.
+            if (settings.IsProLicense && string.IsNullOrWhiteSpace(licenseService.GetStoredLicenseKey()))
+            {
+                ErrorLogger.LogWarning("SECURITY: IsProLicense=true but no DPAPI license found - possible manual edit, resetting to free");
+                settings.IsProLicense = false;
+                needsSettingsSave = true;
+            }
+
+            // Legacy cleanup: older builds wrote the license key plaintext to settings.json.
+            // The DPAPI-encrypted license.dat is now the only authoritative store; by this
+            // point the LicenseService ctor has already migrated any plaintext key into it.
+            if (!string.IsNullOrEmpty(settings.LicenseKey))
+            {
+                settings.LicenseKey = string.Empty;
+                needsSettingsSave = true;
+            }
+
+            return needsSettingsSave;
         }
 
 
