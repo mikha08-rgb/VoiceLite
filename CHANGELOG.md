@@ -4,6 +4,11 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.4.0] - 2026-07-20
+
+### Added
+- **Translate to English (Pro)** — optional offline speech translation. Speak Spanish, French, or German and VoiceLite inserts the English translation. Powered by NVIDIA Canary 180M Flash (CC-BY-4.0) via Sherpa-ONNX; the ~154MB model installs on demand from Settings and audio never leaves the PC. Off by default — existing transcription behavior is unchanged.
+
 ## [2.3.0] - 2026-07-18
 
 ### Fixed
