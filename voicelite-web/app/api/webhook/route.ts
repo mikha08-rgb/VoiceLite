@@ -23,12 +23,19 @@ const EMAIL_RATE_LIMIT_MINUTES = 15;
 // Validates email format before processing to prevent data integrity issues
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-// Custom error class for transient errors that should trigger Stripe retry
-class RetriableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RetriableError';
-  }
+type WebhookOutcome =
+  | { kind: 'success' }
+  | { kind: 'retry'; message: string }
+  | { kind: 'permanentFailure'; message: string };
+
+const SUCCESS: WebhookOutcome = { kind: 'success' };
+
+function retry(message: string): WebhookOutcome {
+  return { kind: 'retry', message };
+}
+
+function permanentFailure(message: string): WebhookOutcome {
+  return { kind: 'permanentFailure', message };
 }
 
 async function canSendLicenseEmail(licenseId: string): Promise<boolean> {
@@ -176,50 +183,36 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let outcome: WebhookOutcome;
   try {
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session);
-        break;
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-      case 'charge.refunded':
-        await handleChargeRefunded(event.data.object as Stripe.Charge);
-        break;
-      default:
-        logger.warn('Unhandled event type', { eventType: event.type });
-    }
+    outcome = await processEvent(stripe, event);
   } catch (error) {
-    logger.error('Webhook processing failure', error);
+    // Fail safe for customer fulfillment: database, Stripe, email, and other
+    // infrastructure exceptions are retriable unless a handler explicitly
+    // classified the event payload itself as permanently invalid.
+    logger.error('Webhook processing failure', error, { eventId: event.id });
+    outcome = retry(error instanceof Error ? error.message : 'Unknown infrastructure failure');
+  }
 
-    // Return 500 for transient errors (Stripe will retry)
-    // Return 200 for permanent errors (no point retrying)
-    if (error instanceof RetriableError) {
-      // BUGFIX: The idempotency row was claimed at line ~104, BEFORE processing.
-      // On a transient failure we must RELEASE that claim, otherwise Stripe's retry
-      // hits the existing WebhookEvent row, short-circuits as { cached: true }, and
-      // NEVER re-runs handleCheckoutCompleted — so the customer pays and never gets a
-      // license. Deleting the row lets the retry re-claim and actually reprocess.
-      try {
-        await prisma.webhookEvent.delete({ where: { eventId: event.id } });
-      } catch (releaseError) {
-        // If we can't release the claim, log loudly — this event will need the
-        // scripts/fix-stripe-webhooks.ts reconciliation to recover.
-        logger.error('Failed to release webhook idempotency claim after transient error', releaseError, { eventId: event.id });
-      }
-      return NextResponse.json({ error: error.message, eventId: event.id }, { status: 500 });
+  if (outcome.kind === 'retry') {
+    // The claim was created before processing. Release it on every retriable
+    // outcome so Stripe's next delivery can actually re-run fulfillment.
+    try {
+      await prisma.webhookEvent.delete({ where: { eventId: event.id } });
+    } catch (releaseError) {
+      // If we can't release the claim, stale-claim takeover remains the recovery
+      // backstop for a later delivery/reconciliation run.
+      logger.error('Failed to release webhook idempotency claim after transient error', releaseError, { eventId: event.id });
     }
+    return NextResponse.json({ error: outcome.message, eventId: event.id }, { status: 500 });
+  }
 
-    // Permanent failure - don't retry. The claim stays in place intentionally so
-    // Stripe stops resending an event we can never process (e.g. malformed email).
-    // Note: processedAt is still the unprocessed sentinel here, so a MANUAL Stripe
-    // redelivery more than STALE_CLAIM_MS later WILL reprocess it - desirable if
-    // the underlying cause (e.g. bad data) has been fixed by then.
-    return NextResponse.json({ error: 'Processing error', eventId: event.id }, { status: 200 });
+  if (outcome.kind === 'permanentFailure') {
+    logger.warn('Webhook event permanently rejected', {
+      eventId: event.id,
+      eventType: event.type,
+      reason: outcome.message,
+    });
   }
 
   // Processing succeeded - stamp the claim as processed so future retries are
@@ -240,10 +233,34 @@ export async function POST(request: NextRequest) {
     logger.error('Failed to stamp webhook claim as processed AFTER successful processing - returning 200 anyway', stampError, { eventId: event.id });
   }
 
-  return NextResponse.json({ received: true, eventId: event.id });
+  return NextResponse.json({
+    received: true,
+    eventId: event.id,
+    ...(outcome.kind === 'permanentFailure' ? { ignored: true } : {}),
+  });
 }
 
-async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
+async function processEvent(stripe: Stripe, event: Stripe.Event): Promise<WebhookOutcome> {
+  switch (event.type) {
+    case 'checkout.session.completed':
+      return handleCheckoutCompleted(stripe, event.data.object as Stripe.Checkout.Session, event.id);
+    case 'customer.subscription.updated':
+      return handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+    case 'customer.subscription.deleted':
+      return handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+    case 'charge.refunded':
+      return handleChargeRefunded(event.data.object as Stripe.Charge);
+    default:
+      logger.warn('Unhandled event type', { eventType: event.type });
+      return permanentFailure(`Unsupported Stripe event type: ${event.type}`);
+  }
+}
+
+async function handleCheckoutCompleted(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  eventId: string,
+): Promise<WebhookOutcome> {
   logger.info('Webhook: checkout.session.completed', { sessionId: session.id });
 
   const email = session.customer_email || session.customer_details?.email;
@@ -253,14 +270,14 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
   if (!email || !stripeCustomerId) {
     logger.error('Missing customer email or ID');
-    throw new Error('Missing customer email or ID on checkout session');
+    return permanentFailure('Missing customer email or ID on checkout session');
   }
 
   // CRITICAL-2 FIX: Validate email format before processing
   // Prevents data integrity issues from malformed emails
   if (!EMAIL_REGEX.test(email)) {
     logger.error('Invalid email format from Stripe', { email: email.substring(0, 50) });
-    throw new Error('Invalid email format on checkout session');
+    return permanentFailure('Invalid email format on checkout session');
   }
 
   const plan = session.metadata?.plan ?? (session.mode === 'subscription' ? 'quarterly' : 'lifetime');
@@ -269,37 +286,23 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   if (plan === 'quarterly') {
     const subscriptionId = session.subscription as string | undefined;
     if (!subscriptionId) {
-      throw new Error('Missing subscription id for quarterly plan');
+      return permanentFailure('Missing subscription id for quarterly plan');
     }
 
-    // Wrap Stripe API call - network errors should trigger retry
-    let subscription: any;
-    try {
-      subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    } catch (stripeError) {
-      logger.error('Failed to retrieve subscription', stripeError, { subscriptionId });
-      throw new RetriableError(`Stripe API error: Failed to retrieve subscription ${subscriptionId}`);
-    }
+    const subscription: any = await stripe.subscriptions.retrieve(subscriptionId);
 
     const currentPeriodEnd = subscription.current_period_end
       ? new Date(subscription.current_period_end * 1000)
       : undefined;
 
-    // Wrap database call - errors should trigger retry
-    let license;
-    try {
-      license = await upsertLicenseFromStripe({
-        email,
-        type: LicenseType.SUBSCRIPTION,
-        stripeCustomerId,
-        stripeSubscriptionId: subscriptionId,
-        subscriptionStatus: subscription.status,
-        periodEndsAt: currentPeriodEnd,
-      });
-    } catch (dbError) {
-      logger.error('Database error creating subscription license', dbError, { email });
-      throw new RetriableError(`Database error creating subscription license for ${email}`);
-    }
+    const license = await upsertLicenseFromStripe({
+      email,
+      type: LicenseType.SUBSCRIPTION,
+      stripeCustomerId,
+      stripeSubscriptionId: subscriptionId,
+      subscriptionStatus: subscription.status,
+      periodEndsAt: currentPeriodEnd,
+    });
 
     logger.info('Sending license email', { email, licenseKey: license.licenseKey });
 
@@ -308,6 +311,8 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       const emailResult = await sendLicenseEmail({
         email,
         licenseKey: license.licenseKey,
+        licenseId: license.id,
+        requestId: eventId,
       });
 
       if (emailResult.success) {
@@ -322,8 +327,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
         });
-        // Throw RetriableError so Stripe will retry - customer MUST get their email
-        throw new RetriableError(`Email sending failed for ${email}`);
+        return retry('License email sending failed');
       }
     } else {
       // Log that email was skipped due to rate limit
@@ -350,7 +354,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       // No PaymentIntent on a PAID session is transient Stripe weirdness -
       // retry loudly instead of dropping the purchase permanently.
       logger.error(`Missing payment intent for paid lifetime plan (session ${session.id}, amount_total ${session.amount_total})`);
-      throw new RetriableError(`Missing payment intent for paid lifetime plan (session ${session.id})`);
+      return retry(`Missing payment intent for paid lifetime plan (session ${session.id})`);
     }
 
     const paymentRef = paymentIntentId ?? session.id;
@@ -360,19 +364,13 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
     logger.debug('Creating license in database');
 
-    let license;
-    try {
-      license = await upsertLicenseFromStripe({
-        email,
-        type: LicenseType.LIFETIME,
-        stripeCustomerId,
-        stripePaymentIntentId: paymentRef,
-      });
-      logger.info('License created', { licenseKey: license.licenseKey, licenseId: license.id });
-    } catch (dbError) {
-      logger.error('Database error creating lifetime license', dbError, { email });
-      throw new RetriableError(`Database error creating lifetime license for ${email}`);
-    }
+    const license = await upsertLicenseFromStripe({
+      email,
+      type: LicenseType.LIFETIME,
+      stripeCustomerId,
+      stripePaymentIntentId: paymentRef,
+    });
+    logger.info('License created', { licenseKey: license.licenseKey, licenseId: license.id });
 
     logger.info('Sending license email', { email, licenseKey: license.licenseKey });
 
@@ -381,6 +379,8 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       const emailResult = await sendLicenseEmail({
         email,
         licenseKey: license.licenseKey,
+        licenseId: license.id,
+        requestId: eventId,
       });
 
       if (emailResult.success) {
@@ -395,8 +395,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
           error: emailResult.error instanceof Error ? emailResult.error.message : String(emailResult.error),
           email: email,
         });
-        // Throw RetriableError so Stripe will retry - customer MUST get their email
-        throw new RetriableError(`Email sending failed for ${email}`);
+        return retry('License email sending failed');
       }
     } else {
       // Log that email was skipped due to rate limit
@@ -406,90 +405,87 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
       });
     }
   }
+
+  return SUCCESS;
 }
 
-// TRANSIENT-ERROR FIX (non-checkout handlers): DB errors used to escape these
-// handlers as plain errors -> caught by POST -> 200 -> Stripe never retried.
-// For charge.refunded that meant a refunded customer kept Pro forever. All
-// unexpected errors are now rethrown as RetriableError (500 -> Stripe retries).
-
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<WebhookOutcome> {
   // Type assertion needed due to Stripe API version differences
   const sub = subscription as any;
   const periodEnd = sub.current_period_end
     ? new Date(sub.current_period_end * 1000)
     : undefined;
 
-  try {
-    await updateLicenseStatusBySubscriptionId(subscription.id, subscription.status, periodEnd);
+  await updateLicenseStatusBySubscriptionId(subscription.id, subscription.status, periodEnd);
 
-    // Record event
-    const license = await prisma.license.findUnique({
-      where: { stripeSubscriptionId: subscription.id },
+  // Record event
+  const license = await prisma.license.findUnique({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+  if (license) {
+    await recordLicenseEvent(license.id, 'subscription_updated', {
+      status: subscription.status,
+      periodEnd: periodEnd?.toISOString(),
     });
-    if (license) {
-      await recordLicenseEvent(license.id, 'subscription_updated', {
-        status: subscription.status,
-        periodEnd: periodEnd?.toISOString(),
-      });
-    }
-  } catch (dbError) {
-    logger.error('Database error handling subscription update', dbError, { subscriptionId: subscription.id });
-    throw new RetriableError(`Database error handling subscription update for ${subscription.id}`);
   }
+
+  return SUCCESS;
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  try {
-    await updateLicenseStatusBySubscriptionId(subscription.id, 'canceled');
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<WebhookOutcome> {
+  await updateLicenseStatusBySubscriptionId(subscription.id, 'canceled');
 
-    const license = await prisma.license.findUnique({
-      where: { stripeSubscriptionId: subscription.id },
+  const license = await prisma.license.findUnique({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+  if (license) {
+    await recordLicenseEvent(license.id, 'subscription_deleted', {
+      deletedAt: new Date().toISOString(),
     });
-    if (license) {
-      await recordLicenseEvent(license.id, 'subscription_deleted', {
-        deletedAt: new Date().toISOString(),
-      });
-    }
-  } catch (dbError) {
-    logger.error('Database error handling subscription deletion', dbError, { subscriptionId: subscription.id });
-    throw new RetriableError(`Database error handling subscription deletion for ${subscription.id}`);
   }
+
+  return SUCCESS;
 }
 
-async function handleChargeRefunded(charge: Stripe.Charge) {
+async function handleChargeRefunded(charge: Stripe.Charge): Promise<WebhookOutcome> {
   const paymentIntentId = typeof charge.payment_intent === 'string'
     ? charge.payment_intent
     : charge.payment_intent?.id;
 
   if (!paymentIntentId) {
     logger.warn('Charge refunded but no payment intent ID found');
-    return;
+    return permanentFailure('Refunded charge has no payment intent ID');
   }
 
-  let license;
-  try {
-    license = await prisma.license.findFirst({
-      where: { stripePaymentIntentId: paymentIntentId },
-    });
-  } catch (dbError) {
-    logger.error('Database error looking up license for refund', dbError, { paymentIntentId });
-    throw new RetriableError(`Database error looking up license for refunded payment intent ${paymentIntentId}`);
-  }
+  const license = await prisma.license.findFirst({
+    where: { stripePaymentIntentId: paymentIntentId },
+  });
 
   if (!license) {
     // Not-found may be event ordering (refund delivered before the checkout
     // event finished creating the license). Retriable so the revocation isn't
     // silently dropped; Stripe's retry schedule caps how long this can loop.
     logger.warn('Refund received but no matching license found - requesting Stripe retry', { paymentIntentId });
-    throw new RetriableError(`No license found for refunded payment intent ${paymentIntentId} (possible event ordering)`);
+    return retry(`No license found for refunded payment intent ${paymentIntentId} (possible event ordering)`);
   }
 
-  try {
-    await revokeLicense(license.id, 'charge_refunded');
-  } catch (dbError) {
-    logger.error('Database error revoking refunded license', dbError, { licenseId: license.id });
-    throw new RetriableError(`Database error revoking license ${license.id} after refund`);
+  // Explicit partial-refund policy: goodwill/partial refunds preserve Pro access.
+  // Only a refund of the full original charge amount (or more, defensively) revokes.
+  if (charge.amount_refunded < charge.amount) {
+    await recordLicenseEvent(license.id, 'charge_partially_refunded', {
+      amount: charge.amount,
+      amountRefunded: charge.amount_refunded,
+      policy: 'license_retained',
+    });
+    logger.info('Partial charge refund recorded; license remains active', {
+      licenseId: license.id,
+      amount: charge.amount,
+      amountRefunded: charge.amount_refunded,
+    });
+    return SUCCESS;
   }
+
+  await revokeLicense(license.id, 'charge_refunded_full');
   logger.warn('License revoked due to charge refund', { licenseId: license.id });
+  return SUCCESS;
 }
