@@ -1767,7 +1767,12 @@ namespace VoiceLite
             currentSettingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
             currentSettingsWindow.Owner = this;
 
-            if (currentSettingsWindow.ShowDialog() == true)
+            // DRAFT FIX: the window edits a cloned draft; live settings change only when
+            // Save/Apply commits it. ChangesCommitted covers Apply-then-Cancel/X — those
+            // commits are already live and persisted, so hotkey re-registration and UI
+            // refresh below must still run. A pure Cancel leaves live settings untouched.
+            var dialogSaved = currentSettingsWindow.ShowDialog() == true;
+            if (dialogSaved || currentSettingsWindow.ChangesCommitted)
             {
                 settings = SettingsValidator.ValidateAndRepair(currentSettingsWindow.Settings);
                 MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
