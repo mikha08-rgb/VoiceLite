@@ -54,6 +54,12 @@ namespace VoiceLite
         // volatile: written on the UI thread, read on whatever thread raises AudioFileReady.
         private volatile bool discardNextAudio = false;
 
+        // LIFECYCLE FIX: session id of the dictation that currently owns isTranscribing and
+        // the stuck-state watchdog. A dictation whose decode outlived its timeout can finish
+        // AFTER a newer dictation started; only the owner may reset that shared state.
+        // Interlocked access: AudioFileReady is not guaranteed to arrive on the UI thread.
+        private long activeDictationSessionId;
+
         // UI BUG FIX: Initialization flag to suppress polling mode warnings during startup
         // More reliable than time-based check (works on slow PCs with 10+ second startup)
         private bool isInitializing = true;
@@ -1285,6 +1291,12 @@ namespace VoiceLite
                 // Stop the timer immediately
                 StopStuckStateRecoveryTimer();
 
+                // LIFECYCLE FIX: expire the abandoned dictation BEFORE resetting state. The
+                // native decode cannot be interrupted and may still complete minutes from now;
+                // expiring the session guarantees its late result is discarded instead of being
+                // injected into whatever window is focused by then.
+                transcriptionService?.ExpireDictationSessions();
+
             // Force UI back to ready state
             try
             {
@@ -1423,6 +1435,18 @@ namespace VoiceLite
             });
         }
 
+        /// <summary>
+        /// LIFECYCLE FIX: true when a dictation's result may still be consumed (UI update,
+        /// history, text injection). Session id 0 means the dictation never got a session
+        /// (transcription service missing) — its error path still owns the UI. A null
+        /// service means shutdown already ran: discard.
+        /// </summary>
+        private bool IsDictationResultCurrent(long dictationSessionId)
+        {
+            return dictationSessionId == 0 ||
+                   transcriptionService?.IsDictationSessionCurrent(dictationSessionId) == true;
+        }
+
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
             ErrorLogger.LogWarning($"OnAudioFileReady: ENTERED with file: {audioFilePath}");
@@ -1463,6 +1487,10 @@ namespace VoiceLite
                 // Start stuck state recovery timer now that we have audio to process
                 StartStuckStateRecoveryTimer();
 
+                // LIFECYCLE FIX: 0 = no session started (transcription service missing);
+                // the finally block treats that as "owns the state" so cleanup still runs.
+                long dictationSessionId = 0;
+
                 ErrorLogger.LogWarning("OnAudioFileReady: Starting transcription...");
                 try
             {
@@ -1474,12 +1502,29 @@ namespace VoiceLite
                     throw new InvalidOperationException("Transcription service not initialized");
                 }
 
+                // LIFECYCLE FIX: bind this dictation to a fresh session. The native decode is
+                // non-cancellable, so a dictation the stuck-state timer already timed out can
+                // still complete later — its session id will no longer be current and the late
+                // result is discarded below instead of being injected into whatever window is
+                // focused by then. Beginning a session also expires any previous dictation.
+                dictationSessionId = transcriber.BeginDictationSession();
+                Interlocked.Exchange(ref activeDictationSessionId, dictationSessionId);
+
                 ErrorLogger.LogWarning($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
                 var transcription = await transcriber.TranscribeAsync(audioFilePath);
                 ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned {transcription?.Length ?? 0} chars");
 
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    // LIFECYCLE FIX: stale-result guard. The session expires on stuck-state
+                    // timeout, shutdown, and when a newer dictation begins — an expired
+                    // dictation's text must never be injected or added to history.
+                    if (!IsDictationResultCurrent(dictationSessionId))
+                    {
+                        ErrorLogger.LogWarning($"OnAudioFileReady: discarding stale transcription result (session {dictationSessionId} expired)");
+                        return;
+                    }
+
                     StopStuckStateRecoveryTimer();
 
                     if (!string.IsNullOrWhiteSpace(transcription))
@@ -1599,6 +1644,14 @@ namespace VoiceLite
 
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    // LIFECYCLE FIX: an expired dictation's late failure must not clobber the
+                    // UI of a newer dictation (or the post-timeout "Ready" state).
+                    if (!IsDictationResultCurrent(dictationSessionId))
+                    {
+                        ErrorLogger.LogWarning($"OnAudioFileReady: suppressing error UI for expired dictation session {dictationSessionId}");
+                        return;
+                    }
+
                     StopStuckStateRecoveryTimer();
                     // CRITICAL FIX: Use helper method with null protection
                     UpdateTranscriptionText(errorText, Brushes.Red);
@@ -1624,11 +1677,19 @@ namespace VoiceLite
             }
             finally
             {
-                isTranscribing = false;
+                // LIFECYCLE FIX: only the dictation that still owns the active session may
+                // reset the shared state — a late-finishing dictation must not clear
+                // isTranscribing or kill the stuck-state watchdog of a newer one.
+                // (Session id 0 means no session was ever started; clean up unconditionally.)
+                if (dictationSessionId == 0 ||
+                    Interlocked.Read(ref activeDictationSessionId) == dictationSessionId)
+                {
+                    isTranscribing = false;
 
-                // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
-                // This is the absolute last line of defense against stuck processing state
-                StopStuckStateRecoveryTimer();
+                    // RELIABILITY: Always stop stuck state timer, even if try/catch blocks failed
+                    // This is the absolute last line of defense against stuck processing state
+                    StopStuckStateRecoveryTimer();
+                }
 
                 try
                 {
