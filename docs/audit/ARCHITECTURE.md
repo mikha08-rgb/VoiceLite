@@ -22,6 +22,8 @@ The scary branch name `v2.0.0-parakeet-migration` is vestigial — it's 0 commit
 
 No DI container. `App.xaml.cs` runs a 3-stage startup gate, then `new MainWindow()`. `MainWindow.InitializeServicesAsync()` directly `new`s every service. MainWindow is the real controller — ViewModels are thin data-binding shells.
 
+**Update 2026-09-07:** the recording/transcription state machine moved out of MainWindow into `Services/DictationController.cs`. It owns every flag and timer (push-to-talk vs toggle, hotkey debounce, cancel/discard, 5-min hot-mic auto-stop, 120 s stuck watchdog, dictation-session stale-result guard) and raises `DictationEvent` notices; MainWindow only renders them and delivers finished text (history + paste). `IDictationRecorder`/`IDictationTranscriber` are the controller's view of `AudioRecorder`/`TranscriptionService`, which is what makes `DictationControllerTests` (18 tests, fakes) possible.
+
 **Startup gate (`App.xaml.cs`):**
 1. `NativeLibrary.Load("sherpa-onnx-c-api")` — fails fast with a "Missing VC++ Runtime" dialog if native deps can't load.
 2. Parakeet-model-installed probe — opens `ModelDownloadControl` (first-launch ~640 MB download from k2-fsa GitHub) if the four ONNX files are absent.
@@ -53,17 +55,18 @@ No DI container. `App.xaml.cs` runs a 3-stage startup gate, then `new MainWindow
 
 ```
 Hotkey (HotkeyManager: RegisterHotKey / GetAsyncKeyState)
-  → MainWindow.StartRecording → AudioRecorder.StartRecording()  [NAudio 16k mono → memory buffer]
+  → MainWindow.OnHotkeyPressed → DictationController.HotkeyPressed() → AudioRecorder.StartRecording()  [NAudio 16k mono → memory buffer]
   … user speaks …
   → AudioRecorder.StopRecording()
        └ SaveMemoryBufferToTempFile(): HighPassFilter → NoiseGate → AGC → Silero VAD trim (threshold 0.35, HARDCODED)
          → temp WAV → fires AudioFileReady
-  → MainWindow.OnAudioFileReady
+  → DictationController.OnAudioFileReady  (session id bound; stuck watchdog armed)
   → TranscriptionService.TranscribeAsync(path)
        ├ default: Parakeet v3 multilingual transcription
        └ TranslateToEnglish: Canary 180M Flash (selected es/fr/de source → English)
        └ WaveFileReader.ToSampleProvider() → float[] → OfflineRecognizer.Decode()  [blocking native, wrapped in Task.Run]
   → TextPostProcessor.Process()  [punctuation, dev-terms, custom dictionary — dictionary Pro-gated since 2026-07-18]
+  → DictationController raises TranscriptionCompleted → MainWindow.DeliverTranscription
   → CustomShortcutService.ProcessShortcuts()
   → if settings.AutoPaste:  TextInjector.InjectText()            [clipboard + Ctrl+V, 2 s auto-clear]
     else:                   TextInjector.CopyToClipboardForManualPaste()  [clipboard only, 30 s hold]
