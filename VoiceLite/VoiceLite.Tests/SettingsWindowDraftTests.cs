@@ -8,7 +8,7 @@ using Xunit;
 namespace VoiceLite.Tests
 {
     /// <summary>
-    /// Regression tests for the v2.4.1 settings-draft fix. SettingsWindowNew edits a
+    /// Regression tests for the v2.4.1 settings-draft fix. SettingsWindow edits a
     /// CLONE of the live settings (CloneForDraft) and copies it back only on Save/Apply
     /// (CommitDraft). These statics ARE the production draft mechanism, so the contracts
     /// under test are exactly the window's: Cancel (= never committing) leaves live
@@ -42,7 +42,7 @@ namespace VoiceLite.Tests
         public void EditingTheDraftHotkey_DoesNotTouchLiveSettings()
         {
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
             // The window writes hotkey edits to the draft on focus loss. Cancel simply
             // discards the draft — this is the "Cancel didn't cancel" regression.
@@ -59,7 +59,7 @@ namespace VoiceLite.Tests
         public void EditingDraftCollections_DoesNotTouchLiveSettings()
         {
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
             draft.CustomShortcuts.Add(new CustomShortcut { Trigger = "brb", Replacement = "be right back" });
             draft.CustomDictionary.Add(new CustomDictionaryEntry { Spoken = "github", Written = "GitHub" });
@@ -74,7 +74,7 @@ namespace VoiceLite.Tests
         {
             var live = MakeLiveSettings();
 
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
             draft.RecordHotkey.Should().Be(Key.F1);
             draft.HotkeyModifiers.Should().Be(ModifierKeys.Control);
@@ -94,7 +94,7 @@ namespace VoiceLite.Tests
             // a user's Save into a silent no-op for that setting. Every field flips away
             // from its MakeLiveSettings value so a lost copy line fails an assertion here.
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
             draft.RecordHotkey = Key.F9;
             draft.HotkeyModifiers = ModifierKeys.Alt;
             draft.Mode = RecordMode.Toggle;
@@ -110,7 +110,7 @@ namespace VoiceLite.Tests
             draft.CustomShortcuts.Add(new CustomShortcut { Trigger = "brb", Replacement = "be right back" });
             draft.CustomDictionary.Add(new CustomDictionaryEntry { Spoken = "github", Written = "GitHub" });
 
-            SettingsWindowNew.CommitDraft(draft, live);
+            SettingsWindow.CommitDraft(draft, live);
 
             live.RecordHotkey.Should().Be(Key.F9,
                 "Save must hand MainWindow the new hotkey so it re-registers it");
@@ -134,9 +134,9 @@ namespace VoiceLite.Tests
         public void CommitDraft_CollectionsDoNotShareInstancesWithTheDraft()
         {
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
-            SettingsWindowNew.CommitDraft(draft, live);
+            SettingsWindow.CommitDraft(draft, live);
 
             // After an Apply the dialog stays open and the draft stays editable —
             // post-Apply edits must not leak into live through shared lists.
@@ -151,7 +151,7 @@ namespace VoiceLite.Tests
         public void ModelInstalledWhileDraftOpen_SurvivesCancel_AndSurvivesCommit()
         {
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
             // The model installer (ModelDownloadControl → headless ModelInstaller) is
             // handed the LIVE instance and writes it immediately.
@@ -162,7 +162,7 @@ namespace VoiceLite.Tests
 
             // Save = commit of a draft whose snapshot predates the install: the whitelist
             // must not clobber the installed model with the stale draft value.
-            SettingsWindowNew.CommitDraft(draft, live);
+            SettingsWindow.CommitDraft(draft, live);
             live.TranscriptionModel.Should().Be("freshly-installed-model",
                 "a model install performed while the settings draft is open is immediate " +
                 "and must not be reverted by Save or Cancel");
@@ -172,7 +172,7 @@ namespace VoiceLite.Tests
         public void HistoryAndLicenseChangedWhileDraftOpen_SurviveCommit()
         {
             var live = MakeLiveSettings();
-            var draft = SettingsWindowNew.CloneForDraft(live);
+            var draft = SettingsWindow.CloneForDraft(live);
 
             // The global hotkey still works over the modal dialog: a dictation adds to
             // live history. License activation writes the live instance immediately.
@@ -183,7 +183,7 @@ namespace VoiceLite.Tests
             });
             live.IsProLicense = true;
 
-            SettingsWindowNew.CommitDraft(draft, live);
+            SettingsWindow.CommitDraft(draft, live);
 
             live.TranscriptionHistory.Should().ContainSingle(
                 h => h.Text == "dictated over the settings dialog",

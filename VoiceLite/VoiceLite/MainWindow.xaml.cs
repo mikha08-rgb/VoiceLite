@@ -91,7 +91,7 @@ namespace VoiceLite
         private readonly object timerLock = new object();
 
         // Child windows (for proper disposal)
-        private SettingsWindowNew? currentSettingsWindow;
+        private SettingsWindow? currentSettingsWindow;
 
         // Timing constants (in milliseconds)
         private const int STATUS_MESSAGE_DISPLAY_DURATION_MS = 3000; // How long to show status messages
@@ -1768,7 +1768,7 @@ namespace VoiceLite
             // logoff), OnClosed runs inside ShowDialog's nested pump and nulls the
             // currentSettingsWindow FIELD before ShowDialog returns — re-reading the field
             // after the pump would NRE mid-shutdown.
-            var settingsWindow = new SettingsWindowNew(settings, () => TestButton_Click(this, new RoutedEventArgs()), () => SaveSettings());
+            var settingsWindow = new SettingsWindow(settings, () => SaveSettings());
             currentSettingsWindow = settingsWindow;
             settingsWindow.Owner = this;
 

@@ -53,7 +53,7 @@ namespace VoiceLite.Tests.Resources
         /// <summary>
         /// Verifies that MainWindow.OnClosed() disposes all child windows.
         /// Windows verified: AnalyticsConsentWindow, LoginWindow, DictionaryManagerWindow,
-        /// SettingsWindowNew, FeedbackWindow
+        /// SettingsWindow, FeedbackWindow
         /// </summary>
         [Fact]
         public void MainWindow_OnClosed_DisposesChildWindows()
@@ -156,7 +156,7 @@ namespace VoiceLite.Tests.Resources
             // - AnalyticsConsentWindow: line 728-730
             // - LoginWindow: line 897-902
             // - DictionaryManagerWindow: lines 1967-1969, 1977-1979
-            // - SettingsWindowNew: lines 1991-1994
+            // - SettingsWindow: lines 1991-1994
             // - FeedbackWindow: lines 2488-2490
             
             // NOTE: This is a documentation test - validates pattern exists in source
