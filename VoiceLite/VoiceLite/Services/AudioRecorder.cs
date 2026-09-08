@@ -16,7 +16,7 @@ namespace VoiceLite.Services
         public override string ToString() => Name;
     }
 
-    public class AudioRecorder : IDisposable
+    public class AudioRecorder : IDisposable, IDictationRecorder
     {
         private WaveInEvent? waveIn;
         private WaveFileWriter? waveFile;

@@ -21,6 +21,12 @@ namespace VoiceLite
         // the per-user install; Inno's CheckForMutexes probes both namespaces.
         private static Mutex? singleInstanceMutex;
 
+        // A second launch sets this; the running instance listens and brings its window
+        // forward (the window is hidden while minimized to the tray, so a plain Activate
+        // from another process cannot reach it).
+        private const string ShowWindowSignalName = "VoiceLite_ShowWindow";
+        private static EventWaitHandle? showWindowSignal;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -33,9 +39,13 @@ namespace VoiceLite
                 // We don't own the mutex — just drop the handle, never ReleaseMutex it.
                 singleInstanceMutex.Dispose();
                 singleInstanceMutex = null;
-                MessageBox.Show(
-                    "VoiceLite is already running — check the system tray.",
-                    "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (!SignalRunningInstanceToShow())
+                {
+                    // Running instance predates the show-window signal.
+                    MessageBox.Show(
+                        "VoiceLite is already running — check the system tray.",
+                        "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
                 Shutdown(0);
                 return;
             }
@@ -49,6 +59,8 @@ namespace VoiceLite
                 Shutdown(0);
                 return;
             }
+
+            ListenForShowWindowSignal();
 
             // Catch unhandled exceptions
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -92,6 +104,58 @@ namespace VoiceLite
         /// Returns false if startup must abort because another VoiceLite process is running
         /// and the user declined to close it (or it couldn't be closed).
         /// </summary>
+        private static bool SignalRunningInstanceToShow()
+        {
+            try
+            {
+                if (!EventWaitHandle.TryOpenExisting(ShowWindowSignalName, out var signal)) return false;
+                using (signal) signal.Set();
+                ErrorLogger.LogWarning("Second launch: asked the running VoiceLite to show its window");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Second launch: could not signal the running instance: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void ListenForShowWindowSignal()
+        {
+            try
+            {
+                showWindowSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowSignalName);
+                var listener = new Thread(() =>
+                {
+                    while (true)
+                    {
+                        var signal = showWindowSignal;
+                        if (signal == null) return;
+                        try { signal.WaitOne(); }
+                        catch (ObjectDisposedException) { return; }
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            var window = MainWindow;
+                            if (window == null) return;
+                            window.Show();
+                            window.WindowState = WindowState.Normal;
+                            window.Activate();
+                            // Windows refuses to steal focus for a background process; the
+                            // Topmost flip is the standard way to actually surface the window.
+                            window.Topmost = true;
+                            window.Topmost = false;
+                        });
+                    }
+                })
+                { IsBackground = true, Name = "VoiceLite.ShowWindowListener" };
+                listener.Start();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Show-window listener not started: {ex.Message}");
+            }
+        }
+
         private static bool CloseOtherInstances()
         {
             using var self = Process.GetCurrentProcess();
@@ -256,6 +320,8 @@ namespace VoiceLite
         // the installer's CheckForMutexes treats the same as released.
         protected override void OnExit(ExitEventArgs e)
         {
+            var signal = Interlocked.Exchange(ref showWindowSignal, null);
+            try { signal?.Dispose(); } catch (Exception ex) { ErrorLogger.LogDebug($"Show-window signal dispose failed: {ex.Message}"); }
             ReleaseSingleInstanceMutex();
             base.OnExit(e);
         }

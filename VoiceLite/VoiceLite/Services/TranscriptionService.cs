@@ -14,7 +14,7 @@ namespace VoiceLite.Services
     /// In-process ASR service backed by Sherpa-ONNX + Parakeet TDT v3.
     /// (Named PersistentWhisperService until the 2026-07-17 vocabulary rename.)
     /// </summary>
-    public class TranscriptionService : IDisposable
+    public class TranscriptionService : IDisposable, IDictationTranscriber
     {
         private readonly Settings settings;
         private readonly string baseDir;
@@ -52,7 +52,7 @@ namespace VoiceLite.Services
         // Translate-to-English is Pro-gated the same way: the Settings toggle is hidden
         // for Free tier, and this runtime check makes a hand-edited settings.json fall
         // back to normal Parakeet transcription instead of unlocking translation.
-        internal bool EffectiveTranslateToEnglish =>
+        public bool EffectiveTranslateToEnglish =>
             proFeatureService.IsProUser && settings.TranslateToEnglish;
 
         private volatile bool isDisposed = false;
