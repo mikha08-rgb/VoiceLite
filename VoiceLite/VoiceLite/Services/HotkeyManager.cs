@@ -125,7 +125,7 @@ namespace VoiceLite.Services
             }
         }
 
-        private bool IsModifierKey(Key key)
+        private static bool IsModifierKey(Key key)
         {
             return key == Key.LeftCtrl || key == Key.RightCtrl ||
                    key == Key.LeftAlt || key == Key.RightAlt ||
@@ -133,10 +133,43 @@ namespace VoiceLite.Services
                    key == Key.LWin || key == Key.RWin;
         }
 
-        private bool IsSpecialKey(Key key)
+        private static bool IsSpecialKey(Key key)
         {
             // CapsLock and similar keys that need polling but aren't true modifiers
             return key == Key.CapsLock;
+        }
+
+        // Probe id: distinct from HOTKEY_ID so a probe can never collide with (or unregister)
+        // the live registration. Hotkeys are global, so a probe from any thread/window sees
+        // the same "already taken" state RegisterHotkey() would.
+        private const int PROBE_HOTKEY_ID = 9001;
+
+        /// <summary>
+        /// Asks Windows whether <paramref name="key"/>+<paramref name="modifiers"/> could be
+        /// registered right now: registers it with a temporary id against the calling thread
+        /// (hWnd = NULL) and immediately unregisters it. Standalone modifier keys and CapsLock
+        /// are handled by polling in this app, not RegisterHotKey, so they always return true.
+        /// Callers must skip the probe for the combination the app already owns — Windows
+        /// rejects a second registration of the same combination even from the same process.
+        /// Does not touch instance state; safe to call while a HotkeyManager is registered.
+        /// </summary>
+        public static bool CanRegisterHotkey(Key key, ModifierKeys modifiers)
+        {
+            if (key == Key.None)
+                return false;
+
+            if (IsModifierKey(key) || IsSpecialKey(key))
+                return true;
+
+            uint virtualKey = (uint)KeyInterop.VirtualKeyFromKey(key);
+            if (virtualKey == 0)
+                return false;
+
+            if (!RegisterHotKey(IntPtr.Zero, PROBE_HOTKEY_ID, ConvertModifiers(modifiers), virtualKey))
+                return false;
+
+            UnregisterHotKey(IntPtr.Zero, PROBE_HOTKEY_ID);
+            return true;
         }
 
         /// <summary>
@@ -411,7 +444,7 @@ namespace VoiceLite.Services
             RunOnDispatcher(() => HotkeyReleased?.Invoke(this, new HotkeyEventArgs { Key = currentKey, Modifiers = currentModifiers, HotkeyId = 0 }));
         }
 
-        private uint ConvertModifiers(ModifierKeys modifiers)
+        private static uint ConvertModifiers(ModifierKeys modifiers)
         {
             uint result = MOD_NONE;
 

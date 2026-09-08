@@ -123,7 +123,7 @@ namespace VoiceLite.Services
         // FOOTGUN: cache invalidation depends on the caller assigning a NEW list reference
         // (settings.CustomDictionary = newList) when entries change. If a future feature
         // mutates the list in place (settings.CustomDictionary.Add(entry)), the cached
-        // regex will be stale. Today only SettingsWindowNew.CommitCustomDictionaryToSettings
+        // regex will be stale. Today only SettingsWindow.CommitDraft
         // touches this collection and it always reassigns; keep that invariant.
         private static readonly ConditionalWeakTable<IReadOnlyList<CustomDictionaryEntry>, CustomDictionaryCache> CustomDictCache = new();
 
