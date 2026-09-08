@@ -800,7 +800,7 @@ namespace VoiceLite
 
             try
             {
-                var window = new UpdateWindow(info, () => isRecording || isTranscribing) { Owner = this };
+                var window = new UpdateWindow(info, () => dictation != null && dictation.State != DictationState.Idle) { Owner = this };
                 updateWindow = window;
                 window.DownloadProgressChanged += pct =>
                 {
