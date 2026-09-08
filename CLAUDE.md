@@ -29,7 +29,7 @@ The audit in `@docs/audit/` is ground truth (2026-07-17). Start every session th
 **Do NOT trust** the root `ARCHITECTURE.md`, `PILOT.md`, `CHANGELOG.md`, `SECURITY.md`, or `voicelite-web/lib/openapi.ts` — all describe a pre-v2.0 Whisper/GGML product that no longer exists.
 
 ## Conventions
-- **No DI.** `App.xaml.cs` runs a 3-stage startup gate, then `MainWindow` directly `new`s every service. MainWindow is the controller.
+- **No DI.** `App.xaml.cs` runs a 3-stage startup gate, then `MainWindow` directly `new`s every service. Recording/transcription state lives in `Services/DictationController.cs` (a tested state machine that raises `DictationEvent` notices); MainWindow wires services and renders. Don't add recording flags or timers back into MainWindow.
 - **Names fixed (2026-07-17 rename):** the Whisper-era misnomers are gone — `PersistentWhisperService`→`TranscriptionService`, `WhisperModelInfo`→`TranscriptionModelInfo`, `WhisperPresetConfig`→`TranscriptionPresetConfig`, `Settings.WhisperModel`→`Settings.TranscriptionModel`. **But** settings.json on disk still uses the legacy `"WhisperModel"` key via `[JsonPropertyName("WhisperModel")]` for compat — never rename the serialized key. Real pattern example: `VoiceLite/VoiceLite/Services/TranscriptionService.cs`.
 - **Logging:** `ErrorLogger.LogWarning()`/`LogError()` are Release-visible; `LogMessage()` is Debug-only (Release silent-failure trap).
 - **Settings/state:** `%LOCALAPPDATA%\VoiceLite\` (never Roaming). `license.dat` = DPAPI `key|email`, authoritative for Pro tier.
