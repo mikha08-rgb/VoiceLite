@@ -52,7 +52,7 @@
                           Foreground="#2F6FDE"
                           TextDecorations="Underline"
                           Cursor="Hand"
-                          ToolTip="Click to download the new version"
+                          ToolTip="Click to download and install the new version"
                           MouseLeftButtonUp="UpdateBanner_Click"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" DataContext="{Binding StatusViewModel}">

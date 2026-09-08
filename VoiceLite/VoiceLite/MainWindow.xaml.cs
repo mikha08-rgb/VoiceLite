@@ -82,8 +82,9 @@ namespace VoiceLite
         // Timers
         private System.Timers.Timer? autoTimeoutTimer;
         private System.Threading.Timer? updateCheckTimer;
-        private string? pendingUpdateUrl;
+        private UpdateInfo? pendingUpdate;
         private string? notifiedUpdateVersion;
+        private UpdateWindow? updateWindow;
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
         private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
@@ -800,8 +801,9 @@ namespace VoiceLite
                 if (info == null) return;
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    pendingUpdateUrl = info.DownloadUrl;
-                    if (UpdateBanner != null)
+                    pendingUpdate = info;
+                    // Don't clobber "Downloading update... 42%" if a download is in flight.
+                    if (UpdateBanner != null && updateWindow == null)
                     {
                         UpdateBanner.Text = $"Update {info.Version} available";
                         UpdateBanner.Visibility = Visibility.Visible;
@@ -822,15 +824,53 @@ namespace VoiceLite
 
         private void UpdateBanner_Click(object sender, MouseButtonEventArgs e)
         {
-            var url = pendingUpdateUrl;
-            if (string.IsNullOrEmpty(url)) return;
+            var info = pendingUpdate;
+            if (info == null) return;
+
+            // One dialog at a time: re-clicking the banner mid-download just refocuses it.
+            if (updateWindow != null)
+            {
+                updateWindow.Activate();
+                return;
+            }
+
             try
             {
-                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                var window = new UpdateWindow(info, () => isRecording || isTranscribing) { Owner = this };
+                updateWindow = window;
+                window.DownloadProgressChanged += pct =>
+                {
+                    if (UpdateBanner != null)
+                        UpdateBanner.Text = $"Downloading update... {pct * 100:0}%";
+                };
+                window.Closed += (_, _) =>
+                {
+                    updateWindow = null;
+                    switch (window.Result)
+                    {
+                        case UpdateWindowResult.Skipped:
+                            lock (settings.SyncRoot)
+                            {
+                                settings.SkippedUpdateVersion = info.Version;
+                            }
+                            SaveSettings();
+                            pendingUpdate = null;
+                            if (UpdateBanner != null) UpdateBanner.Visibility = Visibility.Collapsed;
+                            break;
+                        case UpdateWindowResult.Installing:
+                            if (UpdateBanner != null) UpdateBanner.Text = "Installing update...";
+                            break;
+                        default:
+                            if (UpdateBanner != null) UpdateBanner.Text = $"Update {info.Version} available";
+                            break;
+                    }
+                };
+                window.Show();
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("UpdateBanner_Click: failed to open download URL", ex);
+                updateWindow = null;
+                ErrorLogger.LogError("UpdateBanner_Click: failed to open update window", ex);
             }
         }
 
