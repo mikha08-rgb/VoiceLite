@@ -81,6 +81,9 @@ namespace VoiceLite
 
         // Timers
         private System.Timers.Timer? autoTimeoutTimer;
+        private System.Threading.Timer? updateCheckTimer;
+        private string? pendingUpdateUrl;
+        private string? notifiedUpdateVersion;
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
         private System.Windows.Threading.DispatcherTimer? stuckStateRecoveryTimer;
@@ -498,9 +501,9 @@ namespace VoiceLite
                 }
 
                 // CRITICAL FIX: Null-check before using audioRecorder
-                if (audioRecorder != null && settings.SelectedMicrophoneIndex >= 0)
+                if (audioRecorder != null)
                 {
-                    audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
+                    audioRecorder.SetDevice(settings.SelectedMicrophoneIndex, settings.SelectedMicrophoneName);
                 }
 
                 // Initialize Silero VAD for silence trimming
@@ -618,24 +621,14 @@ namespace VoiceLite
                 // Mark initialization complete - show "Ready" status
                 UpdateStatus("Ready", Brushes.Green);
 
-                // Fire-and-forget update check. 3s delay so startup settles before
-                // we touch HTTP; try/catch around everything so any failure (no
-                // network, parse error, etc.) can never block or affect main app flow.
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
-                        var info = await UpdateCheckService.CheckAsync(settings).ConfigureAwait(false);
-                        if (info == null) return;
-                        await Dispatcher.InvokeAsync(() =>
-                            systemTrayManager?.ShowUpdateAvailable(info.Version, info.DownloadUrl));
-                    }
-                    catch (Exception ex)
-                    {
-                        ErrorLogger.LogError("Update check task failed", ex);
-                    }
-                });
+                // Update check: first run 3s after startup so HTTP never touches the
+                // startup path, then once a day - the app runs for days at a time and a
+                // single launch-time balloon was missed for months (v2.1.2 -> v2.4.1).
+                updateCheckTimer = new System.Threading.Timer(
+                    _ => _ = RunUpdateCheckAsync(),
+                    null,
+                    TimeSpan.FromSeconds(3),
+                    TimeSpan.FromHours(24));
             }
             catch (Exception ex)
             {
@@ -797,6 +790,50 @@ namespace VoiceLite
         }
 
 
+        private async Task RunUpdateCheckAsync()
+        {
+            // try/catch around everything so any failure (no network, parse error, etc.)
+            // can never block or affect main app flow.
+            try
+            {
+                var info = await UpdateCheckService.CheckAsync(settings).ConfigureAwait(false);
+                if (info == null) return;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    pendingUpdateUrl = info.DownloadUrl;
+                    if (UpdateBanner != null)
+                    {
+                        UpdateBanner.Text = $"Update {info.Version} available";
+                        UpdateBanner.Visibility = Visibility.Visible;
+                    }
+                    // Balloon once per version; the banner stays until the user updates.
+                    if (notifiedUpdateVersion != info.Version)
+                    {
+                        notifiedUpdateVersion = info.Version;
+                        systemTrayManager?.ShowUpdateAvailable(info.Version, info.DownloadUrl);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Update check task failed", ex);
+            }
+        }
+
+        private void UpdateBanner_Click(object sender, MouseButtonEventArgs e)
+        {
+            var url = pendingUpdateUrl;
+            if (string.IsNullOrEmpty(url)) return;
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("UpdateBanner_Click: failed to open download URL", ex);
+            }
+        }
+
         private void UpdateStatus(string status, Brush color)
         {
             // Delegate to StatusViewModel (phase 3 refactor)
@@ -880,6 +917,12 @@ namespace VoiceLite
                             UpdateStatus($"Recording {elapsed:m\\:ss}", new SolidColorBrush(StatusColors.Recording));
                         };
                         recordingElapsedTimer.Start();
+
+                        // Hot-mic safety: a toggled-on recording nobody turns off stops itself.
+                        if (settings.Mode == RecordMode.Toggle)
+                        {
+                            StartAutoTimeoutTimer();
+                        }
                     }
                     else
                     {
@@ -909,6 +952,7 @@ namespace VoiceLite
 
             recordingElapsedTimer?.Stop();
             recordingElapsedTimer = null;
+            StopAutoTimeoutTimer();
 
             isRecording = false;
 
@@ -948,13 +992,13 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                ErrorLogger.LogMessage($"OnHotkeyPressed: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogWarning($"Hotkey pressed: mode={settings.Mode}, recording={isRecording}, hotkeyMode={isHotkeyMode}");
 
                 // Debounce protection - ignore rapid key presses
                 var now = DateTime.Now;
                 if ((now - lastHotkeyPressTime).TotalMilliseconds < TimingConstants.HotkeyDebounceMs)
                 {
-                    ErrorLogger.LogMessage("OnHotkeyPressed: Debounced - too rapid key press");
+                    ErrorLogger.LogWarning("Hotkey pressed: ignored (debounced - pressed again too quickly)");
                     return;
                 }
                 lastHotkeyPressTime = now;
@@ -1009,7 +1053,7 @@ namespace VoiceLite
             // CRITICAL: Event handlers must never throw exceptions - wrap entire method
             try
             {
-                ErrorLogger.LogMessage($"OnHotkeyReleased: Entry - Mode={settings.Mode}, // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogWarning($"Hotkey released: mode={settings.Mode}, recording={isRecording}, hotkeyMode={isHotkeyMode}");
 
                 lock (recordingLock)
                 {
@@ -1095,7 +1139,7 @@ namespace VoiceLite
 
             if (!isRecording)
             {
-                ErrorLogger.LogMessage("HandlePushToTalkPressed: Setting isHotkeyMode=true and starting recording");
+                ErrorLogger.LogWarning("Push-to-talk: starting recording");
                 isHotkeyMode = true;
 
                 // Sound feedback removed per user request
@@ -1104,7 +1148,7 @@ namespace VoiceLite
             }
             else
             {
-                ErrorLogger.LogMessage("HandlePushToTalkPressed: Already recording, ignoring");
+                ErrorLogger.LogWarning("Push-to-talk: press ignored - already recording");
             }
         }
 
@@ -1128,7 +1172,7 @@ namespace VoiceLite
 
             if (isRecording && isHotkeyMode)
             {
-                ErrorLogger.LogMessage("HandlePushToTalkReleased: Stopping recording");
+                ErrorLogger.LogWarning("Push-to-talk: stopping recording");
 
                 // Audio feedback for push-to-talk stop
                 // Sound removed per user request
@@ -1139,7 +1183,7 @@ namespace VoiceLite
             }
             else
             {
-                ErrorLogger.LogMessage($"HandlePushToTalkReleased: Not stopping - // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, isHotkeyMode={isHotkeyMode}");
+                ErrorLogger.LogWarning($"Push-to-talk: release ignored - recording={isRecording}, hotkeyMode={isHotkeyMode}");
                 // Defensive reset - but only if we're not actually recording
                 if (isHotkeyMode && !actuallyRecording)
                 {
@@ -1163,7 +1207,7 @@ namespace VoiceLite
 
             if (isRecording != actuallyRecording)
             {
-                ErrorLogger.LogMessage($"HandleToggleModePressed: State mismatch detected - // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}, actuallyRecording={actuallyRecording}. Syncing...");
+                ErrorLogger.LogWarning($"Toggle: state mismatch - isRecording={isRecording}, recorder.IsRecording={actuallyRecording}");
                 // WEEK1-DAY3: State managed by coordinator - isRecording = actuallyRecording;
             }
 
@@ -1171,24 +1215,22 @@ namespace VoiceLite
 
             if (!isRecording)
             {
-                ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE ON - Starting continuous recording");
+                ErrorLogger.LogWarning("Toggle: starting recording");
 
                 // Audio feedback for toggle start
                 // Sound removed per user request
 
                 StartRecording();
-                StartAutoTimeoutTimer();
                 ErrorLogger.LogMessage($"HandleToggleModePressed: After start - // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}");
             }
             else
             {
-                ErrorLogger.LogMessage("HandleToggleModePressed: TOGGLE OFF - Stopping recording");
+                ErrorLogger.LogWarning("Toggle: stopping recording");
 
                 // Audio feedback for toggle stop
                 // Sound removed per user request
 
                 StopRecording(false);
-                StopAutoTimeoutTimer();
                 ErrorLogger.LogMessage($"HandleToggleModePressed: After stop - // WEEK1-DAY3: State managed by coordinator - isRecording ={isRecording}");
             }
         }
@@ -1372,18 +1414,13 @@ namespace VoiceLite
                     {
                         if (isRecording)
                         {
-                            // Show timeout warning
-                            UpdateStatus("Auto-timeout - Recording stopped", Brushes.Orange);
-
-                            // Audio feedback for timeout
-                            // Sound removed per user request
-
+                            ErrorLogger.LogWarning("OnAutoTimeout: toggle recording hit the 5-minute hot-mic limit - stopping and transcribing");
                             StopRecording(false);
-                            StopAutoTimeoutTimer();
 
-                            // Show message to user
-                            MessageBox.Show("Recording automatically stopped after 5 minutes for safety.\n\nThis prevents forgotten hot microphones.",
-                                "Auto-Timeout", MessageBoxButton.OK, MessageBoxImage.Information);
+                            // Non-modal on purpose: the old MessageBox blocked the UI thread while
+                            // holding recordingLock and had to be clicked away every single time.
+                            systemTrayManager?.ShowBalloonTip("Recording auto-stopped",
+                                "Stopped after 5 minutes (hot-mic safety). Transcribing what was captured.");
                         }
                     }
                 });
@@ -1449,7 +1486,7 @@ namespace VoiceLite
 
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
-            ErrorLogger.LogWarning($"OnAudioFileReady: ENTERED with file: {audioFilePath}");
+            ErrorLogger.LogDebug($"OnAudioFileReady: ENTERED with file: {audioFilePath}");
             // CRITICAL FIX: Wrap entire async void method in try-catch to prevent app crashes
             try
             {
@@ -1481,7 +1518,7 @@ namespace VoiceLite
                     return;
                 }
 
-                ErrorLogger.LogWarning("OnAudioFileReady: Setting isTranscribing = true");
+                ErrorLogger.LogDebug("OnAudioFileReady: Setting isTranscribing = true");
                 isTranscribing = true;
 
                 // Start stuck state recovery timer now that we have audio to process
@@ -1491,10 +1528,10 @@ namespace VoiceLite
                 // the finally block treats that as "owns the state" so cleanup still runs.
                 long dictationSessionId = 0;
 
-                ErrorLogger.LogWarning("OnAudioFileReady: Starting transcription...");
+                ErrorLogger.LogDebug("OnAudioFileReady: Starting transcription...");
                 try
             {
-                ErrorLogger.LogWarning("OnAudioFileReady: Checking transcriptionService...");
+                ErrorLogger.LogDebug("OnAudioFileReady: Checking transcriptionService...");
                 var transcriber = transcriptionService;
                 if (transcriber == null)
                 {
@@ -1510,7 +1547,7 @@ namespace VoiceLite
                 dictationSessionId = transcriber.BeginDictationSession();
                 Interlocked.Exchange(ref activeDictationSessionId, dictationSessionId);
 
-                ErrorLogger.LogWarning($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
+                ErrorLogger.LogDebug($"OnAudioFileReady: Calling TranscribeAsync for {audioFilePath}");
                 var transcription = await transcriber.TranscribeAsync(audioFilePath);
                 ErrorLogger.LogWarning($"OnAudioFileReady: TranscribeAsync returned {transcription?.Length ?? 0} chars");
 
@@ -1608,9 +1645,20 @@ namespace VoiceLite
                     }
                     else
                     {
-                        // CRITICAL FIX: Use helper method with null protection
-                        UpdateTranscriptionText("(No speech detected)", Brushes.Gray);
-                        UpdateStatus("Ready", Brushes.Green);
+                        // TranscriptionText is collapsed in XAML - the status line is the only
+                        // thing the user sees, so the mic diagnosis has to go there.
+                        var emptyRecorder = audioRecorder;
+                        string micName = emptyRecorder?.ActiveDeviceName ?? "default";
+                        if (emptyRecorder != null && emptyRecorder.LastPeakPercent < 1.0)
+                        {
+                            UpdateTranscriptionText($"No audio from microphone '{micName}' - muted, unplugged, or wrong device", Brushes.Red);
+                            UpdateStatus($"No audio from '{micName}' - check mic in Settings", Brushes.Red);
+                        }
+                        else
+                        {
+                            UpdateTranscriptionText($"(No speech detected - mic: {micName})", Brushes.Gray);
+                            UpdateStatus($"No speech detected (mic: {micName})", Brushes.Gray);
+                        }
                     }
 
                     lock (recordingLock)
@@ -1824,8 +1872,8 @@ namespace VoiceLite
                 {
                     try
                     {
-                        audioRecorder.SetDevice(settings.SelectedMicrophoneIndex);
-                        ErrorLogger.LogMessage($"Microphone changed to device index: {settings.SelectedMicrophoneIndex}");
+                        audioRecorder.SetDevice(settings.SelectedMicrophoneIndex, settings.SelectedMicrophoneName);
+                        ErrorLogger.LogMessage($"Microphone changed to device index: {settings.SelectedMicrophoneIndex} ({settings.SelectedMicrophoneName})");
                     }
                     catch (Exception ex)
                     {
@@ -2140,6 +2188,9 @@ namespace VoiceLite
             // MEMORY FIX: Dispose all timers properly
             StopAutoTimeoutTimer();
             autoTimeoutTimer = null;
+
+            try { updateCheckTimer?.Dispose(); } catch (Exception ex) { ErrorLogger.LogWarning($"updateCheckTimer disposal failed: {ex.Message}"); }
+            updateCheckTimer = null;
 
             StopStuckStateRecoveryTimer(); // Already disposes properly
 

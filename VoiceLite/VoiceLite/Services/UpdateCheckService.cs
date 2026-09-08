@@ -66,7 +66,7 @@ namespace VoiceLite.Services
                 if (latestVersion == null || currentVersion == null) return null;
                 if (latestVersion <= currentVersion)
                 {
-                    ErrorLogger.LogMessage($"UpdateCheck: latest={latestVersion}, current={currentVersion}, no update");
+                    ErrorLogger.LogWarning($"UpdateCheck: latest={latestVersion}, current={currentVersion}, no update");
                     return null;
                 }
 
@@ -77,7 +77,7 @@ namespace VoiceLite.Services
                 }
 
                 var downloadUrl = ResolveDownloadUrl(root, tag!);
-                ErrorLogger.LogMessage($"UpdateCheck: update available {currentVersion} -> {latestVersion}");
+                ErrorLogger.LogWarning($"UpdateCheck: update available {currentVersion} -> {latestVersion}");
                 return new UpdateInfo { Version = latestVersion.ToString(3), DownloadUrl = downloadUrl };
             }
             catch (OperationCanceledException) { return null; }

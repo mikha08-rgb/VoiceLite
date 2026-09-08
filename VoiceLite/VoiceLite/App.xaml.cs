@@ -40,6 +40,16 @@ namespace VoiceLite
                 return;
             }
 
+            // Builds before v2.2.0 never created the mutex, so an old VoiceLite left running
+            // in the tray (typical right after an upgrade) slips past the check above; the new
+            // instance then fails to register the hotkey ("in use by another application")
+            // while the old one keeps swallowing the keypresses. Catch it by process name.
+            if (!CloseOtherInstances())
+            {
+                Shutdown(0);
+                return;
+            }
+
             // Catch unhandled exceptions
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             DispatcherUnhandledException += OnDispatcherUnhandledException;
@@ -76,6 +86,48 @@ namespace VoiceLite
 
             var mainWindow = new MainWindow();
             mainWindow.Show();
+        }
+
+        /// <summary>
+        /// Returns false if startup must abort because another VoiceLite process is running
+        /// and the user declined to close it (or it couldn't be closed).
+        /// </summary>
+        private static bool CloseOtherInstances()
+        {
+            using var self = Process.GetCurrentProcess();
+            var others = Process.GetProcessesByName(self.ProcessName).Where(p => p.Id != self.Id).ToList();
+            if (others.Count == 0)
+                return true;
+
+            var result = MessageBox.Show(
+                "An older copy of VoiceLite is still running in the background (probably in the system tray).\n\n" +
+                "Close it and continue starting this one?",
+                "VoiceLite", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                return false;
+
+            foreach (var other in others)
+            {
+                try
+                {
+                    other.Kill();
+                    other.WaitForExit(5000);
+                    ErrorLogger.LogWarning($"Closed stale VoiceLite instance (pid {other.Id})");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError($"Failed to close stale VoiceLite instance (pid {other.Id})", ex);
+                    MessageBox.Show(
+                        "Couldn't close the other VoiceLite. Exit it from the system tray and start VoiceLite again.",
+                        "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
+                }
+                finally
+                {
+                    other.Dispose();
+                }
+            }
+            return true;
         }
 
         private static bool IsSherpaNativeLoadable()

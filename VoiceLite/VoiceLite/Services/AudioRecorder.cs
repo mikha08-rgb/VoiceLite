@@ -25,6 +25,13 @@ namespace VoiceLite.Services
         private string? currentAudioFilePath;
         private volatile bool isRecording; // volatile for thread-safe reads
         private int selectedDeviceIndex = -1; // -1 means default device
+        private string? selectedDeviceName;
+
+        /// <summary>Name of the WaveIn device the most recent session actually recorded from.</summary>
+        public string? ActiveDeviceName { get; private set; }
+
+        /// <summary>Peak input level of the last saved recording, 0-100. Below 1 means the mic delivered silence.</summary>
+        public double LastPeakPercent { get; private set; } = 100;
         private bool eventHandlersAttached = false;
         private readonly object lockObject = new object();
         private System.Timers.Timer? cleanupTimer;
@@ -240,12 +247,56 @@ namespace VoiceLite.Services
             return WaveInEvent.DeviceCount > 0;
         }
 
-        public void SetDevice(int deviceIndex)
+        public void SetDevice(int deviceIndex, string? deviceName = null)
         {
             if (isRecording)
                 throw new InvalidOperationException("Cannot change device while recording");
 
             selectedDeviceIndex = deviceIndex;
+            selectedDeviceName = deviceName;
+        }
+
+        /// <summary>
+        /// Picks the WaveIn device to record from. The saved index is only a hint: Windows
+        /// renumbers WaveIn devices whenever one is added or removed (a USB mic moved to a
+        /// different port even gets a brand-new endpoint), so the saved name wins. If that
+        /// name is gone, fall back to the default device rather than whatever now happens to
+        /// sit at the stale index - that silently recorded a dead mic and produced empty
+        /// transcriptions for days.
+        /// </summary>
+        public static int ResolveDeviceIndex(IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
+        {
+            if (!string.IsNullOrEmpty(savedName))
+            {
+                var byName = devices.FirstOrDefault(d => d.Name == savedName);
+                return byName?.Index ?? 0;
+            }
+
+            return savedIndex >= 0 && savedIndex < devices.Count ? savedIndex : 0;
+        }
+
+        /// <summary>Largest absolute 16-bit sample in a PCM WAV (0 if no data chunk is found).</summary>
+        internal static int PeakAbsSample(byte[] wav)
+        {
+            // Locate the "data" chunk instead of assuming a 44-byte header - NAudio writes 46.
+            int dataStart = -1;
+            for (int i = 12; i + 8 <= Math.Min(wav.Length, 128); i++)
+            {
+                if (wav[i] == (byte)'d' && wav[i + 1] == (byte)'a' && wav[i + 2] == (byte)'t' && wav[i + 3] == (byte)'a')
+                {
+                    dataStart = i + 8;
+                    break;
+                }
+            }
+            if (dataStart < 0) return 0;
+
+            int peak = 0;
+            for (int i = dataStart; i + 1 < wav.Length; i += 2)
+            {
+                int s = Math.Abs((int)BitConverter.ToInt16(wav, i));
+                if (s > peak) peak = s;
+            }
+            return peak;
         }
 
         /// <summary>
@@ -284,13 +335,16 @@ namespace VoiceLite.Services
                     throw new InvalidOperationException("No microphone detected. Please connect a microphone and try again.");
                 }
 
-                // Validate selected device
-                int deviceToUse = selectedDeviceIndex;
-                if (deviceToUse >= WaveInEvent.DeviceCount)
+                // Resolve the device by NAME on every session - the app can run for days and
+                // the WaveIn device list gets renumbered underneath it.
+                var devices = GetAvailableMicrophones();
+                int deviceToUse = ResolveDeviceIndex(devices, selectedDeviceIndex, selectedDeviceName);
+                string deviceName = devices.FirstOrDefault(d => d.Index == deviceToUse)?.Name ?? "unknown";
+                if (!string.IsNullOrEmpty(selectedDeviceName) && deviceName != selectedDeviceName)
                 {
-                    // Selected device no longer available, fall back to default
-                    deviceToUse = 0;
+                    ErrorLogger.LogWarning($"StartRecording: saved microphone '{selectedDeviceName}' not found - using default device {deviceToUse} ({deviceName})");
                 }
+                ActiveDeviceName = deviceName;
 
                 try
                 {
@@ -310,7 +364,7 @@ namespace VoiceLite.Services
                     int sessionId = Interlocked.Increment(ref currentSessionId);
 
                     // Release-visible log for troubleshooting recording issues
-                    ErrorLogger.LogWarning($"StartRecording: session #{sessionId}, device={deviceToUse}");
+                    ErrorLogger.LogWarning($"StartRecording: session #{sessionId}, device={deviceToUse} ({deviceName})");
 
                     waveIn = new WaveInEvent
                     {
@@ -518,7 +572,7 @@ namespace VoiceLite.Services
 
                             if (audioData.Length > 100) // Only process if there's actual audio
                             {
-                                ErrorLogger.LogWarning($"StopRecording: CALLING SaveMemoryBufferToTempFile with {audioData.Length} bytes");
+                                ErrorLogger.LogDebug($"StopRecording: CALLING SaveMemoryBufferToTempFile with {audioData.Length} bytes");
 
                                 // Notify listeners with the audio data
                                 AudioDataReady?.Invoke(this, audioData);
@@ -527,7 +581,7 @@ namespace VoiceLite.Services
                                 // Don't depend on event subscribers - the file is needed regardless
                                 SaveMemoryBufferToTempFile(audioData);
 
-                                ErrorLogger.LogWarning("StopRecording: SaveMemoryBufferToTempFile COMPLETED");
+                                ErrorLogger.LogDebug("StopRecording: SaveMemoryBufferToTempFile COMPLETED");
                             }
                             else
                             {
@@ -632,7 +686,7 @@ namespace VoiceLite.Services
 
         private void SaveMemoryBufferToTempFile(byte[] audioData)
         {
-            ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: ENTERED with {audioData.Length} bytes");
+            ErrorLogger.LogDebug($"SaveMemoryBufferToTempFile: ENTERED with {audioData.Length} bytes");
             try
             {
                 // Ensure temp directory exists (Windows temp cleanup might delete it while app is running)
@@ -645,7 +699,16 @@ namespace VoiceLite.Services
                 string guidPart = Guid.NewGuid().ToString("N")[..8];
                 currentAudioFilePath = Path.Combine(tempDirectory, $"recording_{DateTime.Now:yyyyMMddHHmmssfff}_{guidPart}.wav");
 
-                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: About to write {audioData.Length} bytes to {currentAudioFilePath}");
+                ErrorLogger.LogDebug($"SaveMemoryBufferToTempFile: About to write {audioData.Length} bytes to {currentAudioFilePath}");
+
+                // Release-visible mic health signal: a muted/unplugged/wrong device shows up
+                // here as a ~0% peak long before anyone notices every transcription is empty.
+                double peakPct = PeakAbsSample(audioData) * 100.0 / short.MaxValue;
+                LastPeakPercent = peakPct;
+                if (peakPct < 1.0)
+                    ErrorLogger.LogWarning($"Audio level: peak={peakPct:F1}% - microphone '{ActiveDeviceName}' looks silent (muted, unplugged, or wrong device)");
+                else
+                    ErrorLogger.LogWarning($"Audio level: peak={peakPct:F0}%");
 
                 // Apply audio preprocessing if any features are enabled
                 byte[] processedAudioData = audioData;
@@ -698,7 +761,7 @@ namespace VoiceLite.Services
                 // Notify about the file
                 AudioFileReady?.Invoke(this, currentAudioFilePath);
 
-                ErrorLogger.LogWarning($"SaveMemoryBufferToTempFile: AudioFileReady event invoked");
+                ErrorLogger.LogDebug($"SaveMemoryBufferToTempFile: AudioFileReady event invoked");
             }
             catch (Exception ex)
             {

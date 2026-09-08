@@ -279,7 +279,7 @@ namespace VoiceLite.Services
             // However, in tests and some disposal scenarios, it may be unavoidable
             if (dispatcher.CheckAccess())
             {
-                ErrorLogger.LogWarning("StopKeyMonitor called on UI thread - may cause brief UI freeze (up to 2s)");
+                ErrorLogger.LogDebug("StopKeyMonitor called on UI thread - may cause brief UI freeze (up to 2s)");
             }
 
             CancellationTokenSource? cts;
