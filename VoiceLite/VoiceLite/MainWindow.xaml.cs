@@ -51,7 +51,6 @@ namespace VoiceLite
         private readonly SemaphoreSlim saveSettingsSemaphore = new SemaphoreSlim(1, 1);
         // CancellationToken for settings save operations (cancelled on disposal)
         private readonly CancellationTokenSource settingsSaveCts = new CancellationTokenSource();
-        private DateTime lastClickTime = DateTime.MinValue;
 
         // Pre-configured JSON serializer options (5-15ms savings per save)
         private static readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions
@@ -737,22 +736,6 @@ namespace VoiceLite
         #endregion
 
         #region Recording Control
-
-        private void TestButton_Click(object sender, RoutedEventArgs e)
-        {
-            var now = DateTime.Now;
-            if ((now - lastClickTime).TotalMilliseconds < TimingConstants.ClickDebounceMs) return;
-            lastClickTime = now;
-
-            if (dictation == null)
-            {
-                UpdateStatus("Audio recorder not initialized", Brushes.Red);
-                return;
-            }
-
-            ErrorLogger.LogWarning("Record button clicked");
-            dictation.Toggle();
-        }
 
 
         private async Task RunUpdateCheckAsync()
