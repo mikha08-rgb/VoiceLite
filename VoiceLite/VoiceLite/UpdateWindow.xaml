@@ -50,10 +50,37 @@
             </Setter>
         </Style>
 
-        <Style x:Key="QuietUpdateButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <!-- Self-contained: App.xaml has no shared styles (ModernStyles.xaml is gone). Mirrors Settings' FlatButton. -->
+        <Style x:Key="QuietUpdateButtonStyle" TargetType="Button">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#4A4A4A"/>
+            <Setter Property="BorderBrush" Value="#CFCFCF"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#F3F4F6"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
