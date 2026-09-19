@@ -4,6 +4,23 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.5.0] - 2026-09-19
+
+### Fixed
+- **The saved microphone is found by name every time you dictate** — after a re-plug Windows can renumber devices, and VoiceLite could silently record from the wrong (silent) one.
+- An empty transcription now names the microphone it used, in red when that mic was silent, so a dead input is obvious.
+- The 5-minute toggle-mode auto-stop shows a tray notification instead of a pop-up that could block the app mid-recording.
+- An older VoiceLite still running in the background and holding the hotkey is detected at launch, with an offer to close it.
+- Launching VoiceLite a second time brings the existing window forward instead of showing a "check the system tray" message.
+
+### Added
+- **In-app updates** — "Download and install" fetches the new installer, verifies its SHA-256 hash, installs silently, and relaunches. You can also skip a version. A persistent "Update available" banner replaces the easy-to-miss launch notification, and VoiceLite re-checks daily.
+- **Rebuilt Settings window** — left-hand navigation, a live microphone level meter (with a "No signal" warning), and a check that refuses a hotkey another program already owns.
+
+### Changed
+- The installer closes a running VoiceLite before updating.
+- Recording and transcription state moved into a single tested state machine (internal; no behavior change intended).
+
 ## [2.4.1] - 2026-07-21
 
 ### Fixed

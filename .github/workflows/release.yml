@@ -222,9 +222,12 @@ jobs:
 
         # Save hashes to output for release notes
         $hashesContent = $hashes -join "`n"
-        # Escape special characters for GitHub Actions
-        $hashesContentEscaped = $hashesContent -replace '%','%25' -replace '\r','%0D' -replace '\n','%0A'
-        echo "HASHES=$hashesContentEscaped" >> $env:GITHUB_OUTPUT
+        # Multi-line output needs the heredoc form; the old %0A escaping was for the
+        # retired set-output command and showed up literally in the release notes.
+        $delimiter = "HASHES_EOF_$([guid]::NewGuid().ToString('N'))"
+        "HASHES<<$delimiter" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        $hashesContent      | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        $delimiter          | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
     - name: List installer files
       shell: pwsh

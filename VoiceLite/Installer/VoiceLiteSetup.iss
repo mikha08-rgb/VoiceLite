@@ -2,7 +2,7 @@
 ; v2.0.0.0: Parakeet v3 engine (Sherpa-ONNX). Speech model downloaded on first launch (~640MB).
 ; No manual downloads required - .NET bundled (self-contained), VC++ auto-installed
 
-#define MyAppVersion "2.4.1"
+#define MyAppVersion "2.5.0"
 
 [Setup]
 AppId={{A06BC0AA-DD0A-4341-9E41-68AC0D6E541E}
@@ -72,6 +72,14 @@ Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/quiet /norestart"; StatusMsg:
 ; Launch VoiceLite after installation
 Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Flags: nowait postinstall skipifsilent
 
+; In-app updater path: VoiceLite runs this installer with
+;   /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /RELAUNCH=1
+; (see Services/UpdateInstaller.cs). The postinstall entry above is skipifsilent, so
+; without this line a silent upgrade would leave the user with no VoiceLite running.
+; runasoriginaluser: if Setup self-elevated (all-users install), still start the app
+; as the logged-in user so its %LOCALAPPDATA% settings/license resolve correctly.
+Filename: "{app}\VoiceLite.exe"; Flags: nowait skipifnotsilent runasoriginaluser; Check: RelaunchRequested
+
 [UninstallDelete]
 ; Only delete the install dir's temp folder. User data in {localappdata}\VoiceLite
 ; (settings, license.dat, downloaded Parakeet model, transcription history) is
@@ -87,27 +95,121 @@ Type: filesandordirs; Name: "{app}\temp"
 // app-side comment points back here.
 const
   AppMutexName = 'VoiceLite_SingleInstance';
+  AppExeName = 'VoiceLite.exe';
+
+// Set by the in-app updater (/RELAUNCH=1). Read via {param:...} so it works with
+// both "/RELAUNCH=1" and "/RELAUNCH 1" forms.
+function RelaunchRequested(): Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
+// Process-based running check. CheckForMutexes only sees builds >= 2.2 (the ones
+// that create the mutex); v2.1.x installs in the wild have no mutex, so ask tasklist.
+// tasklist prints a header line + one line per match, or "INFO: No tasks are
+// running..." when nothing matches — the image name never appears in that INFO line.
+function IsVoiceLiteProcessRunning(): Boolean;
+var
+  ResultCode: Integer;
+  TmpFile: String;
+  Lines: TArrayOfString;
+  i: Integer;
+begin
+  Result := False;
+  TmpFile := ExpandConstant('{tmp}\voicelite_tasklist.txt');
+  if Exec(ExpandConstant('{cmd}'),
+          '/C tasklist /FI "IMAGENAME eq ' + AppExeName + '" /NH > "' + TmpFile + '"',
+          '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if LoadStringsFromFile(TmpFile, Lines) then
+    begin
+      for i := 0 to GetArrayLength(Lines) - 1 do
+      begin
+        if Pos(Lowercase(AppExeName), Lowercase(Lines[i])) > 0 then
+        begin
+          Result := True;
+          Break;
+        end;
+      end;
+    end;
+    DeleteFile(TmpFile);
+  end
+  else
+    Log('tasklist could not be run (code ' + IntToStr(ResultCode) + '); relying on mutex check only');
+end;
+
+function IsVoiceLiteRunning(): Boolean;
+begin
+  Result := IsVoiceLiteProcessRunning() or CheckForMutexes(AppMutexName);
+end;
+
+// Waits up to MaxMs for VoiceLite to exit on its own. Returns True when it is gone.
+function WaitForVoiceLiteExit(MaxMs: Integer): Boolean;
+var
+  Waited: Integer;
+begin
+  Waited := 0;
+  while IsVoiceLiteRunning() and (Waited < MaxMs) do
+  begin
+    Sleep(500);
+    Waited := Waited + 500;
+  end;
+  Result := not IsVoiceLiteRunning();
+end;
+
+// Force-terminates VoiceLite.exe and polls up to ~10s until it is gone.
+function CloseRunningVoiceLite(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Log('VoiceLite is running - terminating ' + AppExeName);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM ' + AppExeName + ' /F', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Log('taskkill exit code ' + IntToStr(ResultCode));
+  Result := WaitForVoiceLiteExit(10000);
+  if Result then
+    Log(AppExeName + ' has exited')
+  else
+    Log(AppExeName + ' is still running after taskkill');
+end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  // Check if VoiceLite is currently running
-  if CheckForMutexes(AppMutexName) then
+  Result := '';
+  if not IsVoiceLiteRunning() then
+    Exit;
+
+  if WizardSilent then
   begin
-    Result := 'VoiceLite is currently running. Please close it before continuing.';
+    // Silent = in-app updater (or an IT push). The updater shuts VoiceLite down
+    // right after launching us; give it a moment to exit cleanly (settings flush)
+    // before falling back to taskkill.
+    if WaitForVoiceLiteExit(3000) then
+      Exit;
   end
   else
   begin
-    Result := '';
+    if MsgBox('VoiceLite is running.'#13#10#13#10 +
+              'Close it and continue with the installation?',
+              mbConfirmation, MB_YESNO) <> IDYES then
+    begin
+      Result := 'VoiceLite is currently running. Please close it (check the system tray) before continuing.';
+      Exit;
+    end;
   end;
+
+  if not CloseRunningVoiceLite() then
+    Result := 'VoiceLite is still running and could not be closed. ' +
+              'Please exit it from the system tray and run Setup again.';
 end;
 
 function InitializeUninstall(): Boolean;
 begin
   // Same running-check on uninstall: removing files while VoiceLite holds them
   // locked leaves a partially-deleted install (exe gone, DLLs behind, or vice
-  // versa). Abort cleanly instead.
+  // versa). Abort cleanly instead. Process check covers pre-mutex (v2.1.x) builds.
   Result := True;
-  if CheckForMutexes(AppMutexName) then
+  if IsVoiceLiteRunning() then
   begin
     MsgBox('VoiceLite is currently running.'#13#10#13#10 +
            'Please close it (check the system tray), then run the uninstaller again.',

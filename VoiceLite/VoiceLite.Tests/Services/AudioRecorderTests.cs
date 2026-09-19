@@ -151,6 +151,48 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void ResolveDeviceIndex_PrefersSavedNameOverStaleIndex()
+        {
+            // Real case: HyperX re-plugged into another USB port -> Windows renumbered the
+            // devices, the saved index 1 now pointed at a silent Realtek mic, and every
+            // transcription came back empty for a week.
+            var devices = new List<AudioDevice>
+            {
+                new() { Index = 0, Name = "Microphone (HyperX SoloCast)" },
+                new() { Index = 1, Name = "Microphone (Realtek USB2.0 Audi" },
+            };
+            AudioRecorder.ResolveDeviceIndex(devices, 1, "Microphone (HyperX SoloCast)").Should().Be(0);
+        }
+
+        [Fact]
+        public void ResolveDeviceIndex_FallsBackToDefaultWhenSavedNameIsGone()
+        {
+            var devices = new List<AudioDevice> { new() { Index = 0, Name = "A" }, new() { Index = 1, Name = "B" } };
+            AudioRecorder.ResolveDeviceIndex(devices, 1, "Microphone (2- HyperX SoloCast)").Should().Be(0);
+        }
+
+        [Fact]
+        public void ResolveDeviceIndex_UsesIndexWhenNoNameSaved()
+        {
+            var devices = new List<AudioDevice> { new() { Index = 0, Name = "A" }, new() { Index = 1, Name = "B" } };
+            AudioRecorder.ResolveDeviceIndex(devices, 1, null).Should().Be(1);
+            AudioRecorder.ResolveDeviceIndex(devices, -1, null).Should().Be(0);
+            AudioRecorder.ResolveDeviceIndex(devices, 7, null).Should().Be(0);
+        }
+
+        [Fact]
+        public void PeakAbsSample_FindsDataChunkPastNAudioHeader()
+        {
+            using var ms = new MemoryStream();
+            using (var writer = new NAudio.Wave.WaveFileWriter(new NAudio.Utils.IgnoreDisposeStream(ms), new NAudio.Wave.WaveFormat(16000, 16, 1)))
+            {
+                writer.WriteSamples(new short[] { 0, 1000, -12000, 300 }, 0, 4);
+            }
+            AudioRecorder.PeakAbsSample(ms.ToArray()).Should().Be(12000);
+            AudioRecorder.PeakAbsSample(new byte[10]).Should().Be(0);
+        }
+
+        [Fact]
         public async Task SetDevice_ChangesSelectedDevice()
         {
             var devices = AudioRecorder.GetAvailableMicrophones();
