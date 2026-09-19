@@ -4,6 +4,11 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.5.1] - 2026-09-19
+
+### Fixed
+- **The in-app updater opens again** — in 2.5.0, clicking the "Update available" banner did nothing because the update window failed to load. If you are on 2.5.0, download this version from the website once; later updates install from inside the app.
+
 ## [2.5.0] - 2026-09-19
 
 ### Fixed
