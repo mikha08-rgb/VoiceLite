@@ -57,13 +57,9 @@ namespace VoiceLite.Tests
             ex.Message.Should().Contain("Install translation model");
         }
 
-        // ---- source tripwires (skipped when the test binaries run away from the source tree)
+        // ---- source tripwires (a missing source tree FAILS them: SourceTripwirePolicyTests)
 
-        private static string? AppSourceDir([CallerFilePath] string thisFile = "")
-        {
-            var dir = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite"));
-            return Directory.Exists(dir) ? dir : null;
-        }
+        private static string AppSourceDir() => RepoSourceFile.AppDir;
 
         private static IEnumerable<string> AppCsFiles(string appDir) =>
             Directory.GetFiles(appDir, "*.cs", SearchOption.AllDirectories)
@@ -111,7 +107,6 @@ var s = ""Open Settings > Transcription"";
         public void Tripwire_EverySettingsTabNamedInCode_ExistsInSettingsWindow()
         {
             var appDir = AppSourceDir();
-            if (appDir == null) return;
 
             var xaml = File.ReadAllText(Path.Combine(appDir, "SettingsWindow.xaml"));
             var tabs = TabHeaders(xaml);
@@ -135,7 +130,6 @@ var s = ""Open Settings > Transcription"";
         public void Tripwire_NoMessageMentionsManualButtons()
         {
             var appDir = AppSourceDir();
-            if (appDir == null) return;
 
             var offenders = AppCsFiles(appDir)
                 .Where(f => File.ReadAllText(f).Contains("manual buttons", StringComparison.OrdinalIgnoreCase))

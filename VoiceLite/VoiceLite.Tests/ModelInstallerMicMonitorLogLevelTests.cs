@@ -14,11 +14,8 @@ namespace VoiceLite.Tests
     /// </summary>
     public class ModelInstallerMicMonitorLogLevelTests
     {
-        private static string? ReadAppSource(string relativePath, [CallerFilePath] string thisFile = "")
-        {
-            var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite", relativePath));
-            return File.Exists(path) ? File.ReadAllText(path) : null; // null: binaries copied away from the source tree
-        }
+        // A missing source file FAILS the tripwire (SourceTripwirePolicyTests), it is not skipped.
+        private static string ReadAppSource(string relativePath) => RepoSourceFile.ReadApp(relativePath.Split('/'));
 
         [Theory]
         [InlineData("Services/ModelInstaller.cs", "Temp model archive cleanup failed")]
@@ -30,7 +27,6 @@ namespace VoiceLite.Tests
         public void FailureBranch_IsLoggedAtAReleaseVisibleLevel(string file, string messagePrefix)
         {
             var source = ReadAppSource(file);
-            if (source == null) return;
 
             var at = source.IndexOf(messagePrefix, StringComparison.Ordinal);
             at.Should().BeGreaterThan(0, $"'{messagePrefix}' should still be logged in {file} (update this test if it was reworded)");

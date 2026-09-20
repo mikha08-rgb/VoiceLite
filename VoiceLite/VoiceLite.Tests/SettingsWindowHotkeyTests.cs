@@ -80,7 +80,6 @@ namespace VoiceLite.Tests
         public void Wiring_EscBranchReverts_AndTheHintSaysSo()
         {
             var code = ReadAppSource("SettingsWindow.xaml.cs");
-            if (code == null) return; // test binaries copied away from the source tree
 
             Regex.IsMatch(code, @"e\.Key == Key\.Escape\)\s*\{[^}]*RevertHotkeyToLive\(settings, liveSettings\)")
                 .Should().BeTrue("the Esc branch of HotkeyBox_PreviewKeyDown must restore the live hotkey");
@@ -136,7 +135,6 @@ namespace VoiceLite.Tests
         public void Wiring_MainWindowTellsSettingsWhetherTheHotkeyIsRegistered()
         {
             var code = ReadAppSource("MainWindow.xaml.cs");
-            if (code == null) return;
 
             // A delegate, not a bool: Settings can be opened while startup is still initializing
             // services, and the startup registration then succeeds BEHIND the open dialog. A
@@ -149,7 +147,6 @@ namespace VoiceLite.Tests
         public void Wiring_RegistrationStateIsReadWhenItIsNeeded_NotSnapshottedWhenTheDialogOpens()
         {
             var code = ReadAppSource("SettingsWindow.xaml.cs");
-            if (code == null) return;
 
             Assert.False(Regex.IsMatch(code, @"\bbool appOwnsRegisteredHotkey;"),
                 "a bool field is a dialog-open snapshot; it goes stale when startup registration completes behind the dialog");
@@ -157,10 +154,7 @@ namespace VoiceLite.Tests
                 "the probe exemption and the dead-hotkey warning must ask MainWindow's HotkeyManager each time");
         }
 
-        internal static string? ReadAppSource(string fileName, [CallerFilePath] string thisFile = "")
-        {
-            var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite", fileName));
-            return File.Exists(path) ? File.ReadAllText(path) : null;
-        }
+        /// <summary>App source text. A missing file FAILS the calling tripwire (SourceTripwirePolicyTests).</summary>
+        internal static string ReadAppSource(string fileName) => RepoSourceFile.ReadApp(fileName);
     }
 }

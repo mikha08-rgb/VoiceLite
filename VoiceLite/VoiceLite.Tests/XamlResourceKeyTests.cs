@@ -24,15 +24,14 @@ namespace VoiceLite.Tests
             RegexOptions.Compiled);
         private static readonly Regex MergedDictionary = new(@"Source=""([^""]+\.xaml)""", RegexOptions.Compiled);
 
-        private static string AppSourceDir([CallerFilePath] string thisFile = "") =>
-            Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite"));
+        // A missing source tree FAILS the test (SourceTripwirePolicyTests): returning early would
+        // report "every resource key resolves" without having opened a single XAML file.
+        private static string AppSourceDir() => RepoSourceFile.AppDir;
 
         [Fact]
         public void EveryResourceReference_ResolvesToADefinedKey()
         {
             var appDir = AppSourceDir();
-            if (!Directory.Exists(appDir))
-                return; // test binaries copied away from the source tree
 
             var xamlFiles = Directory.GetFiles(appDir, "*.xaml", SearchOption.AllDirectories)
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")

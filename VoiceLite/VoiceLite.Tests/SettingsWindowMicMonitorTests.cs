@@ -21,7 +21,6 @@ namespace VoiceLite.Tests
         public void Wiring_MeterFollowsLevelTrackVisibility_NotWindowLoaded()
         {
             var code = SettingsWindowHotkeyTests.ReadAppSource("SettingsWindow.xaml.cs");
-            if (code == null) return; // test binaries copied away from the source tree
 
             // Assert.True/False on Contains: a Should().Contain failure would dump the whole file.
             Assert.False(code.Contains("Loaded += (_, _) => StartMicMonitor();"),
@@ -39,7 +38,6 @@ namespace VoiceLite.Tests
             // StartMicMonitor always stops first, so the second one would close and re-open the
             // device back-to-back on the UI thread (slow, and a Bluetooth profile flip).
             var code = SettingsWindowHotkeyTests.ReadAppSource("SettingsWindow.xaml.cs");
-            if (code == null) return; // test binaries copied away from the source tree
 
             Assert.True(System.Text.RegularExpressions.Regex.IsMatch(code,
                     @"if \(LevelTrack\.IsVisible && micMonitor == null\)\s*StartMicMonitor\(\);"),

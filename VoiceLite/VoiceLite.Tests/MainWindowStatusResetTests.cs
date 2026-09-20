@@ -105,11 +105,8 @@ namespace VoiceLite.Tests
         // ---- source tripwires: ShowDictationNotice is WPF code-behind with no seam, so these only
         // check that the wiring is still written down. They do not prove the UI behaviour.
 
-        private static string? MainWindowSource([CallerFilePath] string thisFile = "")
-        {
-            var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite", "MainWindow.xaml.cs"));
-            return File.Exists(path) ? File.ReadAllText(path) : null; // null: binaries copied away from the source tree
-        }
+        // A missing source file FAILS the tripwire (SourceTripwirePolicyTests), it is not skipped.
+        private static string MainWindowSource() => RepoSourceFile.ReadApp("MainWindow.xaml.cs");
 
         private static string CaseBlock(string source, string kind)
         {
@@ -123,7 +120,6 @@ namespace VoiceLite.Tests
         public void Tripwire_NoSpeechStatus_IsResetToReady()
         {
             var source = MainWindowSource();
-            if (source == null) return;
             CaseBlock(source, "NoSpeech").Should().Contain("ResetToReadyLater(",
                 "the no-speech status is transient like \"Error\" and must not stick until the next dictation");
         }
@@ -132,7 +128,6 @@ namespace VoiceLite.Tests
         public void Tripwire_RecordingStarted_CancelsThePendingReset()
         {
             var source = MainWindowSource();
-            if (source == null) return;
             CaseBlock(source, "RecordingStarted").Should().Contain("CancelReadyReset(",
                 "a reset armed by the previous dictation must not fire into this one's messages");
         }
@@ -141,7 +136,6 @@ namespace VoiceLite.Tests
         public void Tripwire_AutoStopBalloon_HasNoHardcodedMinutes()
         {
             var source = MainWindowSource();
-            if (source == null) return;
             var block = CaseBlock(source, "AutoStopped");
             block.Should().Contain("DescribeAutoStop(");
             block.Should().Contain("ev.Message", "a lost recording must not be announced as \"Transcribing what was captured\"");
