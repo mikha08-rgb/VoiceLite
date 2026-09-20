@@ -136,17 +136,32 @@ namespace VoiceLite.Tests
         /// finds no event, shows "already running", and is itself reported as an "older copy".
         /// </summary>
         [Fact]
-        public void OnStartup_StartsShowWindowListener_BeforeProcessCheck()
+        public void OnStartup_StartsShowWindowListener_BeforeProcessCheck() =>
+            AssertListenerStartsBeforeProcessCheck(AppSourceFile());
+
+        [Fact]
+        public void StartupOrderTripwire_FailsLoudly_WhenSourceIsMissing() =>
+            // A tripwire that silently passes without reading anything is worse than none.
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+                AssertListenerStartsBeforeProcessCheck(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "App.xaml.cs")));
+
+        private static void AssertListenerStartsBeforeProcessCheck(string source)
         {
-            var source = AppSourceFile();
-            if (!File.Exists(source))
-                return; // test binaries copied away from the source tree
+            // Resolved from the compile-time path of this file; a copied test binary or a
+            // PathMap/deterministic build must fail here rather than pass unchecked.
+            Assert.True(File.Exists(source),
+                $"Startup-order tripwire could not find App.xaml.cs at '{source}'; the listener-before-process-check order is unverified.");
 
             var text = File.ReadAllText(source);
-            int listen = text.IndexOf("ListenForShowWindowSignal();", StringComparison.Ordinal);
-            int check = text.IndexOf("if (!CloseOtherInstances())", StringComparison.Ordinal);
+            const string listenCall = "ListenForShowWindowSignal();";
+            const string checkCall = "if (!CloseOtherInstances())";
+            int listen = text.IndexOf(listenCall, StringComparison.Ordinal);
+            int check = text.IndexOf(checkCall, StringComparison.Ordinal);
             Assert.True(listen >= 0, "ListenForShowWindowSignal() call not found in App.xaml.cs");
             Assert.True(check >= 0, "CloseOtherInstances() call not found in App.xaml.cs");
+            // First-occurrence comparison is only meaningful while each call appears once.
+            Assert.True(text.IndexOf(listenCall, listen + 1, StringComparison.Ordinal) < 0, "ListenForShowWindowSignal() is called more than once; update this tripwire");
+            Assert.True(text.IndexOf(checkCall, check + 1, StringComparison.Ordinal) < 0, "CloseOtherInstances() is called more than once; update this tripwire");
             Assert.True(listen < check, "ListenForShowWindowSignal() must run before CloseOtherInstances()");
         }
 

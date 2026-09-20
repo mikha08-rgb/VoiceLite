@@ -24,6 +24,10 @@ Add-Type -AssemblyName PresentationFramework
 $asm = [Reflection.Assembly]::LoadFrom('{ASSEMBLY}')
 $appType = $asm.GetType('VoiceLite.App', $true)
 $flags = [Reflection.BindingFlags]'NonPublic,Static'
+# ErrorLogger's path is hard-wired to the real %LOCALAPPDATA%\VoiceLite\logs\voicelite.log.
+# Raise the level so the Warning paths exercised here return before any file access.
+$logLevel = $asm.GetType('VoiceLite.Services.ErrorLogger', $true).GetProperty('MinimumLogLevel')
+$logLevel.SetValue($null, [Enum]::Parse($logLevel.PropertyType, 'Error'))
 function New-TestWindow {
     $w = [Windows.Window]::new()
     $w.WindowStyle = 'None'; $w.ShowInTaskbar = $false; $w.ShowActivated = $false
@@ -76,6 +80,8 @@ $ok = $run.Invoke($null, @($app, $gate))
             // the final Show() a no-op for an unrelated reason.
             var output = RunInChildPwsh(Prelude + @"
 $surface = $appType.GetMethod('SurfaceWindow', $flags)
+if ($logLevel.GetValue($null) -ne 'Error') { throw 'ErrorLogger is not muted; refusing to write to the real voicelite.log' }
+""LOGLEVEL=$($logLevel.GetValue($null))""
 $closed = New-TestWindow; $closed.Show(); $closed.Close()
 $surface.Invoke($null, @($closed))
 $surface.Invoke($null, @($null))
@@ -83,6 +89,8 @@ $open = New-TestWindow
 $surface.Invoke($null, @($open))
 ""SURFACED=$($open.IsVisible)""
 ");
+            // The closed-window path logs a Warning; it must not land in the real user log.
+            Assert.Contains("LOGLEVEL=Error", output);
             Assert.Contains("SURFACED=True", output);
         }
 
