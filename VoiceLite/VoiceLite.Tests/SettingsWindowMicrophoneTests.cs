@@ -76,6 +76,37 @@ namespace VoiceLite.Tests
             (picked?.Index ?? 0).Should().Be(AudioRecorder.ResolveDeviceIndex(devices, savedIndex, savedName));
         }
 
+        // F1(b): WaveIn names are truncated to 31 chars, so two mics can share one name. The
+        // saved index breaks the tie - but ONLY among devices that already match the name.
+        [Theory]
+        [InlineData(2, "Twin", 2)]     // second twin saved -> second twin (was: always the first)
+        [InlineData(0, "Twin", 0)]     // first twin saved
+        [InlineData(1, "Twin", 0)]     // index points at a different-named device -> first by name
+        [InlineData(5, "Twin", 0)]     // index out of range -> first by name
+        [InlineData(2, "Webcam", 1)]   // unique name, index points at a twin -> the name wins
+        public void PickSavedMicrophone_SameNamedTwins_IndexOnlyBreaksTheTie_AndAgreesWithTheRecorder(
+            int savedIndex, string savedName, int expectedIndex)
+        {
+            var devices = Devices("Twin", "Webcam", "Twin");
+
+            var picked = SettingsWindow.PickSavedMicrophone(devices, savedIndex, savedName);
+
+            picked!.Index.Should().Be(expectedIndex);
+            AudioRecorder.ResolveDeviceIndex(devices, savedIndex, savedName).Should().Be(expectedIndex,
+                "Settings (and its level meter) must show the same twin the recorder records from");
+        }
+
+        [Theory]
+        [InlineData(0)]   // stale index now points at the webcam
+        [InlineData(2)]   // stale index now out of range
+        public void PickSavedMicrophone_OneTwinUnplugged_PicksTheRemainingTwinByName(int savedIndex)
+        {
+            var devices = Devices("Webcam", "Twin");
+
+            SettingsWindow.PickSavedMicrophone(devices, savedIndex, "Twin")!.Index.Should().Be(1);
+            AudioRecorder.ResolveDeviceIndex(devices, savedIndex, "Twin").Should().Be(1);
+        }
+
         // ---- BuildMicrophoneChoices: what the combo shows ----
 
         [Fact]

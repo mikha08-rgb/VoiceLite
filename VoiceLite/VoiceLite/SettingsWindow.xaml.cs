@@ -409,9 +409,10 @@ namespace VoiceLite
         /// <summary>
         /// Finds the saved microphone among the connected devices exactly the way
         /// AudioRecorder.ResolveDeviceIndex does: -1 = default; a saved NAME wins and the index
-        /// is then never consulted (Windows renumbers devices, so whatever now sits at the
-        /// stale index is a different microphone); the index alone is trusted only for legacy
-        /// settings that have no name. Null = not found / default.
+        /// only breaks the tie between same-named devices (WaveIn truncates names to 31 chars) -
+        /// it never selects a device by itself (Windows renumbers devices, so whatever now sits
+        /// at the stale index is a different microphone); the index alone is trusted only for
+        /// legacy settings that have no name. Null = not found / default.
         /// Internal static for the regression tests (which also pin parity with the recorder).
         /// </summary>
         internal static AudioDevice? PickSavedMicrophone(System.Collections.Generic.IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
@@ -419,7 +420,8 @@ namespace VoiceLite
             if (savedIndex == -1)
                 return null;
             if (!string.IsNullOrEmpty(savedName))
-                return devices.FirstOrDefault(d => d.Index != -1 && d.Name == savedName);
+                return devices.FirstOrDefault(d => d.Index == savedIndex && d.Name == savedName)
+                       ?? devices.FirstOrDefault(d => d.Index != -1 && d.Name == savedName);
             return devices.FirstOrDefault(d => d.Index == savedIndex);
         }
 
