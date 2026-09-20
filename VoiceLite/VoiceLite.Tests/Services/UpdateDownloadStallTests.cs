@@ -101,7 +101,7 @@ namespace VoiceLite.Tests.Services
         private static readonly TimeSpan SlowButSteadyDelayPerRead = TimeSpan.FromMilliseconds(200);
         private const int SlowButSteadyChunks = 12;
 
-        private async Task<Exception?> RunSlowButSteady(TimeSpan stallWindow, TimeSpan delayPerRead, int chunks)
+        private async Task<Exception?> RunSlowButSteady(TimeSpan stallWindow, TimeSpan delayPerRead, int chunks, bool onCallersContext = false)
         {
             (delayPerRead * chunks).Should().BeGreaterThan(stallWindow,
                 "the point of the test: the watchdog is per read, not a cap on the whole download (slow links must still finish)");
@@ -113,8 +113,10 @@ namespace VoiceLite.Tests.Services
 
             // Task.Run: FakeHandler completes synchronously, so without it DownloadAsync would run
             // up to its first read on the caller's (xunit's bounded) SynchronizationContext.
-            var download = Task.Run(() => UpdateInstaller.DownloadAsync(
-                Info(payload), null, CancellationToken.None, dir, client, stallWindow));
+            // onCallersContext skips it on purpose, so that context IS what the awaits see.
+            Func<Task<string>> start = () => UpdateInstaller.DownloadAsync(
+                Info(payload), null, CancellationToken.None, dir, client, stallWindow);
+            var download = onCallersContext ? start() : Task.Run(start);
             var error = await RunGuarded(download).ConfigureAwait(false);
             if (error != null) return error;
 
@@ -139,13 +141,16 @@ namespace VoiceLite.Tests.Services
             // expires and the slow-but-steady test fails although nothing is wrong. Simulated
             // here with a context that delivers every post later than the stall window: if any
             // read (or the download itself) captured it, the window below expires.
+            // DownloadAsync is started directly under that context (no Task.Run), otherwise
+            // nothing below would ever see it: this pins ScriptedStream's ConfigureAwait(false)
+            // (verified: without them this test fails) and UpdateInstaller's own read loop.
             var window = TimeSpan.FromSeconds(1);
             var previous = SynchronizationContext.Current;
             Task<Exception?> run;
             SynchronizationContext.SetSynchronizationContext(new StarvedSynchronizationContext(window * 1.5));
             try
             {
-                run = RunSlowButSteady(window, delayPerRead: TimeSpan.FromMilliseconds(100), chunks: 12);
+                run = RunSlowButSteady(window, delayPerRead: TimeSpan.FromMilliseconds(100), chunks: 12, onCallersContext: true);
             }
             finally
             {

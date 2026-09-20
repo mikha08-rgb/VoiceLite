@@ -90,7 +90,6 @@ namespace VoiceLite.Tests
         public void Wiring_LoadMicrophonesRemembersTheMissingMic_AndPassesItBackOnRefresh()
         {
             var code = SettingsWindowHotkeyTests.ReadAppSource("SettingsWindow.xaml.cs");
-            if (code == null) return; // test binaries copied away from the source tree
 
             Assert.True(code.Contains("keptMissingMicIndex, keptMissingMicName,"),
                 "LoadMicrophones must hand the remembered unconnected microphone to BuildMicrophoneChoices");

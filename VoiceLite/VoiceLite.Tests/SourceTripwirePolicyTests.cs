@@ -45,6 +45,18 @@ namespace VoiceLite.Tests
         public void SharedReadAppSource_FailsLoudly_WhenTheFileIsMissing() =>
             Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => SettingsWindowHotkeyTests.ReadAppSource("NoSuchWindow.xaml.cs"));
 
+        private static readonly Regex ReturnOnNull =
+            new(@"if\s*\(\s*\w+\s*(==|is)\s*null(\s*\|\|\s*\w+\s*(==|is)\s*null)*\s*\)\s*return\s*;");
+
+        [Theory]
+        [InlineData("var code = ReadAppSource(\"App.xaml.cs\");\n            if (code == null) return; // copied binaries", true)]
+        [InlineData("if (csproj == null || iss == null || web == null) return;", true)]
+        [InlineData("if (yml is null) return;", true)]
+        [InlineData("if (match == null) return null;", false)]
+        [InlineData("Assert.True(code != null);", false)]
+        public void ReturnOnNullPattern_MatchesTheSilentPassIdiom_AndNothingElse(string snippet, bool flagged) =>
+            Assert.Equal(flagged, ReturnOnNull.IsMatch(snippet));
+
         /// <summary>
         /// Keeps the policy from eroding: no test file may bring back a source lookup that
         /// answers "not found" with null or a bare return.
@@ -58,6 +70,11 @@ namespace VoiceLite.Tests
             var silentReturn = new Regex(@"if\s*\(\s*!\s*(File|Directory)\.Exists\([^;{]*\)\s*return\b");
             // An existence check used as a conditional whose "missing" arm is null.
             var nullWhenMissing = new Regex(@"(File|Directory)\.Exists\([^;]*\?[^;]*:\s*null\s*;");
+            // The caller's half of the same idiom, with no [CallerFilePath] in sight: the shared
+            // lookups throw today, so a null check after them is dead - and the day a helper
+            // returns null again it is a green test that read nothing. Not allowed at all in a
+            // file that reads repo sources.
+            var readsRepoSources = new Regex(@"\bRepoSourceFile\.|\bReadAppSource\(|\bReleaseYml\(");
 
             var testDir = Path.Combine(RepoSourceFile.RepoRoot, "VoiceLite", "VoiceLite.Tests");
             var files = Directory.GetFiles(testDir, "*.cs", SearchOption.AllDirectories)
@@ -70,8 +87,11 @@ namespace VoiceLite.Tests
                 .Where(f =>
                 {
                     var text = File.ReadAllText(f);
-                    return text.Contains("CallerFilePath", StringComparison.Ordinal)
-                           && (nullableLookup.IsMatch(text) || silentReturn.IsMatch(text) || nullWhenMissing.IsMatch(text));
+                    // This file quotes the idiom in its own comments and test data.
+                    bool self = Path.GetFileName(f) == nameof(SourceTripwirePolicyTests) + ".cs";
+                    return (text.Contains("CallerFilePath", StringComparison.Ordinal)
+                            && (nullableLookup.IsMatch(text) || silentReturn.IsMatch(text) || nullWhenMissing.IsMatch(text)))
+                           || (!self && readsRepoSources.IsMatch(text) && ReturnOnNull.IsMatch(text));
                 })
                 .Select(f => Path.GetRelativePath(testDir, f))
                 .ToList();

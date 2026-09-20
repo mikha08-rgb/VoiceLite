@@ -253,13 +253,83 @@ namespace VoiceLite.Tests
             return string.Join("\n", script);
         }
 
+        /// <summary>
+        /// The step is EXECUTED on developer machines by this class (the owner's licensed
+        /// VoiceLite may be running there), so it may only list, hash and append to
+        /// $env:GITHUB_OUTPUT. Strict allowlist, not a denylist: anything this does not know -
+        /// a new cmdlet, alias, native tool, .NET type or method, a redirection, a call
+        /// operator - fails the test until a human has looked at it and extended the lists.
+        /// Deliberately string-blind: "$( ... )" inside a string is code too.
+        /// </summary>
+        private static void AssertHashStepIsSafeToRun(string script)
+        {
+            const string review = "; review the 'Generate SHA256 hashes' step before letting a unit test run it, then extend the allowlist";
+            var commands = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "echo", "Get-ChildItem", "Get-FileHash", "Out-File", "foreach" };
+            var staticCalls = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "[math]::Round(", "[guid]::NewGuid(" };
+
+            // Full-line comments are prose; everything else is scanned, strings included.
+            var code = string.Join("\n", script.Split('\n').Where(l => !l.TrimStart().StartsWith('#')));
+
+            // 1. Whatever stands where PowerShell reads a command name - start of a line, or
+            //    after | ; { ( = - is an allowlisted name or plainly an expression.
+            foreach (Match m in Regex.Matches(code, @"(?:^|[|;{(=])[ \t]*(?=(?<tok>\S+))", RegexOptions.Multiline))
+            {
+                var tok = m.Groups["tok"].Value;
+                var name = Regex.Match(tok, @"^[A-Za-z_][\w-]*");
+                if (name.Success)
+                    Assert.True(commands.Contains(name.Value), $"command '{name.Value}' is not on the allowlist" + review);
+                else
+                    Assert.True("$\"'[})@#".Contains(tok[0]) || char.IsDigit(tok[0]), $"'{tok}' in command position is not on the allowlist" + review);
+            }
+
+            // 2. .NET: only these static calls, and ToString() as the only instance method.
+            foreach (Match m in Regex.Matches(code, @"\[[^\]\r\n]*\](?:\s*::\s*\w+\s*\(?)?"))
+                Assert.True(staticCalls.Contains(Regex.Replace(m.Value, @"\s", "")), $"'{m.Value}' is not on the allowlist" + review);
+            foreach (Match m in Regex.Matches(code, @"\.\s*(?<method>\w+)\s*\("))
+                Assert.True(m.Groups["method"].Value == "ToString", $"method call '.{m.Groups["method"].Value}(' is not on the allowlist" + review);
+
+            // 3. No call operator, no redirection; the only file written is $env:GITHUB_OUTPUT,
+            //    and that variable is not reassigned.
+            Assert.False(code.Contains('&') || code.Contains('>'), "'&' or '>' found" + review);
+            foreach (Match m in Regex.Matches(code, @"\bOut-File\b[^\n|;]*", RegexOptions.IgnoreCase))
+                Assert.True(m.Value.StartsWith("Out-File -FilePath $env:GITHUB_OUTPUT ", StringComparison.Ordinal), $"'{m.Value.Trim()}' writes somewhere else" + review);
+            Assert.False(Regex.IsMatch(code, @"\$env:\w+\s*[-+*/]?="), "an environment variable is assigned" + review);
+        }
+
+        [Fact]
+        public void HashStepGuard_AcceptsTheRealStep() =>
+            AssertHashStepIsSafeToRun(StepScript(ReleaseWorkflowContractTests.ReleaseYml(), "Generate SHA256 hashes"));
+
+        [Theory]
+        [InlineData("Get-Process VoiceLite | Stop-Process")]
+        [InlineData("gh release upload v9.9.9 x.exe")]
+        [InlineData("rm -r -fo .")]
+        [InlineData("$x = Get-Process")]
+        [InlineData("$x=Stop-Process -Name VoiceLite")]
+        [InlineData("echo \"$(Stop-Process -Name VoiceLite)\"")]
+        [InlineData("echo 'done'; del x")]
+        [InlineData("foreach ($i in $installers) { Move-Item $i.FullName C:\\ }")]
+        [InlineData("& 'C:\\Windows\\System32\\taskkill.exe' /IM VoiceLite.exe")]
+        [InlineData(". .\\other.ps1")]
+        [InlineData("[Diagnostics.Process]::Start('notepad')")]
+        [InlineData("[math]::Max(1, 2)")]
+        [InlineData("$installers[0].Delete()")]
+        [InlineData("'x' > C:\\somewhere.txt")]
+        [InlineData("'x' | Out-File -FilePath C:\\somewhere.txt")]
+        [InlineData("$env:GITHUB_OUTPUT = 'C:\\somewhere.txt'")]
+        [InlineData("if ($true) { echo 'x' }")]
+        [InlineData("Get-ChildItem | % { $_ }")]
+        public void HashStepGuard_RefusesAnythingOutsideTheAllowlist(string addedLine)
+        {
+            var real = StepScript(ReleaseWorkflowContractTests.ReleaseYml(), "Generate SHA256 hashes");
+
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertHashStepIsSafeToRun(real + "\n" + addedLine + "\n"));
+        }
+
         private static GeneratorRun RunHashGeneratorStep()
         {
             var script = StepScript(ReleaseWorkflowContractTests.ReleaseYml(), "Generate SHA256 hashes");
-            // This step only lists, hashes and writes $GITHUB_OUTPUT. It is executed on developer
-            // machines by this test, so refuse anything that starts or deletes things.
-            Assert.False(Regex.IsMatch(script, @"Start-Process|Invoke-Expression|\biex\b|Remove-Item|Invoke-WebRequest|VoiceLite\.exe", RegexOptions.IgnoreCase),
-                "the 'Generate SHA256 hashes' step now does more than hashing; review it before letting a unit test run it");
+            AssertHashStepIsSafeToRun(script);
 
             var dir = Path.Combine(Path.GetTempPath(), "VoiceLite-ReleaseHashStep-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path.Combine(dir, "work", "VoiceLite", "Installer"));

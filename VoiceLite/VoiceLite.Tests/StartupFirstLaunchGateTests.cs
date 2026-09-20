@@ -123,21 +123,47 @@ $surface.Invoke($null, @($open))
         // The original bug: the dialog is shown directly, the helper is left unused.
         [InlineData("if (!ShowFirstLaunchModelDownload())")]
         // Helper still called, but the dialog is also shown directly somewhere else.
-        [InlineData("ShowFirstLaunchModelDownload(); if (!RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload))")]
+        [InlineData("ShowFirstLaunchModelDownload(); {WIRED}")]
         // Helper called with some other gate.
-        [InlineData("if (!RunGateWithoutLastWindowShutdown(this, () => true))")]
+        [InlineData("if (!{HELPER}(this, () => true{REST}))")]
         public void GateCallSiteTripwire_FailsLoudly_WhenTheCallSiteBypassesTheHelper(string revertedCallSite)
         {
-            const string wired = "if (!RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload))";
+            // Derived from whichever accepted shape App.OnStartup really uses, so these stay
+            // mutations of the REAL call site when it moves between the two.
             var real = File.ReadAllText(AppSourceFile());
-            Assert.Contains(wired, real);
+            var wired = Regex.Match(real,
+                @"if \(!(?<helper>RunGateWithoutLastWindowShutdown|TryRunStartupGate)\(this, ShowFirstLaunchModelDownload(?<rest>[^)]*)\)\)");
+            Assert.True(wired.Success,
+                "the first-launch gate call site in App.xaml.cs has a shape this theory cannot mutate; update it");
 
+            AssertMutationTripsTheWire(real.Replace(wired.Value, revertedCallSite
+                .Replace("{WIRED}", wired.Value)
+                .Replace("{HELPER}", wired.Groups["helper"].Value)
+                .Replace("{REST}", wired.Groups["rest"].Value)));
+        }
+
+        [Fact]
+        public void GateCallSiteTripwire_FailsLoudly_WhenTheWrapperStopsCallingTheHelper()
+        {
+            // Second hop: OnStartup goes through TryRunStartupGate, which must itself run the
+            // gate inside RunGateWithoutLastWindowShutdown. Calling gate() directly there is the
+            // original bug again, one level down.
+            const string hop = "return RunGateWithoutLastWindowShutdown(app, gate);";
+            var real = File.ReadAllText(AppSourceFile());
+            Assert.Contains("if (!TryRunStartupGate(this, ShowFirstLaunchModelDownload,", real);
+            Assert.Contains(hop, real);
+
+            AssertMutationTripsTheWire(real.Replace(hop, "return gate();"));
+        }
+
+        private static void AssertMutationTripsTheWire(string mutatedSource)
+        {
             var dir = Path.Combine(Path.GetTempPath(), "VoiceLite-GateTripwire-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             try
             {
                 var mutated = Path.Combine(dir, "App.xaml.cs");
-                File.WriteAllText(mutated, real.Replace(wired, revertedCallSite));
+                File.WriteAllText(mutated, mutatedSource);
 
                 Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertFirstLaunchGateIsRoutedThroughHelper(mutated));
             }
@@ -155,11 +181,29 @@ $surface.Invoke($null, @($open))
                 $"First-launch gate tripwire could not find App.xaml.cs at '{source}'; the gate call site is unverified.");
 
             var text = File.ReadAllText(source);
-            const string gateCall = "RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload)";
-            int gate = text.IndexOf(gateCall, StringComparison.Ordinal);
-            Assert.True(gate >= 0,
-                $"App.xaml.cs no longer contains '{gateCall}'. Showing the model-download dialog any other way " +
-                "closes the app's only window under OnLastWindowClose: a fresh install exits right after the download.");
+            // Two accepted shapes: the helper directly, or the TryRunStartupGate wrapper (which
+            // also catches a throwing gate) - and then the wrapper's own hop is pinned as well.
+            const string direct = "RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload)";
+            const string wrapped = "TryRunStartupGate(this, ShowFirstLaunchModelDownload,";
+            const string wrapperHop = "RunGateWithoutLastWindowShutdown(app, gate)";
+            int gate = text.IndexOf(direct, StringComparison.Ordinal);
+            if (gate < 0)
+            {
+                gate = text.IndexOf(wrapped, StringComparison.Ordinal);
+                Assert.True(gate >= 0,
+                    $"App.xaml.cs contains neither '{direct}' nor '{wrapped}'. Showing the model-download dialog any other way " +
+                    "closes the app's only window under OnLastWindowClose: a fresh install exits right after the download.");
+
+                // Body = from the wrapper's declaration to the next member (doc comment or modifier).
+                var wrapper = Regex.Match(text,
+                    @"\bstatic\s+bool\s+TryRunStartupGate\s*\((?<body>.*?)(?=\n\s*(?:///|internal\s|private\s|public\s|protected\s)|\z)",
+                    RegexOptions.Singleline);
+                Assert.True(wrapper.Success,
+                    "TryRunStartupGate is called but its declaration was not found in App.xaml.cs; update this tripwire");
+                Assert.True(wrapper.Groups["body"].Value.Contains(wrapperHop, StringComparison.Ordinal),
+                    $"TryRunStartupGate no longer calls '{wrapperHop}': the first-launch dialog runs under OnLastWindowClose " +
+                    "again and a fresh install exits right after the download.");
+            }
 
             // The pinned call passes the method GROUP (no parenthesis), so the declaration is the
             // only "ShowFirstLaunchModelDownload(" allowed; a second one is a direct call.

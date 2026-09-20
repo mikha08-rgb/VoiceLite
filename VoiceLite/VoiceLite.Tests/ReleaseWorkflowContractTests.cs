@@ -121,7 +121,6 @@ namespace VoiceLite.Tests
         public void ReleaseYml_SetupLogHint_NamesTheLogOfBothUpdaterGenerations()
         {
             var yml = ReleaseYml();
-            if (yml == null) return;
             var hint = ReleaseBodyTemplate(yml).Split('\n').Single(l => l.Contains("Setup Log"));
 
             // The 2.5.2+ updater passes /LOG=<GetSetupLogPath()>, which REPLACES the %TEMP%
@@ -149,7 +148,6 @@ namespace VoiceLite.Tests
         public void ReleaseYml_ValidatesAllThreeCsprojVersionFields_TheIssDefine_AndVersionTs()
         {
             var yml = ReleaseYml();
-            if (yml == null) return;
             var step = ValidateVersionStep(yml);
 
             // UpdateCheckService.GetCurrentVersion() reads the AssemblyVersion. A release with
@@ -180,7 +178,6 @@ namespace VoiceLite.Tests
             var csproj = RepoSourceFile.Read("VoiceLite", "VoiceLite", "VoiceLite.csproj");
             var iss = RepoSourceFile.Read("VoiceLite", "Installer", "VoiceLiteSetup.iss");
             var web = RepoSourceFile.Read("voicelite-web", "lib", "version.ts");
-            if (csproj == null || iss == null || web == null) return;
 
             var version = Regex.Match(csproj, @"<Version>([\d\.]+)</Version>").Groups[1].Value;
             version.Should().MatchRegex(@"^\d+\.\d+\.\d+$");

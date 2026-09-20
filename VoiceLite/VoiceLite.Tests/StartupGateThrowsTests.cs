@@ -84,7 +84,6 @@ $ok = $try.Invoke($null, $a)
         public void Wiring_OnStartupShutsDown_WhenTheGateThrew()
         {
             var code = SettingsWindowHotkeyTests.ReadAppSource("App.xaml.cs");
-            if (code == null) return; // test binaries copied away from the source tree
 
             Assert.True(code.Contains("TryRunStartupGate(this, ShowFirstLaunchModelDownload, out var gateError)"),
                 "OnStartup must run the first-launch gate through TryRunStartupGate");
