@@ -16,7 +16,7 @@ namespace VoiceLite.Tests.Services
     /// The dictation state machine, driven through fakes: every transition the hotkey,
     /// the record button, Esc, the hot-mic limit and the transcription watchdog can cause.
     /// </summary>
-    public class DictationControllerTests : IDisposable
+    public partial class DictationControllerTests : IDisposable
     {
         private sealed class FakeRecorder : IDictationRecorder
         {
@@ -26,6 +26,7 @@ namespace VoiceLite.Tests.Services
             public bool FailToStart { get; set; }
             public bool EmitAudioOnStop { get; set; } = true;
             public Exception? ErrorOnStop { get; set; }
+            public bool StopProducesNothing { get; set; }
             public int StartCalls;
             public int StopCalls;
             public readonly List<string> EmittedFiles = new();
@@ -40,10 +41,15 @@ namespace VoiceLite.Tests.Services
                 IsRecording = true;
             }
 
+            /// <summary>AudioRecorder.OnDataAvailable's write-failure branch: isRecording=false, no event.</summary>
+            public void SimulateSilentCaptureFailure() => IsRecording = false;
+
             public void StopRecording()
             {
                 StopCalls++;
+                if (!IsRecording) return; // same early return as AudioRecorder.StopRecording
                 IsRecording = false;
+                if (StopProducesNothing) return; // device died mid-recording: writer already gone, nothing raised
                 if (ErrorOnStop != null)
                 {
                     RecordingError?.Invoke(this, ErrorOnStop);

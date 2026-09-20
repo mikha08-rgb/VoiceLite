@@ -85,6 +85,7 @@ namespace VoiceLite.Services
         private bool isTranscribing;
         private bool isHotkeyMode;          // push-to-talk: the held key started this recording
         private volatile bool discardNextAudio;
+        private volatile bool stopOutcomeSeen; // the recorder answered StopRecording with audio or an error
         private long activeSessionId;
         private DateTime lastHotkeyPressUtc = DateTime.MinValue;
         private Timer? autoStopTimer;
@@ -267,9 +268,10 @@ namespace VoiceLite.Services
             }
         }
 
-        private void StopLocked(bool cancel)
+        /// <returns>false when a non-cancel stop produced no audio and no error (already reported as RecordingFailed).</returns>
+        private bool StopLocked(bool cancel)
         {
-            if (!isRecording) return;
+            if (!isRecording) return true;
 
             StopAutoStopTimer();
             isRecording = false;
@@ -281,21 +283,37 @@ namespace VoiceLite.Services
             discardNextAudio = cancel;
             Raise(cancel ? DictationEventKind.RecordingCancelled : DictationEventKind.RecordingStopped);
 
+            bool recorderWasRecording = recorder.IsRecording;
+            stopOutcomeSeen = false;
             try
             {
                 recorder.StopRecording();
             }
             catch (Exception ex)
             {
+                stopOutcomeSeen = true;
                 ErrorLogger.LogError("StopRecording", ex);
                 Raise(DictationEventKind.RecordingFailed, message: "Failed to stop recording");
             }
+
+            // Every real stop ends in AudioFileReady or RecordingError, raised synchronously from
+            // inside StopRecording(). Neither means the recorder had already died (write failure,
+            // device lost) and nothing else would ever replace "Processing..." in the UI.
+            // If the recorder ever raises its outcome asynchronously, this check must move.
+            if (!cancel && !stopOutcomeSeen)
+            {
+                ErrorLogger.LogWarning($"StopRecording produced no audio and no error (recorder.IsRecording was {recorderWasRecording}) - recording lost");
+                Raise(DictationEventKind.RecordingFailed, message: "Recording failed - audio was not saved");
+                return false;
+            }
+            return true;
         }
 
         // ---------------------------------------------------------------- recorder callbacks
 
         private void OnRecordingError(object? sender, Exception ex)
         {
+            stopOutcomeSeen = true;
             ErrorLogger.LogError("Recording lost", ex);
 
             // A cancelled recording can also trip the too-short path; the user asked to
@@ -313,6 +331,7 @@ namespace VoiceLite.Services
 
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
+            stopOutcomeSeen = true; // before the await: StopLocked reads it as soon as StopRecording returns
             try
             {
                 await TranscribeFileAsync(audioFilePath);
@@ -450,8 +469,8 @@ namespace VoiceLite.Services
                 if (isRecording)
                 {
                     ErrorLogger.LogWarning($"Toggle recording hit the {autoStopAfter.TotalMinutes:0}-minute hot-mic limit - stopping and transcribing");
-                    StopLocked(cancel: false);
-                    stopped = true;
+                    // A stop that lost the recording already said so; "transcribing what was captured" would contradict it.
+                    stopped = StopLocked(cancel: false);
                 }
             }
             if (stopped) Raise(DictationEventKind.AutoStopped);
