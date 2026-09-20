@@ -60,18 +60,30 @@ jobs:
         $expectedVersion = "${{ steps.version.outputs.VERSION }}"
         $errors = @()
 
-        # Check VoiceLite.csproj
+        # Check VoiceLite.csproj: all THREE version fields. The in-app updater compares the
+        # ASSEMBLY version (UpdateCheckService.GetCurrentVersion), so a release with <Version>
+        # bumped but <AssemblyVersion> forgotten reports the old version and offers itself
+        # as an update forever - to every user.
         $csprojPath = "VoiceLite/VoiceLite/VoiceLite.csproj"
         $csprojContent = Get-Content $csprojPath -Raw
-        if ($csprojContent -match '<Version>([\d\.]+)</Version>') {
-          $csprojVersion = $matches[1]
-          if ($csprojVersion -ne $expectedVersion) {
-            $errors += "❌ VoiceLite.csproj has version $csprojVersion, expected $expectedVersion"
+        $csprojFields = [ordered]@{
+          Version = $expectedVersion
+          AssemblyVersion = "$expectedVersion.0"
+          FileVersion = "$expectedVersion.0"
+        }
+        foreach ($field in $csprojFields.Keys) {
+          $wanted = $csprojFields[$field]
+          $found = [regex]::Matches($csprojContent, "<$field>([^<]*)</$field>")
+          if ($found.Count -eq 0 -and $field -ne 'Version') {
+            # Absent = the SDK derives it from <Version>
+            Write-Host "✓ VoiceLite.csproj <$field>: not set, derived from <Version>" -ForegroundColor Green
+          } elseif ($found.Count -ne 1) {
+            $errors += "❌ VoiceLite.csproj must contain exactly one <$field> element, found $($found.Count)"
+          } elseif ($found[0].Groups[1].Value.Trim() -ne $wanted) {
+            $errors += "❌ VoiceLite.csproj has <$field> $($found[0].Groups[1].Value.Trim()), expected $wanted"
           } else {
-            Write-Host "✓ VoiceLite.csproj version: $csprojVersion" -ForegroundColor Green
+            Write-Host "✓ VoiceLite.csproj <$field>: $wanted" -ForegroundColor Green
           }
-        } else {
-          $errors += "❌ Could not find version in VoiceLite.csproj"
         }
 
         # Check VoiceLiteSetup.iss (uses preprocessor directive #define MyAppVersion)
@@ -108,11 +120,14 @@ jobs:
           Write-Host "Version Mismatch Detected!" -ForegroundColor Red
           Write-Host "Git tag: v$expectedVersion" -ForegroundColor Yellow
           Write-Host ""
-          foreach ($error in $errors) {
-            Write-Host $error -ForegroundColor Red
+          # Not "$error": that is a read-only automatic variable, the loop would throw
+          # "Cannot overwrite variable Error" and never print which file is wrong.
+          foreach ($problem in $errors) {
+            Write-Host $problem -ForegroundColor Red
           }
           Write-Host ""
-          Write-Host "Fix: manually bump <Version> in VoiceLite/VoiceLite/VoiceLite.csproj," -ForegroundColor Yellow
+          Write-Host "Fix: manually bump <Version>, <AssemblyVersion> and <FileVersion> (the last two" -ForegroundColor Yellow
+          Write-Host "as X.Y.Z.0) in VoiceLite/VoiceLite/VoiceLite.csproj," -ForegroundColor Yellow
           Write-Host "#define MyAppVersion in VoiceLite/Installer/VoiceLiteSetup.iss and" -ForegroundColor Yellow
           Write-Host "CURRENT_VERSION in voicelite-web/lib/version.ts to match the tag." -ForegroundColor Yellow
           exit 1
@@ -127,6 +142,19 @@ jobs:
 
     - name: Build Release
       run: dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self-contained
+
+    - name: Verify built assembly version
+      shell: pwsh
+      run: |
+        # The value the in-app updater actually compares with the latest release tag.
+        $expected = "${{ steps.version.outputs.VERSION }}.0"
+        $dll = Resolve-Path "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish/VoiceLite.dll"
+        $actual = [System.Reflection.AssemblyName]::GetAssemblyName($dll.Path).Version.ToString()
+        if ($actual -ne $expected) {
+          Write-Host "❌ Built VoiceLite.dll has assembly version $actual, expected $expected - the shipped app would offer this release as an update forever" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host "✓ VoiceLite.dll assembly version: $actual" -ForegroundColor Green
 
     - name: Copy Silero VAD to publish directory
       shell: pwsh
@@ -297,7 +325,7 @@ jobs:
           - **Antivirus blocking**: Add VoiceLite.exe to antivirus exclusions
           - **Speech model download fails**: Check your internet connection, then exit VoiceLite from the tray icon and start it again to retry
           - **VC++ install fails**: Installer auto-installs VC++ Runtime - if it fails, manually download from [Microsoft](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-          - **An update did not complete**: Setup leaves a `Setup Log <date>.txt` file in your `%TEMP%` folder (or the administrator's `%TEMP%`, if you entered an administrator password during the update) — include it when you contact support
+          - **An update did not complete**: if you updated from inside VoiceLite 2.5.2 or later, the installer log is `%LOCALAPPDATA%\VoiceLite\logs\update-setup.log`. Otherwise (update started from VoiceLite 2.5.1, or installer run by hand) Setup leaves a `Setup Log <date>.txt` file in your `%TEMP%` folder (or the administrator's `%TEMP%`, if you entered an administrator password) — include the file when you contact support
 
           ---
 

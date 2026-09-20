@@ -79,14 +79,107 @@ namespace VoiceLite.Tests
         }
 
         [Fact]
+        public void Iss_Comments_NameTheSetupLogLocationOfBothUpdaterGenerations()
+        {
+            var iss = Iss();
+            if (iss == null) return;
+
+            // 2.5.0/2.5.1 updater: no /LOG => SetupLogging's %TEMP% log. 2.5.2+ updater:
+            // /LOG=<file> REPLACES that log (observed in the sandbox run), it is not additional.
+            iss.Should().NotContain("Setup /VERYSILENT without /LOG", "only true for the 2.5.0/2.5.1 updater");
+            var setup = iss.Substring(0, iss.IndexOf("[Languages]", StringComparison.Ordinal));
+            setup.Should().Contain("%TEMP%");
+            setup.Should().Contain(@"%LOCALAPPDATA%\VoiceLite\logs\" + UpdateSetupLogFileName());
+
+            // The [Run] comment lists the updater's arguments: both generations.
+            var run = iss.Substring(iss.IndexOf("[Run]", StringComparison.Ordinal));
+            run = run.Substring(0, run.IndexOf("[UninstallDelete]", StringComparison.Ordinal));
+            run.Should().Contain("/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /RELAUNCH=1");
+            run.Should().Contain("/READYFILE=");
+            run.Should().Contain("/LOG=");
+        }
+
+        /// <summary>File name of the log the shipped updater passes as /LOG (UpdateInstaller.GetSetupLogPath).</summary>
+        internal static string UpdateSetupLogFileName() =>
+            Path.GetFileName(VoiceLite.Services.UpdateInstaller.GetSetupLogPath());
+
+        [Fact]
         public void Iss_TracksInstallOutcome()
         {
             var iss = Iss();
             if (iss == null) return;
             var step = Routine(iss, "procedure CurStepChanged(");
-            Regex.IsMatch(step, @"CurStep = ssInstall\b[^;]*\s+FilesTouched := True;").Should().BeTrue();
             Regex.IsMatch(step, @"CurStep = ssPostInstall\b[^;]*\s+begin\s+InstallSucceeded := True;").Should().BeTrue(
                 "the success flag must be set before anything in ssPostInstall that could fail");
+
+            // ssInstall fires BEFORE Inno's RestartManager "close applications" step. An abort
+            // there replaces nothing (sandbox scenario d1b), so ssInstall must not set the flag.
+            step.Should().NotContain("FilesTouched");
+        }
+
+        [Fact]
+        public void Iss_FilesTouched_IsSetByTheFirstFileWrittenToApp_NotBySsInstall()
+        {
+            var iss = Iss();
+            if (iss == null) return;
+
+            Routine(iss, "procedure MarkFilesTouched(").Should().Contain("FilesTouched := True;");
+            Regex.Matches(iss, @"FilesTouched := True;").Count.Should().Be(1, "MarkFilesTouched is the only writer");
+
+            // Every [Files] entry that lands in {app} must carry the hook: the first file
+            // actually written can come from any of them.
+            var files = iss.Substring(iss.IndexOf("[Files]", StringComparison.Ordinal));
+            files = files.Substring(0, files.IndexOf("[Icons]", StringComparison.Ordinal));
+            var appEntries = files.Split('\n')
+                .Where(l => l.StartsWith("Source:", StringComparison.Ordinal) && l.Contains("DestDir: \"{app}"))
+                .ToList();
+            appEntries.Count.Should().BeGreaterThanOrEqualTo(6);
+            appEntries.Should().OnlyContain(l => l.TrimEnd().EndsWith("; BeforeInstall: MarkFilesTouched", StringComparison.Ordinal));
+
+            // The fix must not be "turn RestartManager off": an RM abort leaves an intact
+            // install, which is the better failure.
+            iss.Should().NotContain("CloseApplications=no");
+        }
+
+        [Fact]
+        public void Iss_FailedUpdate_IsLeftToAHandshakeUpdaterThatIsStillRunning()
+        {
+            var iss = Iss();
+            if (iss == null) return;
+
+            // 2.5.2+ app (/READYFILE) only exits once the ready file exists. Until then it is
+            // alive, waits for Setup to exit and reports the failure itself - a MsgBox here
+            // would block Setup (and so the app) and then be followed by a second report.
+            Routine(iss, "procedure WriteReadyFile(").Should().Contain("ReadyFileWritten := True;");
+
+            var own = Routine(iss, "function UpdaterReportsFailureItself(");
+            own.Should().Contain("ExpandConstant('{param:READYFILE|}') <> ''");
+            own.Should().Contain("not ReadyFileWritten");
+            own.Should().Contain("CheckForMutexes(AppMutexName)", "an app that died meanwhile reports nothing");
+            own.Should().NotContain("MsgBox(");
+
+            var deinit = Routine(iss, "procedure DeinitializeSetup(");
+            var skipAt = deinit.IndexOf("UpdaterReportsFailureItself()", StringComparison.Ordinal);
+            var reportAt = deinit.IndexOf("ReportFailedUpdate();", StringComparison.Ordinal);
+            skipAt.Should().BeGreaterThan(0);
+            reportAt.Should().BeGreaterThan(skipAt);
+            deinit.Should().NotContain("MsgBox(");
+        }
+
+        [Fact]
+        public void Iss_SilentUninstall_WhileRunning_IsHeadless()
+        {
+            var iss = Iss();
+            if (iss == null) return;
+            var init = Routine(iss, "function InitializeUninstall(");
+
+            // MsgBox ignores /VERYSILENT /SUPPRESSMSGBOXES: an Intune uninstall hung on it forever.
+            var silentAt = init.IndexOf("if UninstallSilent then", StringComparison.Ordinal);
+            var boxAt = init.IndexOf("MsgBox(", StringComparison.Ordinal);
+            silentAt.Should().BeGreaterThan(0);
+            boxAt.Should().BeGreaterThan(silentAt, "the interactive message stays, behind the silent check");
+            init.Should().Contain("Log(");
+            init.Should().Contain("Result := False;");
         }
 
         [Fact]
@@ -123,8 +216,8 @@ namespace VoiceLite.Tests
             var iss = Iss();
             if (iss == null) return;
             var prepare = Routine(iss, "function PrepareToInstall(");
-            prepare.Should().Contain("if WaitForVoiceLiteExit(10000) then");
-            prepare.Should().NotContain("WaitForVoiceLiteExit(3000)");
+            prepare.Should().Contain("if WaitForVoiceLiteExit(10000, 0) then");
+            prepare.Should().NotContain("WaitForVoiceLiteExit(3000");
         }
 
         [Fact]
@@ -163,10 +256,32 @@ namespace VoiceLite.Tests
             var close = Routine(iss, "function CloseRunningVoiceLite(");
             // Kill semantics unchanged (machine-wide image-name kill)...
             close.Should().Contain("'/IM ' + AppExeName + ' /F'");
-            close.Should().Contain("WaitForVoiceLiteExit(10000)");
+            close.Should().Contain("WaitForVoiceLiteExit(10000, 2000)");
             // ...only the abort decision is session-scoped, and only outside admin mode.
             close.Should().Contain("not IsAdminInstallMode");
             close.Should().Contain("IsVoiceLiteRunningInThisSession(");
+        }
+
+        [Fact]
+        public void Iss_NonAdminInstall_DoesNotSitOutTheFullWaitForAnotherSessionsVoiceLite()
+        {
+            var iss = Iss();
+            if (iss == null) return;
+
+            // Another user's VoiceLite.exe (Fast User Switching/RDP) cannot be killed by a
+            // per-user Setup and does not lock this user's {app}; waiting 10 s + 10 s for it
+            // left the updating user without an app or any UI for ~25 s.
+            var wait = Routine(iss, "function WaitForVoiceLiteExit(");
+            wait.Should().Contain("function WaitForVoiceLiteExit(MaxMs, OtherSessionGraceMs: Integer): Boolean;");
+            wait.Should().Contain("Waited >= OtherSessionGraceMs");
+            wait.Should().Contain("not IsAdminInstallMode", "all-users installs share one {app}: stay machine-wide");
+            wait.Should().Contain("not IsVoiceLiteRunningInThisSession()");
+            // The result stays machine-wide, so PrepareToInstall still reaches the taskkill
+            // that ends a same-user instance in another (disconnected RDP) session.
+            wait.TrimEnd().Should().EndWith("Result := not IsVoiceLiteRunning();\nend;");
+
+            var prepare = Routine(iss, "function PrepareToInstall(");
+            prepare.Should().Contain("if not CloseRunningVoiceLite() then");
         }
     }
 
