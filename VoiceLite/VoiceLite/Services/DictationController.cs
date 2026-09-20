@@ -96,6 +96,9 @@ namespace VoiceLite.Services
 
         public DateTime RecordingStartedAt { get; private set; }
 
+        /// <summary>The toggle-mode hot-mic limit in use. Lock-free: readonly field, safe from Notice handlers.</summary>
+        public TimeSpan AutoStopAfter => autoStopAfter;
+
         public bool IsRecording { get { lock (gate) return isRecording; } }
         public bool IsTranscribing { get { lock (gate) return isTranscribing; } }
 

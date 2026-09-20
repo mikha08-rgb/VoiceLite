@@ -115,6 +115,14 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void AutoStopAfter_ExposesTheLimitInUse()
+        {
+            Create(autoStop: TimeSpan.FromMinutes(7)).AutoStopAfter.Should().Be(TimeSpan.FromMinutes(7));
+            controller!.Dispose();
+            Create().AutoStopAfter.Should().Be(DictationController.DefaultAutoStopAfter);
+        }
+
+        [Fact]
         public void ErrorOnStop_IsReportedOnce()
         {
             recorder.EmitAudioOnStop = false;
