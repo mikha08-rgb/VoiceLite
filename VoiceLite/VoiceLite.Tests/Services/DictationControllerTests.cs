@@ -14,7 +14,7 @@ namespace VoiceLite.Tests.Services
 {
     /// <summary>
     /// The dictation state machine, driven through fakes: every transition the hotkey,
-    /// the record button, Esc, the hot-mic limit and the transcription watchdog can cause.
+    /// Esc, the hot-mic limit and the transcription watchdog can cause.
     /// </summary>
     public partial class DictationControllerTests : IDisposable
     {
@@ -147,11 +147,16 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public void PushToTalk_ReleaseDoesNotStopARecordingTheHotkeyDidNotStart()
+        public void ModeSwitchedToPushToTalkMidRecording_ReleaseIsIgnored()
         {
+            // Characterization of the isHotkeyMode guard in HotkeyReleased - it pins current
+            // behaviour, it is not a product requirement. Reachable via Settings > Apply during
+            // a toggle-mode recording (the controller reads Mode live).
+            settings.Mode = RecordMode.Toggle;
             var c = Create();
 
-            c.Toggle(); // record button
+            c.HotkeyPressed();
+            settings.Mode = RecordMode.PushToTalk;
             c.HotkeyReleased();
 
             recorder.IsRecording.Should().BeTrue();
@@ -266,7 +271,8 @@ namespace VoiceLite.Tests.Services
             await Task.Delay(100);
             Kinds.Should().NotContain(DictationEventKind.TranscriptionCompleted);
 
-            c.Toggle();
+            Thread.Sleep(300); // past the hotkey debounce
+            c.HotkeyPressed();
             recorder.StartCalls.Should().Be(2, "a new dictation can start after recovery");
         }
 
@@ -353,7 +359,8 @@ namespace VoiceLite.Tests.Services
             c.State.Should().Be(DictationState.Idle);
 
             recorder.FailToStart = false;
-            c.Toggle();
+            Thread.Sleep(300); // past the hotkey debounce
+            c.HotkeyPressed();
             recorder.IsRecording.Should().BeTrue();
         }
 

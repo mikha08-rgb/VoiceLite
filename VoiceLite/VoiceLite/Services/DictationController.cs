@@ -61,7 +61,7 @@ namespace VoiceLite.Services
     /// Owns every flag and timer that used to live in MainWindow. Raises <see cref="Notice"/>
     /// for everything the UI needs to show; it never touches UI itself.
     ///
-    /// Threading: commands (HotkeyPressed/Released, Toggle, Cancel) may be called from any
+    /// Threading: commands (HotkeyPressed/Released, Cancel) may be called from any
     /// thread and are serialized by an internal lock. Timer callbacks are routed through the
     /// <c>invoke</c> delegate given at construction (MainWindow passes the dispatcher) so the
     /// recorder is always driven from the same thread the app always used. Notice handlers
@@ -98,7 +98,6 @@ namespace VoiceLite.Services
 
         public bool IsRecording { get { lock (gate) return isRecording; } }
         public bool IsTranscribing { get { lock (gate) return isTranscribing; } }
-        public bool IsHotkeyMode { get { lock (gate) return isHotkeyMode; } }
 
         public DictationState State
         {
@@ -200,16 +199,6 @@ namespace VoiceLite.Services
             catch (Exception ex)
             {
                 Fault("OnHotkeyReleased", ex);
-            }
-        }
-
-        /// <summary>Start if idle, stop if recording. Used by the on-screen button and the Settings test button.</summary>
-        public void Toggle()
-        {
-            lock (gate)
-            {
-                if (!isRecording) StartLocked();
-                else StopLocked(cancel: false);
             }
         }
 
