@@ -121,7 +121,7 @@ namespace VoiceLite.Services
                     shownState = target;
                     idleStrikes = 0;
                     StopSafetyTimer();
-                    view?.HideIndicator();
+                    HideOrClose();
                     return;
                 }
 
@@ -131,6 +131,26 @@ namespace VoiceLite.Services
                 view.ShowState(target);
                 safetyTimer ??= startSafetyTimer?.Invoke(SafetyTick);
             });
+        }
+
+        /// <summary>
+        /// Nothing retries a hide (the safety timer is already off and shownState says Hidden), so a
+        /// hide that fails ends with the window closed; the next dictation builds a new one.
+        /// </summary>
+        private void HideOrClose()
+        {
+            var v = view;
+            if (v == null) return;
+            try
+            {
+                v.HideIndicator();
+            }
+            catch
+            {
+                view = null;
+                try { v.CloseView(); } catch { /* the failure below is the one that gets logged */ }
+                throw; // Guard counts and logs it
+            }
         }
 
         private void StopSafetyTimer()

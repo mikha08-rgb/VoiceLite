@@ -17,6 +17,7 @@ namespace VoiceLite.Tests.Services
         {
             public readonly List<string> Calls = new();
             public bool Throw;
+            public bool ThrowOnHide;
 
             public void ShowState(RecordingIndicatorState state)
             {
@@ -27,7 +28,7 @@ namespace VoiceLite.Tests.Services
             public void HideIndicator()
             {
                 Calls.Add("hide");
-                if (Throw) throw new InvalidOperationException("view broke");
+                if (Throw || ThrowOnHide) throw new InvalidOperationException("view broke");
             }
 
             public void CloseView()
@@ -138,6 +139,29 @@ namespace VoiceLite.Tests.Services
 
             act.Should().NotThrow();
             warnings.Should().HaveCount(1, "one line in voicelite.log, not one per dictation");
+        }
+
+        [Fact]
+        public void AFailedHide_ClosesTheWindow_SoThePillCanNeverStayUp()
+        {
+            // The safety timer is stopped on hide and the controller believes the pill is gone:
+            // nothing would ever retry. A hide that fails must therefore end with the window closed.
+            int created = 0;
+            var first = new FakeView { ThrowOnHide = true };
+            var second = new FakeView();
+            var indicator = new RecordingIndicator(() => true, null, _ => created++ == 0 ? first : second);
+            indicator.LogWarning = _ => { };
+
+            indicator.OnDictationEvent(DictationEventKind.RecordingStarted);
+            var act = () => indicator.OnDictationEvent(DictationEventKind.RecordingCancelled);
+
+            act.Should().NotThrow();
+            first.Calls.Should().Equal("show:Recording", "hide", "close");
+
+            // The next dictation gets a fresh window.
+            indicator.OnDictationEvent(DictationEventKind.RecordingStarted);
+            second.Calls.Should().Equal("show:Recording");
+            first.Calls.Should().HaveCount(3, "the closed window is never touched again");
         }
 
         [Fact]

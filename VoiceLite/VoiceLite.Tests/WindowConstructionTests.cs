@@ -341,6 +341,9 @@ namespace VoiceLite.Tests
                 window.ShowState(RecordingIndicatorState.Recording);
                 PumpUntil(() => root.Opacity > 0.99 && centre.Height > RecordingIndicatorLogic.MinBarHeight + 2,
                     "recording: the pill never faded in / the bars never followed the level");
+                // Smoke only: Windows never hands the foreground to a background test host, so these
+                // two would pass without the styles too. The style bits and ShowActivated/Focusable
+                // asserted above are the real no-activation coverage.
                 Assert.False(window.IsActive);
                 Assert.NotEqual(hwnd, GetForegroundWindow());
 
@@ -368,6 +371,48 @@ namespace VoiceLite.Tests
                 window.ShowState(RecordingIndicatorState.Processing);
                 for (int i = 0; i < 15; i++) { Thread.Sleep(20); Pump(); }
                 Assert.True(window.IsVisible, "a show during the fade-out was undone by the fade-out's completion");
+            });
+        });
+
+        [Theory]
+        [InlineData(true)]  // the fade-out cannot even be started
+        [InlineData(false)] // it starts, but its Completed never arrives (rendering suspended: locked session, RDP disconnect)
+        public void RecordingIndicatorWindow_HidesEvenWhenItsFadeOutFails(bool fadeThrows) => RunOnSta(() =>
+        {
+            var window = new VoiceLite.RecordingIndicatorWindow(() => 0f) { PlaceOnShow = false };
+            var ticking = typeof(VoiceLite.RecordingIndicatorWindow).GetField("ticking",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.True(ticking != null, "RecordingIndicatorWindow.ticking was renamed - update this test");
+
+            ShowOffScreenThenClose(window, whileOpen: () =>
+            {
+                window.ShowState(RecordingIndicatorState.Recording);
+                Assert.True(window.IsVisible);
+                Assert.True((bool)ticking!.GetValue(window)!);
+
+                window.StartFadeOut = fadeThrows
+                    ? _ => throw new InvalidOperationException("animation system broke")
+                    : _ => { };
+
+                if (fadeThrows)
+                {
+                    window.HideIndicator(); // must not throw either
+                    Assert.False(window.IsVisible, "a fade-out that cannot start must hide the pill at once");
+                }
+                else
+                {
+                    window.HideIndicator();
+                    PumpUntil(() => !window.IsVisible, "a fade-out that never completes left the pill on screen");
+                }
+                Assert.False((bool)ticking.GetValue(window)!, "the 60 fps render tick stayed hooked on a hidden pill");
+
+                // The fallback must not undo a later show.
+                window.StartFadeOut = _ => { };
+                window.ShowState(RecordingIndicatorState.Recording);
+                window.HideIndicator();
+                window.ShowState(RecordingIndicatorState.Processing);
+                for (int i = 0; i < 30; i++) { Thread.Sleep(20); Pump(); }
+                Assert.True(window.IsVisible, "the hide fallback fired after the pill was shown again");
             });
         });
 

@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using VoiceLite.Services;
 using VoiceLite.Utilities;
 using Logic = VoiceLite.Utilities.RecordingIndicatorLogic;
@@ -31,6 +32,7 @@ namespace VoiceLite
     {
         private static readonly TimeSpan AppearDuration = TimeSpan.FromMilliseconds(140);
         private static readonly TimeSpan DisappearDuration = TimeSpan.FromMilliseconds(120);
+        private static readonly TimeSpan HideFallbackDelay = TimeSpan.FromMilliseconds(300);
         private const double SlideDistance = 6;
         private const double StateBlendSeconds = 0.18;
 
@@ -44,14 +46,19 @@ namespace VoiceLite
         private double lastTickSeconds;
         private double smoothedLevel;
         private double processingBlend; // 0 = recording look, 1 = processing look
+        private DispatcherTimer? hideFallback; // one-shot: see HideIndicator
 
         /// <summary>Tests show the window off-screen themselves; production always places it.</summary>
         internal bool PlaceOnShow { get; set; } = true;
+
+        /// <summary>Starts the fade-out. A seam: tests make it throw, or never complete.</summary>
+        internal Action<DoubleAnimation> StartFadeOut;
 
         public RecordingIndicatorWindow(Func<float> levelSource)
         {
             this.levelSource = levelSource ?? throw new ArgumentNullException(nameof(levelSource));
             InitializeComponent();
+            StartFadeOut = fade => Root.BeginAnimation(OpacityProperty, fade);
 
             // One source of truth for the geometry: Placement() assumes exactly these.
             Width = Logic.PillWidth + 2 * Logic.ShadowPadding;
@@ -74,6 +81,7 @@ namespace VoiceLite
 
             bool wasHidden = state == RecordingIndicatorState.Hidden;
             state = newState;
+            hideFallback?.Stop();
 
             if (wasHidden)
             {
@@ -99,28 +107,55 @@ namespace VoiceLite
             state = RecordingIndicatorState.Hidden;
             if (!IsVisible) return;
 
+            // The fade is cosmetic; the hide is not. Completed is the normal route, the one-shot
+            // timer covers a Completed that never comes (no rendering: locked session, RDP
+            // disconnect), and a fade that cannot even start hides at once.
             var fade = new DoubleAnimation(0, DisappearDuration);
-            fade.Completed += (_, _) =>
+            fade.Completed += (_, _) => FinishHide();
+            try
             {
-                try
-                {
-                    if (state != RecordingIndicatorState.Hidden) return; // shown again while fading
-                    StopTicking();
-                    Hide();
-                    Slide.BeginAnimation(TranslateTransform.YProperty, null);
-                    Slide.Y = SlideDistance; // the next appearance slides up again
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogWarning($"Recording indicator: hide failed: {ex.Message}");
-                }
-            };
-            Root.BeginAnimation(OpacityProperty, fade);
+                hideFallback ??= CreateHideFallback();
+                hideFallback.Stop();
+                hideFallback.Start();
+                StartFadeOut(fade);
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Recording indicator: fade-out failed, hiding at once: {ex.GetType().Name}: {ex.Message}");
+                FinishHide();
+            }
+        }
+
+        private DispatcherTimer CreateHideFallback()
+        {
+            var timer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher) { Interval = HideFallbackDelay };
+            timer.Tick += (_, _) => FinishHide();
+            return timer;
+        }
+
+        /// <summary>Idempotent; a no-op when the pill was shown again in the meantime. Never throws.</summary>
+        private void FinishHide()
+        {
+            try
+            {
+                hideFallback?.Stop();
+                if (state != RecordingIndicatorState.Hidden) return; // shown again while fading
+                StopTicking();
+                if (!IsVisible) return;
+                Hide();
+                Slide.BeginAnimation(TranslateTransform.YProperty, null);
+                Slide.Y = SlideDistance; // the next appearance slides up again
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"Recording indicator: hide failed: {ex.Message}");
+            }
         }
 
         public void CloseView()
         {
             state = RecordingIndicatorState.Hidden;
+            hideFallback?.Stop();
             StopTicking();
             Close();
         }
@@ -128,6 +163,7 @@ namespace VoiceLite
         protected override void OnClosed(EventArgs e)
         {
             StopTicking(); // CompositionTarget.Rendering is static: a leftover handler would keep this window alive
+            hideFallback?.Stop(); // so would a running DispatcherTimer
             base.OnClosed(e);
         }
 

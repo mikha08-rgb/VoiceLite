@@ -86,6 +86,26 @@ namespace VoiceLite.Tests
             var onClosed = code.Substring(code.IndexOf("protected override void OnClosed(EventArgs e)", System.StringComparison.Ordinal));
             onClosed.Should().Contain("recordingIndicator?.Close()");
             onClosed.Should().Contain("LevelAvailable -= ");
+
+            // ... and FIRST: OnClosed is a long run of unguarded cleanup. A throw anywhere before
+            // the pill is closed is swallowed by the dispatcher's unhandled-exception handler
+            // ("application will continue"), and the hidden pill then keeps a UI-less VoiceLite.exe
+            // holding the single-instance mutex. Close() never throws, so nothing is lost by going first.
+            int close = onClosed.IndexOf("recordingIndicator?.Close()", System.StringComparison.Ordinal);
+            int firstCleanup = onClosed.IndexOf("FlushSettingsOnExit()", System.StringComparison.Ordinal);
+            firstCleanup.Should().BeGreaterThanOrEqualTo(0, "OnClosed no longer starts with FlushSettingsOnExit - update this tripwire");
+            close.Should().BeLessThan(firstCleanup, "the pill must be closed before any cleanup that could throw");
+        }
+
+        [Fact]
+        public void MainWindow_SettingsApply_RefreshesTheIndicator()
+        {
+            // Apply keeps the Settings dialog open: without a Refresh in the Apply callback, unticking
+            // the box while recording leaves the pill up until the next notice or until the dialog closes.
+            var code = MainWindowCode();
+            var ctor = Regex.Match(code, @"new SettingsWindow\(settings,\s*\(\)\s*=>\s*(?<apply>\{[^}]*\}|[^,]*),");
+            ctor.Success.Should().BeTrue("the SettingsWindow construction was reshaped - update this tripwire");
+            ctor.Groups["apply"].Value.Should().Contain("SaveSettings()").And.Contain("recordingIndicator?.Refresh()");
         }
 
         [Fact]

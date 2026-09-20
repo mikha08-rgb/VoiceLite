@@ -139,7 +139,8 @@ namespace VoiceLite.Tests
             // A delegate, not a bool: Settings can be opened while startup is still initializing
             // services, and the startup registration then succeeds BEHIND the open dialog. A
             // snapshot taken at dialog-open would call the working hotkey "not active".
-            Regex.IsMatch(code, @"new SettingsWindow\(settings, \(\) => SaveSettings\(\), \(\) => hotkeyManager\?\.IsRegistered == true\)")
+            // (The second argument is the Apply callback - RecordingIndicatorSettingTests owns that one.)
+            Regex.IsMatch(code, @"new SettingsWindow\(settings, .*, \(\) => hotkeyManager\?\.IsRegistered == true\);")
                 .Should().BeTrue("without this the window assumes the saved hotkey is registered and skips the probe");
         }
 
