@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 1.0.22)'
+        description: 'Version number (e.g., 2.5.2)'
         required: true
         type: string
 
@@ -112,8 +112,9 @@ jobs:
             Write-Host $error -ForegroundColor Red
           }
           Write-Host ""
-          Write-Host "Fix: manually bump <Version> in VoiceLite/VoiceLite/VoiceLite.csproj and" -ForegroundColor Yellow
-          Write-Host "#define MyAppVersion in VoiceLite/Installer/VoiceLiteSetup.iss to match the tag." -ForegroundColor Yellow
+          Write-Host "Fix: manually bump <Version> in VoiceLite/VoiceLite/VoiceLite.csproj," -ForegroundColor Yellow
+          Write-Host "#define MyAppVersion in VoiceLite/Installer/VoiceLiteSetup.iss and" -ForegroundColor Yellow
+          Write-Host "CURRENT_VERSION in voicelite-web/lib/version.ts to match the tag." -ForegroundColor Yellow
           exit 1
         }
 
@@ -250,34 +251,23 @@ jobs:
         body: |
           ## VoiceLite v${{ steps.version.outputs.VERSION }}
 
-          ### ⚠️ IMPORTANT: Verify Download First
+          ### What's New
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for what changed in this release.
 
-          **Before installing**, verify your download hasn't been corrupted:
-
-          ```powershell
-          Get-FileHash VoiceLite-Setup-*.exe -Algorithm SHA256
-          ```
-
-          Compare with SHA256 hashes at bottom of this page. **Mismatched hash = corrupted download**.
-
-          ---
-
-          ### What's New in v2.0
-
-          VoiceLite v2.0 swaps the speech engine to **NVIDIA Parakeet TDT 0.6B v3** via [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx). Parakeet beats Whisper Large v3 on the [Open ASR Leaderboard](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) at 2–3× the CPU speed, supports 25 European languages, and physically cannot hallucinate "Thanks for watching!" on silence (transducer architecture).
-
-          Model is CC-BY-4.0 licensed — full attribution shipped in the `LICENSES/` folder.
+          ### Updating from an earlier version
+          - **On 2.5.1 or later**: use the **Update available** banner in the app. It downloads this installer, checks its SHA-256 and installs it for you. If Windows asks for permission during the update, click **Yes**. If VoiceLite does not reopen by itself afterwards, start it from the Start menu.
+          - **On 2.5.0 or older**: download and run the installer below. Your settings, license and speech model are kept.
 
           ### Download
-          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe** (~150 MB)
+          - **VoiceLite-Setup-${{ steps.version.outputs.VERSION }}.exe**
             - .NET 8 bundled (self-contained, no separate install needed)
             - VC++ Runtime bundled (25MB, auto-installs silently)
             - Silero VAD model bundled (~2.3MB)
             - **Parakeet v3 speech model downloads on first launch (~640MB)** — needs an internet connection at first run
 
           ### Installation Steps
-          1. **Verify SHA256 hash** (see above) ⚠️
-          2. Download the installer
+          1. Download the installer
+          2. Optional: check the download (see "Verify your download" below)
           3. Right-click installer → Properties → **Unblock** (if shown)
           4. Run the installer - dependencies auto-install silently
           5. Accept EULA and complete installation
@@ -291,19 +281,23 @@ jobs:
           - Internet connection for first launch (for model download); offline after that
           - **All dependencies bundled** — VC++ Runtime and .NET 8 install automatically
 
+          ### Verify your download (optional)
+          The in-app updater does this automatically. For a manual download:
+
+          ```powershell
+          Get-FileHash VoiceLite-Setup-*.exe -Algorithm SHA256
+          ```
+
+          Compare the result with the checksum listed below. A mismatch means the download is corrupted — download it again.
+
           ### SHA256 Hashes
           ${{ steps.generate-hashes.outputs.HASHES }}
 
           ### Troubleshooting
-          If installation fails, see [TROUBLESHOOTING.md](https://github.com/${{ github.repository }}/blob/master/TROUBLESHOOTING.md)
-
-          **Common issues**:
           - **Antivirus blocking**: Add VoiceLite.exe to antivirus exclusions
-          - **Model corruption**: Verify SHA256 hash, re-download if mismatch
+          - **Speech model download fails**: Check your internet connection, then exit VoiceLite from the tray icon and start it again to retry
           - **VC++ install fails**: Installer auto-installs VC++ Runtime - if it fails, manually download from [Microsoft](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-
-          ### What's New
-          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for full release notes.
+          - **An update did not complete**: Setup leaves a `Setup Log <date>.txt` file in your `%TEMP%` folder (or the administrator's `%TEMP%`, if you entered an administrator password during the update) — include it when you contact support
 
           ---
 
