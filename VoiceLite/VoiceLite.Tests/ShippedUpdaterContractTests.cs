@@ -271,15 +271,23 @@ namespace VoiceLite.Tests
             var code = string.Join("\n", script.Split('\n').Where(l => !l.TrimStart().StartsWith('#')));
 
             // 1. Whatever stands where PowerShell reads a command name - start of a line, or
-            //    after | ; { ( = - is an allowlisted name or plainly an expression.
-            foreach (Match m in Regex.Matches(code, @"(?:^|[|;{(=])[ \t]*(?=(?<tok>\S+))", RegexOptions.Multiline))
+            //    after | ; { } ( = - is an allowlisted name or plainly an expression. '}' counts:
+            //    a statement block needs no terminator, so "} Stop-Process" is a new command.
+            foreach (Match m in Regex.Matches(code, @"(?:^|[|;{}(=])[ \t]*(?=(?<tok>\S+))", RegexOptions.Multiline))
             {
                 var tok = m.Groups["tok"].Value;
                 var name = Regex.Match(tok, @"^[A-Za-z_][\w-]*");
                 if (name.Success)
+                {
                     Assert.True(commands.Contains(name.Value), $"command '{name.Value}' is not on the allowlist" + review);
+                    // Only the foreach STATEMENT: in a pipeline "foreach" is ForEach-Object, and
+                    // "| foreach Delete" calls a method without parentheses.
+                    if (name.Value.Equals("foreach", StringComparison.OrdinalIgnoreCase))
+                        Assert.True(Regex.IsMatch(code.Substring(m.Index + m.Length), @"^foreach\s*\(", RegexOptions.IgnoreCase)
+                            && !m.Value.TrimStart().StartsWith('|'), "'foreach' is allowed only as the statement 'foreach (...)'" + review);
+                }
                 else
-                    Assert.True("$\"'[})@#".Contains(tok[0]) || char.IsDigit(tok[0]), $"'{tok}' in command position is not on the allowlist" + review);
+                    Assert.True("$\"'[})@#|;".Contains(tok[0]) || char.IsDigit(tok[0]), $"'{tok}' in command position is not on the allowlist" + review);
             }
 
             // 2. .NET: only these static calls, and ToString() as the only instance method.
@@ -319,6 +327,9 @@ namespace VoiceLite.Tests
         [InlineData("$env:GITHUB_OUTPUT = 'C:\\somewhere.txt'")]
         [InlineData("if ($true) { echo 'x' }")]
         [InlineData("Get-ChildItem | % { $_ }")]
+        [InlineData("foreach ($i in $installers) { } Stop-Process -Name VoiceLite")]
+        [InlineData("$installers | foreach Delete")]
+        [InlineData("$installers | foreach ($_) { }")]
         public void HashStepGuard_RefusesAnythingOutsideTheAllowlist(string addedLine)
         {
             var real = StepScript(ReleaseWorkflowContractTests.ReleaseYml(), "Generate SHA256 hashes");
