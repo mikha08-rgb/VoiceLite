@@ -44,7 +44,7 @@ namespace VoiceLite.Tests
             var live = MakeLiveSettings();
             var draft = SettingsWindow.CloneForDraft(live);
 
-            // The window writes hotkey edits to the draft on focus loss. Cancel simply
+            // The window writes hotkey edits to the draft on every key-down. Cancel simply
             // discards the draft — this is the "Cancel didn't cancel" regression.
             draft.RecordHotkey = Key.F9;
             draft.HotkeyModifiers = ModifierKeys.Alt;

@@ -180,6 +180,14 @@ namespace VoiceLite.Models
                 settings.SelectedMicrophoneIndex = -1;
             }
 
+            // -1 = default device, which never carries a name. v2.4.1 saved the combo text
+            // "Default Microphone" with it; the recorder resolves by name first, so that made
+            // it log "saved microphone not found" on every single recording.
+            if (settings.SelectedMicrophoneIndex == -1)
+            {
+                settings.SelectedMicrophoneName = null;
+            }
+
             return settings;
         }
     }

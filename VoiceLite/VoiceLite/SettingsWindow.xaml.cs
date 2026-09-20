@@ -29,12 +29,25 @@ namespace VoiceLite
 
         // The hotkey the app had registered when this dialog opened. Windows refuses a
         // second registration of a combination the process already owns, so the probe is
-        // skipped for exactly this one.
+        // skipped for exactly this one - but only if the app really owns it: after a failed
+        // startup registration (another app holds it) the saved combination is NOT ours.
+        // Asked each time, not snapshotted: Settings can be opened while startup is still
+        // initializing services, and the registration then succeeds behind this dialog.
         private readonly Key registeredKey;
         private readonly ModifierKeys registeredModifiers;
+        private readonly Func<bool> isHotkeyRegistered;
+        private bool AppOwnsRegisteredHotkey => isHotkeyRegistered();
+
+        private const string HotkeyTakenMessage = "That key is already taken by another app. Pick a different one.";
+        private const string HotkeyNotActiveMessage =
+            "This hotkey is not active: another app is using it. Pick a different one, or close the other app and press Save to try again.";
 
         private bool isCapturingHotkey;
         private MicLevelMonitor? micMonitor;
+        // Combo placeholder for a saved microphone that is not connected right now: the saved
+        // index + the saved name with NotConnectedSuffix. Selecting it saves that saved choice.
+        private AudioDevice? missingMic;
+        private const string NotConnectedSuffix = " (not connected)";
         private ObservableCollection<CustomDictionaryEntry>? customDictionaryView;
 
         // The live instance — after Save/Apply it carries the committed values, so
@@ -46,7 +59,11 @@ namespace VoiceLite
         // Cancel/X after an Apply (DialogResult alone would discard them).
         public bool ChangesCommitted => changesCommitted;
 
-        public SettingsWindow(Settings currentSettings, Action? onSaveSettings = null)
+        /// <param name="hotkeyRegistered">
+        /// Whether MainWindow's HotkeyManager holds the saved hotkey right now. False after a
+        /// failed registration: the saved combination is then probed like any other.
+        /// </param>
+        public SettingsWindow(Settings currentSettings, Action? onSaveSettings = null, Func<bool>? hotkeyRegistered = null)
         {
             InitializeComponent();
             liveSettings = currentSettings ?? new Settings();
@@ -56,9 +73,24 @@ namespace VoiceLite
             licenseService = new LicenseService();
             registeredKey = settings.RecordHotkey;
             registeredModifiers = settings.HotkeyModifiers;
+            isHotkeyRegistered = hotkeyRegistered ?? (() => true);
 
             LoadSettings();
-            Loaded += (_, _) => StartMicMonitor();
+
+            // The level meter holds the microphone open (mic-in-use indicator, Bluetooth
+            // headsets drop to hands-free), so it runs only while it is on screen: the
+            // content of an unselected tab is not visible. ApplicationIdle lets the tab paint
+            // before the blocking device open and collapses arrowing past the tab. Showing the
+            // tab twice before the queue idles queues two starts: the second must not close and
+            // re-open the device the first one just opened (hence micMonitor == null).
+            LevelTrack.IsVisibleChanged += (_, e) =>
+            {
+                if ((bool)e.NewValue)
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                        new Action(() => { if (LevelTrack.IsVisible && micMonitor == null) StartMicMonitor(); }));
+                else
+                    StopMicMonitor();
+            };
         }
 
         /// <summary>
@@ -124,6 +156,7 @@ namespace VoiceLite
             try
             {
                 HotkeyBox.Text = HotkeyDisplayHelper.Format(settings.RecordHotkey, settings.HotkeyModifiers);
+                UpdateDeadHotkeyWarning();
                 if (settings.Mode == RecordMode.PushToTalk) PushToTalkRadio.IsChecked = true;
                 else ToggleRadio.IsChecked = true;
 
@@ -197,9 +230,17 @@ namespace VoiceLite
 
             if (!HotkeyIsAvailable())
             {
-                SettingsTabs.SelectedItem = HotkeyTab;
-                HotkeyErrorText.Visibility = Visibility.Visible;
-                return false;
+                // The saved hotkey was already dead when the dialog opened (startup said so and
+                // offered the manual buttons): warn, but let the user save their other settings.
+                // MainWindow retries the registration after every commit while it is dead.
+                bool savedButDead = IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers,
+                    registeredKey, registeredModifiers, AppOwnsRegisteredHotkey);
+                ShowHotkeyProblem(savedButDead);
+                if (!savedButDead)
+                {
+                    SettingsTabs.SelectedItem = HotkeyTab;
+                    return false;
+                }
             }
 
             ReadUiIntoDraft();
@@ -215,10 +256,7 @@ namespace VoiceLite
             settings.Mode = PushToTalkRadio.IsChecked == true ? RecordMode.PushToTalk : RecordMode.Toggle;
 
             if (MicrophoneComboBox.SelectedItem is AudioDevice device)
-            {
-                settings.SelectedMicrophoneIndex = device.Index;
-                settings.SelectedMicrophoneName = device.Index == -1 ? null : device.Name;
-            }
+                WriteMicrophoneToDraft(settings, device, missingMic);
             settings.EnableVAD = EnableVADCheckBox.IsChecked ?? true;
 
             settings.TranscriptionPreset =
@@ -245,9 +283,64 @@ namespace VoiceLite
         /// </summary>
         private bool HotkeyIsAvailable()
         {
-            if (settings.RecordHotkey == registeredKey && settings.HotkeyModifiers == registeredModifiers)
+            if (ProbeIsExempt(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, AppOwnsRegisteredHotkey))
                 return true;
             return HotkeyManager.CanRegisterHotkey(settings.RecordHotkey, settings.HotkeyModifiers);
+        }
+
+        /// <summary>
+        /// The probe is skipped only for the combination this process really holds. When the
+        /// startup registration failed the app owns nothing, so the saved combination is
+        /// probed too. Internal static for the regression tests.
+        /// </summary>
+        internal static bool ProbeIsExempt(Key draftKey, ModifierKeys draftModifiers,
+            Key registeredKey, ModifierKeys registeredModifiers, bool appOwnsRegisteredHotkey)
+        {
+            return appOwnsRegisteredHotkey && draftKey == registeredKey && draftModifiers == registeredModifiers;
+        }
+
+        /// <summary>
+        /// Esc in the hotkey box: put the hotkey that is in effect (the live, last committed
+        /// one) back into the draft. Every key-down writes the draft, so without this an
+        /// aborted capture - or an Alt+Tab away from the box - left a bare modifier behind for
+        /// the next Save. Live rather than a focus-in snapshot: keyboard focus returns to the
+        /// box on window re-activation, which would snapshot the already-polluted draft.
+        /// Internal static for the regression tests.
+        /// </summary>
+        internal static void RevertHotkeyToLive(Settings draft, Settings live)
+        {
+            lock (live.SyncRoot)
+            {
+                draft.RecordHotkey = live.RecordHotkey;
+                draft.HotkeyModifiers = live.HotkeyModifiers;
+            }
+        }
+
+        /// <summary>
+        /// The draft still holds the hotkey that was saved when the dialog opened, and the app
+        /// failed to register it. Internal static for the regression tests.
+        /// </summary>
+        internal static bool IsSavedButDeadHotkey(Key draftKey, ModifierKeys draftModifiers,
+            Key registeredKey, ModifierKeys registeredModifiers, bool appOwnsRegisteredHotkey)
+        {
+            return !appOwnsRegisteredHotkey && draftKey == registeredKey && draftModifiers == registeredModifiers;
+        }
+
+        /// <summary>Says so when the hotkey in the box is the saved one and it is not working.</summary>
+        private void UpdateDeadHotkeyWarning()
+        {
+            if (IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, AppOwnsRegisteredHotkey)
+                && !HotkeyManager.CanRegisterHotkey(settings.RecordHotkey, settings.HotkeyModifiers))
+                ShowHotkeyProblem(hotkeyIsDead: true);
+            else
+                HotkeyErrorText.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>Red text under the hotkey box.</summary>
+        private void ShowHotkeyProblem(bool hotkeyIsDead)
+        {
+            HotkeyErrorText.Text = hotkeyIsDead ? HotkeyNotActiveMessage : HotkeyTakenMessage;
+            HotkeyErrorText.Visibility = Visibility.Visible;
         }
 
         private void HotkeyBox_GotFocus(object sender, RoutedEventArgs e)
@@ -272,6 +365,9 @@ namespace VoiceLite
 
             if (e.Key == Key.Escape)
             {
+                RevertHotkeyToLive(settings, liveSettings);
+                HotkeyBox.Text = HotkeyDisplayHelper.Format(settings.RecordHotkey, settings.HotkeyModifiers);
+                UpdateDeadHotkeyWarning();
                 Keyboard.ClearFocus();
                 return;
             }
@@ -292,29 +388,80 @@ namespace VoiceLite
 
         private void LoadMicrophones()
         {
-            var devices = AudioRecorder.GetAvailableMicrophones();
-            devices.Insert(0, new AudioDevice { Index = -1, Name = "Default microphone" });
+            var devices = BuildMicrophoneChoices(AudioRecorder.GetAvailableMicrophones(),
+                settings.SelectedMicrophoneIndex, settings.SelectedMicrophoneName,
+                out var selected, out missingMic);
             MicrophoneComboBox.ItemsSource = devices;
+            MicrophoneComboBox.SelectedItem = selected;
+        }
 
-            // Same resolution order the recorder uses: -1 = default; otherwise prefer the
-            // saved NAME (indices shift when devices are re-plugged), then the saved index.
-            AudioDevice? selected = null;
-            if (settings.SelectedMicrophoneIndex != -1)
+        /// <summary>
+        /// Finds the saved microphone among the connected devices exactly the way
+        /// AudioRecorder.ResolveDeviceIndex does: -1 = default; a saved NAME wins and the index
+        /// is then never consulted (Windows renumbers devices, so whatever now sits at the
+        /// stale index is a different microphone); the index alone is trusted only for legacy
+        /// settings that have no name. Null = not found / default.
+        /// Internal static for the regression tests (which also pin parity with the recorder).
+        /// </summary>
+        internal static AudioDevice? PickSavedMicrophone(System.Collections.Generic.IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
+        {
+            if (savedIndex == -1)
+                return null;
+            if (!string.IsNullOrEmpty(savedName))
+                return devices.FirstOrDefault(d => d.Index != -1 && d.Name == savedName);
+            return devices.FirstOrDefault(d => d.Index == savedIndex);
+        }
+
+        /// <summary>
+        /// The combo's items and pre-selection. A saved microphone that is not connected gets
+        /// an explicit "(not connected)" placeholder instead of silently pre-selecting another
+        /// device - the pre-selected item is what Save persists, and that is how an unplugged
+        /// USB mic used to turn into "record from the webcam from now on".
+        /// Internal static for the regression tests.
+        /// </summary>
+        internal static System.Collections.Generic.List<AudioDevice> BuildMicrophoneChoices(
+            System.Collections.Generic.IReadOnlyList<AudioDevice> available, int savedIndex, string? savedName,
+            out AudioDevice selected, out AudioDevice? missingPlaceholder)
+        {
+            var devices = available.ToList();
+            devices.Insert(0, new AudioDevice { Index = -1, Name = "Default microphone" });
+
+            missingPlaceholder = null;
+            var saved = PickSavedMicrophone(devices, savedIndex, savedName);
+            if (saved == null && savedIndex != -1 && !string.IsNullOrEmpty(savedName))
             {
-                selected = devices.FirstOrDefault(d => d.Index != -1 && d.Name == settings.SelectedMicrophoneName)
-                        ?? devices.FirstOrDefault(d => d.Index == settings.SelectedMicrophoneIndex);
+                missingPlaceholder = new AudioDevice { Index = savedIndex, Name = savedName + NotConnectedSuffix };
+                devices.Insert(1, missingPlaceholder);
             }
-            MicrophoneComboBox.SelectedItem = selected ?? devices[0];
+
+            selected = saved ?? missingPlaceholder ?? devices[0];
+            return devices;
+        }
+
+        /// <summary>
+        /// Combo selection → draft. The not-connected placeholder writes back the saved choice
+        /// it stands for (saved index + the name without the suffix): the preference survives
+        /// saving unrelated settings, and re-selecting the placeholder after an Apply of
+        /// another device really restores it - what is visibly selected is what gets saved.
+        /// Internal static for the regression tests.
+        /// </summary>
+        internal static void WriteMicrophoneToDraft(Settings draft, AudioDevice selected, AudioDevice? missingPlaceholder)
+        {
+            if (ReferenceEquals(selected, missingPlaceholder))
+            {
+                draft.SelectedMicrophoneIndex = selected.Index;
+                draft.SelectedMicrophoneName = selected.Name[..^NotConnectedSuffix.Length];
+                return;
+            }
+            draft.SelectedMicrophoneIndex = selected.Index;
+            draft.SelectedMicrophoneName = selected.Index == -1 ? null : selected.Name;
         }
 
         private void RefreshMicrophonesButton_Click(object sender, RoutedEventArgs e)
         {
             // Keep the current choice across a refresh (it may not be persisted yet).
             if (MicrophoneComboBox.SelectedItem is AudioDevice current)
-            {
-                settings.SelectedMicrophoneIndex = current.Index;
-                settings.SelectedMicrophoneName = current.Index == -1 ? null : current.Name;
-            }
+                WriteMicrophoneToDraft(settings, current, missingMic);
             LoadMicrophones();
             StatusText.Text = "Microphone list refreshed.";
         }
@@ -333,10 +480,18 @@ namespace VoiceLite
 
             if (MicrophoneComboBox.SelectedItem is not AudioDevice device)
                 return;
+            if (!LevelTrack.IsVisible)
+                return; // never hold the microphone open while the meter is not on screen
+
+            // Saved mic not connected: the recorder falls back to the default device, so
+            // that is what the meter shows (and the text says so).
+            bool missing = ReferenceEquals(device, missingMic);
+            if (missing)
+                ShowMissingMicStatus();
 
             try
             {
-                var monitor = new MicLevelMonitor(device.Index);
+                var monitor = new MicLevelMonitor(missing ? -1 : device.Index);
                 monitor.LevelChanged += OnMicLevelChanged;
                 monitor.Start();
                 micMonitor = monitor;
@@ -371,10 +526,21 @@ namespace VoiceLite
                 MicStatusText.Text = "No signal — check that the microphone is plugged in and not muted.";
                 MicStatusText.Visibility = Visibility.Visible;
             }
+            else if (missingMic != null && ReferenceEquals(MicrophoneComboBox.SelectedItem, missingMic))
+            {
+                ShowMissingMicStatus();
+            }
             else
             {
                 MicStatusText.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void ShowMissingMicStatus()
+        {
+            MicStatusText.Text = "This microphone isn't connected, so VoiceLite is recording from the default microphone. "
+                + "It will be used again when you plug it back in, or you can pick another one here.";
+            MicStatusText.Visibility = Visibility.Visible;
         }
 
         // ================= Translation (Pro) =================
