@@ -66,6 +66,10 @@ namespace VoiceLite
         private UpdateInfo? pendingUpdate;
         private string? notifiedUpdateVersion;
         private UpdateWindow? updateWindow;
+        // True from UpdateWindow's "dictation idle? then launch installer" step until the app
+        // shuts down for the update or the install fails. Hotkey presses are dropped meanwhile
+        // (a recording started now would be thrown away by the shutdown). UI thread only.
+        private bool updateInstallInProgress;
         private System.Windows.Threading.DispatcherTimer? recordingElapsedTimer;
         private System.Windows.Threading.DispatcherTimer? settingsSaveTimer;
 
@@ -549,6 +553,7 @@ namespace VoiceLite
                 }
 
                 systemTrayManager = new SystemTrayManager();
+                systemTrayManager.UpdateBalloonClicked += OnUpdateBalloonClicked;
                 await Dispatcher.InvokeAsync(() => systemTrayManager.Initialize(this, GetHotkeyDisplayString()));
 
                 // Load and display existing history
@@ -759,7 +764,7 @@ namespace VoiceLite
                     if (notifiedUpdateVersion != info.Version)
                     {
                         notifiedUpdateVersion = info.Version;
-                        systemTrayManager?.ShowUpdateAvailable(info.Version, info.DownloadUrl);
+                        systemTrayManager?.ShowUpdateAvailable(info.Version);
                     }
                 });
             }
@@ -769,7 +774,20 @@ namespace VoiceLite
             }
         }
 
-        private void UpdateBanner_Click(object sender, MouseButtonEventArgs e)
+        private void UpdateBanner_Click(object sender, MouseButtonEventArgs e) => OpenUpdateWindow();
+
+        // Tray balloon click: same verified in-app updater as the banner, never the browser.
+        // Raised on the UI thread. Restore first - UpdateWindow is CenterOwner/ShowInTaskbar=False,
+        // so under a hidden owner it would be unfindable. Nothing pops up if the update is gone
+        // (skipped since the balloon was shown).
+        private void OnUpdateBalloonClicked()
+        {
+            if (pendingUpdate == null) return;
+            systemTrayManager?.ShowMainWindow();
+            OpenUpdateWindow();
+        }
+
+        private void OpenUpdateWindow()
         {
             var info = pendingUpdate;
             if (info == null) return;
@@ -783,12 +801,29 @@ namespace VoiceLite
 
             try
             {
-                var window = new UpdateWindow(info, () => dictation != null && dictation.State != DictationState.Idle) { Owner = this };
+                var window = new UpdateWindow(
+                    info,
+                    isDictationBusy: () => dictation != null && dictation.State != DictationState.Idle,
+                    // IsVisible, not "!= null": the field is never cleared after Settings closes.
+                    isSettingsOpen: () => currentSettingsWindow?.IsVisible == true,
+                    blockHotkeys: () => updateInstallInProgress = true,
+                    unblockHotkeys: () => updateInstallInProgress = false) { Owner = this };
                 updateWindow = window;
                 window.DownloadProgressChanged += pct =>
                 {
+                    // A report queued before the window closed must not undo the Closed handler.
+                    if (!ReferenceEquals(updateWindow, window)) return;
                     if (UpdateBanner != null)
                         UpdateBanner.Text = $"Downloading update... {pct * 100:0}%";
+                };
+                window.InstallStarted += () =>
+                {
+                    if (UpdateBanner != null) UpdateBanner.Text = "Installing update...";
+                };
+                window.AttemptFailed += () =>
+                {
+                    // Download or install failed; VoiceLite keeps running on the current version.
+                    if (UpdateBanner != null) UpdateBanner.Text = $"Update {info.Version} available";
                 };
                 window.Closed += (_, _) =>
                 {
@@ -847,8 +882,17 @@ namespace VoiceLite
         // handler synchronously - always via the dispatcher.
         // ------------------------------------------------------------------
 
-        private void OnHotkeyPressed(object? sender, EventArgs e) => dictation?.HotkeyPressed();
-        private void OnHotkeyReleased(object? sender, EventArgs e) => dictation?.HotkeyReleased();
+        private void OnHotkeyPressed(object? sender, EventArgs e)
+        {
+            if (updateInstallInProgress) return; // app is about to close for the update
+            dictation?.HotkeyPressed();
+        }
+
+        private void OnHotkeyReleased(object? sender, EventArgs e)
+        {
+            if (updateInstallInProgress) return;
+            dictation?.HotkeyReleased();
+        }
 
         private void OnDictationNotice(object? sender, DictationEvent ev)
         {
