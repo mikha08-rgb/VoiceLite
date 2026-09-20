@@ -381,13 +381,15 @@ end;
 // That app (/READYFILE) keeps running until the ready file exists; if Setup exits first
 // it stays up and tells the user itself ("Update failed (exit code N)"). A message box
 // here would hold Setup - and with it the app, stuck on "Installing..." - until someone
-// finds it, and then be followed by that second report. No ready file + the app still
-// holds its mutex = that case. An app that died meanwhile (no mutex) reports nothing, so
-// it falls through to ReportFailedUpdate, which restarts it.
+// finds it, and then be followed by that second report. No ready file + the app is still
+// alive = that case. "Alive" is the mutex OR a VoiceLite.exe in this session: a Setup
+// elevated with another admin account may be denied the user's mutex (default DACL), and
+// "not held" would start a second instance plus a second report. An app that died
+// meanwhile reports nothing, so it falls through to ReportFailedUpdate, which restarts it.
 function UpdaterReportsFailureItself(): Boolean;
 begin
   Result := (ExpandConstant('{param:READYFILE|}') <> '') and (not ReadyFileWritten) and
-            CheckForMutexes(AppMutexName);
+            IsVoiceLiteRunningInThisSession();
 end;
 
 // In-app update that did not complete and that nobody else reports: the 2.5.0/2.5.1

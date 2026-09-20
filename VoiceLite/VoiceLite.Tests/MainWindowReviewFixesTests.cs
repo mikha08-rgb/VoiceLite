@@ -110,9 +110,21 @@ namespace VoiceLite.Tests
         }
 
         [Fact]
-        public void HotkeyOutcome_ChangedHotkeyThatRegistered_NeedsNoExtraStatus()
+        public void HotkeyOutcome_ChangedHotkeyThatRegistered_ReplacesAnEarlierStickyFailure()
         {
-            MainWindow.DescribeHotkeyOutcomeAfterSettings(hotkeyChanged: true, registered: true, "F9").Should().BeNull();
+            // F9 was taken -> sticky red "Hotkey F9 is not active". The user then picks F10 and it
+            // registers: null here left that red line standing although F10 was live.
+            MainWindow.DescribeHotkeyOutcomeAfterSettings(hotkeyChanged: true, registered: true, "F10")
+                .Should().Be("Hotkey F10 is active");
+        }
+
+        [Fact]
+        public void Wiring_HotkeyOutcome_SuccessRevertsToReady_FailureStays()
+        {
+            var body = MethodBody(Source(), "private void ShowHotkeyOutcome(string? outcome, bool registered)");
+
+            Assert.True(body.Contains("CancelReadyReset();") && body.Contains("if (registered) ResetToReadyLater();"),
+                "a successful registration is a transient status; only the failure is sticky");
         }
 
         [Fact]

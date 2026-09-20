@@ -440,8 +440,11 @@ namespace VoiceLite
         /// saved microphone this dialog session already showed a placeholder for. Refresh rebuilds
         /// the list from the draft, which by then may point at a device the user was only trying
         /// out; the placeholder stays on offer (unselected) so the real preference can be
-        /// re-selected. The draft can only name a connected device, the default, or that same
-        /// microphone, so one placeholder is always enough.
+        /// re-selected. Only ONE unconnected microphone is offered at a time (missingMic is
+        /// compared by reference in four places): if the device being tried out is itself
+        /// unplugged before a Refresh, the draft's own placeholder wins and replaces the
+        /// remembered one for the rest of the dialog session. Cancel discards the draft, so the
+        /// saved preference itself is not lost; too rare to carry a second placeholder.
         /// </summary>
         internal static System.Collections.Generic.List<AudioDevice> BuildMicrophoneChoices(
             System.Collections.Generic.IReadOnlyList<AudioDevice> available, int savedIndex, string? savedName,

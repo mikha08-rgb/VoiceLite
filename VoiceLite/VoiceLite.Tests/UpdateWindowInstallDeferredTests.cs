@@ -148,6 +148,12 @@ namespace VoiceLite.Tests
             h.BannerEvents.Should().NotBeEmpty();
             h.BannerEvents[^1].Should().Be("deferred",
                 "whatever arrives last is what the banner shows; 'Downloading update... 100%' must not win");
+
+            // The dropped late report was also what stopped the marquee: next to "click Install
+            // now" a still-animating bar reads as work in progress.
+            var bar = (ProgressBar)h.Window.FindName("DownloadProgress");
+            bar.IsIndeterminate.Should().BeFalse();
+            bar.Value.Should().Be(100);
         });
 
         [Fact]

@@ -80,7 +80,6 @@ namespace VoiceLite.Tests
         public void Iss_Comments_NameTheSetupLogLocationOfBothUpdaterGenerations()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             // 2.5.0/2.5.1 updater: no /LOG => SetupLogging's %TEMP% log. 2.5.2+ updater:
             // /LOG=<file> REPLACES that log (observed in the sandbox run), it is not additional.
@@ -118,7 +117,6 @@ namespace VoiceLite.Tests
         public void Iss_FilesTouched_IsSetByTheFirstFileWrittenToApp_NotBySsInstall()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             Routine(iss, "procedure MarkFilesTouched(").Should().Contain("FilesTouched := True;");
             Regex.Matches(iss, @"FilesTouched := True;").Count.Should().Be(1, "MarkFilesTouched is the only writer");
@@ -142,7 +140,6 @@ namespace VoiceLite.Tests
         public void Iss_FailedUpdate_IsLeftToAHandshakeUpdaterThatIsStillRunning()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             // 2.5.2+ app (/READYFILE) only exits once the ready file exists. Until then it is
             // alive, waits for Setup to exit and reports the failure itself - a MsgBox here
@@ -152,8 +149,14 @@ namespace VoiceLite.Tests
             var own = Routine(iss, "function UpdaterReportsFailureItself(");
             own.Should().Contain("ExpandConstant('{param:READYFILE|}') <> ''");
             own.Should().Contain("not ReadyFileWritten");
-            own.Should().Contain("CheckForMutexes(AppMutexName)", "an app that died meanwhile reports nothing");
+            // "App alive" = mutex OR a VoiceLite.exe in this session: Setup elevated over the
+            // shoulder with another admin account may be denied the user's mutex (default DACL),
+            // and "not held" there would start a second instance plus a second failure report.
+            own.Should().Contain("IsVoiceLiteRunningInThisSession()", "an app that died meanwhile reports nothing");
             own.Should().NotContain("MsgBox(");
+            var alive = Routine(iss, "function IsVoiceLiteRunningInThisSession(");
+            alive.Should().Contain("CheckForMutexes(AppMutexName)");
+            alive.Should().Contain("/FI \"SESSION eq ' +", "the process check must not depend on the mutex ACL");
 
             var deinit = Routine(iss, "procedure DeinitializeSetup(");
             var skipAt = deinit.IndexOf("UpdaterReportsFailureItself()", StringComparison.Ordinal);
@@ -167,7 +170,6 @@ namespace VoiceLite.Tests
         public void Iss_SilentUninstall_WhileRunning_IsHeadless()
         {
             var iss = Iss();
-            if (iss == null) return;
             var init = Routine(iss, "function InitializeUninstall(");
 
             // MsgBox ignores /VERYSILENT /SUPPRESSMSGBOXES: an Intune uninstall hung on it forever.
@@ -259,7 +261,6 @@ namespace VoiceLite.Tests
         public void Iss_NonAdminInstall_DoesNotSitOutTheFullWaitForAnotherSessionsVoiceLite()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             // Another user's VoiceLite.exe (Fast User Switching/RDP) cannot be killed by a
             // per-user Setup and does not lock this user's {app}; waiting 10 s + 10 s for it

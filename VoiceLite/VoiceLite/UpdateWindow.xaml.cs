@@ -211,6 +211,9 @@ namespace VoiceLite
             // file stays on disk and is reused next time; the user's "not now" wins.
             if (closed || cts.IsCancellationRequested) return;
 
+            // A reused verified file's only progress report arrives after this point and is
+            // dropped (downloadedPath is set), so the marquee has to be stopped here.
+            DownloadProgress.IsIndeterminate = false;
             DownloadProgress.Value = 100;
             StatusText.Text = "Download verified.";
             await TryInstallAsync();

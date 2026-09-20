@@ -375,7 +375,7 @@ namespace VoiceLite
 
             // Use SemaphoreSlim instead of lock for async compatibility
             // Use cancellation token to allow graceful shutdown
-            // ConfigureAwait(false) on every await past the UI-state capture above:
+            // ConfigureAwait(false) on every await in this method:
             // the finally block's semaphore Release must not queue behind a busy/blocked
             // dispatcher, or the exit-flush wait on this semaphore can never succeed
             // against an in-flight save.
@@ -1213,16 +1213,17 @@ namespace VoiceLite
             => hotkeyChanged || !currentlyRegistered;
 
         /// <summary>
-        /// Status-line text after a Settings commit that (re)tried the hotkey registration, or
-        /// null when nothing needs saying. The Settings window advertises "press Save to try
+        /// Status-line text after a Settings commit that (re)tried the hotkey registration - for
+        /// EVERY attempt: a changed hotkey that registered must replace the sticky red line an
+        /// earlier failed one left behind. The Settings window advertises "press Save to try
         /// again" for a dead hotkey; both outcomes of that retry used to be invisible (the dialog
         /// closes, status stayed a green "Ready"). Deliberately a status line, not a MessageBox:
         /// no modal nag when saving unrelated settings. Internal static for tests.
         /// </summary>
-        internal static string? DescribeHotkeyOutcomeAfterSettings(bool hotkeyChanged, bool registered, string hotkeyDisplay)
+        internal static string DescribeHotkeyOutcomeAfterSettings(bool hotkeyChanged, bool registered, string hotkeyDisplay)
         {
             if (!registered) return $"Hotkey {hotkeyDisplay} is not active - another app may be using it";
-            return hotkeyChanged ? null : $"Hotkey {hotkeyDisplay} is active";
+            return $"Hotkey {hotkeyDisplay} is active";
         }
 
         /// <summary>Failure stays on the status line (no hotkey = no next dictation to replace it); success reverts to Ready.</summary>
