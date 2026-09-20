@@ -17,7 +17,7 @@ dotnet publish VoiceLite/VoiceLite/VoiceLite.csproj -c Release -r win-x64 --self
 # Web backend
 cd voicelite-web && npm run dev
 ```
-Release is automated: push a `v*.*.*` tag → `release.yml` validates that `VoiceLite.csproj <Version>` and `VoiceLiteSetup.iss #define MyAppVersion` both match the tag, then builds + publishes.
+Release is automated: push a `v*.*.*` tag → `release.yml` validates that `VoiceLite.csproj <Version>`, `<AssemblyVersion>` + `<FileVersion>` (tag + `.0`; the in-app updater compares the assembly version), `VoiceLiteSetup.iss #define MyAppVersion` and `voicelite-web/lib/version.ts CURRENT_VERSION` all match the tag, re-checks the built assembly's version, then builds + publishes. Bump all five.
 
 ## Read first
 The audit in `@docs/audit/` is ground truth (2026-07-17). Start every session there:
@@ -32,6 +32,7 @@ The audit in `@docs/audit/` is ground truth (2026-07-17). Start every session th
 - **No DI.** `App.xaml.cs` runs a 3-stage startup gate, then `MainWindow` directly `new`s every service. Recording/transcription state lives in `Services/DictationController.cs` (a tested state machine that raises `DictationEvent` notices); MainWindow wires services and renders. Don't add recording flags or timers back into MainWindow.
 - **Names fixed (2026-07-17 rename):** the Whisper-era misnomers are gone — `PersistentWhisperService`→`TranscriptionService`, `WhisperModelInfo`→`TranscriptionModelInfo`, `WhisperPresetConfig`→`TranscriptionPresetConfig`, `Settings.WhisperModel`→`Settings.TranscriptionModel`. **But** settings.json on disk still uses the legacy `"WhisperModel"` key via `[JsonPropertyName("WhisperModel")]` for compat — never rename the serialized key. Real pattern example: `VoiceLite/VoiceLite/Services/TranscriptionService.cs`.
 - **Logging:** `ErrorLogger.LogWarning()`/`LogError()` are Release-visible; `LogMessage()` is Debug-only (Release silent-failure trap).
+- **Test logging:** tests never write the real `voicelite.log`: `TestUtilities/TestLogRedirect.cs` (module initializer) points `ErrorLogger` at a temp dir; a test child process that loads `VoiceLite.dll` itself must set `ErrorLogger.LogDirectoryOverrideKey` before loading it.
 - **Settings/state:** `%LOCALAPPDATA%\VoiceLite\` (never Roaming). `license.dat` = DPAPI `key|email`, authoritative for Pro tier.
 - **`OfflineRecognizer.Decode()` is blocking native** — always `await Task.Run(...)` from UI threads.
 - Web: opaque DB-lookup license keys (no crypto signing), Stripe one-time payments, 3-device cap via `LicenseActivation @@unique`.
