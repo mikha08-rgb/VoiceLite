@@ -44,6 +44,10 @@ namespace VoiceLite
         // MainWindow only renders what it reports; see DictationController.
         private DictationController? dictation;
 
+        // The bottom-centre recording pill. It holds no recording state of its own: it is fed the
+        // same notices as ShowDictationNotice, and nothing it does can reach dictation (see the class).
+        private RecordingIndicator? recordingIndicator;
+
         // Initialization flag to suppress polling mode warnings during startup
         // More reliable than time-based check (works on slow PCs with 10+ second startup)
         private bool isInitializing = true;
@@ -532,6 +536,11 @@ namespace VoiceLite
                     prepareRecorder: ApplySelectedMicrophone);
                 dictation.Notice += OnDictationNotice;
 
+                // Reads the settings FIELD on every notice: the instance is replaced after a Settings save.
+                recordingIndicator = RecordingIndicator.ForWindow(() => settings.ShowRecordingIndicator,
+                    () => dictation != null && dictation.State != DictationState.Idle);
+                audioRecorder.LevelAvailable += recordingIndicator.OnLevel;
+
                 // Null-check hotkeyManager before subscribing
                 if (hotkeyManager != null)
                 {
@@ -922,6 +931,10 @@ namespace VoiceLite
 
         private void ShowDictationNotice(DictationEvent ev)
         {
+            // First, and for every kind: the Fault case below blocks in a MessageBox, and the pill
+            // must already be gone by then. Never throws (RecordingIndicator catches everything).
+            recordingIndicator?.OnDictationEvent(ev.Kind);
+
             try
             {
                 switch (ev.Kind)
@@ -1250,7 +1263,8 @@ namespace VoiceLite
             // logoff), OnClosed runs inside ShowDialog's nested pump and nulls the
             // currentSettingsWindow FIELD before ShowDialog returns — re-reading the field
             // after the pump would NRE mid-shutdown.
-            var settingsWindow = new SettingsWindow(settings, () => SaveSettings(), () => hotkeyManager?.IsRegistered == true);
+            // Apply keeps the dialog open: the pill follows "Show recording indicator" right then.
+            var settingsWindow = new SettingsWindow(settings, () => { SaveSettings(); recordingIndicator?.Refresh(); }, () => hotkeyManager?.IsRegistered == true);
             currentSettingsWindow = settingsWindow;
             settingsWindow.Owner = this;
 
@@ -1264,6 +1278,7 @@ namespace VoiceLite
                 settings = SettingsValidator.ValidateAndRepair(settingsWindow.Settings);
                 MinimizeCheckBox.IsChecked = settings.MinimizeToTray;
                 SaveSettings();
+                recordingIndicator?.Refresh(); // "Show recording indicator" applies now, not at the next dictation
 
                 // Log mode changes
                 if (oldMode != settings.Mode)
@@ -1619,6 +1634,14 @@ namespace VoiceLite
 
         protected override void OnClosed(EventArgs e)
         {
+            // FIRST, before any cleanup that could throw: the pill is a second (usually hidden)
+            // Window and ShutdownMode is OnLastWindowClose, so left open it would keep VoiceLite.exe
+            // running with no UI, holding the single-instance mutex. Close() never throws.
+            if (audioRecorder != null && recordingIndicator != null)
+                audioRecorder.LevelAvailable -= recordingIndicator.OnLevel;
+            recordingIndicator?.Close();
+            recordingIndicator = null;
+
             // Last-resort settings flush (covers tray Exit / Application.Shutdown,
             // where OnClosing's async flush may never complete). Redundant-but-harmless on the
             // normal X-button exit path where OnClosing already flushed.

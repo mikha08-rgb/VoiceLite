@@ -48,6 +48,7 @@ namespace VoiceLite.Tests
                      {
                          "App.xaml", "MainWindow.xaml", "SettingsWindow.xaml", "UpdateWindow.xaml",
                          "ShortcutEditDialog.xaml", "Controls/ModelDownloadControl.xaml",
+                         "RecordingIndicatorWindow.xaml",
                      })
             {
                 Assert.True(scanned.Contains(expected), $"resource-key scan did not see {expected}");

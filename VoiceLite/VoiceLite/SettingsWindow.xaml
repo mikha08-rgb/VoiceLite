@@ -383,6 +383,7 @@
                         <TextBlock Text="Startup &amp; window" Style="{StaticResource Label}"/>
                         <CheckBox Name="CheckForUpdatesCheckBox" Content="Check for updates when VoiceLite starts" IsChecked="True" Margin="0"/>
                         <CheckBox Name="MinimizeToTrayCheckBox" Content="Keep running in the tray when the window is closed" IsChecked="True"/>
+                        <CheckBox Name="ShowRecordingIndicatorCheckBox" Content="Show recording indicator while dictating" IsChecked="True"/>
 
                         <TextBlock Text="Third-party notices" Style="{StaticResource Label}"/>
                         <TextBlock Style="{StaticResource Hint}" Margin="0">
