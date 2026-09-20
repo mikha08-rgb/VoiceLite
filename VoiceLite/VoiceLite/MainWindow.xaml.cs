@@ -1094,6 +1094,15 @@ namespace VoiceLite
         // was removed — its minimize-to-tray decision is consolidated into the OnClosing
         // override so the close flow has exactly one owner (no double-cancel confusion).
 
+        /// <summary>
+        /// After a Settings commit: register when the hotkey changed, and ALSO when it did not
+        /// but the app holds no registration (startup registration failed because another app
+        /// had the combination) - Save is the user's way to retry once the combination is free.
+        /// Internal static for the regression tests.
+        /// </summary>
+        internal static bool ShouldRegisterHotkeyAfterSettings(bool hotkeyChanged, bool currentlyRegistered)
+            => hotkeyChanged || !currentlyRegistered;
+
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var oldMode = settings.Mode;
@@ -1104,7 +1113,7 @@ namespace VoiceLite
             // logoff), OnClosed runs inside ShowDialog's nested pump and nulls the
             // currentSettingsWindow FIELD before ShowDialog returns — re-reading the field
             // after the pump would NRE mid-shutdown.
-            var settingsWindow = new SettingsWindow(settings, () => SaveSettings());
+            var settingsWindow = new SettingsWindow(settings, () => SaveSettings(), hotkeyManager?.IsRegistered == true);
             currentSettingsWindow = settingsWindow;
             settingsWindow.Owner = this;
 
@@ -1170,8 +1179,10 @@ namespace VoiceLite
                     ErrorLogger.LogMessage("Skipping microphone change - recording in progress");
                 }
 
-                // Only re-register hotkey if it actually changed
-                if (oldHotkey != settings.RecordHotkey || oldModifiers != settings.HotkeyModifiers)
+                // Re-register when the hotkey changed - and also when it did not but the app holds
+                // no registration (startup registration failed: another app had the combination).
+                bool hotkeyChanged = oldHotkey != settings.RecordHotkey || oldModifiers != settings.HotkeyModifiers;
+                if (ShouldRegisterHotkeyAfterSettings(hotkeyChanged, hotkeyManager?.IsRegistered == true))
                 {
                     try
                     {
@@ -1193,19 +1204,24 @@ namespace VoiceLite
                         var helper = new WindowInteropHelper(this);
                         hotkeyManager.RegisterHotkey(helper.Handle, settings.RecordHotkey, settings.HotkeyModifiers);
 
-                        ErrorLogger.LogMessage("Hotkey re-registration successful");
+                        ErrorLogger.LogWarning($"Hotkey registered after Settings: {GetHotkeyDisplayString()} (changed={hotkeyChanged})");
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogMessage($"Failed to register new hotkey: {ex.Message}");
-                        MessageBox.Show($"Failed to apply new hotkey: {ex.Message}\n\nThe old hotkey may still be active.",
-                            "Hotkey Registration Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ErrorLogger.LogWarning($"Failed to register hotkey {GetHotkeyDisplayString()} after Settings (changed={hotkeyChanged}) - no hotkey is active: {ex.Message}");
+                        // An unchanged hotkey that is still taken: the user was told at startup and
+                        // the Settings window says so - no modal nag on every Settings save.
+                        if (hotkeyChanged)
+                        {
+                            MessageBox.Show($"Failed to apply new hotkey: {ex.Message}\n\nNo hotkey is active right now. Pick a different one in Settings - the manual buttons still work.",
+                                "Hotkey Registration Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
                         // Don't return - continue with UI updates
                     }
                 }
                 else
                 {
-                    ErrorLogger.LogMessage("Hotkey unchanged - skipping re-registration");
+                    ErrorLogger.LogWarning("Hotkey unchanged and registered - skipping re-registration");
                 }
 
                 // Always update UI regardless of service recreation success
