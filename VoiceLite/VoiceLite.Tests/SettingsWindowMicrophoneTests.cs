@@ -107,6 +107,35 @@ namespace VoiceLite.Tests
             AudioRecorder.ResolveDeviceIndex(devices, savedIndex, "Twin").Should().Be(1);
         }
 
+        [Fact]
+        public void PickSavedMicrophone_TwinsRenumbered_KnownLimitation_TheSavedIndexStillBreaksTheTie()
+        {
+            // ACCEPTED LIMITATION, pinned so nobody "fixes" one resolver only: saved (1, first
+            // twin) out of [Webcam, TwinA, TwinB]; the webcam is unplugged -> [TwinA, TwinB].
+            // Name + index 1 now means TwinB. WaveIn gives same-named devices no stable
+            // identity (that needs MMDevice endpoint IDs), so both resolvers answer 1.
+            var devices = Devices("Twin", "Twin");
+
+            SettingsWindow.PickSavedMicrophone(devices, 1, "Twin")!.Index.Should().Be(1);
+            AudioRecorder.ResolveDeviceIndex(devices, 1, "Twin").Should().Be(1);
+        }
+
+        [Theory]
+        [InlineData(2, 2)]   // second twin saved -> second twin pre-selected (Save keeps it)
+        [InlineData(0, 0)]
+        [InlineData(1, 0)]   // index points at the webcam -> first twin by name
+        public void SameNamedTwins_ThroughTheComboList_PreselectTheTwinTheRecorderUses(int savedIndex, int expectedIndex)
+        {
+            // Through BuildMicrophoneChoices, which prepends "Default microphone" (Index -1).
+            var devices = Devices("Twin", "Webcam", "Twin");
+
+            SettingsWindow.BuildMicrophoneChoices(devices, savedIndex, "Twin", out var selected, out var missing);
+
+            missing.Should().BeNull("a twin is connected");
+            selected.Index.Should().Be(expectedIndex);
+            selected.Index.Should().Be(AudioRecorder.ResolveDeviceIndex(devices, savedIndex, "Twin"));
+        }
+
         // ---- BuildMicrophoneChoices: what the combo shows ----
 
         [Fact]

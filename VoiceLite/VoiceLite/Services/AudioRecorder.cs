@@ -265,6 +265,8 @@ namespace VoiceLite.Services
         /// transcriptions for days.
         /// WaveIn names are truncated to 31 chars, so two mics can share a name: the saved
         /// index then breaks the tie, but only among devices that already match the NAME.
+        /// Known limitation: if Windows renumbers the twins themselves, the tie-break can land
+        /// on the other twin (WaveIn has no stable device ID; that needs MMDevice endpoints).
         /// </summary>
         public static int ResolveDeviceIndex(IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
         {

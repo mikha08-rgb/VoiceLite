@@ -413,6 +413,11 @@ namespace VoiceLite
         /// it never selects a device by itself (Windows renumbers devices, so whatever now sits
         /// at the stale index is a different microphone); the index alone is trusted only for
         /// legacy settings that have no name. Null = not found / default.
+        /// Known limitations of the twin tie-break (accepted for v2.5.2, pinned by tests): if
+        /// Windows renumbers the twins themselves the index can land on the other twin; and with
+        /// the chosen twin unplugged the remaining twin is pre-selected by name (no "(not
+        /// connected)" placeholder), so a Save then persists the remaining twin - the same
+        /// device the recorder is using. A real fix needs a stable ID (MMDevice endpoints).
         /// Internal static for the regression tests (which also pin parity with the recorder).
         /// </summary>
         internal static AudioDevice? PickSavedMicrophone(System.Collections.Generic.IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)

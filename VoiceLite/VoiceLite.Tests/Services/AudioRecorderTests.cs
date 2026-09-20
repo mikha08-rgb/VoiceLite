@@ -218,6 +218,21 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public void ResolveDeviceIndex_SameNamedTwins_Renumbered_KnownLimitation()
+        {
+            // ACCEPTED LIMITATION (pinned, not endorsed): the user saved (1, first twin) out of
+            // [Webcam, TwinA, TwinB]; the webcam is unplugged and Windows renumbers to
+            // [TwinA, TwinB]. Name + index 1 now means TwinB. WaveIn offers no stable identity
+            // for same-named devices (that needs MMDevice endpoint IDs).
+            var renumbered = new List<AudioDevice>
+            {
+                new() { Index = 0, Name = "Headset Microphone (Plantronics" },
+                new() { Index = 1, Name = "Headset Microphone (Plantronics" },
+            };
+            AudioRecorder.ResolveDeviceIndex(renumbered, 1, "Headset Microphone (Plantronics").Should().Be(1);
+        }
+
+        [Fact]
         public void PeakAbsSample_FindsDataChunkPastNAudioHeader()
         {
             using var ms = new MemoryStream();
