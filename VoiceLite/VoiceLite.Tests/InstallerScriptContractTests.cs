@@ -16,7 +16,7 @@ namespace VoiceLite.Tests
     /// </summary>
     public class InstallerScriptContractTests
     {
-        private static string? Iss() => RepoSourceFile.Read("VoiceLite", "Installer", "VoiceLiteSetup.iss");
+        private static string Iss() => RepoSourceFile.Read("VoiceLite", "Installer", "VoiceLiteSetup.iss");
 
         /// <summary>Text of one Pascal routine: from its header to its closing column-0
         /// "end;" - the last one before the next top-level "function"/"procedure" (or end of
@@ -55,7 +55,6 @@ namespace VoiceLite.Tests
         public void Iss_HappyPathContractWithShippedUpdater_IsUnchanged()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             // The shipped updater runs: Setup /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /RELAUNCH=1
             iss.Should().Contain(
@@ -73,7 +72,6 @@ namespace VoiceLite.Tests
         public void Iss_EnablesSetupLogging()
         {
             var iss = Iss();
-            if (iss == null) return;
             Regex.IsMatch(iss, @"^SetupLogging=yes$", RegexOptions.Multiline).Should().BeTrue(
                 "a failed silent update must leave a log in %TEMP%");
         }
@@ -82,7 +80,6 @@ namespace VoiceLite.Tests
         public void Iss_TracksInstallOutcome()
         {
             var iss = Iss();
-            if (iss == null) return;
             var step = Routine(iss, "procedure CurStepChanged(");
             Regex.IsMatch(step, @"CurStep = ssInstall\b[^;]*\s+FilesTouched := True;").Should().BeTrue();
             Regex.IsMatch(step, @"CurStep = ssPostInstall\b[^;]*\s+begin\s+InstallSucceeded := True;").Should().BeTrue(
@@ -93,7 +90,6 @@ namespace VoiceLite.Tests
         public void Iss_DeinitializeSetup_ReportsFailedUpdaterInstall_AndCanNeverRaise()
         {
             var iss = Iss();
-            if (iss == null) return;
             var deinit = Routine(iss, "procedure DeinitializeSetup(");
 
             // Only the in-app updater path (/RELAUNCH=1 + silent) that did not succeed.
@@ -121,7 +117,6 @@ namespace VoiceLite.Tests
         public void Iss_SilentGraceBeforeTaskkill_Is10Seconds()
         {
             var iss = Iss();
-            if (iss == null) return;
             var prepare = Routine(iss, "function PrepareToInstall(");
             prepare.Should().Contain("if WaitForVoiceLiteExit(10000) then");
             prepare.Should().NotContain("WaitForVoiceLiteExit(3000)");
@@ -131,7 +126,6 @@ namespace VoiceLite.Tests
         public void Iss_WritesReadyFile_BeforeTheRunningCheck()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             // Contract with UpdateInstaller: /READYFILE=<path> => Setup creates that file as
             // soon as it reaches PrepareToInstall (i.e. it got past UAC and initialisation).
@@ -154,7 +148,6 @@ namespace VoiceLite.Tests
         public void Iss_NonAdminInstall_IgnoresOtherSessionsWhenDecidingToAbort()
         {
             var iss = Iss();
-            if (iss == null) return;
 
             iss.Should().Contain("external 'ProcessIdToSessionId@kernel32.dll stdcall delayload';",
                 "delayload keeps a failed import from stopping Setup at start-up");
@@ -170,30 +163,54 @@ namespace VoiceLite.Tests
         }
     }
 
-    /// <summary>Reads a source file from the repo checkout the tests were built from.</summary>
+    /// <summary>
+    /// Reads a source file from the repo checkout the tests were built from. Shared by every
+    /// source-text tripwire. There is NO "not in a checkout" escape hatch: a tripwire that
+    /// cannot find its file fails (see SourceTripwirePolicyTests) instead of passing unread.
+    /// </summary>
     internal static class RepoSourceFile
     {
-        /// <summary>Repo root = the directory that holds VoiceLite/VoiceLite.sln. Null when the
-        /// test binaries were copied away from the source tree (same escape hatch as
-        /// XamlResourceKeyTests); inside a checkout the file is REQUIRED to exist.</summary>
-        private static string? RepoRoot([CallerFilePath] string thisFile = "")
+        private static string CompileTimePathOfThisFile([CallerFilePath] string thisFile = "") => thisFile;
+
+        /// <summary>Repo root = the directory that holds VoiceLite/VoiceLite.sln.</summary>
+        public static string RepoRoot => FindRepoRoot(CompileTimePathOfThisFile());
+
+        /// <summary>The app project directory (VoiceLite/VoiceLite).</summary>
+        public static string AppDir
         {
-            if (!File.Exists(thisFile)) return null;
-            var dir = new DirectoryInfo(Path.GetDirectoryName(thisFile)!);
+            get
+            {
+                var dir = Path.Combine(RepoRoot, "VoiceLite", "VoiceLite");
+                Assert.True(Directory.Exists(dir), "Missing app source directory " + dir);
+                return dir;
+            }
+        }
+
+        internal static string FindRepoRoot(string compileTimeTestFile)
+        {
+            Assert.True(File.Exists(compileTimeTestFile),
+                $"Source tripwires locate the repository from the compile-time path of a test file, and '{compileTimeTestFile}' " +
+                "does not exist. The test binaries are running away from the checkout they were built from (copied output, " +
+                "PathMap / ContinuousIntegrationBuild / SourceLink paths): every source-text contract check is unverified.");
+            var dir = new DirectoryInfo(Path.GetDirectoryName(compileTimeTestFile)!);
             while (dir != null && !File.Exists(Path.Combine(dir.FullName, "VoiceLite", "VoiceLite.sln")))
                 dir = dir.Parent;
-            Assert.True(dir != null, "Could not find VoiceLite/VoiceLite.sln above " + thisFile);
+            Assert.True(dir != null, "Could not find VoiceLite/VoiceLite.sln above " + compileTimeTestFile);
             return dir!.FullName;
         }
 
-        /// <summary>File text with LF line endings, or null outside a checkout.</summary>
-        public static string? Read(params string[] parts)
+        /// <summary>Text of a file under the repo root, with LF line endings.</summary>
+        public static string Read(params string[] parts) =>
+            File.ReadAllText(Existing(RepoRoot, parts)).Replace("\r\n", "\n");
+
+        /// <summary>Text of a file under VoiceLite/VoiceLite, exactly as it is on disk.</summary>
+        public static string ReadApp(params string[] parts) => File.ReadAllText(Existing(AppDir, parts));
+
+        private static string Existing(string root, string[] parts)
         {
-            var root = RepoRoot();
-            if (root == null) return null;
-            var path = Path.Combine(new[] { root }.Concat(parts).ToArray());
+            var path = Path.GetFullPath(Path.Combine(new[] { root }.Concat(parts).ToArray()));
             Assert.True(File.Exists(path), "Missing " + path);
-            return File.ReadAllText(path).Replace("\r\n", "\n");
+            return path;
         }
     }
 }

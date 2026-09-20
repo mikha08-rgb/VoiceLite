@@ -1,6 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace VoiceLite.Tests
@@ -21,13 +24,19 @@ namespace VoiceLite.Tests
         private const string Prelude = @"
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework
+# This child loads its own copy of VoiceLite.dll, so the test assembly's log redirect
+# (TestLogRedirect) does not reach it: point ErrorLogger away from the real
+# %LOCALAPPDATA%\VoiceLite\logs\voicelite.log BEFORE the assembly is loaded...
+[AppContext]::SetData('{LOGKEY}', '{LOGDIR}')
 $asm = [Reflection.Assembly]::LoadFrom('{ASSEMBLY}')
 $appType = $asm.GetType('VoiceLite.App', $true)
 $flags = [Reflection.BindingFlags]'NonPublic,Static'
-# ErrorLogger's path is hard-wired to the real %LOCALAPPDATA%\VoiceLite\logs\voicelite.log.
-# Raise the level so the Warning paths exercised here return before any file access.
+# ...and, second layer, raise the level so the Warning paths exercised here return before
+# any file access.
 $logLevel = $asm.GetType('VoiceLite.Services.ErrorLogger', $true).GetProperty('MinimumLogLevel')
 $logLevel.SetValue($null, [Enum]::Parse($logLevel.PropertyType, 'Error'))
+$logPath = $asm.GetType('VoiceLite.Services.ErrorLogger', $true).GetField('LogPath', $flags).GetValue($null)
+if (-not $logPath.StartsWith('{LOGDIR}', [StringComparison]::OrdinalIgnoreCase)) { throw ""ErrorLogger is not redirected ($logPath); refusing to risk the real voicelite.log"" }
 function New-TestWindow {
     $w = [Windows.Window]::new()
     $w.WindowStyle = 'None'; $w.ShowInTaskbar = $false; $w.ShowActivated = $false
@@ -94,9 +103,86 @@ $surface.Invoke($null, @($open))
             Assert.Contains("SURFACED=True", output);
         }
 
+        // ---- call-site tripwire --------------------------------------------------------
+        // The tests above call the helper by reflection with their own gate, so they stay
+        // green if App.OnStartup stops USING it (e.g. a merge turns the call site back into
+        // "if (!ShowFirstLaunchModelDownload())") - and a fresh install exits silently right
+        // after the 640MB download again. Startup can't be exercised without launching the
+        // app, so the call site is pinned at source level.
+
+        [Fact]
+        public void OnStartup_RoutesTheFirstLaunchDialog_ThroughRunGateWithoutLastWindowShutdown() =>
+            AssertFirstLaunchGateIsRoutedThroughHelper(AppSourceFile());
+
+        [Fact]
+        public void GateCallSiteTripwire_FailsLoudly_WhenSourceIsMissing() =>
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+                AssertFirstLaunchGateIsRoutedThroughHelper(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "App.xaml.cs")));
+
+        [Theory]
+        // The original bug: the dialog is shown directly, the helper is left unused.
+        [InlineData("if (!ShowFirstLaunchModelDownload())")]
+        // Helper still called, but the dialog is also shown directly somewhere else.
+        [InlineData("ShowFirstLaunchModelDownload(); if (!RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload))")]
+        // Helper called with some other gate.
+        [InlineData("if (!RunGateWithoutLastWindowShutdown(this, () => true))")]
+        public void GateCallSiteTripwire_FailsLoudly_WhenTheCallSiteBypassesTheHelper(string revertedCallSite)
+        {
+            const string wired = "if (!RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload))";
+            var real = File.ReadAllText(AppSourceFile());
+            Assert.Contains(wired, real);
+
+            var dir = Path.Combine(Path.GetTempPath(), "VoiceLite-GateTripwire-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                var mutated = Path.Combine(dir, "App.xaml.cs");
+                File.WriteAllText(mutated, real.Replace(wired, revertedCallSite));
+
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertFirstLaunchGateIsRoutedThroughHelper(mutated));
+            }
+            finally
+            {
+                try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+            }
+        }
+
+        private static void AssertFirstLaunchGateIsRoutedThroughHelper(string source)
+        {
+            // Resolved from the compile-time path of this file; a copied test binary or a
+            // PathMap/deterministic build must fail here rather than pass unchecked.
+            Assert.True(File.Exists(source),
+                $"First-launch gate tripwire could not find App.xaml.cs at '{source}'; the gate call site is unverified.");
+
+            var text = File.ReadAllText(source);
+            const string gateCall = "RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload)";
+            int gate = text.IndexOf(gateCall, StringComparison.Ordinal);
+            Assert.True(gate >= 0,
+                $"App.xaml.cs no longer contains '{gateCall}'. Showing the model-download dialog any other way " +
+                "closes the app's only window under OnLastWindowClose: a fresh install exits right after the download.");
+
+            // The pinned call passes the method GROUP (no parenthesis), so the declaration is the
+            // only "ShowFirstLaunchModelDownload(" allowed; a second one is a direct call.
+            int invocations = Regex.Matches(text, @"\bShowFirstLaunchModelDownload\s*\(").Count;
+            Assert.True(invocations == 1,
+                $"Expected only the declaration of ShowFirstLaunchModelDownload( in App.xaml.cs, found {invocations} occurrences: " +
+                "the dialog is being shown without RunGateWithoutLastWindowShutdown.");
+
+            // The helper restores OnLastWindowClose; that has to happen before MainWindow exists.
+            int mainWindow = text.IndexOf("new MainWindow()", StringComparison.Ordinal);
+            Assert.True(mainWindow >= 0, "'new MainWindow()' not found in App.xaml.cs; update this tripwire");
+            Assert.True(gate < mainWindow, "the first-launch gate must run before MainWindow is created");
+        }
+
+        private static string AppSourceFile([CallerFilePath] string thisFile = "") =>
+            Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite", "App.xaml.cs"));
+
         private static string RunInChildPwsh(string script)
         {
-            script = script.Replace("{ASSEMBLY}", typeof(App).Assembly.Location.Replace("'", "''"));
+            script = script
+                .Replace("{ASSEMBLY}", typeof(App).Assembly.Location.Replace("'", "''"))
+                .Replace("{LOGKEY}", VoiceLite.Services.ErrorLogger.LogDirectoryOverrideKey)
+                .Replace("{LOGDIR}", TestUtilities.TestLogRedirect.LogDirectory.Replace("'", "''"));
             var psi = new ProcessStartInfo("pwsh")
             {
                 UseShellExecute = false,

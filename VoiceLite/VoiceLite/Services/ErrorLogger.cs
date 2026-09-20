@@ -14,12 +14,19 @@ namespace VoiceLite.Services
 
     public static class ErrorLogger
     {
-        private static readonly string LogDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "VoiceLite",
-            "logs");
+        // Test seam only: VoiceLite.Tests sets this AppContext value (module initializer, before
+        // this class is first touched) so test runs never append to or rotate the real user log.
+        // Nothing in the app sets it; unset, the path is the same as it has always been.
+        internal const string LogDirectoryOverrideKey = "VoiceLite.Tests.LogDirectory";
 
-        private static readonly string LogPath = Path.Combine(LogDirectory, "voicelite.log");
+        private static readonly string LogDirectory =
+            AppContext.GetData(LogDirectoryOverrideKey) as string
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VoiceLite",
+                "logs");
+
+        internal static readonly string LogPath = Path.Combine(LogDirectory, "voicelite.log");
 
         private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB max
         private static readonly object LogLock = new object();

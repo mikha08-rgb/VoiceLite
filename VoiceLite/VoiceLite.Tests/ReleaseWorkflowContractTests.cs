@@ -3,23 +3,28 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using AwesomeAssertions;
 using VoiceLite.Services;
+using VoiceLite.Tests.TestUtilities;
 using Xunit;
 
 namespace VoiceLite.Tests
 {
     /// <summary>
     /// Text-contract tripwires for .github/workflows/release.yml: the release-notes body
-    /// it generates is the SHA-256 fallback the shipped updater parses
-    /// (UpdateCheckService.ExtractSha256FromBody), so its hash block is a frozen format.
+    /// it generates is the SHA-256 fallback the updater parses, so its hash block is a frozen
+    /// format. "The updater" is two parsers: the one 2.5.0/2.5.1 clients in the field run
+    /// (ShippedV251Parser, a frozen copy - the in-tree method was rewritten for 2.5.2 and is NOT
+    /// what they run) and today's UpdateCheckService.ExtractSha256FromBody. Every rendered
+    /// body here must parse with both. ShippedUpdaterContractTests does the same with the
+    /// real output of the hash-generator step and a full release JSON.
     /// </summary>
     public class ReleaseWorkflowContractTests
     {
         private const string HashA = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         private const string HashB = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 
-        private static string? ReleaseYml() => RepoSourceFile.Read(".github", "workflows", "release.yml");
+        internal static string ReleaseYml() => RepoSourceFile.Read(".github", "workflows", "release.yml");
 
-        private static string ReleaseBodyTemplate(string yml)
+        internal static string ReleaseBodyTemplate(string yml)
         {
             var lines = yml.Split('\n');
             var start = Array.FindIndex(lines, l => l.TrimEnd() == "        body: |");
@@ -31,19 +36,33 @@ namespace VoiceLite.Tests
             return string.Join("\n", body);
         }
 
-        /// <summary>Exactly what the "Generate SHA256 hashes" step emits per installer.</summary>
-        private static string HashBlock(string name, string hash) => $"**{name}** (78.83 MB)\n```text\n{hash}\n```\n";
+        /// <summary>What the "Generate SHA256 hashes" step emits per installer. Hand-written;
+        /// ShippedUpdaterContractTests checks it against the step's REAL output.</summary>
+        internal static string HashBlock(string name, string hash, string sizeInMB = "78.83") =>
+            $"**{name}** ({sizeInMB} MB)\n```text\n{hash}\n```\n";
 
-        private static string Render(string template, string hashes) => template
+        internal static string Render(string template, string hashes) => template
             .Replace("${{ steps.version.outputs.VERSION }}", "9.9.9")
             .Replace("${{ github.repository }}", "owner/VoiceLite")
             .Replace("${{ steps.generate-hashes.outputs.HASHES }}", hashes);
+
+        /// <summary>Both updaters, on the body as rendered (LF) and as a CRLF body.</summary>
+        internal static void AssertBothUpdatersReadHash(string body, string assetName, string expectedHash)
+        {
+            foreach (var variant in new[] { body, body.Replace("\r\n", "\n").Replace("\n", "\r\n") })
+            {
+                var lineEndings = variant.Contains('\r') ? "CRLF" : "LF";
+                ShippedV251Parser.ExtractSha256FromBody(variant, assetName).Should().Be(expectedHash,
+                    $"2.5.0/2.5.1 clients in the field parse the release body with the FROZEN v2.5.1 code ({lineEndings} body)");
+                UpdateCheckService.ExtractSha256FromBody(variant, assetName).Should().Be(expectedHash,
+                    $"the current updater must read the same hash ({lineEndings} body)");
+            }
+        }
 
         [Fact]
         public void ReleaseYml_HashGeneratorAndAssetName_AreByteCompatibleWithShippedParser()
         {
             var yml = ReleaseYml();
-            if (yml == null) return;
 
             yml.Should().Contain("$hashes += \"**$($installer.Name)** ($sizeInMB MB)`n``````text`n$($hash.Hash)`n```````n\"");
             yml.Should().Contain("          ### SHA256 Hashes\n          ${{ steps.generate-hashes.outputs.HASHES }}\n");
@@ -53,36 +72,30 @@ namespace VoiceLite.Tests
         [Fact]
         public void ReleaseYml_RenderedBody_ParsesWithShippedExtractor()
         {
-            var yml = ReleaseYml();
-            if (yml == null) return;
-            var body = Render(ReleaseBodyTemplate(yml), HashBlock("VoiceLite-Setup-9.9.9.exe", HashB));
+            var body = Render(ReleaseBodyTemplate(ReleaseYml()), HashBlock("VoiceLite-Setup-9.9.9.exe", HashB));
 
-            UpdateCheckService.ExtractSha256FromBody(body, "VoiceLite-Setup-9.9.9.exe").Should().Be(HashB);
+            AssertBothUpdatersReadHash(body, "VoiceLite-Setup-9.9.9.exe", HashB);
         }
 
         [Fact]
         public void ReleaseYml_SectionAnchor_LandsOnTheHashHeading()
         {
-            var yml = ReleaseYml();
-            if (yml == null) return;
-            var template = ReleaseBodyTemplate(yml);
+            var template = ReleaseBodyTemplate(ReleaseYml());
 
-            // The parser anchors on the FIRST case-insensitive "SHA256 Hashes". Prose using
+            // The shipped parser anchors on the FIRST case-insensitive "SHA256 Hashes". Prose using
             // that phrase above the heading drags the anchor up to the Download bullet.
             Regex.Matches(template, "SHA256 Hashes", RegexOptions.IgnoreCase).Count.Should().Be(1);
 
             // With the anchor on the heading, a second installer listed first cannot
             // donate its hash to the primary asset.
             var hashes = HashBlock("VoiceLite-Setup-9.9.9-arm64.exe", HashA) + "\n" + HashBlock("VoiceLite-Setup-9.9.9.exe", HashB);
-            UpdateCheckService.ExtractSha256FromBody(Render(template, hashes), "VoiceLite-Setup-9.9.9.exe").Should().Be(HashB);
+            AssertBothUpdatersReadHash(Render(template, hashes), "VoiceLite-Setup-9.9.9.exe", HashB);
         }
 
         [Fact]
         public void ReleaseYml_BodyTemplate_HasNoStaleV2EraText_AndNoStrayHash()
         {
-            var yml = ReleaseYml();
-            if (yml == null) return;
-            var template = ReleaseBodyTemplate(yml);
+            var template = ReleaseBodyTemplate(ReleaseYml());
 
             template.Should().NotContain("What's New in v2.0");
             template.Should().NotContain("~150 MB");
@@ -96,9 +109,7 @@ namespace VoiceLite.Tests
         [Fact]
         public void ReleaseYml_SetupLogHint_CoversElevationWithAnotherAccount()
         {
-            var yml = ReleaseYml();
-            if (yml == null) return;
-            var hint = ReleaseBodyTemplate(yml).Split('\n').Single(l => l.Contains("Setup Log"));
+            var hint = ReleaseBodyTemplate(ReleaseYml()).Split('\n').Single(l => l.Contains("Setup Log"));
 
             // Setup only logs in the process that installs. If the update was elevated with
             // a different administrator's credentials, that is the admin's %TEMP%, not the user's.
@@ -111,9 +122,7 @@ namespace VoiceLite.Tests
         [Fact]
         public void BuildReleaseReadme_DoesNotPointAtTheRemovedAiModelsTab()
         {
-            var ps1 = RepoSourceFile.Read("build-release.ps1");
-            if (ps1 == null) return;
-            ps1.Should().NotContain("AI Models");
+            RepoSourceFile.Read("build-release.ps1").Should().NotContain("AI Models");
         }
     }
 }
