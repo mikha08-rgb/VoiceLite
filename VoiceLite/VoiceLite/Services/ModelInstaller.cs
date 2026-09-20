@@ -146,7 +146,7 @@ namespace VoiceLite.Services
                     try { File.Delete(tempArchivePath); }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogDebug($"Temp model archive cleanup failed: {ex.Message}");
+                        ErrorLogger.LogWarning($"Temp model archive cleanup failed: {ex.Message}");
                     }
                 }
 
@@ -293,7 +293,7 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"Stale model archive sweep failed: {ex.Message}");
+                ErrorLogger.LogWarning($"Stale model archive sweep failed: {ex.Message}");
             }
         }
 
@@ -491,7 +491,7 @@ namespace VoiceLite.Services
                     {
                         // Best-effort for unusual/UNC drives: never reject a download
                         // solely because the preflight itself could not run.
-                        ErrorLogger.LogDebug(
+                        ErrorLogger.LogWarning(
                             $"Disk-space preflight skipped for {root}: {ex.Message}");
                         continue;
                     }
@@ -512,7 +512,7 @@ namespace VoiceLite.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogDebug($"Disk-space preflight skipped: {ex.Message}");
+                ErrorLogger.LogWarning($"Disk-space preflight skipped: {ex.Message}");
             }
         }
 
