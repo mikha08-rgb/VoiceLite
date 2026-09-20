@@ -586,11 +586,11 @@ namespace VoiceLite
                     MessageBox.Show(
                         $"Failed to register hotkey: {ex.Message}\n\n" +
                         $"The hotkey may be in use by another application.\n\n" +
-                        $"You can change the hotkey in Settings, or the app will use manual buttons.",
+                        $"Open Settings > Hotkey & mode to pick a different hotkey.",
                         "Hotkey Registration Failed",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
-                    // App continues - user can still use manual buttons
+                    // App continues so the user can reach Settings; there is no other way to record
                 }
 
                 // Step 3: Update UI (now safe - all services initialized)
