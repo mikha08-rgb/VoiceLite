@@ -124,6 +124,10 @@ namespace VoiceLite.Models
         public string? SelectedMicrophoneName { get; set; }
         public bool AutoPaste { get; set; } = true;
 
+        // The small pill at the bottom-centre of the screen while recording/transcribing.
+        // A settings.json written before this existed has no key and loads as true.
+        public bool ShowRecordingIndicator { get; set; } = true;
+
         // Clinical pilot opt-out: when false, transcriptions are never written to TranscriptionHistory
         // (and therefore never persisted to settings.json). Defaults true to match current behavior;
         // a site that previously set this false in settings.json keeps that preference on upgrade.

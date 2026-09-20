@@ -89,7 +89,7 @@ namespace VoiceLite.Tests
         [Fact]
         public void CommitDraft_CopiesEveryWhitelistedFieldToLive()
         {
-            // Edits and asserts ALL 14 whitelisted fields: CommitDraft is a hand-maintained
+            // Edits and asserts ALL 15 whitelisted fields: CommitDraft is a hand-maintained
             // whitelist, and its characteristic failure mode is a dropped copy line turning
             // a user's Save into a silent no-op for that setting. Every field flips away
             // from its MakeLiveSettings value so a lost copy line fails an assertion here.
@@ -105,6 +105,7 @@ namespace VoiceLite.Tests
             draft.TranslateToEnglish = true;
             draft.TranslationSourceLanguage = "de";
             draft.AutoPaste = false;
+            draft.ShowRecordingIndicator = false;
             draft.SelectedMicrophoneIndex = 2;
             draft.SelectedMicrophoneName = "USB Mic";
             draft.CustomShortcuts.Add(new CustomShortcut { Trigger = "brb", Replacement = "be right back" });
@@ -124,6 +125,7 @@ namespace VoiceLite.Tests
                 "a Pro user toggling translation and pressing Save must not get a silent no-op");
             live.TranslationSourceLanguage.Should().Be("de");
             live.AutoPaste.Should().BeFalse();
+            live.ShowRecordingIndicator.Should().BeFalse();
             live.SelectedMicrophoneIndex.Should().Be(2);
             live.SelectedMicrophoneName.Should().Be("USB Mic");
             live.CustomShortcuts.Should().HaveCount(2);

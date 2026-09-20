@@ -133,6 +133,7 @@ namespace VoiceLite
                 live.TranslateToEnglish = draft.TranslateToEnglish;
                 live.TranslationSourceLanguage = draft.TranslationSourceLanguage;
                 live.AutoPaste = draft.AutoPaste;
+                live.ShowRecordingIndicator = draft.ShowRecordingIndicator;
                 live.SelectedMicrophoneIndex = draft.SelectedMicrophoneIndex;
                 live.SelectedMicrophoneName = draft.SelectedMicrophoneName;
                 live.CustomShortcuts = draft.CustomShortcuts
@@ -183,6 +184,7 @@ namespace VoiceLite
 
                 CheckForUpdatesCheckBox.IsChecked = settings.CheckForUpdates;
                 MinimizeToTrayCheckBox.IsChecked = settings.MinimizeToTray;
+                ShowRecordingIndicatorCheckBox.IsChecked = settings.ShowRecordingIndicator;
                 var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
                 if (version != null)
                     AboutVersionText.Text = $"v{version.Major}.{version.Minor}.{version.Build}";
@@ -276,6 +278,7 @@ namespace VoiceLite
 
             settings.CheckForUpdates = CheckForUpdatesCheckBox.IsChecked ?? true;
             settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked ?? true;
+            settings.ShowRecordingIndicator = ShowRecordingIndicatorCheckBox.IsChecked ?? true;
         }
 
         // ================= Hotkey =================

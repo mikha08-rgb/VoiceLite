@@ -4,10 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using System.Xaml;
@@ -15,6 +17,7 @@ using System.Xml.Linq;
 using VoiceLite.Controls;
 using VoiceLite.Models;
 using VoiceLite.Services;
+using VoiceLite.Utilities;
 using Xunit;
 using XamlReader = System.Windows.Markup.XamlReader;
 
@@ -56,6 +59,7 @@ namespace VoiceLite.Tests
             ["VoiceLite.UpdateWindow"] = "constructed + shown, all three constructors",
             ["VoiceLite.ShortcutEditDialog"] = "constructed + shown, both constructors",
             ["VoiceLite.Controls.ModelDownloadControl"] = "constructed + shown in both code-built host windows, isolated model directories",
+            ["VoiceLite.RecordingIndicatorWindow"] = "constructed + shown, walked through recording -> processing -> hidden, no-activate styles asserted",
         };
 
         [Fact]
@@ -252,6 +256,132 @@ namespace VoiceLite.Tests
                 $"this test opened the microphone ({when}); the level meter must only start from the idle-priority callback");
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void SettingsWindow_RecordingIndicatorCheckBox_LoadsFromSettings_AndWritesBackToTheDraft(bool initial) => RunOnSta(() =>
+        {
+            // Same side effects as above (constructed, never shown, nothing saved).
+            var live = new Settings { ShowRecordingIndicator = initial };
+            var window = new VoiceLite.SettingsWindow(live, () => { }, () => true);
+            try
+            {
+                var box = (CheckBox)window.FindName("ShowRecordingIndicatorCheckBox");
+                Assert.True(box != null, "ShowRecordingIndicatorCheckBox is gone from SettingsWindow.xaml");
+                Assert.Equal("Show recording indicator while dictating", box!.Content);
+                Assert.Equal(initial, box.IsChecked); // LoadSettings
+
+                box.IsChecked = !initial;
+                const System.Reflection.BindingFlags priv = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                var readUi = typeof(VoiceLite.SettingsWindow).GetMethod("ReadUiIntoDraft", priv);
+                var draftField = typeof(VoiceLite.SettingsWindow).GetField("settings", priv);
+                Assert.True(readUi != null && draftField != null, "SettingsWindow.ReadUiIntoDraft / settings were renamed - update this test");
+                readUi!.Invoke(window, null);
+
+                Assert.Equal(!initial, ((Settings)draftField!.GetValue(window)!).ShowRecordingIndicator);
+                Assert.Equal(initial, live.ShowRecordingIndicator); // not committed: live untouched
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+        // ------------------------------------------------------------------ RecordingIndicatorWindow
+
+        // Side effects: none beyond its own HWND. PlaceOnShow=false keeps it at the harness's
+        // off-screen position (production moves it to the bottom-centre of the active monitor
+        // with SetWindowPos - that would flash a pill on the developer's screen). No Application,
+        // no owner, no timers; the render tick (CompositionTarget.Rendering) is unhooked on
+        // hide and on close.
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [Fact]
+        public void RecordingIndicatorWindow_NeverTakesActivation_AndWalksThroughItsStates() => RunOnSta(() =>
+        {
+            Assert.True(IntPtr.Size == 8, "this test reads the extended style with GetWindowLongPtrW (64-bit test host expected)");
+
+            float level = 0.3f;
+            var window = new VoiceLite.RecordingIndicatorWindow(() => level) { PlaceOnShow = false };
+
+            // Asserted on the window AS BUILT - the harness below sets some of these itself.
+            Assert.False(window.ShowActivated, "the pill must never be activated: dictated text is pasted into the foreground window");
+            Assert.False(window.Focusable);
+            Assert.False(window.ShowInTaskbar);
+            Assert.True(window.Topmost);
+            Assert.True(window.AllowsTransparency);
+            Assert.Equal(WindowStyle.None, window.WindowStyle);
+            Assert.False(window.IsHitTestVisible);
+            Assert.Null(window.Owner); // an owned window would vanish with a MainWindow minimized to the tray
+            Assert.Equal(RecordingIndicatorLogic.PillWidth + 2 * RecordingIndicatorLogic.ShadowPadding, window.Width);
+            Assert.Equal(RecordingIndicatorLogic.PillHeight + 2 * RecordingIndicatorLogic.ShadowPadding, window.Height);
+
+            var bars = ((Panel)window.FindName("Bars")).Children.OfType<System.Windows.Shapes.Rectangle>().ToList();
+            Assert.Equal(RecordingIndicatorLogic.BarCount, bars.Count);
+            var centre = bars[bars.Count / 2];
+            var processingDot = (FrameworkElement)window.FindName("ProcessingDot");
+            var root = (FrameworkElement)window.FindName("Root");
+
+            ShowOffScreenThenClose(window, whileOpen: () =>
+            {
+                var hwnd = new WindowInteropHelper(window).Handle;
+                long exStyle = GetWindowLongPtr(hwnd, -20 /* GWL_EXSTYLE */).ToInt64();
+                const long WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_NOACTIVATE = 0x08000000, WS_EX_LAYERED = 0x80000;
+                Assert.True((exStyle & WS_EX_NOACTIVATE) != 0, "WS_EX_NOACTIVATE missing");
+                Assert.True((exStyle & WS_EX_TRANSPARENT) != 0, "WS_EX_TRANSPARENT (click-through) missing");
+                Assert.True((exStyle & WS_EX_LAYERED) != 0, "WS_EX_LAYERED missing - WS_EX_TRANSPARENT is only click-through on a layered window");
+                Assert.True((exStyle & WS_EX_TOOLWINDOW) != 0, "WS_EX_TOOLWINDOW (no Alt+Tab entry) missing");
+                Assert.Equal(VoiceLite.RecordingIndicatorWindow.RequiredExtendedStyles, exStyle & VoiceLite.RecordingIndicatorWindow.RequiredExtendedStyles);
+
+                window.ShowState(RecordingIndicatorState.Recording);
+                PumpUntil(() => root.Opacity > 0.99 && centre.Height > RecordingIndicatorLogic.MinBarHeight + 2,
+                    "recording: the pill never faded in / the bars never followed the level");
+                Assert.False(window.IsActive);
+                Assert.NotEqual(hwnd, GetForegroundWindow());
+
+                level = 0f;
+                PumpUntil(() => bars.All(b => b.Height < RecordingIndicatorLogic.MinBarHeight + 0.5),
+                    "silence: the bars never came back to rest");
+
+                window.ShowState(RecordingIndicatorState.Processing);
+                PumpUntil(() => processingDot.Opacity > 0.99, "processing: the dot never changed");
+                Assert.All(bars, b => Assert.InRange(b.Height, RecordingIndicatorLogic.MinBarHeight, RecordingIndicatorLogic.MaxBarHeight / 2));
+
+                window.HideIndicator();
+                PumpUntil(() => !window.IsVisible, "the pill never hid after its fade-out");
+
+                // Shown again for the next dictation: same window, still not activated.
+                level = 0.3f;
+                window.ShowState(RecordingIndicatorState.Recording);
+                PumpUntil(() => window.IsVisible && root.Opacity > 0.99 && processingDot.Opacity < 0.01,
+                    "second dictation: the pill never came back in its recording look");
+                Assert.False(window.IsActive);
+                Assert.NotEqual(hwnd, GetForegroundWindow());
+
+                // Hide, then show before the fade-out finished: must stay up.
+                window.HideIndicator();
+                window.ShowState(RecordingIndicatorState.Processing);
+                for (int i = 0; i < 15; i++) { Thread.Sleep(20); Pump(); }
+                Assert.True(window.IsVisible, "a show during the fade-out was undone by the fade-out's completion");
+            });
+        });
+
+        private static void PumpUntil(Func<bool> condition, string because)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!condition())
+            {
+                Assert.True(DateTime.UtcNow < deadline, because);
+                Thread.Sleep(15);
+                Pump();
+            }
+        }
+
         // ------------------------------------------------------------------ ModelDownloadControl
 
         // Side effects read before writing these: the PUBLIC constructor repairs interrupted
@@ -388,6 +518,7 @@ namespace VoiceLite.Tests
         /// </summary>
         [Theory]
         [InlineData("MainWindow.xaml")]
+        [InlineData("RecordingIndicatorWindow.xaml")]
         [InlineData("SettingsWindow.xaml")]
         [InlineData("UpdateWindow.xaml")]
         [InlineData("ShortcutEditDialog.xaml")]
