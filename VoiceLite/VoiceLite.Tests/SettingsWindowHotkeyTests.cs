@@ -138,8 +138,23 @@ namespace VoiceLite.Tests
             var code = ReadAppSource("MainWindow.xaml.cs");
             if (code == null) return;
 
-            Regex.IsMatch(code, @"new SettingsWindow\(settings, \(\) => SaveSettings\(\), hotkeyManager\?\.IsRegistered == true\)")
+            // A delegate, not a bool: Settings can be opened while startup is still initializing
+            // services, and the startup registration then succeeds BEHIND the open dialog. A
+            // snapshot taken at dialog-open would call the working hotkey "not active".
+            Regex.IsMatch(code, @"new SettingsWindow\(settings, \(\) => SaveSettings\(\), \(\) => hotkeyManager\?\.IsRegistered == true\)")
                 .Should().BeTrue("without this the window assumes the saved hotkey is registered and skips the probe");
+        }
+
+        [Fact]
+        public void Wiring_RegistrationStateIsReadWhenItIsNeeded_NotSnapshottedWhenTheDialogOpens()
+        {
+            var code = ReadAppSource("SettingsWindow.xaml.cs");
+            if (code == null) return;
+
+            Assert.False(Regex.IsMatch(code, @"\bbool appOwnsRegisteredHotkey;"),
+                "a bool field is a dialog-open snapshot; it goes stale when startup registration completes behind the dialog");
+            Assert.True(Regex.IsMatch(code, @"bool AppOwnsRegisteredHotkey\s*=>\s*isHotkeyRegistered\(\)"),
+                "the probe exemption and the dead-hotkey warning must ask MainWindow's HotkeyManager each time");
         }
 
         internal static string? ReadAppSource(string fileName, [CallerFilePath] string thisFile = "")

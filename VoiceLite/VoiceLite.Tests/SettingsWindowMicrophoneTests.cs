@@ -148,6 +148,30 @@ namespace VoiceLite.Tests
             draft.SelectedMicrophoneName.Should().Be("USB Mic");
         }
 
+        [Theory]
+        [InlineData(false)] // another real device applied in between
+        [InlineData(true)]  // "Default microphone" applied in between
+        public void ReselectingThePlaceholder_AfterAnApplyOfAnotherDevice_PersistsTheNotConnectedMicAgain(bool applyDefault)
+        {
+            // Apply does not rebuild the combo, so the placeholder stays selectable after the
+            // draft has moved on. Whatever is visibly selected at Save is what must be saved.
+            var live = new Settings { SelectedMicrophoneIndex = 2, SelectedMicrophoneName = "USB Mic" };
+            var draft = SettingsWindow.CloneForDraft(live);
+            var choices = SettingsWindow.BuildMicrophoneChoices(
+                Devices("Realtek", "Webcam"), 2, "USB Mic", out _, out var missing);
+
+            var other = applyDefault ? choices[0] : choices.Single(d => d.Name == "Webcam");
+            SettingsWindow.WriteMicrophoneToDraft(draft, other, missing);
+            SettingsWindow.CommitDraft(draft, live); // Apply
+            live.SelectedMicrophoneName.Should().Be(applyDefault ? null : "Webcam");
+
+            SettingsWindow.WriteMicrophoneToDraft(draft, missing!, missing); // change of mind, Save
+            SettingsWindow.CommitDraft(draft, live);
+
+            live.SelectedMicrophoneIndex.Should().Be(2);
+            live.SelectedMicrophoneName.Should().Be("USB Mic", "the UI says it will be used again when plugged back in");
+        }
+
         [Fact]
         public void ExplicitlyChoosingDefault_WhileTheSavedMicIsUnplugged_IsPersisted()
         {

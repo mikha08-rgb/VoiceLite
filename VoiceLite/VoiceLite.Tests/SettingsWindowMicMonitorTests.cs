@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Threading;
-using AwesomeAssertions;
 using Xunit;
 
 namespace VoiceLite.Tests
@@ -15,8 +8,12 @@ namespace VoiceLite.Tests
     /// indicator lit (and Bluetooth headsets dropped to hands-free) just to change a hotkey.
     /// The meter now follows the visibility of its own track element.
     /// SettingsWindow itself cannot be constructed here (its ctor reads the real license
-    /// store and the fix opens real audio hardware), so this is a tripwire on the wiring plus
-    /// a check of the WPF behaviour the wiring relies on. The end-to-end check is manual.
+    /// store and the fix opens real audio hardware), so these are tripwires on the wiring:
+    /// they match source text, so a reformat of those lines fails them without a behaviour
+    /// change. The WPF behaviour the wiring relies on (content of an unselected tab reports
+    /// IsVisible=false) was verified once with a throwaway test that showed a real Window; it
+    /// tested WPF rather than the fix, so it is not kept in the release-gating suite.
+    /// The end-to-end check is manual.
     /// </summary>
     public class SettingsWindowMicMonitorTests
     {
@@ -36,67 +33,17 @@ namespace VoiceLite.Tests
         }
 
         [Fact]
-        public void WpfContract_ContentOfAnUnselectedTab_IsNotVisible_UntilTheTabIsSelected()
+        public void Wiring_QueuedStart_DoesNotReopenADeviceThatIsAlreadyBeingMetered()
         {
-            // The assumption behind the wiring: a TabControl only hosts the selected tab's
-            // content, so an element on the second tab reports IsVisible=false until the user
-            // goes there, and false again when they leave.
-            Exception? failure = null;
-            var thread = new Thread(() =>
-            {
-                Window? window = null;
-                try
-                {
-                    var meter = new Border { Width = 10, Height = 10 };
-                    var changes = new List<bool>();
-                    meter.IsVisibleChanged += (_, e) => changes.Add((bool)e.NewValue);
+            // Mic tab -> other tab -> Mic tab before the dispatcher idles queues TWO starts.
+            // StartMicMonitor always stops first, so the second one would close and re-open the
+            // device back-to-back on the UI thread (slow, and a Bluetooth profile flip).
+            var code = SettingsWindowHotkeyTests.ReadAppSource("SettingsWindow.xaml.cs");
+            if (code == null) return; // test binaries copied away from the source tree
 
-                    var tabs = new TabControl();
-                    tabs.Items.Add(new TabItem { Header = "Hotkey", Content = new TextBlock { Text = "first" } });
-                    tabs.Items.Add(new TabItem { Header = "Microphone", Content = new StackPanel { Children = { meter } } });
-                    window = new Window
-                    {
-                        Content = tabs, Width = 200, Height = 120, Left = -10000, Top = -10000,
-                        WindowStartupLocation = WindowStartupLocation.Manual,
-                        ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.ToolWindow,
-                    };
-                    window.Show();
-                    Pump();
-                    meter.IsVisible.Should().BeFalse("the window opens on the first tab");
-                    changes.Should().BeEmpty();
-
-                    tabs.SelectedIndex = 1;
-                    Pump();
-                    meter.IsVisible.Should().BeTrue();
-
-                    tabs.SelectedIndex = 0;
-                    Pump();
-                    meter.IsVisible.Should().BeFalse();
-                    changes.Should().Equal(true, false);
-                }
-                catch (Exception ex)
-                {
-                    failure = ex;
-                }
-                finally
-                {
-                    window?.Close();
-                    Dispatcher.CurrentDispatcher.InvokeShutdown(); // this thread's dispatcher only
-                }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-
-            Assert.True(failure == null, failure?.ToString());
-        }
-
-        private static void Pump()
-        {
-            var frame = new DispatcherFrame();
-            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
-                new Action(() => frame.Continue = false));
-            Dispatcher.PushFrame(frame);
+            Assert.True(System.Text.RegularExpressions.Regex.IsMatch(code,
+                    @"if \(LevelTrack\.IsVisible && micMonitor == null\)\s*StartMicMonitor\(\);"),
+                "the queued start must be a no-op when a monitor is already running");
         }
     }
 }

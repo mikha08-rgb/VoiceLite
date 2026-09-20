@@ -31,9 +31,12 @@ namespace VoiceLite
         // second registration of a combination the process already owns, so the probe is
         // skipped for exactly this one - but only if the app really owns it: after a failed
         // startup registration (another app holds it) the saved combination is NOT ours.
+        // Asked each time, not snapshotted: Settings can be opened while startup is still
+        // initializing services, and the registration then succeeds behind this dialog.
         private readonly Key registeredKey;
         private readonly ModifierKeys registeredModifiers;
-        private readonly bool appOwnsRegisteredHotkey;
+        private readonly Func<bool> isHotkeyRegistered;
+        private bool AppOwnsRegisteredHotkey => isHotkeyRegistered();
 
         private const string HotkeyTakenMessage = "That key is already taken by another app. Pick a different one.";
         private const string HotkeyNotActiveMessage =
@@ -41,9 +44,10 @@ namespace VoiceLite
 
         private bool isCapturingHotkey;
         private MicLevelMonitor? micMonitor;
-        // Combo placeholder for a saved microphone that is not connected right now. Never
-        // written to the draft, so saving anything else cannot overwrite the user's choice.
+        // Combo placeholder for a saved microphone that is not connected right now: the saved
+        // index + the saved name with NotConnectedSuffix. Selecting it saves that saved choice.
         private AudioDevice? missingMic;
+        private const string NotConnectedSuffix = " (not connected)";
         private ObservableCollection<CustomDictionaryEntry>? customDictionaryView;
 
         // The live instance — after Save/Apply it carries the committed values, so
@@ -56,10 +60,10 @@ namespace VoiceLite
         public bool ChangesCommitted => changesCommitted;
 
         /// <param name="hotkeyRegistered">
-        /// Whether MainWindow's HotkeyManager currently holds the saved hotkey. False after a
+        /// Whether MainWindow's HotkeyManager holds the saved hotkey right now. False after a
         /// failed registration: the saved combination is then probed like any other.
         /// </param>
-        public SettingsWindow(Settings currentSettings, Action? onSaveSettings = null, bool hotkeyRegistered = true)
+        public SettingsWindow(Settings currentSettings, Action? onSaveSettings = null, Func<bool>? hotkeyRegistered = null)
         {
             InitializeComponent();
             liveSettings = currentSettings ?? new Settings();
@@ -69,19 +73,21 @@ namespace VoiceLite
             licenseService = new LicenseService();
             registeredKey = settings.RecordHotkey;
             registeredModifiers = settings.HotkeyModifiers;
-            appOwnsRegisteredHotkey = hotkeyRegistered;
+            isHotkeyRegistered = hotkeyRegistered ?? (() => true);
 
             LoadSettings();
 
             // The level meter holds the microphone open (mic-in-use indicator, Bluetooth
             // headsets drop to hands-free), so it runs only while it is on screen: the
             // content of an unselected tab is not visible. ApplicationIdle lets the tab paint
-            // before the blocking device open and collapses arrowing past the tab.
+            // before the blocking device open and collapses arrowing past the tab. Showing the
+            // tab twice before the queue idles queues two starts: the second must not close and
+            // re-open the device the first one just opened (hence micMonitor == null).
             LevelTrack.IsVisibleChanged += (_, e) =>
             {
                 if ((bool)e.NewValue)
                     Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
-                        new Action(() => { if (LevelTrack.IsVisible) StartMicMonitor(); }));
+                        new Action(() => { if (LevelTrack.IsVisible && micMonitor == null) StartMicMonitor(); }));
                 else
                     StopMicMonitor();
             };
@@ -228,7 +234,7 @@ namespace VoiceLite
                 // offered the manual buttons): warn, but let the user save their other settings.
                 // MainWindow retries the registration after every commit while it is dead.
                 bool savedButDead = IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers,
-                    registeredKey, registeredModifiers, appOwnsRegisteredHotkey);
+                    registeredKey, registeredModifiers, AppOwnsRegisteredHotkey);
                 ShowHotkeyProblem(savedButDead);
                 if (!savedButDead)
                 {
@@ -277,7 +283,7 @@ namespace VoiceLite
         /// </summary>
         private bool HotkeyIsAvailable()
         {
-            if (ProbeIsExempt(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, appOwnsRegisteredHotkey))
+            if (ProbeIsExempt(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, AppOwnsRegisteredHotkey))
                 return true;
             return HotkeyManager.CanRegisterHotkey(settings.RecordHotkey, settings.HotkeyModifiers);
         }
@@ -323,7 +329,7 @@ namespace VoiceLite
         /// <summary>Says so when the hotkey in the box is the saved one and it is not working.</summary>
         private void UpdateDeadHotkeyWarning()
         {
-            if (IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, appOwnsRegisteredHotkey)
+            if (IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers, registeredKey, registeredModifiers, AppOwnsRegisteredHotkey)
                 && !HotkeyManager.CanRegisterHotkey(settings.RecordHotkey, settings.HotkeyModifiers))
                 ShowHotkeyProblem(hotkeyIsDead: true);
             else
@@ -424,7 +430,7 @@ namespace VoiceLite
             var saved = PickSavedMicrophone(devices, savedIndex, savedName);
             if (saved == null && savedIndex != -1 && !string.IsNullOrEmpty(savedName))
             {
-                missingPlaceholder = new AudioDevice { Index = savedIndex, Name = $"{savedName} (not connected)" };
+                missingPlaceholder = new AudioDevice { Index = savedIndex, Name = savedName + NotConnectedSuffix };
                 devices.Insert(1, missingPlaceholder);
             }
 
@@ -433,14 +439,20 @@ namespace VoiceLite
         }
 
         /// <summary>
-        /// Combo selection → draft. The not-connected placeholder is skipped: the draft already
-        /// holds the user's real choice, and it must survive saving unrelated settings.
+        /// Combo selection → draft. The not-connected placeholder writes back the saved choice
+        /// it stands for (saved index + the name without the suffix): the preference survives
+        /// saving unrelated settings, and re-selecting the placeholder after an Apply of
+        /// another device really restores it - what is visibly selected is what gets saved.
         /// Internal static for the regression tests.
         /// </summary>
         internal static void WriteMicrophoneToDraft(Settings draft, AudioDevice selected, AudioDevice? missingPlaceholder)
         {
             if (ReferenceEquals(selected, missingPlaceholder))
+            {
+                draft.SelectedMicrophoneIndex = selected.Index;
+                draft.SelectedMicrophoneName = selected.Name[..^NotConnectedSuffix.Length];
                 return;
+            }
             draft.SelectedMicrophoneIndex = selected.Index;
             draft.SelectedMicrophoneName = selected.Index == -1 ? null : selected.Name;
         }

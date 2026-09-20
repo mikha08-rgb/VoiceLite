@@ -1113,7 +1113,7 @@ namespace VoiceLite
             // logoff), OnClosed runs inside ShowDialog's nested pump and nulls the
             // currentSettingsWindow FIELD before ShowDialog returns — re-reading the field
             // after the pump would NRE mid-shutdown.
-            var settingsWindow = new SettingsWindow(settings, () => SaveSettings(), hotkeyManager?.IsRegistered == true);
+            var settingsWindow = new SettingsWindow(settings, () => SaveSettings(), () => hotkeyManager?.IsRegistered == true);
             currentSettingsWindow = settingsWindow;
             settingsWindow.Owner = this;
 
