@@ -985,6 +985,7 @@ namespace VoiceLite
                         {
                             // Stays until the next dictation on purpose (d65aad8): it is the only visible
                             // mic diagnostic, and the window is usually opened after the dictation "did nothing".
+                            // Re-reviewed in the v2.5.2 hardening pass (owner-delegated decision): keep it sticky.
                             UpdateTranscriptionText($"No audio from microphone '{ev.MicName}' - muted, unplugged, or wrong device", Brushes.Red);
                             UpdateStatus($"No audio from '{ev.MicName}' - check mic in Settings", Brushes.Red);
                         }

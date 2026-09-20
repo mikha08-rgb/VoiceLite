@@ -266,12 +266,17 @@ namespace VoiceLite.Services
         /// name is gone, fall back to the default device rather than whatever now happens to
         /// sit at the stale index - that silently recorded a dead mic and produced empty
         /// transcriptions for days.
+        /// WaveIn names are truncated to 31 chars, so two mics can share a name: the saved
+        /// index then breaks the tie, but only among devices that already match the NAME.
+        /// Known limitation: if Windows renumbers the twins themselves, the tie-break can land
+        /// on the other twin (WaveIn has no stable device ID; that needs MMDevice endpoints).
         /// </summary>
         public static int ResolveDeviceIndex(IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
         {
             if (!string.IsNullOrEmpty(savedName))
             {
-                var byName = devices.FirstOrDefault(d => d.Name == savedName);
+                var byName = devices.FirstOrDefault(d => d.Name == savedName && d.Index == savedIndex)
+                             ?? devices.FirstOrDefault(d => d.Name == savedName);
                 return byName?.Index ?? 0;
             }
 
@@ -539,7 +544,7 @@ namespace VoiceLite.Services
 
                     if (waveIn != null)
                     {
-                        ErrorLogger.LogMessage("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
+                        ErrorLogger.LogWarning("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
                         DisposeWaveInCompletely();
                     }
                 }

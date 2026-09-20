@@ -239,7 +239,7 @@ namespace VoiceLite.Services
                         $"source {currentTranslationSourceLanguage} -> {translationSourceLanguage}, " +
                         $"preset {currentPreset} -> {preset}");
                     try { recognizer.Dispose(); }
-                    catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer disposal failed during switch: {ex.Message}"); }
+                    catch (Exception ex) { ErrorLogger.LogWarning($"OfflineRecognizer disposal failed during switch: {ex.Message}"); }
                     recognizer = null;
                 }
 
@@ -694,7 +694,7 @@ namespace VoiceLite.Services
             lock (recognizerLock)
             {
                 try { recognizer?.Dispose(); }
-                catch (Exception ex) { ErrorLogger.LogDebug($"OfflineRecognizer dispose failed: {ex.Message}"); }
+                catch (Exception ex) { ErrorLogger.LogWarning($"OfflineRecognizer dispose failed: {ex.Message}"); }
                 recognizer = null;
                 currentModelDir = null;
                 currentPreset = null;

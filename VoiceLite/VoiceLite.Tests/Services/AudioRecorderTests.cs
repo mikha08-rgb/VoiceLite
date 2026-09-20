@@ -180,6 +180,58 @@ namespace VoiceLite.Tests.Services
             AudioRecorder.ResolveDeviceIndex(devices, 7, null).Should().Be(0);
         }
 
+        // F1(b): WaveIn ProductName is truncated to 31 chars, so two different mics can
+        // enumerate under the SAME name. v2.4.1 recorded by index (second twin worked);
+        // name-only resolution (v2.5.0) made the second twin impossible to record from.
+        private static List<AudioDevice> TwinDevices() => new()
+        {
+            new() { Index = 0, Name = "Headset Microphone (Plantronics" },
+            new() { Index = 1, Name = "Webcam" },
+            new() { Index = 2, Name = "Headset Microphone (Plantronics" },
+        };
+
+        [Fact]
+        public void ResolveDeviceIndex_SameNamedTwins_SavedIndexBreaksTheTie()
+        {
+            AudioRecorder.ResolveDeviceIndex(TwinDevices(), 2, "Headset Microphone (Plantronics").Should().Be(2);
+            AudioRecorder.ResolveDeviceIndex(TwinDevices(), 0, "Headset Microphone (Plantronics").Should().Be(0);
+        }
+
+        [Fact]
+        public void ResolveDeviceIndex_SameNamedTwins_IndexAloneIsNeverTrusted()
+        {
+            // Saved index points at a device with a DIFFERENT name -> first device by name.
+            AudioRecorder.ResolveDeviceIndex(TwinDevices(), 1, "Headset Microphone (Plantronics").Should().Be(0);
+
+            // First twin unplugged: Windows renumbered, saved index 2 is now out of range and
+            // index 1 (where a stale index could land) is the webcam -> the remaining twin.
+            var oneTwinLeft = new List<AudioDevice>
+            {
+                new() { Index = 0, Name = "Webcam" },
+                new() { Index = 1, Name = "Headset Microphone (Plantronics" },
+            };
+            AudioRecorder.ResolveDeviceIndex(oneTwinLeft, 0, "Headset Microphone (Plantronics").Should().Be(1);
+            AudioRecorder.ResolveDeviceIndex(oneTwinLeft, 2, "Headset Microphone (Plantronics").Should().Be(1);
+
+            // Saved index out of range with both twins present -> first by name.
+            AudioRecorder.ResolveDeviceIndex(TwinDevices(), 5, "Headset Microphone (Plantronics").Should().Be(0);
+        }
+
+        [Fact]
+        public void ResolveDeviceIndex_SameNamedTwins_Renumbered_KnownLimitation()
+        {
+            // ACCEPTED LIMITATION (pinned, not endorsed): the user saved (1, first twin) out of
+            // [Webcam, TwinA, TwinB]; the webcam is unplugged and Windows renumbers to
+            // [TwinA, TwinB]. Name + index 1 now means TwinB. WaveIn offers no stable identity
+            // for same-named devices (that needs MMDevice endpoint IDs).
+            var renumbered = new List<AudioDevice>
+            {
+                new() { Index = 0, Name = "Headset Microphone (Plantronics" },
+                new() { Index = 1, Name = "Headset Microphone (Plantronics" },
+            };
+            AudioRecorder.ResolveDeviceIndex(renumbered, 1, "Headset Microphone (Plantronics").Should().Be(1);
+        }
+
         [Fact]
         public void PeakAbsSample_FindsDataChunkPastNAudioHeader()
         {
