@@ -24,6 +24,9 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
 ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=..\..\EULA.txt
+; Always write "Setup Log YYYY-MM-DD #NNN.txt" to %TEMP%. The in-app updater runs
+; Setup /VERYSILENT without /LOG, so without this a failed update leaves no evidence.
+SetupLogging=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -97,11 +100,47 @@ const
   AppMutexName = 'VoiceLite_SingleInstance';
   AppExeName = 'VoiceLite.exe';
 
+// Outcome of THIS Setup process, read by DeinitializeSetup. When Setup re-launches
+// itself elevated (all-users install), the non-elevated parent exits before [Code] is
+// loaded, so only the process that actually installs ever evaluates these.
+var
+  InstallSucceeded: Boolean;  // ssPostInstall reached
+  FilesTouched: Boolean;      // ssInstall reached - files in {app} may be partly replaced
+
+// delayload: bind on first call, so a failed import raises a catchable exception
+// there instead of stopping Setup (or the uninstaller) at start-up.
+function GetCurrentProcessId: DWORD;
+  external 'GetCurrentProcessId@kernel32.dll stdcall delayload';
+function ProcessIdToSessionId(dwProcessId: DWORD; var pSessionId: DWORD): BOOL;
+  external 'ProcessIdToSessionId@kernel32.dll stdcall delayload';
+
 // Set by the in-app updater (/RELAUNCH=1). Read via {param:...} so it works with
-// both "/RELAUNCH=1" and "/RELAUNCH 1" forms.
+// both "/RELAUNCH=1" and "/RELAUNCH 1" forms. Updater-only flag: on a failed silent
+// install it also turns on the DeinitializeSetup message box, so IT pushes must not pass it.
 function RelaunchRequested(): Boolean;
 begin
   Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
+// Updater handshake (VoiceLite >= 2.5.2 passes /READYFILE=<path>): creating that file
+// tells the app Setup got past UAC/initialisation, so it is safe to shut down. No
+// parameter (2.5.0/2.5.1 updater, manual installs, IT pushes) => does nothing.
+procedure WriteReadyFile();
+var
+  ReadyFile: String;
+begin
+  try
+    ReadyFile := ExpandConstant('{param:READYFILE|}');
+    if ReadyFile <> '' then
+    begin
+      if SaveStringToFile(ReadyFile, 'ready', False) then
+        Log('Ready file written: ' + ReadyFile)
+      else
+        Log('Could not write ready file: ' + ReadyFile);
+    end;
+  except
+    Log('Ready file not written: ' + GetExceptionMessage);
+  end;
 end;
 
 // Process-based running check. CheckForMutexes only sees builds >= 2.2 (the ones
@@ -157,6 +196,51 @@ begin
   Result := not IsVoiceLiteRunning();
 end;
 
+// Session-scoped variant of IsVoiceLiteRunning, used ONLY to decide whether a
+// VoiceLite.exe that survived taskkill really blocks a per-user install. Fails closed:
+// returns True ("still running") unless tasklist demonstrably ran with a valid
+// session filter (exit code 0, output readable) and listed no VoiceLite.exe.
+function IsVoiceLiteRunningInThisSession(): Boolean;
+var
+  SessionId: DWORD;
+  ResultCode: Integer;
+  TmpFile: String;
+  Lines: TArrayOfString;
+  i: Integer;
+begin
+  Result := True;
+  try
+    // The app mutex is session-local, so a hit here is an instance in OUR session.
+    if CheckForMutexes(AppMutexName) then
+      Exit;
+    if not ProcessIdToSessionId(GetCurrentProcessId(), SessionId) then
+    begin
+      Log('ProcessIdToSessionId failed; keeping the machine-wide running check');
+      Exit;
+    end;
+    TmpFile := ExpandConstant('{tmp}\voicelite_tasklist_session.txt');
+    if not Exec(ExpandConstant('{cmd}'),
+                '/C tasklist /FI "IMAGENAME eq ' + AppExeName + '" /FI "SESSION eq ' +
+                IntToStr(SessionId) + '" /NH > "' + TmpFile + '"',
+                '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      Exit;
+    if ResultCode <> 0 then
+      Exit;
+    if not LoadStringsFromFile(TmpFile, Lines) then
+      Exit;
+    DeleteFile(TmpFile);
+    for i := 0 to GetArrayLength(Lines) - 1 do
+    begin
+      if Pos(Lowercase(AppExeName), Lowercase(Lines[i])) > 0 then
+        Exit;
+    end;
+    Result := False;
+  except
+    Log('Session-scoped running check failed: ' + GetExceptionMessage);
+    Result := True;
+  end;
+end;
+
 // Force-terminates VoiceLite.exe and polls up to ~10s until it is gone.
 function CloseRunningVoiceLite(): Boolean;
 var
@@ -170,21 +254,36 @@ begin
   if Result then
     Log(AppExeName + ' has exited')
   else
+  begin
     Log(AppExeName + ' is still running after taskkill');
+    // tasklist/taskkill see every session, but a non-elevated taskkill cannot end
+    // another user's VoiceLite (Fast User Switching, RDP) - and that process does not
+    // lock this user's per-user {app}. Don't abort the install over it. Admin
+    // (all-users) installs stay machine-wide: every session runs from the same {app}.
+    // An instance of the SAME user in another session was killable above, so it is gone.
+    if (not IsAdminInstallMode) and (not IsVoiceLiteRunningInThisSession()) then
+    begin
+      Log('Remaining ' + AppExeName + ' belongs to another session - continuing');
+      Result := True;
+    end;
+  end;
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
+  // Must stay first: the updater waits for this file before it shuts the app down.
+  WriteReadyFile();
   if not IsVoiceLiteRunning() then
     Exit;
 
   if WizardSilent then
   begin
     // Silent = in-app updater (or an IT push). The updater shuts VoiceLite down
-    // right after launching us; give it a moment to exit cleanly (settings flush)
-    // before falling back to taskkill.
-    if WaitForVoiceLiteExit(3000) then
+    // right after launching us; give it time to exit cleanly (settings flush, hotkey
+    // and recognizer disposal can add up to ~10s worst case) before falling back
+    // to taskkill.
+    if WaitForVoiceLiteExit(10000) then
       Exit;
   end
   else
@@ -223,8 +322,13 @@ var
   AppDataDir: String;
   LogsDir: String;
 begin
+  if CurStep = ssInstall then
+    FilesTouched := True;
+
   if CurStep = ssPostInstall then
   begin
+    InstallSucceeded := True;
+
     // Create AppData directories for settings and logs
     AppDataDir := ExpandConstant('{localappdata}\VoiceLite');
     LogsDir := AppDataDir + '\logs';
@@ -238,6 +342,73 @@ begin
     except
       // Silently fail - the app will create directories on first run if needed
     end;
+  end;
+end;
+
+// In-app update that did not complete. The app already exited when it launched us
+// (2.5.0/2.5.1 shut down unconditionally), and Setup is /VERYSILENT /SUPPRESSMSGBOXES,
+// so without this the user's VoiceLite just vanishes with no explanation.
+// MsgBox (unlike SuppressibleMsgBox) is still shown under /SUPPRESSMSGBOXES.
+procedure ReportFailedUpdate();
+var
+  ExePath: String;
+  ResultCode: Integer;
+  Relaunched: Boolean;
+begin
+  Relaunched := False;
+  if not FilesTouched then
+  begin
+    Log('Update failed before any file was replaced - the existing install is intact');
+    // The old install is intact, so put the user's app back. ExecAsOriginalUser only:
+    // an elevated Setup must never start VoiceLite elevated (breaks text injection and
+    // resolves the wrong %LOCALAPPDATA%). Skip it if an instance is still running here.
+    try
+      if not CheckForMutexes(AppMutexName) then
+      begin
+        ExePath := AddBackslash(WizardDirValue) + AppExeName;
+        if FileExists(ExePath) then
+          Relaunched := ExecAsOriginalUser(ExePath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+      end;
+    except
+      Log('Could not restart the existing VoiceLite: ' + GetExceptionMessage);
+    end;
+
+    if Relaunched then
+      MsgBox('VoiceLite could not install the update, so your current version has been restarted. Nothing was changed.'#13#10#13#10 +
+             'You can try the update again later, or download the installer from https://voicelite.app.',
+             mbInformation, MB_OK)
+    else
+      MsgBox('VoiceLite could not install the update. Your current version was not changed.'#13#10#13#10 +
+             'If VoiceLite is not running, start it from the Start menu. You can try the update again later, ' +
+             'or download the installer from https://voicelite.app.',
+             mbError, MB_OK);
+  end
+  else
+  begin
+    // Setup stopped after it began replacing files. Inno's rollback does not restore
+    // files it already overwrote, so the install may be a mix of two versions - do NOT
+    // auto-start it and do NOT claim it was restarted.
+    Log('Update failed after file replacement began - not restarting VoiceLite');
+    if MsgBox('The VoiceLite update did not finish, and VoiceLite may not start until it is reinstalled.'#13#10#13#10 +
+              'Please download the installer from https://voicelite.app and run it. ' +
+              'Your settings, license and speech model are not affected.'#13#10#13#10 +
+              'Open the download page now?',
+              mbError, MB_YESNO) = IDYES then
+      ShellExecAsOriginalUser('open', 'https://voicelite.app', '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+  end;
+end;
+
+// Called just before Setup terminates, success or not. Must never raise.
+// Gated on /RELAUNCH=1 + silent, i.e. the in-app updater; a plain /VERYSILENT IT push
+// that fails stays headless. Not reached for a declined UAC prompt on an all-users
+// install: the non-elevated Setup exits before [Code] is loaded (known gap).
+procedure DeinitializeSetup();
+begin
+  try
+    if RelaunchRequested() and WizardSilent and (not InstallSucceeded) then
+      ReportFailedUpdate();
+  except
+    Log('DeinitializeSetup: ' + GetExceptionMessage);
   end;
 end;
 
