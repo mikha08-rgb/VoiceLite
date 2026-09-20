@@ -70,6 +70,43 @@ namespace VoiceLite.Tests
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
                          && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"));
 
+        private static List<string> TabHeaders(string xaml) =>
+            // Header may be any attribute of the tag, on any line - SettingsWindow.xaml belongs to someone else.
+            Regex.Matches(xaml, @"<TabItem(?![\w.:])[^>]*?\sHeader=""([^""]+)""")
+                .Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))
+                .ToList();
+
+        // Spaces around the arrow are required: skips generics like Deserialize<Settings>(json).
+        // Whole-line comments are dropped: history notes may name tabs that are gone.
+        private static List<Match> SettingsTabReferences(string source) =>
+            Regex.Matches(Regex.Replace(source, @"(?m)^[ \t]*//[^\r\n]*", ""), @"Settings\s+(?:>|→)\s+([^""\r\n]{1,40})").ToList();
+
+        [Fact]
+        public void TabHeaders_FindsHeaderWhereverItSitsInTheTag()
+        {
+            var xaml = @"<TabControl>
+  <TabItem Header=""Transcription"">
+  <TabItem x:Name=""HotkeyTab"" Header=""Hotkey &amp; mode"" Style=""{StaticResource T}"">
+  <TabItem
+      x:Name=""AboutTab""
+      Header=""About"" />
+  <TabItemExtra Header=""NotATab"" />
+</TabControl>";
+
+            TabHeaders(xaml).Should().Equal("Transcription", "Hotkey & mode", "About");
+        }
+
+        [Fact]
+        public void SettingsTabReferences_IgnoresCommentLines()
+        {
+            var source = @"// was: Settings > General before adc86ac
+    /// see Settings > AI Models
+var s = ""Open Settings > Transcription"";
+";
+
+            SettingsTabReferences(source).Select(m => m.Groups[1].Value).Should().Equal("Transcription");
+        }
+
         [Fact]
         public void Tripwire_EverySettingsTabNamedInCode_ExistsInSettingsWindow()
         {
@@ -77,15 +114,13 @@ namespace VoiceLite.Tests
             if (appDir == null) return;
 
             var xaml = File.ReadAllText(Path.Combine(appDir, "SettingsWindow.xaml"));
-            var tabs = Regex.Matches(xaml, @"<TabItem\s+Header=""([^""]+)""")
-                .Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))
-                .ToList();
+            var tabs = TabHeaders(xaml);
             tabs.Should().Contain("Transcription").And.Contain("Hotkey & mode");
 
             var stale = new List<string>();
             foreach (var file in AppCsFiles(appDir))
             {
-                foreach (Match m in Regex.Matches(File.ReadAllText(file), @"Settings\s+(?:>|→)\s+([^""\r\n]{1,40})")) // spaces required: skips generics like Deserialize<Settings>(json)
+                foreach (Match m in SettingsTabReferences(File.ReadAllText(file)))
                 {
                     var rest = m.Groups[1].Value;
                     if (!tabs.Any(t => rest.StartsWith(t, StringComparison.Ordinal)))
