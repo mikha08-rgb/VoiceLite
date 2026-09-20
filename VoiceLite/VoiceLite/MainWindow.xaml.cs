@@ -591,11 +591,11 @@ namespace VoiceLite
                     MessageBox.Show(
                         $"Failed to register hotkey: {ex.Message}\n\n" +
                         $"The hotkey may be in use by another application.\n\n" +
-                        $"You can change the hotkey in Settings, or the app will use manual buttons.",
+                        $"Open Settings > Hotkey & mode to pick a different hotkey.",
                         "Hotkey Registration Failed",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
-                    // App continues - user can still use manual buttons
+                    // App continues so the user can reach Settings; there is no other way to record
                 }
 
                 // Step 3: Update UI (now safe - all services initialized)
@@ -906,6 +906,7 @@ namespace VoiceLite
                 switch (ev.Kind)
                 {
                     case DictationEventKind.RecordingStarted:
+                        CancelReadyReset(); // the previous dictation's reset must not fire into this one's messages
                         UpdateStatus("Recording 0:00", new SolidColorBrush(StatusColors.Recording));
                         UpdateUIForCurrentMode();
                         TranscriptionText.Foreground = Brushes.Gray;
@@ -948,6 +949,8 @@ namespace VoiceLite
                         // TranscriptionText is collapsed in XAML - the status line is what the user sees.
                         if (ev.MicSilent)
                         {
+                            // Stays until the next dictation on purpose (d65aad8): it is the only visible
+                            // mic diagnostic, and the window is usually opened after the dictation "did nothing".
                             UpdateTranscriptionText($"No audio from microphone '{ev.MicName}' - muted, unplugged, or wrong device", Brushes.Red);
                             UpdateStatus($"No audio from '{ev.MicName}' - check mic in Settings", Brushes.Red);
                         }
@@ -955,6 +958,7 @@ namespace VoiceLite
                         {
                             UpdateTranscriptionText($"(No speech detected - mic: {ev.MicName})", Brushes.Gray);
                             UpdateStatus($"No speech detected (mic: {ev.MicName})", Brushes.Gray);
+                            ResetToReadyLater();
                         }
                         break;
 
@@ -968,7 +972,7 @@ namespace VoiceLite
                         // Non-modal on purpose: a MessageBox here used to block the UI thread
                         // while holding the recording lock and had to be clicked away every time.
                         systemTrayManager?.ShowBalloonTip("Recording auto-stopped",
-                            "Stopped after 5 minutes (hot-mic safety). Transcribing what was captured.");
+                            DescribeAutoStop(dictation?.AutoStopAfter ?? DictationController.DefaultAutoStopAfter, ev.Message));
                         break;
 
                     case DictationEventKind.StuckRecovered:
@@ -1060,17 +1064,48 @@ namespace VoiceLite
         /// <summary>Put the status line back to Ready unless a new dictation is under way by then.</summary>
         private void ResetToReadyLater(int delayMs = STATUS_MESSAGE_DISPLAY_DURATION_MS)
         {
-            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(delayMs) };
-            timer.Tick += (s, e) =>
+            RestartOneShot(ref readyResetTimer, delayMs, () =>
             {
-                timer.Stop();
                 if (dictation == null || dictation.State == DictationState.Idle)
                 {
                     UpdateUIForCurrentMode();
                     UpdateStatus("Ready", Brushes.Green);
                 }
+            });
+        }
+
+        // The one pending "back to Ready" reset. Deliberately not in activeStatusTimers:
+        // CreateStatusTimer stops everything in that set, and the history copy timers share it.
+        private System.Windows.Threading.DispatcherTimer? readyResetTimer;
+
+        private void CancelReadyReset()
+        {
+            readyResetTimer?.Stop();
+            readyResetTimer = null;
+        }
+
+        /// <summary>
+        /// Arms a one-shot timer in <paramref name="slot"/>, stopping whatever was pending there, so
+        /// an older reset can never fire into a newer status message. internal static for tests.
+        /// </summary>
+        internal static void RestartOneShot(ref System.Windows.Threading.DispatcherTimer? slot, int delayMs, Action onTick)
+        {
+            slot?.Stop();
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(delayMs) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                onTick();
             };
+            slot = timer;
             timer.Start();
+        }
+
+        /// <summary>Auto-stop balloon text, built from the controller's real hot-mic limit. <paramref name="failure"/> replaces the "transcribing" half when the audio was lost.</summary>
+        internal static string DescribeAutoStop(TimeSpan limit, string? failure = null)
+        {
+            var minutes = limit.TotalMinutes.ToString("0");
+            return $"Stopped after {minutes} minute{(minutes == "1" ? "" : "s")} (hot-mic safety). {failure ?? "Transcribing what was captured"}.";
         }
 
         /// <summary>
@@ -1528,6 +1563,7 @@ namespace VoiceLite
             }
 
             StopElapsedTimer();
+            CancelReadyReset();
 
             // Use new cleanup method for proper timer disposal
             CleanupAllTimers();

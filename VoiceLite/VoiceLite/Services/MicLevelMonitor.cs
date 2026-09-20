@@ -131,9 +131,9 @@ namespace VoiceLite.Services
 
             capture.DataAvailable -= OnDataAvailable;
             try { capture.StopRecording(); }
-            catch (Exception ex) { ErrorLogger.LogDebug($"MicLevelMonitor stop failed: {ex.Message}"); }
+            catch (Exception ex) { ErrorLogger.LogWarning($"MicLevelMonitor stop failed: {ex.Message}"); }
             try { capture.Dispose(); }
-            catch (Exception ex) { ErrorLogger.LogDebug($"MicLevelMonitor dispose failed: {ex.Message}"); }
+            catch (Exception ex) { ErrorLogger.LogWarning($"MicLevelMonitor dispose failed: {ex.Message}"); }
         }
     }
 }

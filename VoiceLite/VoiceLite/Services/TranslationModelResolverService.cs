@@ -53,7 +53,7 @@ namespace VoiceLite.Services
 
             throw new FileNotFoundException(
                 "The English translation model is not installed. " +
-                "Open Settings > General > Translate to English and click Install translation model.");
+                "Open Settings > Transcription > Translate to English and click Install translation model.");
         }
 
         public bool IsModelInstalled() => modelPaths.Any(HasRequiredFiles);
