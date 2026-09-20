@@ -24,8 +24,10 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
 ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=..\..\EULA.txt
-; Always write "Setup Log YYYY-MM-DD #NNN.txt" to %TEMP%. The in-app updater runs
-; Setup /VERYSILENT without /LOG, so without this a failed update leaves no evidence.
+; Write "Setup Log YYYY-MM-DD #NNN.txt" to %TEMP% whenever no /LOG is passed: the
+; 2.5.0/2.5.1 in-app updater and manual runs, so a failed update still leaves evidence.
+; The 2.5.2+ updater passes /LOG="%LOCALAPPDATA%\VoiceLite\logs\update-setup.log", which
+; REPLACES the %TEMP% log (it is not written in addition to it).
 SetupLogging=yes
 
 [Languages]
@@ -36,22 +38,22 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main application files
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\VoiceLite.exe"; DestDir: "{app}"; Flags: ignoreversion; BeforeInstall: MarkFilesTouched
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs; BeforeInstall: MarkFilesTouched
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\*.json"; DestDir: "{app}"; Flags: ignoreversion; BeforeInstall: MarkFilesTouched
 
 ; Silero VAD ONNX model (~2.3MB, used for silence trimming before transcription).
 ; Speech model (Parakeet v3, ~640MB) is downloaded on first launch — not bundled in installer.
 ; Sherpa-ONNX + ONNX Runtime native DLLs are included in the *.dll wildcard above.
 ; Explicit single-file copy (not a glob) prevents stale GGML files from leaking into
 ; the installer if a developer accidentally drops them in publish/whisper/.
-Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\silero_vad_v5.onnx"; DestDir: "{app}\whisper"; Flags: ignoreversion
+Source: "..\VoiceLite\bin\Release\net8.0-windows\win-x64\publish\whisper\silero_vad_v5.onnx"; DestDir: "{app}\whisper"; Flags: ignoreversion; BeforeInstall: MarkFilesTouched
 
 ; Icon file
-Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\VoiceLite\VoiceLite.ico"; DestDir: "{app}"; Flags: ignoreversion; BeforeInstall: MarkFilesTouched
 
 ; Third-party license texts (NVIDIA Parakeet CC-BY-4.0 attribution is mandatory)
-Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion recursesubdirs
+Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion recursesubdirs; BeforeInstall: MarkFilesTouched
 
 ; VC++ Redistributable (bundled for auto-install)
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -77,6 +79,7 @@ Filename: "{app}\VoiceLite.exe"; Description: "{cm:LaunchProgram,VoiceLite}"; Fl
 
 ; In-app updater path: VoiceLite runs this installer with
 ;   /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /RELAUNCH=1
+; and, from 2.5.2 on, additionally /READYFILE="<path>" /LOG="<path>"
 ; (see Services/UpdateInstaller.cs). The postinstall entry above is skipifsilent, so
 ; without this line a silent upgrade would leave the user with no VoiceLite running.
 ; runasoriginaluser: if Setup self-elevated (all-users install), still start the app
@@ -105,7 +108,17 @@ const
 // loaded, so only the process that actually installs ever evaluates these.
 var
   InstallSucceeded: Boolean;  // ssPostInstall reached
-  FilesTouched: Boolean;      // ssInstall reached - files in {app} may be partly replaced
+  FilesTouched: Boolean;      // a file in {app} was about to be replaced - see MarkFilesTouched
+  ReadyFileWritten: Boolean;  // the /READYFILE handshake file exists - see WriteReadyFile
+
+// BeforeInstall handler of every [Files] entry that lands in {app}: runs right before
+// each such file is written. NOT CurStepChanged(ssInstall): that fires before Inno's
+// RestartManager "close applications" step, and an abort there (a locked exe/dll whose
+// owner cannot be closed) replaces nothing - the old install is intact and restartable.
+procedure MarkFilesTouched();
+begin
+  FilesTouched := True;
+end;
 
 // delayload: bind on first call, so a failed import raises a catchable exception
 // there instead of stopping Setup (or the uninstaller) at start-up.
@@ -137,6 +150,9 @@ begin
         Log('Ready file written: ' + ReadyFile)
       else
         Log('Could not write ready file: ' + ReadyFile);
+      // The app only tests for existence, so a partly written file counts too.
+      if FileExists(ReadyFile) then
+        ReadyFileWritten := True;
     end;
   except
     Log('Ready file not written: ' + GetExceptionMessage);
@@ -182,22 +198,8 @@ begin
   Result := IsVoiceLiteProcessRunning() or CheckForMutexes(AppMutexName);
 end;
 
-// Waits up to MaxMs for VoiceLite to exit on its own. Returns True when it is gone.
-function WaitForVoiceLiteExit(MaxMs: Integer): Boolean;
-var
-  Waited: Integer;
-begin
-  Waited := 0;
-  while IsVoiceLiteRunning() and (Waited < MaxMs) do
-  begin
-    Sleep(500);
-    Waited := Waited + 500;
-  end;
-  Result := not IsVoiceLiteRunning();
-end;
-
 // Session-scoped variant of IsVoiceLiteRunning, used ONLY to decide whether a
-// VoiceLite.exe that survived taskkill really blocks a per-user install. Fails closed:
+// VoiceLite.exe that is still there really blocks a per-user install. Fails closed:
 // returns True ("still running") unless tasklist demonstrably ran with a valid
 // session filter (exit code 0, output readable) and listed no VoiceLite.exe.
 function IsVoiceLiteRunningInThisSession(): Boolean;
@@ -241,6 +243,31 @@ begin
   end;
 end;
 
+// Waits up to MaxMs for VoiceLite to exit. Returns True when it is gone (machine-wide).
+// Per-user install: once OtherSessionGraceMs have passed, stop waiting for a VoiceLite.exe
+// that is not in this session - it is another user's (Fast User Switching, RDP), will not
+// exit for us and does not lock this user's {app}. Waiting it out cost ~25 s per update
+// with no app and no UI. The result stays machine-wide, so the caller still runs taskkill
+// (which does end an instance of the SAME user in another session). The session check
+// fails closed, so a failed query just means the full wait, as before.
+function WaitForVoiceLiteExit(MaxMs, OtherSessionGraceMs: Integer): Boolean;
+var
+  Waited: Integer;
+begin
+  Waited := 0;
+  while IsVoiceLiteRunning() and (Waited < MaxMs) do
+  begin
+    if (Waited >= OtherSessionGraceMs) and (not IsAdminInstallMode) then
+    begin
+      if not IsVoiceLiteRunningInThisSession() then
+        Break;
+    end;
+    Sleep(500);
+    Waited := Waited + 500;
+  end;
+  Result := not IsVoiceLiteRunning();
+end;
+
 // Force-terminates VoiceLite.exe and polls up to ~10s until it is gone.
 function CloseRunningVoiceLite(): Boolean;
 var
@@ -250,7 +277,9 @@ begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM ' + AppExeName + ' /F', '',
        SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Log('taskkill exit code ' + IntToStr(ResultCode));
-  Result := WaitForVoiceLiteExit(10000);
+  // 2000: a process taskkill /F did end (this user's, any session) is gone well within
+  // 2 s; only after that is a VoiceLite.exe outside this session taken to be another user's.
+  Result := WaitForVoiceLiteExit(10000, 2000);
   if Result then
     Log(AppExeName + ' has exited')
   else
@@ -282,8 +311,9 @@ begin
     // Silent = in-app updater (or an IT push). The updater shuts VoiceLite down
     // right after launching us; give it time to exit cleanly (settings flush, hotkey
     // and recognizer disposal can add up to ~10s worst case) before falling back
-    // to taskkill.
-    if WaitForVoiceLiteExit(10000) then
+    // to taskkill. 0: the app that launched us is in this session, so there is nothing
+    // to wait for once this session is clear.
+    if WaitForVoiceLiteExit(10000, 0) then
       Exit;
   end
   else
@@ -310,10 +340,15 @@ begin
   Result := True;
   if IsVoiceLiteRunning() then
   begin
-    MsgBox('VoiceLite is currently running.'#13#10#13#10 +
-           'Please close it (check the system tray), then run the uninstaller again.',
-           mbError, MB_OK);
     Result := False;
+    // MsgBox ignores /VERYSILENT /SUPPRESSMSGBOXES: a silent (Intune/IT) uninstall would
+    // hang on it forever. Stay headless there - the abort is in the log and the exit code.
+    if UninstallSilent then
+      Log('VoiceLite is running - silent uninstall aborted, nothing was removed')
+    else
+      MsgBox('VoiceLite is currently running.'#13#10#13#10 +
+             'Please close it (check the system tray), then run the uninstaller again.',
+             mbError, MB_OK);
   end;
 end;
 
@@ -322,9 +357,6 @@ var
   AppDataDir: String;
   LogsDir: String;
 begin
-  if CurStep = ssInstall then
-    FilesTouched := True;
-
   if CurStep = ssPostInstall then
   begin
     InstallSucceeded := True;
@@ -345,9 +377,24 @@ begin
   end;
 end;
 
-// In-app update that did not complete. The app already exited when it launched us
-// (2.5.0/2.5.1 shut down unconditionally), and Setup is /VERYSILENT /SUPPRESSMSGBOXES,
-// so without this the user's VoiceLite just vanishes with no explanation.
+// True when the app that launched us is a 2.5.2+ updater that is still waiting for us.
+// That app (/READYFILE) keeps running until the ready file exists; if Setup exits first
+// it stays up and tells the user itself ("Update failed (exit code N)"). A message box
+// here would hold Setup - and with it the app, stuck on "Installing..." - until someone
+// finds it, and then be followed by that second report. No ready file + the app still
+// holds its mutex = that case. An app that died meanwhile (no mutex) reports nothing, so
+// it falls through to ReportFailedUpdate, which restarts it.
+function UpdaterReportsFailureItself(): Boolean;
+begin
+  Result := (ExpandConstant('{param:READYFILE|}') <> '') and (not ReadyFileWritten) and
+            CheckForMutexes(AppMutexName);
+end;
+
+// In-app update that did not complete and that nobody else reports: the 2.5.0/2.5.1
+// updater shut the app down unconditionally when it launched us, and a 2.5.2+ app is
+// shutting down (or was taskkilled by PrepareToInstall) once the ready file exists.
+// Setup is /VERYSILENT /SUPPRESSMSGBOXES, so without this the user's VoiceLite just
+// vanishes with no explanation.
 // MsgBox (unlike SuppressibleMsgBox) is still shown under /SUPPRESSMSGBOXES.
 procedure ReportFailedUpdate();
 var
@@ -406,7 +453,12 @@ procedure DeinitializeSetup();
 begin
   try
     if RelaunchRequested() and WizardSilent and (not InstallSucceeded) then
-      ReportFailedUpdate();
+    begin
+      if UpdaterReportsFailureItself() then
+        Log('Update failed before the ready file was written - the running VoiceLite reports it')
+      else
+        ReportFailedUpdate();
+    end;
   except
     Log('DeinitializeSetup: ' + GetExceptionMessage);
   end;

@@ -106,6 +106,86 @@ namespace VoiceLite.Tests
             hint.Should().Contain("administrator");
         }
 
+        [Fact]
+        public void ReleaseYml_SetupLogHint_NamesTheLogOfBothUpdaterGenerations()
+        {
+            var yml = ReleaseYml();
+            if (yml == null) return;
+            var hint = ReleaseBodyTemplate(yml).Split('\n').Single(l => l.Contains("Setup Log"));
+
+            // The 2.5.2+ updater passes /LOG=<GetSetupLogPath()>, which REPLACES the %TEMP%
+            // log; only the 2.5.0/2.5.1 updater and manual runs leave "Setup Log*.txt".
+            var logPath = UpdateInstaller.GetSetupLogPath();
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            logPath.Should().StartWith(localAppData);
+            hint.Should().Contain("`%LOCALAPPDATA%" + logPath.Substring(localAppData.Length) + "`");
+            hint.Should().Contain("2.5.2");
+            hint.IndexOf("update-setup.log", StringComparison.Ordinal).Should().BeLessThan(
+                hint.IndexOf("Setup Log", StringComparison.Ordinal), "the current updater's log comes first");
+        }
+
+        // ---------- version guard: the updater compares the ASSEMBLY version ----------
+
+        private static string ValidateVersionStep(string yml)
+        {
+            var start = yml.IndexOf("    - name: Validate version consistency\n", StringComparison.Ordinal);
+            Assert.True(start >= 0, "release.yml: 'Validate version consistency' step not found");
+            var next = yml.IndexOf("\n    - name: ", start + 10, StringComparison.Ordinal);
+            return yml.Substring(start, next - start);
+        }
+
+        [Fact]
+        public void ReleaseYml_ValidatesAllThreeCsprojVersionFields_TheIssDefine_AndVersionTs()
+        {
+            var yml = ReleaseYml();
+            if (yml == null) return;
+            var step = ValidateVersionStep(yml);
+
+            // UpdateCheckService.GetCurrentVersion() reads the AssemblyVersion. A release with
+            // <Version> bumped and <AssemblyVersion> forgotten reports the OLD version and
+            // offers itself as an update forever - to every user.
+            step.Should().Contain("Version = $expectedVersion");
+            step.Should().Contain("AssemblyVersion = \"$expectedVersion.0\"");
+            step.Should().Contain("FileVersion = \"$expectedVersion.0\"");
+            step.Should().Contain("#define MyAppVersion \"([\\d\\.]+)\"");
+            step.Should().Contain("CURRENT_VERSION\\s*=\\s*'([\\d\\.]+)'");
+            step.Should().Contain("exit 1");
+            // $error is a read-only automatic variable: "foreach ($error in ...)" throws and
+            // the step never prints which file is wrong (seen when the step was run locally).
+            Regex.IsMatch(step, @"foreach\s*\(\s*\$error\b", RegexOptions.IgnoreCase).Should().BeFalse();
+            // The "Fix:" hint must name the fields a releaser has to bump.
+            step.Should().Contain("<AssemblyVersion>");
+            step.Should().Contain("<FileVersion>");
+
+            // ...and the value the updater really compares is checked on the built assembly.
+            yml.Should().Contain("[System.Reflection.AssemblyName]::GetAssemblyName(");
+        }
+
+        [Fact]
+        public void VersionFields_InTheCheckout_AllAgree()
+        {
+            // Same rule release.yml enforces against the tag, enforced on every test run so a
+            // half-done version bump fails in the PR instead of while cutting the release.
+            var csproj = RepoSourceFile.Read("VoiceLite", "VoiceLite", "VoiceLite.csproj");
+            var iss = RepoSourceFile.Read("VoiceLite", "Installer", "VoiceLiteSetup.iss");
+            var web = RepoSourceFile.Read("voicelite-web", "lib", "version.ts");
+            if (csproj == null || iss == null || web == null) return;
+
+            var version = Regex.Match(csproj, @"<Version>([\d\.]+)</Version>").Groups[1].Value;
+            version.Should().MatchRegex(@"^\d+\.\d+\.\d+$");
+
+            foreach (var field in new[] { "AssemblyVersion", "FileVersion" })
+            {
+                // Absent = derived from <Version> by the SDK, which is fine.
+                var m = Regex.Matches(csproj, $@"<{field}>([^<]*)</{field}>");
+                m.Count.Should().BeLessThanOrEqualTo(1);
+                if (m.Count == 1) m[0].Groups[1].Value.Should().Be(version + ".0", $"<{field}> must follow <Version>");
+            }
+
+            Regex.Match(iss, "#define MyAppVersion \"([\\d\\.]+)\"").Groups[1].Value.Should().Be(version);
+            Regex.Match(web, @"CURRENT_VERSION\s*=\s*'([\d\.]+)'").Groups[1].Value.Should().Be(version);
+        }
+
         // ---------- build-release.ps1 (S4, legacy README text) ----------
 
         [Fact]
