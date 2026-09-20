@@ -42,7 +42,7 @@ namespace VoiceLite.Services
         TranscriptionCompleted, // Text is non-empty
         NoSpeech,               // MicName / MicSilent describe the device
         TranscriptionFailed,    // Message is user-facing
-        AutoStopped,            // toggle recording hit the hot-mic limit (RecordingStopped already sent)
+        AutoStopped,            // toggle recording hit the hot-mic limit (RecordingStopped already sent); Message set when the audio was lost
         StuckRecovered,         // transcription watchdog fired; state was force-reset
         Fault                   // unexpected exception in a hotkey path; Message for the user
     }
@@ -455,17 +455,19 @@ namespace VoiceLite.Services
         private void OnAutoStop()
         {
             if (disposed) return;
-            bool stopped = false;
+            bool? audioKept = null;
             lock (gate)
             {
                 if (isRecording)
                 {
                     ErrorLogger.LogWarning($"Toggle recording hit the {autoStopAfter.TotalMinutes:0}-minute hot-mic limit - stopping and transcribing");
-                    // A stop that lost the recording already said so; "transcribing what was captured" would contradict it.
-                    stopped = StopLocked(cancel: false);
+                    audioKept = StopLocked(cancel: false);
                 }
             }
-            if (stopped) Raise(DictationEventKind.AutoStopped);
+            // The balloon is the only surface when the window sits in the tray, so it goes out either
+            // way; after a lost recording it must say so instead of "transcribing what was captured".
+            if (audioKept != null)
+                Raise(DictationEventKind.AutoStopped, message: audioKept.Value ? null : "Recording failed - audio was not saved");
         }
 
         private void StartStuckTimer()

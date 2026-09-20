@@ -928,7 +928,7 @@ namespace VoiceLite
                         // Non-modal on purpose: a MessageBox here used to block the UI thread
                         // while holding the recording lock and had to be clicked away every time.
                         systemTrayManager?.ShowBalloonTip("Recording auto-stopped",
-                            DescribeAutoStop(dictation?.AutoStopAfter ?? DictationController.DefaultAutoStopAfter));
+                            DescribeAutoStop(dictation?.AutoStopAfter ?? DictationController.DefaultAutoStopAfter, ev.Message));
                         break;
 
                     case DictationEventKind.StuckRecovered:
@@ -1057,11 +1057,11 @@ namespace VoiceLite
             timer.Start();
         }
 
-        /// <summary>Auto-stop balloon text, built from the controller's real hot-mic limit.</summary>
-        internal static string DescribeAutoStop(TimeSpan limit)
+        /// <summary>Auto-stop balloon text, built from the controller's real hot-mic limit. <paramref name="failure"/> replaces the "transcribing" half when the audio was lost.</summary>
+        internal static string DescribeAutoStop(TimeSpan limit, string? failure = null)
         {
             var minutes = limit.TotalMinutes.ToString("0");
-            return $"Stopped after {minutes} minute{(minutes == "1" ? "" : "s")} (hot-mic safety). Transcribing what was captured.";
+            return $"Stopped after {minutes} minute{(minutes == "1" ? "" : "s")} (hot-mic safety). {failure ?? "Transcribing what was captured"}.";
         }
 
         /// <summary>

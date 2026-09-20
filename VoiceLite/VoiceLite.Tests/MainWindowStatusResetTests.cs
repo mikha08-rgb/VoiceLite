@@ -95,6 +95,13 @@ namespace VoiceLite.Tests
                 .Should().Be("Stopped after 5 minutes (hot-mic safety). Transcribing what was captured.");
         }
 
+        [Fact]
+        public void DescribeAutoStop_WhenTheAudioWasLost_SaysSoInsteadOfTranscribing()
+        {
+            MainWindow.DescribeAutoStop(TimeSpan.FromMinutes(5), "Recording failed - audio was not saved")
+                .Should().Be("Stopped after 5 minutes (hot-mic safety). Recording failed - audio was not saved.");
+        }
+
         // ---- source tripwires: ShowDictationNotice is WPF code-behind with no seam, so these only
         // check that the wiring is still written down. They do not prove the UI behaviour.
 
@@ -137,6 +144,7 @@ namespace VoiceLite.Tests
             if (source == null) return;
             var block = CaseBlock(source, "AutoStopped");
             block.Should().Contain("DescribeAutoStop(");
+            block.Should().Contain("ev.Message", "a lost recording must not be announced as \"Transcribing what was captured\"");
             block.Should().NotContain("5 minutes");
         }
     }

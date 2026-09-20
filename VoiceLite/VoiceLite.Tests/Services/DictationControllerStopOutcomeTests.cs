@@ -75,19 +75,31 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
-        public async Task HotMicLimit_OnADeadRecorder_ReportsFailureWithoutTheTranscribingBalloon()
+        public async Task HotMicLimit_OnADeadRecorder_BalloonSaysTheAudioWasLost()
         {
             settings.Mode = RecordMode.Toggle;
             var c = Create(autoStop: TimeSpan.FromMilliseconds(50));
 
             c.HotkeyPressed();
             recorder.SimulateSilentCaptureFailure();
-            await WaitForKind(DictationEventKind.RecordingFailed);
-            await Task.Delay(100);
+            await WaitForKind(DictationEventKind.AutoStopped);
 
-            Kinds.Should().Contain(DictationEventKind.RecordingFailed);
-            Kinds.Should().NotContain(DictationEventKind.AutoStopped,
-                "\"Transcribing what was captured\" would contradict the failure");
+            // The status line is invisible when the window sits in the tray, so the balloon still
+            // goes out - but it must carry the failure instead of "Transcribing what was captured".
+            Kinds.Should().ContainInOrder(DictationEventKind.RecordingFailed, DictationEventKind.AutoStopped);
+            Find(DictationEventKind.AutoStopped)!.Message.Should().Contain("not saved");
+        }
+
+        [Fact]
+        public async Task HotMicLimit_OnAHealthyRecorder_BalloonCarriesNoFailure()
+        {
+            settings.Mode = RecordMode.Toggle;
+            var c = Create(autoStop: TimeSpan.FromMilliseconds(50));
+
+            c.HotkeyPressed();
+            await WaitForKind(DictationEventKind.AutoStopped);
+
+            Find(DictationEventKind.AutoStopped)!.Message.Should().BeNull();
         }
 
         [Fact]
