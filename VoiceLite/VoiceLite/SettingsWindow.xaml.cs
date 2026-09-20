@@ -230,8 +230,8 @@ namespace VoiceLite
 
             if (!HotkeyIsAvailable())
             {
-                // The saved hotkey was already dead when the dialog opened (startup said so and
-                // offered the manual buttons): warn, but let the user save their other settings.
+                // The saved hotkey was already dead when the dialog opened (startup said so):
+                // warn, but let the user save their other settings.
                 // MainWindow retries the registration after every commit while it is dead.
                 bool savedButDead = IsSavedButDeadHotkey(settings.RecordHotkey, settings.HotkeyModifiers,
                     registeredKey, registeredModifiers, AppOwnsRegisteredHotkey);

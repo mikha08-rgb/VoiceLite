@@ -1296,7 +1296,7 @@ namespace VoiceLite
                         // the Settings window says so - no modal nag on every Settings save.
                         if (hotkeyChanged)
                         {
-                            MessageBox.Show($"Failed to apply new hotkey: {ex.Message}\n\nNo hotkey is active right now. Pick a different one in Settings - the manual buttons still work.",
+                            MessageBox.Show($"Failed to apply new hotkey: {ex.Message}\n\nNo hotkey is active right now. Pick a different one in Settings.",
                                 "Hotkey Registration Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                         }
                         // Don't return - continue with UI updates
