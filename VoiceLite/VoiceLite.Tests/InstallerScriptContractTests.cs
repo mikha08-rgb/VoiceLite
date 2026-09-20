@@ -18,14 +18,35 @@ namespace VoiceLite.Tests
     {
         private static string? Iss() => RepoSourceFile.Read("VoiceLite", "Installer", "VoiceLiteSetup.iss");
 
-        /// <summary>Text of one Pascal routine: from its header up to the next top-level
-        /// "function"/"procedure" (or end of file).</summary>
+        /// <summary>Text of one Pascal routine: from its header to its closing column-0
+        /// "end;" - the last one before the next top-level "function"/"procedure" (or end of
+        /// file), so the comment block above the NEXT routine is not part of the slice.</summary>
         private static string Routine(string iss, string header)
         {
             var start = iss.IndexOf(header, StringComparison.Ordinal);
             Assert.True(start >= 0, $"'{header}' not found in VoiceLiteSetup.iss");
             var next = Regex.Match(iss.Substring(start + header.Length), @"^(function|procedure) ", RegexOptions.Multiline);
-            return next.Success ? iss.Substring(start, header.Length + next.Index) : iss.Substring(start);
+            var slice = next.Success ? iss.Substring(start, header.Length + next.Index) : iss.Substring(start);
+            var close = Regex.Match(slice, @"^end;", RegexOptions.Multiline | RegexOptions.RightToLeft);
+            Assert.True(close.Success, $"no closing 'end;' found for '{header}'");
+            return slice.Substring(0, close.Index + close.Length);
+        }
+
+        [Fact]
+        public void Routine_Slice_ExcludesTheCommentBlockAboveTheNextRoutine()
+        {
+            // Otherwise a comment added above the NEXT routine (or one mentioning "Exec(")
+            // fails the tripwires below although the routine itself is unchanged.
+            const string script =
+                "// Use Exec( here? No.\n" +
+                "procedure First();\nbegin\n  try\n    A;\n  except\n  end;\nend;\n" +
+                "\n// Comment about Second, mentions Exec( too.\n\n// More.\n" +
+                "function Second: Boolean;\nbegin\n  Result := True;\nend;\n";
+
+            Routine(script, "procedure First(").Should().Be(
+                "procedure First();\nbegin\n  try\n    A;\n  except\n  end;\nend;");
+            Routine(script, "function Second").Should().Be(
+                "function Second: Boolean;\nbegin\n  Result := True;\nend;");
         }
 
         // ---------- VoiceLiteSetup.iss: the frozen happy path ----------

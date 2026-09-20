@@ -297,7 +297,7 @@ jobs:
           - **Antivirus blocking**: Add VoiceLite.exe to antivirus exclusions
           - **Speech model download fails**: Check your internet connection, then exit VoiceLite from the tray icon and start it again to retry
           - **VC++ install fails**: Installer auto-installs VC++ Runtime - if it fails, manually download from [Microsoft](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-          - **An update did not complete**: Setup leaves a `Setup Log <date>.txt` file in your `%TEMP%` folder — include it when you contact support
+          - **An update did not complete**: Setup leaves a `Setup Log <date>.txt` file in your `%TEMP%` folder (or the administrator's `%TEMP%`, if you entered an administrator password during the update) — include it when you contact support
 
           ---
 

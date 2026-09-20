@@ -93,6 +93,19 @@ namespace VoiceLite.Tests
             template.Should().NotContain("2.5.0 or later");
         }
 
+        [Fact]
+        public void ReleaseYml_SetupLogHint_CoversElevationWithAnotherAccount()
+        {
+            var yml = ReleaseYml();
+            if (yml == null) return;
+            var hint = ReleaseBodyTemplate(yml).Split('\n').Single(l => l.Contains("Setup Log"));
+
+            // Setup only logs in the process that installs. If the update was elevated with
+            // a different administrator's credentials, that is the admin's %TEMP%, not the user's.
+            hint.Should().Contain("%TEMP%");
+            hint.Should().Contain("administrator");
+        }
+
         // ---------- build-release.ps1 (S4, legacy README text) ----------
 
         [Fact]
