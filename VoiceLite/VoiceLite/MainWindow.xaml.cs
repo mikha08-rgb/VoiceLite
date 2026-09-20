@@ -368,13 +368,10 @@ namespace VoiceLite
         /// </summary>
         private async Task SaveSettingsInternalAsync()
         {
-            // V1.0.55 Capture UI state on UI thread BEFORE going async
-            // Prevents "The calling thread cannot access this object" errors
-            bool minimizeToTray = false;
-            await Dispatcher.InvokeAsync(() =>
-            {
-                minimizeToTray = MinimizeCheckBox.IsChecked == true;
-            });
+            // No UI state is captured here any more. MinimizeToTray used to be copied from the
+            // collapsed MinimizeCheckBox, which is only synced after the Settings dialog closes:
+            // a save firing while the dialog was open (Apply's own debounce, a dictation adding
+            // history) overwrote the value Apply had just committed. settings is the source of truth.
 
             // Use SemaphoreSlim instead of lock for async compatibility
             // Use cancellation token to allow graceful shutdown
@@ -391,14 +388,6 @@ namespace VoiceLite
                     EnsureAppDataDirectoryExists();
 
                     string settingsPath = GetSettingsPath();
-
-                    // Update settings inside lock, serialize on background thread
-                    // Prevents race condition while maintaining async performance
-                    lock (settings.SyncRoot)
-                    {
-                        // Update settings inside lock to prevent concurrent modifications
-                        settings.MinimizeToTray = minimizeToTray;
-                    }
 
                     // Serialize on background thread to avoid UI blocking
                     // Use pre-configured JsonSerializerOptions with optimized buffer size
@@ -539,7 +528,8 @@ namespace VoiceLite
                 // The controller owns recording/transcription state; timers are routed
                 // through the dispatcher so the recorder is always driven from the UI thread.
                 dictation = new DictationController(audioRecorder, transcriptionService, () => settings,
-                    invoke: a => Dispatcher.InvokeAsync(a));
+                    invoke: a => Dispatcher.InvokeAsync(a),
+                    prepareRecorder: ApplySelectedMicrophone);
                 dictation.Notice += OnDictationNotice;
 
                 // Null-check hotkeyManager before subscribing
@@ -776,6 +766,9 @@ namespace VoiceLite
 
         private void UpdateBanner_Click(object sender, MouseButtonEventArgs e) => OpenUpdateWindow();
 
+        /// <summary>Banner text once the installer is downloaded and verified but the install was deferred.</summary>
+        internal static string DescribeUpdateReady(string version) => $"Update {version} ready - click to install";
+
         // Tray balloon click: same verified in-app updater as the banner, never the browser.
         // Raised on the UI thread. Restore first - UpdateWindow is CenterOwner/ShowInTaskbar=False,
         // so under a hidden owner it would be unfindable. Nothing pops up if the update is gone
@@ -819,6 +812,16 @@ namespace VoiceLite
                 window.InstallStarted += () =>
                 {
                     if (UpdateBanner != null) UpdateBanner.Text = "Installing update...";
+                };
+                window.InstallDeferred += () =>
+                {
+                    // Downloaded + verified, but Settings is open / a dictation is running: neither
+                    // InstallStarted nor AttemptFailed fires, and the banner sat on "Downloading
+                    // update... 100%". Clicking the banner brings up the dialog's "Install now".
+                    if (UpdateBanner != null) UpdateBanner.Text = DescribeUpdateReady(info.Version);
+                    // Hidden in the tray (the usual place while dictating) the banner shows nothing;
+                    // the balloon click restores the window and brings the dialog forward.
+                    if (!IsVisible) systemTrayManager?.ShowUpdateReady(info.Version);
                 };
                 window.AttemptFailed += () =>
                 {
@@ -892,6 +895,24 @@ namespace VoiceLite
         {
             if (updateInstallInProgress) return;
             dictation?.HotkeyReleased();
+        }
+
+        /// <summary>
+        /// DictationController calls this right before every recording (the recorder is idle then).
+        /// A microphone saved in Settings while a recording was running is skipped in
+        /// SettingsButton_Click - this is where it takes effect, instead of never.
+        /// </summary>
+        private void ApplySelectedMicrophone(Settings current)
+        {
+            int index;
+            string? name;
+            lock (current.SyncRoot)
+            {
+                index = current.SelectedMicrophoneIndex;
+                name = current.SelectedMicrophoneName;
+            }
+            if (index < -1) return; // same guard as the Settings path
+            audioRecorder?.SetDevice(index, name);
         }
 
         private void OnDictationNotice(object? sender, DictationEvent ev)
@@ -1157,9 +1178,18 @@ namespace VoiceLite
             }
         }
 
+        /// <summary>
+        /// Hiding to the tray announces "Press {hotkey} to dictate". While the updater waits for
+        /// the installer (possibly minutes on a UAC prompt) the hotkey is blocked and the update
+        /// dialog is the only explanation, so the window stays where it is. Internal static for tests.
+        /// </summary>
+        internal static bool ShouldMinimizeToTray(bool minimizeRequested, bool updateInstallInProgress)
+            => minimizeRequested && !updateInstallInProgress;
+
         private void Window_StateChanged(object sender, EventArgs e)
         {
-            if (WindowState == WindowState.Minimized)
+            // During the install wait this stays an ordinary taskbar minimize.
+            if (ShouldMinimizeToTray(WindowState == WindowState.Minimized, updateInstallInProgress))
             {
                 systemTrayManager?.MinimizeToTray();
             }
@@ -1181,6 +1211,29 @@ namespace VoiceLite
         /// </summary>
         internal static bool ShouldRegisterHotkeyAfterSettings(bool hotkeyChanged, bool currentlyRegistered)
             => hotkeyChanged || !currentlyRegistered;
+
+        /// <summary>
+        /// Status-line text after a Settings commit that (re)tried the hotkey registration, or
+        /// null when nothing needs saying. The Settings window advertises "press Save to try
+        /// again" for a dead hotkey; both outcomes of that retry used to be invisible (the dialog
+        /// closes, status stayed a green "Ready"). Deliberately a status line, not a MessageBox:
+        /// no modal nag when saving unrelated settings. Internal static for tests.
+        /// </summary>
+        internal static string? DescribeHotkeyOutcomeAfterSettings(bool hotkeyChanged, bool registered, string hotkeyDisplay)
+        {
+            if (!registered) return $"Hotkey {hotkeyDisplay} is not active - another app may be using it";
+            return hotkeyChanged ? null : $"Hotkey {hotkeyDisplay} is active";
+        }
+
+        /// <summary>Failure stays on the status line (no hotkey = no next dictation to replace it); success reverts to Ready.</summary>
+        private void ShowHotkeyOutcome(string? outcome, bool registered)
+        {
+            if (outcome == null) return;
+            if (dictation != null && dictation.State != DictationState.Idle) return; // never paint over a running dictation
+            CancelReadyReset();
+            UpdateStatus(outcome, registered ? Brushes.Green : Brushes.Red);
+            if (registered) ResetToReadyLater();
+        }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1259,14 +1312,17 @@ namespace VoiceLite
                 }
                 else if (dictation?.IsRecording == true)
                 {
-                    ErrorLogger.LogMessage("Skipping microphone change - recording in progress");
+                    // Not lost: ApplySelectedMicrophone pushes the saved device before the next recording.
+                    ErrorLogger.LogWarning("Microphone change deferred - recording in progress; it applies to the next recording");
                 }
 
                 // Re-register when the hotkey changed - and also when it did not but the app holds
                 // no registration (startup registration failed: another app had the combination).
                 bool hotkeyChanged = oldHotkey != settings.RecordHotkey || oldModifiers != settings.HotkeyModifiers;
+                bool hotkeyAttempted = false;
                 if (ShouldRegisterHotkeyAfterSettings(hotkeyChanged, hotkeyManager?.IsRegistered == true))
                 {
+                    hotkeyAttempted = true;
                     try
                     {
                         ErrorLogger.LogMessage("Re-registering hotkey due to change");
@@ -1311,6 +1367,13 @@ namespace VoiceLite
                 UpdateUIForCurrentMode();
                 UpdateConfigDisplay();
                 systemTrayManager?.UpdateHotkeyDisplay(GetHotkeyDisplayString());
+
+                // After the refresh above so it cannot be overwritten. Only a save that really
+                // (re)tried the registration reports an outcome; unrelated saves stay quiet.
+                bool hotkeyActive = hotkeyManager?.IsRegistered == true;
+                ShowHotkeyOutcome(
+                    hotkeyAttempted ? DescribeHotkeyOutcomeAfterSettings(hotkeyChanged, hotkeyActive, GetHotkeyDisplayString()) : null,
+                    hotkeyActive);
             }
         }
 
@@ -1454,9 +1517,19 @@ namespace VoiceLite
             // release the one-shot flag before returning. (On tray Exit WPF is inside
             // Application.Shutdown and ignores e.Cancel — the window closes anyway and
             // the synchronous backstop flush in OnClosed saves settings.)
-            if (MinimizeCheckBox.IsChecked == true)
+            // settings.MinimizeToTray, not the collapsed MinimizeCheckBox mirror: the mirror is only
+            // synced after the Settings dialog closes and used to overwrite an Apply'd value.
+            if (settings.MinimizeToTray)
             {
                 e.Cancel = true;
+                if (!ShouldMinimizeToTray(true, updateInstallInProgress))
+                {
+                    // Waiting for the installer: the hotkey is blocked, so don't hide behind a
+                    // "Press {hotkey} to dictate" balloon. Show the dialog that explains the wait.
+                    Interlocked.Exchange(ref isClosingHandled, 0);
+                    updateWindow?.Activate();
+                    return;
+                }
                 systemTrayManager?.MinimizeToTray();
                 Interlocked.Exchange(ref isClosingHandled, 0);
                 return;
@@ -1523,7 +1596,6 @@ namespace VoiceLite
                 string json;
                 lock (settings.SyncRoot)
                 {
-                    settings.MinimizeToTray = MinimizeCheckBox.IsChecked == true;
                     json = JsonSerializer.Serialize(settings, _jsonSerializerOptions);
                 }
 

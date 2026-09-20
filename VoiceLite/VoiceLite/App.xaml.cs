@@ -89,8 +89,22 @@ namespace VoiceLite
             // ModelResolverService throws FileNotFoundException without this gate.
             if (!IsParakeetModelInstalled())
             {
-                if (!RunGateWithoutLastWindowShutdown(this, ShowFirstLaunchModelDownload))
+                if (!TryRunStartupGate(this, ShowFirstLaunchModelDownload, out var gateError))
                 {
+                    if (gateError != null)
+                    {
+                        // Not "continue": no window and no tray icon exist yet, and the gate left the
+                        // app in OnExplicitShutdown - nothing else would ever end this process.
+                        ErrorLogger.LogError("First-launch model download dialog failed", gateError);
+                        MessageBox.Show(
+                            "VoiceLite could not show the speech model download.\n\n" +
+                            gateError.Message + "\n\n" +
+                            "Please start VoiceLite again. If this keeps happening, reinstall VoiceLite " +
+                            "(details are in voicelite.log).",
+                            "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Shutdown(1);
+                        return;
+                    }
                     MessageBox.Show(
                         "VoiceLite needs the Parakeet v3 speech model to run.\n\n" +
                         "Restart VoiceLite when you're ready to download (~640MB).",
@@ -180,6 +194,29 @@ namespace VoiceLite
                 return false;
             app.ShutdownMode = ShutdownMode.OnLastWindowClose;
             return true;
+        }
+
+        /// <summary>
+        /// RunGateWithoutLastWindowShutdown, but a gate that THROWS is handed to the caller instead
+        /// of escaping OnStartup. There it would reach OnDispatcherUnhandledException ("The
+        /// application will continue", Handled = true) and leave a process with no window, no tray
+        /// icon and OnExplicitShutdown - a zombie that holds the single-instance mutex, so every
+        /// later launch signals it and exits silently. The caller must Shutdown(): restoring the
+        /// mode would not help, OnLastWindowClose never fires with zero windows either.
+        /// Does not log (tests run it in a child process; the log path is the real user log).
+        /// </summary>
+        internal static bool TryRunStartupGate(Application app, Func<bool> gate, out Exception? gateError)
+        {
+            gateError = null;
+            try
+            {
+                return RunGateWithoutLastWindowShutdown(app, gate);
+            }
+            catch (Exception ex)
+            {
+                gateError = ex;
+                return false;
+            }
         }
 
         internal readonly record struct InstanceInfo(int Pid, int SessionId, DateTime? StartTime, bool HasExited);

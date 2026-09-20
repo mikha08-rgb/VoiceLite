@@ -79,6 +79,7 @@ namespace VoiceLite.Services
         private readonly Action<Action> invoke;
         private readonly TimeSpan autoStopAfter;
         private readonly TimeSpan stuckAfter;
+        private readonly Action<Settings>? prepareRecorder;
 
         private readonly object gate = new();
         private bool isRecording;
@@ -86,6 +87,7 @@ namespace VoiceLite.Services
         private bool isHotkeyMode;          // push-to-talk: the held key started this recording
         private volatile bool discardNextAudio;
         private volatile bool stopOutcomeSeen; // the recorder answered StopRecording with audio or an error
+        private volatile bool stopAudioReady;  // ...and the answer was audio (AudioFileReady), not an error
         private long activeSessionId;
         private DateTime lastHotkeyPressUtc = DateTime.MinValue;
         private Timer? autoStopTimer;
@@ -121,7 +123,8 @@ namespace VoiceLite.Services
             Func<Settings> settings,
             Action<Action>? invoke = null,
             TimeSpan? autoStopAfter = null,
-            TimeSpan? stuckAfter = null)
+            TimeSpan? stuckAfter = null,
+            Action<Settings>? prepareRecorder = null)
         {
             this.recorder = recorder ?? throw new ArgumentNullException(nameof(recorder));
             this.transcriber = transcriber ?? throw new ArgumentNullException(nameof(transcriber));
@@ -129,6 +132,7 @@ namespace VoiceLite.Services
             this.invoke = invoke ?? (a => a());
             this.autoStopAfter = autoStopAfter ?? DefaultAutoStopAfter;
             this.stuckAfter = stuckAfter ?? DefaultStuckAfter;
+            this.prepareRecorder = prepareRecorder;
 
             recorder.AudioFileReady += OnAudioFileReady;
             recorder.RecordingError += OnRecordingError;
@@ -238,6 +242,19 @@ namespace VoiceLite.Services
             isRecording = true;
             Raise(DictationEventKind.RecordingStarted); // before the device opens: instant feedback
 
+            // The recorder only learns its device from its owner. A microphone saved in Settings
+            // WHILE a recording ran could not be applied then (SetDevice throws mid-recording) and
+            // was never re-applied: wrong mic until restart. Pushing the saved device before every
+            // session makes it follow settings. Never fatal - the device already set stays in use.
+            try
+            {
+                prepareRecorder?.Invoke(settings());
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning($"StartRecording: could not apply the saved microphone, keeping the current device: {ex.Message}");
+            }
+
             try
             {
                 recorder.StartRecording();
@@ -260,7 +277,11 @@ namespace VoiceLite.Services
             }
         }
 
-        /// <returns>false when a non-cancel stop produced no audio and no error (already reported as RecordingFailed).</returns>
+        /// <returns>
+        /// false when a non-cancel stop kept no audio: the recorder answered with an error, StopRecording
+        /// threw, or it answered with nothing at all. Each of those has already been reported as
+        /// RecordingFailed / RecordingTooShort. Only OnAutoStop reads this.
+        /// </returns>
         private bool StopLocked(bool cancel)
         {
             if (!isRecording) return true;
@@ -277,6 +298,7 @@ namespace VoiceLite.Services
 
             bool recorderWasRecording = recorder.IsRecording;
             stopOutcomeSeen = false;
+            stopAudioReady = false;
             try
             {
                 recorder.StopRecording();
@@ -298,7 +320,10 @@ namespace VoiceLite.Services
                 Raise(DictationEventKind.RecordingFailed, message: "Recording failed - audio was not saved");
                 return false;
             }
-            return true;
+            // An error outcome (RecordingError, or StopRecording threw) was reported above / by
+            // OnRecordingError, but it kept no audio either: the auto-stop balloon must not
+            // promise a transcription.
+            return cancel || stopAudioReady;
         }
 
         // ---------------------------------------------------------------- recorder callbacks
@@ -324,6 +349,7 @@ namespace VoiceLite.Services
         private async void OnAudioFileReady(object? sender, string audioFilePath)
         {
             stopOutcomeSeen = true; // before the await: StopLocked reads it as soon as StopRecording returns
+            stopAudioReady = true;
             try
             {
                 await TranscribeFileAsync(audioFilePath);
