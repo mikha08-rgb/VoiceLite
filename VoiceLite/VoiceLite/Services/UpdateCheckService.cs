@@ -107,7 +107,7 @@ namespace VoiceLite.Services
 
                 if (string.Equals(settings.SkippedUpdateVersion, latestVersion.ToString(3), StringComparison.OrdinalIgnoreCase))
                 {
-                    ErrorLogger.LogMessage($"UpdateCheck: latest={latestVersion} matches SkippedUpdateVersion, suppressed");
+                    ErrorLogger.LogWarning($"UpdateCheck: latest={latestVersion} matches SkippedUpdateVersion, suppressed");
                     return null;
                 }
 
@@ -159,7 +159,10 @@ namespace VoiceLite.Services
         /// </summary>
         internal static UpdateInfo BuildUpdateInfo(JsonElement root, string tag, string version)
         {
+            // html_url is ShellExecuted by UpdateWindow, so it gets the same https + github.com
+            // check as the asset; anything else falls back to the constructed tag URL.
             string releasePage = root.TryGetProperty("html_url", out var html) && html.ValueKind == JsonValueKind.String
+                                 && IsTrustedGitHubUrl(html.GetString(), requiredPathPart: null)
                 ? html.GetString()!
                 : $"https://github.com/mikha08-rgb/VoiceLite/releases/tag/{tag}";
 
@@ -167,23 +170,38 @@ namespace VoiceLite.Services
             string? assetUrl = null;
             string? digestHash = null;
 
-            // Prefer the .exe asset's browser_download_url; fall back to the release html_url.
+            // Only the installer release.yml publishes (VoiceLite-Setup-<version>.exe, served
+            // from github.com over https) may be downloaded and run silently. Any other .exe
+            // (a redistributable, a tool, an off-host URL) is ignored; with no pinned asset the
+            // update falls back to the release page. The exact name for this version wins over
+            // a merely pattern-matching one.
             if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
             {
+                var exactName = $"VoiceLite-Setup-{version}.exe";
                 foreach (var asset in assets.EnumerateArray())
                 {
-                    if (asset.TryGetProperty("name", out var nameElem) &&
-                        nameElem.ValueKind == JsonValueKind.String &&
-                        nameElem.GetString()!.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
-                        asset.TryGetProperty("browser_download_url", out var urlElem) &&
-                        urlElem.ValueKind == JsonValueKind.String)
+                    if (!asset.TryGetProperty("name", out var nameElem) || nameElem.ValueKind != JsonValueKind.String ||
+                        !asset.TryGetProperty("browser_download_url", out var urlElem) || urlElem.ValueKind != JsonValueKind.String)
+                        continue;
+
+                    var name = nameElem.GetString()!;
+                    var url = urlElem.GetString()!;
+                    if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!InstallerAssetName.IsMatch(name) || !IsTrustedGitHubUrl(url, "/releases/download/"))
                     {
-                        assetName = nameElem.GetString()!;
-                        assetUrl = urlElem.GetString()!;
-                        if (asset.TryGetProperty("digest", out var digestElem) && digestElem.ValueKind == JsonValueKind.String)
-                            digestHash = ParseSha256Digest(digestElem.GetString());
-                        break;
+                        ErrorLogger.LogWarning($"UpdateCheck: ignoring unexpected .exe asset '{name}' ({url})");
+                        continue;
                     }
+
+                    var isExact = string.Equals(name, exactName, StringComparison.OrdinalIgnoreCase);
+                    if (assetName != null && !isExact) continue;
+
+                    assetName = name;
+                    assetUrl = url;
+                    digestHash = asset.TryGetProperty("digest", out var digestElem) && digestElem.ValueKind == JsonValueKind.String
+                        ? ParseSha256Digest(digestElem.GetString())
+                        : null;
+                    if (isExact) break;
                 }
             }
 
@@ -249,20 +267,47 @@ namespace VoiceLite.Services
             return hex.ToUpperInvariant();
         }
 
+        // release.yml names the installer VoiceLite-Setup-$VERSION.exe where VERSION is [\d.]+.
+        private static readonly Regex InstallerAssetName = new(
+            @"^VoiceLite-Setup-\d+(\.\d+){1,3}\.exe$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+        // "### SHA256 Hashes" on a line of its own. \s*$ (not a bare $) tolerates CRLF bodies.
+        private static readonly Regex HashHeading = new(
+            @"^[ \t]*#{1,6}[ \t]*SHA256 Hashes\s*$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+        /// <summary>
+        /// https + github.com only. Only the URL the API hands us is checked: the download
+        /// itself is a 302 to GitHub's asset CDN which HttpClient follows, and the SHA-256
+        /// check (not the final host) is what authenticates the bytes. Owner/repo are not
+        /// pinned so a repo rename doesn't silently disable auto-install.
+        /// </summary>
+        internal static bool IsTrustedGitHubUrl(string? url, string? requiredPathPart)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+            if (uri.Scheme != Uri.UriSchemeHttps) return false;
+            if (!string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase)) return false;
+            return requiredPathPart == null ||
+                   uri.AbsolutePath.Contains(requiredPathPart, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// Finds the 64-hex SHA-256 listed for <paramref name="assetName"/> in the release
         /// notes. release.yml emits "**name** (size)\n```text\nHASH\n```" blocks under a
-        /// "### SHA256 Hashes" heading; we search that section first (the asset name may
-        /// also appear earlier in install instructions) and fall back to the whole body.
+        /// "### SHA256 Hashes" heading. We anchor on that heading line (the template also says
+        /// "SHA256 hashes" in prose and names the asset in the Download section, long before
+        /// the real block) and fall back to the whole body only when there is no heading.
+        /// Returns null - auto-install refused - rather than guess.
         /// </summary>
         internal static string? ExtractSha256FromBody(string? body, string assetName)
         {
             if (string.IsNullOrEmpty(body) || string.IsNullOrEmpty(assetName)) return null;
 
-            var sectionStart = body.IndexOf("SHA256 Hashes", StringComparison.OrdinalIgnoreCase);
-            if (sectionStart >= 0)
+            var heading = HashHeading.Match(body);
+            if (heading.Success)
             {
-                var fromSection = FindHashAfterName(body[sectionStart..], assetName);
+                var fromSection = FindHashAfterName(body[heading.Index..], assetName);
                 if (fromSection != null) return fromSection;
             }
 
@@ -272,9 +317,21 @@ namespace VoiceLite.Services
         private static string? FindHashAfterName(string text, string assetName)
         {
             var idx = text.IndexOf(assetName, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) return null;
-            var m = Hex64.Match(text, idx + assetName.Length);
-            return m.Success ? m.Groups[1].Value.ToUpperInvariant() : null;
+            while (idx >= 0)
+            {
+                var afterName = idx + assetName.Length;
+                var m = Hex64.Match(text, afterName);
+                if (!m.Success) return null;
+
+                // Another file name between this mention and the hash means the hash belongs
+                // to that file (or this mention is just prose) - try the next mention.
+                var between = text.AsSpan(afterName, m.Index - afterName);
+                if (between.IndexOf(".exe", StringComparison.OrdinalIgnoreCase) < 0)
+                    return m.Groups[1].Value.ToUpperInvariant();
+
+                idx = text.IndexOf(assetName, afterName, StringComparison.OrdinalIgnoreCase);
+            }
+            return null;
         }
     }
 }

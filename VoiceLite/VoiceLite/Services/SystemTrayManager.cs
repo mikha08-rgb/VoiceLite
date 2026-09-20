@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -11,10 +10,16 @@ namespace VoiceLite.Services
         private TaskbarIcon? trayIcon;
         private System.Drawing.Icon? customIcon;
         private Window? mainWindow;
-        private string? pendingUpdateUrl;
+        private bool updateBalloonPending;
         // Configured hotkey display string (e.g. "Ctrl+Alt+Space"), passed in by
         // MainWindow so tooltips/balloons never claim a hardcoded hotkey.
         private string hotkeyDisplay = "the hotkey";
+
+        /// <summary>
+        /// The "update available" balloon was clicked. Raised on the UI thread (the thread that
+        /// created the tray icon). MainWindow opens the same UpdateWindow the banner opens.
+        /// </summary>
+        public event Action? UpdateBalloonClicked;
 
         public SystemTrayManager()
         {
@@ -41,22 +46,9 @@ namespace VoiceLite.Services
                 ShowMainWindow();
             };
 
-            // When an update balloon is showing, clicking it opens the download URL.
-            // Pending URL is captured per-notification so the handler stays generic.
-            trayIcon.TrayBalloonTipClicked += (s, e) =>
-            {
-                var url = pendingUpdateUrl;
-                if (string.IsNullOrEmpty(url)) return;
-                pendingUpdateUrl = null;
-                try
-                {
-                    Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError("Failed to open update download URL", ex);
-                }
-            };
+            // Clicking the update balloon opens the in-app updater (verified download), never
+            // the raw installer URL in a browser.
+            trayIcon.TrayBalloonTipClicked += (s, e) => HandleBalloonClicked();
 
             var contextMenu = new System.Windows.Controls.ContextMenu();
 
@@ -88,29 +80,53 @@ namespace VoiceLite.Services
 
         public void ShowBalloonTip(string title, string message)
         {
-            // A non-update balloon replaces any pending update balloon; clear the stashed
-            // URL so clicking this unrelated balloon doesn't open the update download.
-            pendingUpdateUrl = null;
+            // A non-update balloon replaces any pending update balloon; clear the flag so
+            // clicking this unrelated balloon doesn't open the updater.
+            updateBalloonPending = false;
             trayIcon?.ShowBalloonTip(title, message, BalloonIcon.Info);
         }
 
-        public void ShowUpdateAvailable(string version, string downloadUrl)
+        public void ShowUpdateAvailable(string version)
         {
-            // Stash URL for the balloon-click handler. Stays set until clicked or replaced.
-            pendingUpdateUrl = downloadUrl;
+            // Stays set until clicked or replaced by another balloon.
+            updateBalloonPending = true;
             trayIcon?.ShowBalloonTip(
                 "VoiceLite update available",
-                $"Version {version} is available. Click to download.",
+                $"Version {version} is available. Click to update.",
                 BalloonIcon.Info);
         }
 
-        private void ShowMainWindow()
+        /// <summary>
+        /// Balloon-click handler body (internal so it is testable without a tray icon).
+        /// One-shot: only a click on the update balloon itself raises the event.
+        /// </summary>
+        internal void HandleBalloonClicked()
+        {
+            if (!updateBalloonPending) return;
+            updateBalloonPending = false;
+            try
+            {
+                UpdateBalloonClicked?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Failed to open the update window from the tray balloon", ex);
+            }
+        }
+
+        /// <summary>Restores the main window from the tray and brings it to the foreground.</summary>
+        public void ShowMainWindow()
         {
             mainWindow?.Show();
             if (mainWindow != null)
             {
                 mainWindow.WindowState = WindowState.Normal;
                 mainWindow.Activate();
+                // Same Topmost flip as App.xaml.cs' second-instance restore: Activate() alone
+                // doesn't always surface the window, and a balloon click that appears to do
+                // nothing would be worse than the browser download it replaces.
+                mainWindow.Topmost = true;
+                mainWindow.Topmost = false;
             }
         }
 
