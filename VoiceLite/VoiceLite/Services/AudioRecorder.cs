@@ -513,7 +513,7 @@ namespace VoiceLite.Services
 
                     if (waveIn != null)
                     {
-                        ErrorLogger.LogMessage("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
+                        ErrorLogger.LogWarning("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
                         DisposeWaveInCompletely();
                     }
                 }
