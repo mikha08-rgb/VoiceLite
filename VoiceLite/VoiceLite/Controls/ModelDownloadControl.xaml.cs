@@ -37,15 +37,30 @@ namespace VoiceLite.Controls
         private bool recoveryCompletionRaised;
 
         public ModelDownloadControl()
+            : this(ParakeetModelDirectory, TranslationModelResolverService.DefaultModelDirectory, sweepStaleArchives: true)
+        {
+        }
+
+        /// <summary>
+        /// TEST SEAM (WindowConstructionTests): this constructor repairs interrupted installs
+        /// (directory deletes/renames) under the model directories and sweeps stale tarballs
+        /// from %TEMP%. The construct-every-window tests pass isolated directories so they
+        /// never touch a developer's real %LOCALAPPDATA%\VoiceLite\models or a download a
+        /// running VoiceLite has in flight. Production code must only use the parameterless ctor.
+        /// </summary>
+        internal ModelDownloadControl(
+            string parakeetModelDirectory,
+            string translationModelDirectory,
+            bool sweepStaleArchives)
         {
             InitializeComponent();
 
             var parakeetManifest = DownloadEndpoints.GetManifestForFileName(
                 ModelResolverService.ParakeetModelId,
-                ParakeetModelDirectory);
+                parakeetModelDirectory);
             var translationManifest = DownloadEndpoints.GetManifestForFileName(
                 TranslationModelResolverService.ModelId,
-                TranslationModelResolverService.DefaultModelDirectory);
+                translationModelDirectory);
             manifests = new Dictionary<string, ModelManifest>(StringComparer.OrdinalIgnoreCase)
             {
                 [parakeetManifest.ModelId] = parakeetManifest,
@@ -70,7 +85,8 @@ namespace VoiceLite.Controls
 
             // Tarballs are not part of swap recovery. Sweep them in the background;
             // locked files belong to an active download and are left untouched.
-            _ = Task.Run(() => ModelInstaller.SweepStaleArchiveDownloads(manifests.Values));
+            if (sweepStaleArchives)
+                _ = Task.Run(() => ModelInstaller.SweepStaleArchiveDownloads(manifests.Values));
         }
 
         /// <summary>

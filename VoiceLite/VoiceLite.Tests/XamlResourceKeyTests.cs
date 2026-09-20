@@ -17,7 +17,11 @@ namespace VoiceLite.Tests
     public class XamlResourceKeyTests
     {
         private static readonly Regex KeyDefinition = new(@"x:Key=""([^""]+)""", RegexOptions.Compiled);
-        private static readonly Regex KeyReference = new(@"\{(?:StaticResource|DynamicResource)\s+([A-Za-z0-9_]+)\}", RegexOptions.Compiled);
+        // {StaticResource Key}, {StaticResource ResourceKey=Key} and <StaticResource ResourceKey="Key"/>.
+        private static readonly Regex KeyReference = new(
+            @"\{(?:StaticResource|DynamicResource)\s+(?:ResourceKey\s*=\s*)?([A-Za-z0-9_]+)\s*\}"
+            + @"|<(?:StaticResource|DynamicResource)\s+ResourceKey=""([A-Za-z0-9_]+)""",
+            RegexOptions.Compiled);
         private static readonly Regex MergedDictionary = new(@"Source=""([^""]+\.xaml)""", RegexOptions.Compiled);
 
         private static string AppSourceDir([CallerFilePath] string thisFile = "") =>
@@ -36,6 +40,20 @@ namespace VoiceLite.Tests
                 .ToList();
             Assert.NotEmpty(xamlFiles);
 
+            // The scan is recursive, so every XAML file is covered - pin that, so a change to
+            // the enumeration (or a moved file) cannot silently drop a window from the scan.
+            var scanned = xamlFiles
+                .Select(f => Path.GetRelativePath(appDir, f).Replace(Path.DirectorySeparatorChar, '/'))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var expected in new[]
+                     {
+                         "App.xaml", "MainWindow.xaml", "SettingsWindow.xaml", "UpdateWindow.xaml",
+                         "ShortcutEditDialog.xaml", "Controls/ModelDownloadControl.xaml",
+                     })
+            {
+                Assert.True(scanned.Contains(expected), $"resource-key scan did not see {expected}");
+            }
+
             var appKeys = KeysVisibleFrom(Path.Combine(appDir, "App.xaml"), appDir);
             var unresolved = new List<string>();
 
@@ -46,7 +64,7 @@ namespace VoiceLite.Tests
 
                 foreach (Match reference in KeyReference.Matches(File.ReadAllText(file)))
                 {
-                    var key = reference.Groups[1].Value;
+                    var key = reference.Groups[1].Success ? reference.Groups[1].Value : reference.Groups[2].Value;
                     if (!visible.Contains(key))
                         unresolved.Add($"{Path.GetFileName(file)}: '{key}'");
                 }
