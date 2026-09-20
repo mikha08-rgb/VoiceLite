@@ -97,6 +97,19 @@ namespace VoiceLite.Services
         }
 
         /// <summary>
+        /// The installer is downloaded and verified but the install was deferred (Settings open /
+        /// dictating) while the window is hidden. Clicking opens the same in-app updater.
+        /// </summary>
+        public void ShowUpdateReady(string version)
+        {
+            updateBalloonPending = true;
+            trayIcon?.ShowBalloonTip(
+                "VoiceLite update ready",
+                $"Version {version} is downloaded. Click to install.",
+                BalloonIcon.Info);
+        }
+
+        /// <summary>
         /// Balloon-click handler body (internal so it is testable without a tray icon).
         /// One-shot: only a click on the update balloon itself raises the event.
         /// </summary>

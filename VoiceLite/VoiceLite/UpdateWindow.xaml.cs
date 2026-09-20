@@ -53,6 +53,14 @@ namespace VoiceLite
         /// </summary>
         public event Action? AttemptFailed;
 
+        /// <summary>
+        /// The installer is downloaded and verified, but the install was not started because
+        /// Settings is open or a dictation is running; the dialog now offers "Install now".
+        /// Neither InstallStarted nor AttemptFailed fires on that path, so without this
+        /// MainWindow's banner stayed on "Downloading update... 100%".
+        /// </summary>
+        public event Action? InstallDeferred;
+
         /// <param name="isDictationBusy">
         /// Returns true while a recording or transcription is in progress; the install is
         /// never started in that state (the installer kills VoiceLite.exe).
@@ -161,6 +169,10 @@ namespace VoiceLite
                 // A report queued before Later/X would flip MainWindow's banner back to
                 // "Downloading update... N%" after the Closed handler already reset it.
                 if (closed) return;
+                // Progress<T> posts its callbacks: the final 100% report can arrive after the
+                // download's await has already continued (always, when a verified file is reused)
+                // and would put the banner back on "Downloading..." over "ready"/"Installing".
+                if (downloadedPath != null) return;
                 DownloadProgress.IsIndeterminate = false;
                 DownloadProgress.Value = p * 100;
                 StatusText.Text = $"Downloading VoiceLite {info.Version}... {p * 100:0}%";
@@ -214,6 +226,7 @@ namespace VoiceLite
                 ShowError("The update is ready, but Settings is open. Close Settings, then click Install now.", offerDownloadPage: false);
                 InstallButton.Content = "Install now";
                 SetBusy(false);
+                InstallDeferred?.Invoke();
                 return;
             }
 
@@ -223,6 +236,7 @@ namespace VoiceLite
                 ShowError("VoiceLite is still recording or transcribing. Finish dictating, then click Install now.", offerDownloadPage: false);
                 InstallButton.Content = "Install now";
                 SetBusy(false);
+                InstallDeferred?.Invoke();
                 return;
             }
 

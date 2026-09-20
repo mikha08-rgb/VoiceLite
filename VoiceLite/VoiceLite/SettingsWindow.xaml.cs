@@ -47,6 +47,9 @@ namespace VoiceLite
         // Combo placeholder for a saved microphone that is not connected right now: the saved
         // index + the saved name with NotConnectedSuffix. Selecting it saves that saved choice.
         private AudioDevice? missingMic;
+        // The unconnected saved microphone a placeholder was shown for (see BuildMicrophoneChoices).
+        private int keptMissingMicIndex = -1;
+        private string? keptMissingMicName;
         private const string NotConnectedSuffix = " (not connected)";
         private ObservableCollection<CustomDictionaryEntry>? customDictionaryView;
 
@@ -390,7 +393,15 @@ namespace VoiceLite
         {
             var devices = BuildMicrophoneChoices(AudioRecorder.GetAvailableMicrophones(),
                 settings.SelectedMicrophoneIndex, settings.SelectedMicrophoneName,
+                keptMissingMicIndex, keptMissingMicName,
                 out var selected, out missingMic);
+            if (missingMic != null)
+            {
+                // Remembered for the life of the dialog: Refresh rebuilds from the draft, which
+                // may by then hold a device the user was only trying out.
+                keptMissingMicIndex = missingMic.Index;
+                keptMissingMicName = missingMic.Name[..^NotConnectedSuffix.Length];
+            }
             MicrophoneComboBox.ItemsSource = devices;
             MicrophoneComboBox.SelectedItem = selected;
         }
@@ -422,6 +433,20 @@ namespace VoiceLite
         internal static System.Collections.Generic.List<AudioDevice> BuildMicrophoneChoices(
             System.Collections.Generic.IReadOnlyList<AudioDevice> available, int savedIndex, string? savedName,
             out AudioDevice selected, out AudioDevice? missingPlaceholder)
+            => BuildMicrophoneChoices(available, savedIndex, savedName, -1, null, out selected, out missingPlaceholder);
+
+        /// <summary>
+        /// <paramref name="keepMissingIndex"/>/<paramref name="keepMissingName"/>: the unconnected
+        /// saved microphone this dialog session already showed a placeholder for. Refresh rebuilds
+        /// the list from the draft, which by then may point at a device the user was only trying
+        /// out; the placeholder stays on offer (unselected) so the real preference can be
+        /// re-selected. The draft can only name a connected device, the default, or that same
+        /// microphone, so one placeholder is always enough.
+        /// </summary>
+        internal static System.Collections.Generic.List<AudioDevice> BuildMicrophoneChoices(
+            System.Collections.Generic.IReadOnlyList<AudioDevice> available, int savedIndex, string? savedName,
+            int keepMissingIndex, string? keepMissingName,
+            out AudioDevice selected, out AudioDevice? missingPlaceholder)
         {
             var devices = available.ToList();
             devices.Insert(0, new AudioDevice { Index = -1, Name = "Default microphone" });
@@ -435,6 +460,13 @@ namespace VoiceLite
             }
 
             selected = saved ?? missingPlaceholder ?? devices[0];
+
+            if (missingPlaceholder == null && keepMissingIndex != -1 && !string.IsNullOrEmpty(keepMissingName)
+                && PickSavedMicrophone(devices, keepMissingIndex, keepMissingName) == null)
+            {
+                missingPlaceholder = new AudioDevice { Index = keepMissingIndex, Name = keepMissingName + NotConnectedSuffix };
+                devices.Insert(1, missingPlaceholder); // offered, not selected
+            }
             return devices;
         }
 
