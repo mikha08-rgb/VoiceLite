@@ -21,14 +21,17 @@ namespace VoiceLite.Services
     /// <summary>
     /// Thrown when the installer process ended before it signalled that it was ready to
     /// install (UAC declined, no admin rights, antivirus kill, ...). VoiceLite has NOT been
-    /// shut down when this is thrown.
+    /// shut down when this is thrown. Exit code 0 means the installer finished without the
+    /// handshake - it may have installed, so callers must not claim "nothing changed".
     /// </summary>
     public sealed class UpdateInstallFailedException : Exception
     {
         public int ExitCode { get; }
 
         public UpdateInstallFailedException(int exitCode)
-            : base($"The installer stopped before it could update VoiceLite (exit code {exitCode}).")
+            : base(exitCode == 0
+                ? "The installer finished (exit code 0) without asking VoiceLite to close."
+                : $"The installer stopped before it could update VoiceLite (exit code {exitCode}).")
         {
             ExitCode = exitCode;
         }

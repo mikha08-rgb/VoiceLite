@@ -15,10 +15,45 @@ namespace VoiceLite.Tests
     /// </summary>
     public class UpdateMainWindowWiringTests
     {
-        private static string? MainWindowSource([CallerFilePath] string thisFile = "")
+        private static string MainWindowSource([CallerFilePath] string thisFile = "")
         {
             var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite", "MainWindow.xaml.cs"));
-            return File.Exists(path) ? File.ReadAllText(path) : null; // binaries copied away from the source tree
+            return ReadSource(path);
+        }
+
+        // Missing source = red, never a silent pass (xunit 2.x has no runtime Skip). CI builds and
+        // tests in the same checkout, so the CallerFilePath location always exists there.
+        private static string ReadSource(string path)
+        {
+            File.Exists(path).Should().BeTrue(
+                $"the wiring tripwires read {path}; if the test binaries run away from the source tree they must fail, not pass unchecked");
+            return File.ReadAllText(path);
+        }
+
+        [Fact]
+        public void MissingSourceFile_FailsTheTripwire_InsteadOfPassingSilently()
+        {
+            // These tests are the only thing pinning the MainWindow wiring: a run that cannot
+            // find the source must go red, not green-while-checking-nothing.
+            var missing = Path.Combine(Path.GetTempPath(), $"no-such-dir-{System.Guid.NewGuid():N}", "MainWindow.xaml.cs");
+
+            var act = () => ReadSource(missing);
+
+            act.Should().Throw<Xunit.Sdk.XunitException>().WithMessage("*MainWindow.xaml.cs*");
+        }
+
+        [Fact]
+        public void Settings_CannotBeOpened_WhileAnUpdateInstallIsInProgress()
+        {
+            // UpdateWindow checks "Settings open?" once, before launching the installer. The wait
+            // for the installer can last minutes (UAC), MainWindow stays enabled meanwhile, and
+            // the shutdown that follows would drop a Settings draft / cut off a license activation.
+            var body = MethodBody(MainWindowSource(), "private void SettingsButton_Click(object sender, RoutedEventArgs e)");
+            var gate = body.IndexOf("if (updateInstallInProgress)", System.StringComparison.Ordinal);
+            var open = body.IndexOf("new SettingsWindow(", System.StringComparison.Ordinal);
+
+            gate.Should().BeGreaterThanOrEqualTo(0, "Settings (button and Ctrl+,) must not open between 'begin install' and shutdown");
+            open.Should().BeGreaterThan(gate, "the gate has to come before the dialog is created");
         }
 
         private static string MethodBody(string source, string signature)
@@ -34,10 +69,7 @@ namespace VoiceLite.Tests
         [InlineData("private void OnHotkeyReleased(object? sender, EventArgs e)", "dictation?.HotkeyReleased()")]
         public void HotkeyForwarding_IsGatedWhileAnUpdateInstallIsInProgress(string signature, string forward)
         {
-            var source = MainWindowSource();
-            if (source == null) return;
-
-            var body = MethodBody(source, signature);
+            var body = MethodBody(MainWindowSource(), signature);
             var gate = body.IndexOf("if (updateInstallInProgress) return;", System.StringComparison.Ordinal);
             var call = body.IndexOf(forward, System.StringComparison.Ordinal);
 
@@ -49,7 +81,6 @@ namespace VoiceLite.Tests
         public void UpdateWindow_IsGivenTheHotkeyGate_AndTheSettingsCheck()
         {
             var source = MainWindowSource();
-            if (source == null) return;
 
             source.Should().Contain("blockHotkeys: () => updateInstallInProgress = true");
             source.Should().Contain("unblockHotkeys: () => updateInstallInProgress = false",
@@ -62,7 +93,6 @@ namespace VoiceLite.Tests
         public void TrayBalloon_OpensTheInAppUpdater_AndGetsNoUrl()
         {
             var source = MainWindowSource();
-            if (source == null) return;
 
             source.Should().Contain("UpdateBalloonClicked += OnUpdateBalloonClicked");
             Regex.IsMatch(source, @"ShowUpdateAvailable\([^)]*Url").Should().BeFalse(

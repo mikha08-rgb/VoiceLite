@@ -1140,6 +1140,10 @@ namespace VoiceLite
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
+            // The app is about to close for an update: a Settings draft (or a license activation)
+            // opened now would be cut off by the shutdown. Show why instead.
+            if (updateInstallInProgress) { updateWindow?.Activate(); return; }
+
             var oldMode = settings.Mode;
             var oldHotkey = settings.RecordHotkey;
             var oldModifiers = settings.HotkeyModifiers;

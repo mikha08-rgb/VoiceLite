@@ -69,6 +69,24 @@ namespace VoiceLite.Tests.Services
         }
 
         [Fact]
+        public async Task InstallerExitsWithZeroBeforeReady_DoesNotShutDown_AndIsNotDescribedAsStopped()
+        {
+            // Exit 0 without the handshake: the installer may well have installed (e.g. one built
+            // without the /READYFILE [Code]). Still no shutdown from here, and the exit code is
+            // surfaced - but the message must not claim the installer "stopped before it could update".
+            var shutdowns = 0;
+
+            var error = await RunGuarded(UpdateInstaller.InstallAsync(
+                installer, _ => () => 0, () => shutdowns++, Poll, logPath));
+
+            shutdowns.Should().Be(0);
+            var failed = error.Should().BeOfType<UpdateInstallFailedException>().Which;
+            failed.ExitCode.Should().Be(0);
+            failed.Message.Should().NotContain("before it could update");
+            failed.Message.Should().Contain("exit code 0");
+        }
+
+        [Fact]
         public async Task ReadyFileAppears_WhileInstallerAlive_ShutsDownExactlyOnce()
         {
             var shutdowns = 0;

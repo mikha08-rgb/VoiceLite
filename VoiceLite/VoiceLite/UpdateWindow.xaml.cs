@@ -33,6 +33,7 @@ namespace VoiceLite
         private readonly Action unblockHotkeys;
         private readonly Func<UpdateInfo, IProgress<double>, CancellationToken, Task<string>> download;
         private readonly Func<string, Task> install;
+        private readonly TimeSpan installWaitHintDelay;
         private CancellationTokenSource? downloadCts;
         private string? downloadedPath;
         private bool installing;
@@ -90,7 +91,8 @@ namespace VoiceLite
             Action blockHotkeys,
             Action unblockHotkeys,
             Func<UpdateInfo, IProgress<double>, CancellationToken, Task<string>> download,
-            Func<string, Task> install)
+            Func<string, Task> install,
+            TimeSpan? installWaitHintDelay = null)
         {
             InitializeComponent();
             this.info = info;
@@ -100,6 +102,7 @@ namespace VoiceLite
             this.unblockHotkeys = unblockHotkeys;
             this.download = download;
             this.install = install;
+            this.installWaitHintDelay = installWaitHintDelay ?? TimeSpan.FromSeconds(30);
 
             var current = UpdateCheckService.GetCurrentVersion()?.ToString(3) ?? "?";
             HeadlineText.Text = $"VoiceLite {info.Version} is available";
@@ -238,7 +241,18 @@ namespace VoiceLite
 
                 // Returns once the installer signalled ready and shutdown is queued; throws when
                 // the installer could not be started or exited first (VoiceLite keeps running).
-                await install(downloadedPath);
+                var installTask = install(downloadedPath);
+
+                // No timeout on the wait itself (a UAC prompt can sit for minutes), but the user
+                // must be told why the window won't close and the hotkey does nothing.
+                if (await Task.WhenAny(installTask, Task.Delay(installWaitHintDelay)) != installTask)
+                {
+                    ErrorLogger.LogWarning("UpdateWindow: still waiting for the installer to signal ready; dictation stays paused");
+                    StatusText.Text =
+                        "Waiting for the installer - check for a Windows permission prompt. " +
+                        "Dictation is paused until the update finishes.";
+                }
+                await installTask;
             }
             catch (Exception ex)
             {
@@ -246,10 +260,18 @@ namespace VoiceLite
                 Result = UpdateWindowResult.None;
                 unblockHotkeys();
                 ErrorLogger.LogError("UpdateWindow: update install failed", ex);
-                ShowError(ex is UpdateInstallFailedException failed
-                    ? $"Update failed (exit code {failed.ExitCode}). VoiceLite was not changed and is still running. " +
-                      "Try again, or use the download page."
-                    : $"Couldn't start the installer: {ex.Message}");
+                ShowError(ex switch
+                {
+                    // Finished without the handshake: it may well have installed, so no
+                    // "failed" / "not changed" claim and no nudge to run it again.
+                    UpdateInstallFailedException { ExitCode: 0 } =>
+                        "The installer finished, but VoiceLite was not restarted. " +
+                        "Please exit and restart VoiceLite to finish the update.",
+                    UpdateInstallFailedException failed =>
+                        $"Update failed (exit code {failed.ExitCode}). VoiceLite was not changed and is still running. " +
+                        "Try again, or use the download page.",
+                    _ => $"Couldn't start the installer: {ex.Message}",
+                });
                 DownloadProgress.IsIndeterminate = false;
                 DownloadProgress.Value = 100;
                 StatusText.Text = "Download verified.";

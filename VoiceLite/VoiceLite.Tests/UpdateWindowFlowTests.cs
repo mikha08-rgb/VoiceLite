@@ -45,6 +45,7 @@ namespace VoiceLite.Tests
             public bool Closed;
             public readonly List<double> ForwardedProgress = new();
             public UpdateWindow Window = null!;
+            public static readonly TimeSpan WaitHintDelay = TimeSpan.FromMilliseconds(100);
 
             public int InstallCalls => Calls.FindAll(c => c == "install").Count;
 
@@ -57,7 +58,8 @@ namespace VoiceLite.Tests
                     blockHotkeys: () => Calls.Add("block"),
                     unblockHotkeys: () => Calls.Add("unblock"),
                     download: (_, progress, _) => { Progress = progress; Calls.Add("download"); return Download.Task; },
-                    install: _ => { Calls.Add("install"); return Install.Task; });
+                    install: _ => { Calls.Add("install"); return Install.Task; },
+                    installWaitHintDelay: WaitHintDelay);
                 Window.DownloadProgressChanged += p => ForwardedProgress.Add(p);
                 Window.AttemptFailed += () => AttemptFailed++;
                 Window.InstallStarted += () => InstallStarted++;
@@ -76,6 +78,7 @@ namespace VoiceLite.Tests
             public FrameworkElement ErrorPanel => (FrameworkElement)Window.FindName("ErrorPanel");
             public TextBlock ErrorText => (TextBlock)Window.FindName("ErrorText");
             public Button DownloadPageButton => (Button)Window.FindName("OpenDownloadPageButton");
+            public TextBlock StatusText => (TextBlock)Window.FindName("StatusText");
         }
 
         private static void Pump()
@@ -235,6 +238,64 @@ namespace VoiceLite.Tests
             h.Install = new TaskCompletionSource();
             h.Click(h.InstallButton);
             h.Calls.Should().Equal("download", "block", "install", "unblock", "block", "install");
+        });
+
+        [Fact]
+        public void InstallerExitsWithZero_WithoutHandshake_DoesNotClaimNothingChanged() => RunOnSta(h =>
+        {
+            h.Click(h.InstallButton);
+            h.Download.SetResult(@"C:\fake\VoiceLite-Setup-9.9.9.exe");
+            Pump();
+
+            h.Install.SetException(new UpdateInstallFailedException(0));
+            Pump();
+
+            // Exit code 0 means the installer finished; whether it replaced files is unknown here.
+            h.ErrorText.Text.Should().NotContain("was not changed");
+            h.ErrorText.Text.Should().NotContain("Update failed");
+            h.ErrorText.Text.Should().Contain("restart VoiceLite");
+            h.Calls.Should().Equal("download", "block", "install", "unblock");
+            h.AttemptFailed.Should().Be(1);
+            h.LaterButton.IsEnabled.Should().BeTrue();
+        });
+
+        [Fact]
+        public void InstallerSilentForAWhile_StatusExplainsTheWait_AndThatDictationIsPaused() => RunOnSta(h =>
+        {
+            h.Click(h.InstallButton);
+            h.Download.SetResult(@"C:\fake\VoiceLite-Setup-9.9.9.exe");
+            Pump();
+            h.StatusText.Text.Should().StartWith("Installing...");
+
+            // No timeout on the wait itself (UAC can sit for minutes) - only the text changes.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (h.StatusText.Text.StartsWith("Installing...") && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(20);
+                Pump();
+            }
+
+            h.StatusText.Text.Should().Contain("Dictation is paused");
+            h.StatusText.Text.Should().Contain("permission prompt");
+            h.StatusText.TextWrapping.Should().Be(TextWrapping.Wrap, "the hint is two sentences in a 440px window");
+            h.Window.Result.Should().Be(UpdateWindowResult.Installing, "the wait goes on");
+            h.Calls.Should().Equal("download", "block", "install");
+            h.LaterButton.IsEnabled.Should().BeFalse();
+        });
+
+        [Fact]
+        public void InstallerFailsQuickly_WaitHintNeverOverwritesTheFailureState() => RunOnSta(h =>
+        {
+            h.Click(h.InstallButton);
+            h.Download.SetResult(@"C:\fake\VoiceLite-Setup-9.9.9.exe");
+            Pump();
+            h.Install.SetException(new UpdateInstallFailedException(5));
+            Pump();
+
+            Thread.Sleep(Harness.WaitHintDelay + TimeSpan.FromMilliseconds(150));
+            Pump();
+
+            h.StatusText.Text.Should().Be("Download verified.");
         });
 
         [Fact]
