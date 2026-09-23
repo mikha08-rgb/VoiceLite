@@ -85,7 +85,10 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        # Node 22: `node --test` only expands glob patterns (package.json "test") from Node 21+;
+        # on Node 20 the run fails with "Could not find 'app/**/*.test.ts'". Node 20 is also
+        # deprecated on GitHub runners.
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: voicelite-web/package-lock.json
 
