@@ -4,6 +4,26 @@ All notable changes to VoiceLite are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.5.2] - 2026-09-22
+
+### Fixed
+- **A fresh install no longer closes itself after the first-launch model download** — it now goes straight to the main window.
+- **A failed in-app update no longer disappears silently** — the installer is waited for, a stalled download is cancelled instead of hanging forever, and the outcome is shown in the app and in a tray notification. The installer writes its log to `%LOCALAPPDATA%\VoiceLite\logs\update-setup.log`.
+- The update banner and the installer handshake are tolerant of Windows asking for permission mid-update, and a VoiceLite belonging to another logged-in user is no longer mistaken for a stale copy of yours.
+- Two microphones with the same name (for example twin USB headsets) no longer collide: the saved slot breaks the tie.
+- Settings: a microphone is only saved when you actually chose one, the old "Default Microphone" placeholder is cleared, Esc restores the previous hotkey, a hotkey that failed to register can be retried, and the level meter starts once.
+- Status messages: a stop that produced no audio is reported as a failed recording instead of silence, the "Ready" reset no longer fires twice, and the toggle-mode auto-stop text shows the real limit.
+- The hot-mic auto-stop still shows a tray notification when the recorder has already died.
+- Error messages and help text no longer point at Settings tabs and buttons that were removed in 2.5.0.
+- Several failure paths inside model install, microphone monitoring and text injection now log in Release builds instead of only in Debug builds, so support logs show what went wrong.
+
+### Added
+- **Recording indicator** — a small pill at the bottom-centre of the screen while you dictate. It never takes focus; turn it off in Settings.
+
+### Changed
+- CI: the web tests run on Node 22 (the previous Node 20 runner could not find the test files, which is why the "PR Tests" check showed as failed on every release since 2.4.1).
+- The installer script is compile-checked on every pull request instead of only when a release is cut.
+
 ## [2.5.1] - 2026-09-19
 
 ### Fixed
