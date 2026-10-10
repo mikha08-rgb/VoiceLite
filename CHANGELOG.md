@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 - CI: the web tests run on Node 22 (the previous Node 20 runner could not find the test files, which is why the "PR Tests" check showed as failed on every release since 2.4.1).
+- Website: Next.js 16.2.10 → 16.3.8, nanoid 5.1.16 and a deepmerge-ts override clear the security advisories that failed the CI `npm audit` gate (one Next.js advisory was rated critical).
 - The installer script is compile-checked on every pull request instead of only when a release is cut.
 
 ## [2.5.1] - 2026-09-19
