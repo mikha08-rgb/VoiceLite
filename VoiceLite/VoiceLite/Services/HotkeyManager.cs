@@ -59,6 +59,14 @@ namespace VoiceLite.Services
         public Key CurrentKey => currentKey;
         public ModifierKeys CurrentModifiers => currentModifiers;
 
+        /// <summary>
+        /// True once a RegisterHotkey call has succeeded (RegisterHotKey accepted the
+        /// combination, or polling started for a standalone modifier/CapsLock) and it has not
+        /// been unregistered since. False after a failed registration - the hotkey is dead and
+        /// Settings/MainWindow must not treat the saved combination as owned by this process.
+        /// </summary>
+        public bool IsRegistered => isRegistered;
+
         public void RegisterHotkey(IntPtr handle)
         {
             RegisterHotkey(handle, currentKey, currentModifiers);

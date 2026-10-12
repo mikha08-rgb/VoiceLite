@@ -15,6 +15,9 @@ namespace VoiceLite.Tests.Resources
     /// Test suite for detecting and preventing resource leaks
     /// These tests are written FIRST before fixing the issues (TDD approach)
     /// </summary>
+    // Constructs parameterless LicenseService instances (real license.dat): never while
+    // LicenseServiceTests has that file swapped out.
+    [Collection(RealLicenseFileCollection.Name)]
     public class ResourceLeakTests : IDisposable
     {
         private readonly List<IDisposable> _disposables = new();

@@ -58,6 +58,9 @@ namespace VoiceLite.Services
         public event EventHandler<string>? AudioFileReady;
         public event EventHandler<byte[]>? AudioDataReady; // New event for memory buffer mode
         public event EventHandler<Exception>? RecordingError; // Required by IAudioRecorder
+        // Peak (0..1) of each captured buffer, for the recording indicator. Raised on the capture
+        // thread AFTER lockObject is released; handlers must return immediately.
+        public event EventHandler<float>? LevelAvailable;
 
         public AudioRecorder()
         {
@@ -263,12 +266,17 @@ namespace VoiceLite.Services
         /// name is gone, fall back to the default device rather than whatever now happens to
         /// sit at the stale index - that silently recorded a dead mic and produced empty
         /// transcriptions for days.
+        /// WaveIn names are truncated to 31 chars, so two mics can share a name: the saved
+        /// index then breaks the tie, but only among devices that already match the NAME.
+        /// Known limitation: if Windows renumbers the twins themselves, the tie-break can land
+        /// on the other twin (WaveIn has no stable device ID; that needs MMDevice endpoints).
         /// </summary>
         public static int ResolveDeviceIndex(IReadOnlyList<AudioDevice> devices, int savedIndex, string? savedName)
         {
             if (!string.IsNullOrEmpty(savedName))
             {
-                var byName = devices.FirstOrDefault(d => d.Name == savedName);
+                var byName = devices.FirstOrDefault(d => d.Name == savedName && d.Index == savedIndex)
+                             ?? devices.FirstOrDefault(d => d.Name == savedName);
                 return byName?.Index ?? 0;
             }
 
@@ -409,6 +417,7 @@ namespace VoiceLite.Services
             // If another thread starts a new session while we wait for the lock,
             // we'll detect the mismatch and reject this stale callback
             int callbackSessionId = Volatile.Read(ref currentSessionId);
+            bool bufferWritten = false; // level meter only - read after the lock is released
 
             // BUG FIX (RACE-001): Hold lock for entire method to prevent TOCTOU vulnerabilities
             // Previous code had pre-lock check that created race condition window
@@ -455,6 +464,7 @@ namespace VoiceLite.Services
                     // Write raw audio data directly (no volume scaling - AGC will handle normalization)
                     // This provides cleaner input for audio preprocessing pipeline
                     localWaveFile.Write(e.Buffer, 0, e.BytesRecorded);
+                    bufferWritten = true;
                 }
                 catch (ObjectDisposedException)
                 {
@@ -476,6 +486,30 @@ namespace VoiceLite.Services
                         ErrorLogger.LogMessage("OnDataAvailable: Recording stopped due to write error");
                     });
                 }
+            }
+
+            // Level meter: outside lockObject on purpose (a subscriber must never run under the
+            // capture lock). e.Buffer is still ours - NAudio re-queues it only after this returns.
+            if (bufferWritten)
+                RaiseLevelAvailable(e.Buffer, e.BytesRecorded);
+        }
+
+        /// <summary>Peak |sample| (0..1) of a 16-bit PCM capture buffer. Pure; never throws.</summary>
+        internal static float ComputeBufferPeak(byte[] buffer, int bytesRecorded) =>
+            MicLevelMonitor.ComputePeak(buffer, bytesRecorded);
+
+        /// <summary>Raises LevelAvailable; whatever a subscriber does, nothing reaches the capture callback.</summary>
+        internal void RaiseLevelAvailable(byte[] buffer, int bytesRecorded)
+        {
+            try
+            {
+                var handler = LevelAvailable;
+                if (handler == null) return;
+                handler(this, ComputeBufferPeak(buffer, bytesRecorded));
+            }
+            catch
+            {
+                // Cosmetic feature: swallowed, not logged (this runs ~33 times a second).
             }
         }
 
@@ -510,7 +544,7 @@ namespace VoiceLite.Services
 
                     if (waveIn != null)
                     {
-                        ErrorLogger.LogMessage("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
+                        ErrorLogger.LogWarning("OnRecordingStopped: Defensive waveIn cleanup - this should not happen");
                         DisposeWaveInCompletely();
                     }
                 }

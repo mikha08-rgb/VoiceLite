@@ -14,18 +14,22 @@ namespace VoiceLite.Services
     {
         private readonly string _baseDir;
         private readonly ProFeatureService? _proFeatureService;
+        private readonly string _localAppDataDir;
 
         // Canonical model id used by Settings.TranscriptionModel after migration.
         public const string ParakeetModelId = "parakeet-tdt-0.6b-v3-int8";
         public const string ParakeetDirName = "parakeet-v3";
 
-        public ModelResolverService(string baseDirectory, ProFeatureService? proFeatureService = null)
+        /// <param name="localAppDataDirectory">Tests only: stands in for %LOCALAPPDATA% (same seam as TranslationModelResolverService).</param>
+        public ModelResolverService(string baseDirectory, ProFeatureService? proFeatureService = null, string? localAppDataDirectory = null)
         {
             if (string.IsNullOrWhiteSpace(baseDirectory))
                 throw new ArgumentNullException(nameof(baseDirectory));
 
             _baseDir = baseDirectory;
             _proFeatureService = proFeatureService;
+            _localAppDataDir = localAppDataDirectory ??
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         }
 
         /// <summary>
@@ -45,7 +49,9 @@ namespace VoiceLite.Services
                 "Parakeet model not found.\n\n" +
                 "Expected one of:\n  " +
                 string.Join("\n  ", CandidateDirectories()) + "\n\n" +
-                "Please download the model from Settings → AI Models, or reinstall VoiceLite.");
+                // Settings cannot re-download Parakeet; only the startup gate in App.xaml.cs can, and
+                // closing the window just hides it to the tray, so a real exit is needed first.
+                "Exit VoiceLite from the tray icon (right-click > Exit) and start it again to download the model, or reinstall VoiceLite.");
         }
 
         /// <summary>
@@ -59,7 +65,7 @@ namespace VoiceLite.Services
             yield return Path.Combine(_baseDir, "models", ParakeetDirName);
             yield return Path.Combine(_baseDir, "whisper", ParakeetDirName);
             yield return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                _localAppDataDir,
                 "VoiceLite",
                 "models",
                 ParakeetDirName);

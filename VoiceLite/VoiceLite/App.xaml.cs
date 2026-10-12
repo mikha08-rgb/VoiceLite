@@ -54,13 +54,17 @@ namespace VoiceLite
             // in the tray (typical right after an upgrade) slips past the check above; the new
             // instance then fails to register the hotkey ("in use by another application")
             // while the old one keeps swallowing the keypresses. Catch it by process name.
+            //
+            // The listener must exist BEFORE that check: a fast second launch of this build
+            // already shows up in the process list, and without the event it would pop
+            // "already running" while we report it as an "older copy".
+            ListenForShowWindowSignal();
+
             if (!CloseOtherInstances())
             {
                 Shutdown(0);
                 return;
             }
-
-            ListenForShowWindowSignal();
 
             // Catch unhandled exceptions
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -85,8 +89,22 @@ namespace VoiceLite
             // ModelResolverService throws FileNotFoundException without this gate.
             if (!IsParakeetModelInstalled())
             {
-                if (!ShowFirstLaunchModelDownload())
+                if (!TryRunStartupGate(this, ShowFirstLaunchModelDownload, out var gateError))
                 {
+                    if (gateError != null)
+                    {
+                        // Not "continue": no window and no tray icon exist yet, and the gate left the
+                        // app in OnExplicitShutdown - nothing else would ever end this process.
+                        ErrorLogger.LogError("First-launch model download dialog failed", gateError);
+                        MessageBox.Show(
+                            "VoiceLite could not show the speech model download.\n\n" +
+                            gateError.Message + "\n\n" +
+                            "Please start VoiceLite again. If this keeps happening, reinstall VoiceLite " +
+                            "(details are in voicelite.log).",
+                            "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Shutdown(1);
+                        return;
+                    }
                     MessageBox.Show(
                         "VoiceLite needs the Parakeet v3 speech model to run.\n\n" +
                         "Restart VoiceLite when you're ready to download (~640MB).",
@@ -100,10 +118,6 @@ namespace VoiceLite
             mainWindow.Show();
         }
 
-        /// <summary>
-        /// Returns false if startup must abort because another VoiceLite process is running
-        /// and the user declined to close it (or it couldn't be closed).
-        /// </summary>
         private static bool SignalRunningInstanceToShow()
         {
             try
@@ -133,18 +147,7 @@ namespace VoiceLite
                         if (signal == null) return;
                         try { signal.WaitOne(); }
                         catch (ObjectDisposedException) { return; }
-                        Dispatcher.BeginInvoke(() =>
-                        {
-                            var window = MainWindow;
-                            if (window == null) return;
-                            window.Show();
-                            window.WindowState = WindowState.Normal;
-                            window.Activate();
-                            // Windows refuses to steal focus for a background process; the
-                            // Topmost flip is the standard way to actually surface the window.
-                            window.Topmost = true;
-                            window.Topmost = false;
-                        });
+                        Dispatcher.BeginInvoke(() => SurfaceWindow(MainWindow));
                     }
                 })
                 { IsBackground = true, Name = "VoiceLite.ShowWindowListener" };
@@ -156,42 +159,184 @@ namespace VoiceLite
             }
         }
 
+        internal static void SurfaceWindow(Window? window)
+        {
+            if (window == null) return;
+            try
+            {
+                window.Show();
+                window.WindowState = WindowState.Normal;
+                window.Activate();
+                // Windows refuses to steal focus for a background process; the
+                // Topmost flip is the standard way to actually surface the window.
+                window.Topmost = true;
+                window.Topmost = false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Show() on an already-closed window throws; a second launch must never
+                // surface that as an error dialog in the running instance.
+                ErrorLogger.LogWarning($"Show-window signal ignored: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Runs a startup gate whose dialog is the app's only Window. Under the default
+        /// OnLastWindowClose, closing that dialog starts application shutdown and the
+        /// MainWindow created afterwards never shows (Show() is a no-op while shutting down).
+        /// The mode is restored on the success path only, before MainWindow exists; on
+        /// failure the caller shuts down explicitly.
+        /// </summary>
+        internal static bool RunGateWithoutLastWindowShutdown(Application app, Func<bool> gate)
+        {
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (!gate())
+                return false;
+            app.ShutdownMode = ShutdownMode.OnLastWindowClose;
+            return true;
+        }
+
+        /// <summary>
+        /// RunGateWithoutLastWindowShutdown, but a gate that THROWS is handed to the caller instead
+        /// of escaping OnStartup. There it would reach OnDispatcherUnhandledException ("The
+        /// application will continue", Handled = true) and leave a process with no window, no tray
+        /// icon and OnExplicitShutdown - a zombie that holds the single-instance mutex, so every
+        /// later launch signals it and exits silently. The caller must Shutdown(): restoring the
+        /// mode would not help, OnLastWindowClose never fires with zero windows either.
+        /// Does not log (tests run it in a child process; the log path is the real user log).
+        /// </summary>
+        internal static bool TryRunStartupGate(Application app, Func<bool> gate, out Exception? gateError)
+        {
+            gateError = null;
+            try
+            {
+                return RunGateWithoutLastWindowShutdown(app, gate);
+            }
+            catch (Exception ex)
+            {
+                gateError = ex;
+                return false;
+            }
+        }
+
+        internal readonly record struct InstanceInfo(int Pid, int SessionId, DateTime? StartTime, bool HasExited);
+
+        /// <summary>
+        /// True if <paramref name="other"/> is a VoiceLite process that blocks this one: same
+        /// Windows session (the mutex, the show-window event and RegisterHotKey are all
+        /// per-session, so another user's copy is none of our business), still running, and
+        /// not started after us (a later launch of this build hits our mutex and exits on
+        /// its own). An unreadable start time (elevated copy) counts as stale.
+        /// </summary>
+        internal static bool IsStaleInstanceCandidate(InstanceInfo other, int selfPid, int selfSessionId, DateTime selfStart)
+        {
+            if (other.Pid == selfPid || other.SessionId != selfSessionId || other.HasExited)
+                return false;
+            return other.StartTime == null || other.StartTime <= selfStart;
+        }
+
+        /// <summary>
+        /// Returns true once the process is gone. A process that exited on its own (before
+        /// or during the kill) is a success, not a "couldn't close" failure.
+        /// </summary>
+        internal static bool TryCloseInstance(Func<bool> hasExited, Action kill, Func<int, bool> waitForExit)
+        {
+            try { if (hasExited()) return true; }
+            catch (Exception) { /* no handle (elevated copy) - let Kill decide */ }
+
+            try
+            {
+                kill();
+            }
+            catch (InvalidOperationException)
+            {
+                return true; // exited before we got to it
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Access denied - also what TerminateProcess reports for a process that is
+                // already on its way out.
+                try { return hasExited(); }
+                catch (Exception) { return false; }
+            }
+            return waitForExit(5000);
+        }
+
+        private static InstanceInfo DescribeInstance(Process process)
+        {
+            DateTime? startTime = null;
+            bool hasExited = false;
+            try { startTime = process.StartTime; } catch (Exception) { /* elevated or already gone */ }
+            try { hasExited = process.HasExited; } catch (Exception) { /* no handle - assume running */ }
+            return new InstanceInfo(process.Id, process.SessionId, startTime, hasExited);
+        }
+
+        /// <summary>
+        /// Returns false if startup must abort because another VoiceLite process is running
+        /// and the user declined to close it (or it couldn't be closed).
+        /// </summary>
         private static bool CloseOtherInstances()
         {
             using var self = Process.GetCurrentProcess();
-            var others = Process.GetProcessesByName(self.ProcessName).Where(p => p.Id != self.Id).ToList();
-            if (others.Count == 0)
-                return true;
-
-            var result = MessageBox.Show(
-                "An older copy of VoiceLite is still running in the background (probably in the system tray).\n\n" +
-                "Close it and continue starting this one?",
-                "VoiceLite", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (result != MessageBoxResult.Yes)
-                return false;
-
-            foreach (var other in others)
+            var all = Process.GetProcessesByName(self.ProcessName);
+            try
             {
-                try
+                int selfPid = self.Id;
+                int selfSessionId = self.SessionId;
+                DateTime selfStart = self.StartTime;
+                bool IsStale(Process p) => IsStaleInstanceCandidate(DescribeInstance(p), selfPid, selfSessionId, selfStart);
+
+                var others = all.Where(IsStale).ToList();
+
+                // A second launch of this build that lost the mutex race exits by itself within
+                // moments. One shared grace period, so it isn't reported as an "older copy".
+                var grace = Stopwatch.StartNew();
+                while (others.Count > 0 && grace.ElapsedMilliseconds < 2000)
                 {
-                    other.Kill();
-                    other.WaitForExit(5000);
+                    Thread.Sleep(100);
+                    others = others.Where(IsStale).ToList();
+                }
+                if (others.Count == 0)
+                    return true;
+
+                var result = MessageBox.Show(
+                    "An older copy of VoiceLite is still running in the background (probably in the system tray).\n\n" +
+                    "Close it and continue starting this one?",
+                    "VoiceLite", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result != MessageBoxResult.Yes)
+                    return false;
+
+                foreach (var other in others)
+                {
+                    bool closed;
+                    try
+                    {
+                        closed = TryCloseInstance(() => other.HasExited, () => other.Kill(), ms => other.WaitForExit(ms));
+                        if (!closed)
+                            ErrorLogger.LogWarning($"Stale VoiceLite instance (pid {other.Id}) could not be closed");
+                    }
+                    catch (Exception ex)
+                    {
+                        ErrorLogger.LogError($"Failed to close stale VoiceLite instance (pid {other.Id})", ex);
+                        closed = false;
+                    }
+
+                    if (!closed)
+                    {
+                        MessageBox.Show(
+                            "Couldn't close the other VoiceLite. Exit it from the system tray and start VoiceLite again.",
+                            "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return false;
+                    }
                     ErrorLogger.LogWarning($"Closed stale VoiceLite instance (pid {other.Id})");
                 }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogError($"Failed to close stale VoiceLite instance (pid {other.Id})", ex);
-                    MessageBox.Show(
-                        "Couldn't close the other VoiceLite. Exit it from the system tray and start VoiceLite again.",
-                        "VoiceLite", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return false;
-                }
-                finally
-                {
-                    other.Dispose();
-                }
+                return true;
             }
-            return true;
+            finally
+            {
+                foreach (var process in all)
+                    process.Dispose();
+            }
         }
 
         private static bool IsSherpaNativeLoadable()

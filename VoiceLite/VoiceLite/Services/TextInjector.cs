@@ -91,7 +91,7 @@ namespace VoiceLite.Services
                         }
                         catch (Exception ex)
                         {
-                            ErrorLogger.LogDebug($"Clipboard auto-clear failed: {ex.Message}");
+                            ErrorLogger.LogWarning($"Clipboard auto-clear failed: {ex.Message}");
                         }
                     });
                     thread.SetApartmentState(ApartmentState.STA);
@@ -100,7 +100,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogDebug($"Scheduled clipboard auto-clear failed: {ex.Message}");
+                    ErrorLogger.LogWarning($"Scheduled clipboard auto-clear failed: {ex.Message}");
                 }
             });
         }
@@ -350,7 +350,7 @@ namespace VoiceLite.Services
                         }
                         catch (Exception ex)
                         {
-                            ErrorLogger.LogDebug($"Clipboard auto-clear failed: {ex.Message}");
+                            ErrorLogger.LogWarning($"Clipboard auto-clear failed: {ex.Message}");
                         }
                     });
                     thread.SetApartmentState(ApartmentState.STA);
@@ -359,7 +359,7 @@ namespace VoiceLite.Services
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogDebug($"Scheduled clipboard auto-clear failed: {ex.Message}");
+                    ErrorLogger.LogWarning($"Scheduled clipboard auto-clear failed: {ex.Message}");
                 }
             });
         }

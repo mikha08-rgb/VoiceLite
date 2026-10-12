@@ -17,24 +17,42 @@ namespace VoiceLite.Tests
     public class XamlResourceKeyTests
     {
         private static readonly Regex KeyDefinition = new(@"x:Key=""([^""]+)""", RegexOptions.Compiled);
-        private static readonly Regex KeyReference = new(@"\{(?:StaticResource|DynamicResource)\s+([A-Za-z0-9_]+)\}", RegexOptions.Compiled);
+        // {StaticResource Key}, {StaticResource ResourceKey=Key} and <StaticResource ResourceKey="Key"/>.
+        private static readonly Regex KeyReference = new(
+            @"\{(?:StaticResource|DynamicResource)\s+(?:ResourceKey\s*=\s*)?([A-Za-z0-9_]+)\s*\}"
+            + @"|<(?:StaticResource|DynamicResource)\s+ResourceKey=""([A-Za-z0-9_]+)""",
+            RegexOptions.Compiled);
         private static readonly Regex MergedDictionary = new(@"Source=""([^""]+\.xaml)""", RegexOptions.Compiled);
 
-        private static string AppSourceDir([CallerFilePath] string thisFile = "") =>
-            Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "VoiceLite"));
+        // A missing source tree FAILS the test (SourceTripwirePolicyTests): returning early would
+        // report "every resource key resolves" without having opened a single XAML file.
+        private static string AppSourceDir() => RepoSourceFile.AppDir;
 
         [Fact]
         public void EveryResourceReference_ResolvesToADefinedKey()
         {
             var appDir = AppSourceDir();
-            if (!Directory.Exists(appDir))
-                return; // test binaries copied away from the source tree
 
             var xamlFiles = Directory.GetFiles(appDir, "*.xaml", SearchOption.AllDirectories)
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
                          && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
                 .ToList();
             Assert.NotEmpty(xamlFiles);
+
+            // The scan is recursive, so every XAML file is covered - pin that, so a change to
+            // the enumeration (or a moved file) cannot silently drop a window from the scan.
+            var scanned = xamlFiles
+                .Select(f => Path.GetRelativePath(appDir, f).Replace(Path.DirectorySeparatorChar, '/'))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var expected in new[]
+                     {
+                         "App.xaml", "MainWindow.xaml", "SettingsWindow.xaml", "UpdateWindow.xaml",
+                         "ShortcutEditDialog.xaml", "Controls/ModelDownloadControl.xaml",
+                         "RecordingIndicatorWindow.xaml",
+                     })
+            {
+                Assert.True(scanned.Contains(expected), $"resource-key scan did not see {expected}");
+            }
 
             var appKeys = KeysVisibleFrom(Path.Combine(appDir, "App.xaml"), appDir);
             var unresolved = new List<string>();
@@ -46,7 +64,7 @@ namespace VoiceLite.Tests
 
                 foreach (Match reference in KeyReference.Matches(File.ReadAllText(file)))
                 {
-                    var key = reference.Groups[1].Value;
+                    var key = reference.Groups[1].Success ? reference.Groups[1].Value : reference.Groups[2].Value;
                     if (!visible.Contains(key))
                         unresolved.Add($"{Path.GetFileName(file)}: '{key}'");
                 }

@@ -76,7 +76,8 @@ FIRST TIME SETUP:
 
 TROUBLESHOOTING:
 - If transcription fails to start, ensure VC++ Runtime is installed.
-- If the model download fails, retry from Settings > AI Models.
+- If the model download fails, exit VoiceLite from the tray icon and start it
+  again to retry.
 
 FEATURES:
 - Hold hotkey (default Shift+Z) to record

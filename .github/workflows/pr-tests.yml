@@ -43,6 +43,35 @@ jobs:
         name: test-results
         path: VoiceLite/VoiceLite.Tests/TestResults/test-results.trx
 
+  # Pascal Script in VoiceLiteSetup.iss is otherwise only compiled at tag time
+  # (release.yml), so a typo there would first surface while cutting a release.
+  # Compile-only gate: placeholder payload files, output discarded, never run.
+  compile-installer-script:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Inno Setup
+      shell: pwsh
+      run: choco install innosetup --version=6.7.1 --yes --no-progress  # keep in sync with release.yml
+
+    - name: Compile VoiceLiteSetup.iss against placeholder files
+      shell: pwsh
+      run: |
+        $pub = "VoiceLite/VoiceLite/bin/Release/net8.0-windows/win-x64/publish"
+        New-Item -ItemType Directory -Force -Path "$pub/whisper" | Out-Null
+        $placeholders = "$pub/VoiceLite.exe", "$pub/placeholder.dll", "$pub/placeholder.json",
+                        "$pub/whisper/silero_vad_v5.onnx", "VoiceLite/Installer/vc_redist.x64.exe"
+        foreach ($f in $placeholders) { Set-Content -Path $f -Value "placeholder" }
+
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/O$env:RUNNER_TEMP\iss-compile-check" "VoiceLite\Installer\VoiceLiteSetup.iss"
+        if ($LASTEXITCODE -ne 0) {
+          echo "ERROR: VoiceLiteSetup.iss does not compile"
+          exit 1
+        }
+
   test-web:
     runs-on: ubuntu-latest
     defaults:
@@ -56,7 +85,10 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        # Node 22: `node --test` only expands glob patterns (package.json "test") from Node 21+;
+        # on Node 20 the run fails with "Could not find 'app/**/*.test.ts'". Node 20 is also
+        # deprecated on GitHub runners.
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: voicelite-web/package-lock.json
 

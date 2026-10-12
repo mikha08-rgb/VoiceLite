@@ -70,6 +70,8 @@ namespace VoiceLite.Tests.Services
         }
     }
 
+    // Serialized with every other class that reads the real license.dat (see the collection).
+    [Collection(RealLicenseFileCollection.Name)]
     public class LicenseServiceTests : IClassFixture<LicenseFileGuard>, IDisposable
     {
         private LicenseService _licenseService;
